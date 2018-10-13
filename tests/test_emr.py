@@ -4963,6 +4963,13 @@ class UsesSparkTestCase(MockBoto3TestCase):
 
 class SparkPyFilesTestCase(MockBoto3TestCase):
 
+    def setUp(self):
+        super(SparkPyFilesTestCase, self).setUp()
+
+        # so we don't need to start a (mock) cluster
+        self.start(patch('mrjob.emr.EMRJobRunner.get_hadoop_version',
+                         return_value='2'))
+
     def test_eggs(self):
         egg1_path = self.makefile('dragon.egg')
         egg2_path = self.makefile('horton.egg')
@@ -4975,15 +4982,20 @@ class SparkPyFilesTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner._add_job_files_for_upload()
 
+            # we don't use py_files to bootstrap mrjob
+            self.assertEqual(
+                runner._py_files(),
+                [egg1_path, egg2_path]
+            )
+
             # in the cloud, we need to upload py_files to cloud storage
             self.assertIn(egg1_path, runner._upload_mgr.path_to_uri())
             self.assertIn(egg2_path, runner._upload_mgr.path_to_uri())
 
-            self.assertEqual(
-                runner._spark_py_files(),
-                [runner._upload_mgr.uri(egg1_path),
-                 runner._upload_mgr.uri(egg2_path)]
-            )
+            egg_uris = '%s,%s' % (runner._upload_mgr.uri(egg1_path),
+                                  runner._upload_mgr.uri(egg2_path))
+
+            self.assertIn(egg_uris, runner._spark_submit_args(0))
 
 
 class TestClusterSparkSupportWarning(MockBoto3TestCase):
@@ -5236,15 +5248,28 @@ class ImageVersionGteTestCase(MockBoto3TestCase):
         self.assertFalse(runner._image_version_gte('5'))
 
 
-class SparkSubmitArgPrefixTestCase(MockBoto3TestCase):
+class SparkMasterAndDeployModeTestCase(MockBoto3TestCase):
 
     def test_default(self):
-        # these are hard-coded and always the same
+        mr_job = MRNullSpark(['-r', 'emr'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            # patch this so we don't have to start a (mock) cluster
+            self.start(patch('mrjob.emr.EMRJobRunner.get_hadoop_version',
+                             return_value='2'))
+
+            self.assertEqual(
+                runner._spark_submit_args(0)[:4],
+                ['--master', 'yarn', '--deploy-mode', 'cluster']
+            )
+
+    def test_spark_master_and_deploy_mode_are_hard_coded(self):
         runner = EMRJobRunner()
 
-        self.assertEqual(
-            runner._spark_submit_arg_prefix(),
-            ['--master', 'yarn', '--deploy-mode', 'cluster'])
+        # these can't be configured
+        self.assertNotIn('spark_master', runner._opts)
+        self.assertNotIn('spark_deploy_mode', runner._opts)
 
 
 class SSHWorkerHostsTestCase(MockBoto3TestCase):

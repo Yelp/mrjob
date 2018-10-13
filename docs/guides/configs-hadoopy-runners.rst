@@ -163,6 +163,14 @@ Options available to hadoop and emr runners
 
     Extra arguments to pass to :command:`spark-submit`.
 
+    .. warning::
+
+       Don't use this to set ``--master``  or ``--deploy-mode``.
+       On the Hadoop runner, you can change these with
+       :mrjob-opt:`spark_master` and :mrjob-opt:`spark_deploy_mode`.
+       Other runners don't allow you to set these because they can only
+       handle the defaults.
+
     .. versionadded:: 0.5.7
 
     .. versionchanged:: 0.6.6
@@ -240,6 +248,18 @@ Options available to hadoop runner only
     .. versionchanged:: 0.5.0
 
        This option used to be named ``hdfs_scratch_dir``.
+
+.. mrjob-opt::
+    :config: spark_deploy_mode
+    :switch: --spark-deploy-mode
+    :type: :ref:`string <data-type-string>`
+    :set: hadoop
+    :default: ``'client'``
+
+    Deploy mode (``client`` or ``cluster``) to pass to the ``--deploy-mode``
+    argument of :command:`spark-submit`.
+
+    .. versionadded:: 0.6.6
 
 .. mrjob-opt::
     :config: spark_master

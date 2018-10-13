@@ -32,7 +32,6 @@ import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import translate_jobconf_for_all_versions
-from mrjob.conf import combine_dicts
 from mrjob.conf import combine_jobconfs
 from mrjob.conf import combine_opts
 from mrjob.conf import load_opts_from_mrjob_confs
@@ -1150,8 +1149,21 @@ class MRJobRunner(object):
         for name, path in named_paths:
             if not name:
                 name = self._working_dir_mgr.name(type, path)
-            uri = self._upload_mgr.uri(path)
+
+            if self._upload_mgr:
+                uri = self._upload_mgr.uri(path)
+            else:
+                uri = path
+
             yield '%s#%s' % (uri, name)
+
+    def _upload_uris(self, paths):
+        """If there's an upload manager, convert list of path to list of upload
+        URIs. Otherwise return *paths* as-is"""
+        if self._upload_mgr:
+            return [self._upload_mgr.uri(path) for path in paths]
+        else:
+            return list(paths)
 
     def _write_script(self, lines, path, description):
         """Write text of a setup script, input manifest, etc. to the given

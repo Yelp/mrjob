@@ -825,14 +825,14 @@ class SetupWrapperScriptContentTestCase(SandboxedTestCase):
             self.assertEqual(out[:2], ['set -e', 'set -v'])
 
 
-class SparkPyFilesTestCase(SandboxedTestCase):
+class PyFilesTestCase(SandboxedTestCase):
 
     def test_default(self):
         job = MRNullSpark(['-r', 'local'])
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._spark_py_files(),
+            self.assertEqual(runner._py_files(),
                              [runner._create_mrjob_zip()])
 
     def test_eggs(self):
@@ -846,7 +846,7 @@ class SparkPyFilesTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_py_files(),
+                runner._py_files(),
                 [egg1_path, egg2_path, runner._create_mrjob_zip()]
             )
 
@@ -856,7 +856,7 @@ class SparkPyFilesTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._spark_py_files(),
+            self.assertEqual(runner._py_files(),
                              [])
 
     def test_no_bootstrap_mrjob_in_py_files(self):
@@ -866,7 +866,7 @@ class SparkPyFilesTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             # this happens in runners that run on a cluster
             runner._BOOTSTRAP_MRJOB_IN_PY_FILES = False
-            self.assertEqual(runner._spark_py_files(),
+            self.assertEqual(runner._py_files(),
                              [])
 
     def test_no_hash_paths(self):
@@ -1212,9 +1212,11 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy')))
 
-    def test_spark_submit_arg_prefix(self):
-        self.start(patch('mrjob.bin.MRJobBinRunner._spark_submit_arg_prefix',
-                         return_value=['<arg prefix>']))
+    def test_spark_master_and_deploy_mode(self):
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_master',
+                         return_value='yoda'))
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_deploy_mode',
+                         return_value='the-force'))
 
         job = MRNullSpark(['-r', 'local'])
         job.sandbox()
@@ -1222,7 +1224,22 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                ['<arg prefix>'] +
+                ['--master', 'yoda', '--deploy-mode', 'the-force'] +
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+
+    def test_empty_string_spark_master_and_deploy_mode(self):
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_master',
+                         return_value=''))
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_deploy_mode',
+                         return_value=''))
+
+        job = MRNullSpark(['-r', 'local'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy')))
 
@@ -1486,7 +1503,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._spark_py_files = Mock(
+            runner._py_files = Mock(
                 return_value=['<first py_file>', '<second py_file>']
             )
 
@@ -1509,7 +1526,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._spark_py_files = Mock(
+            runner._py_files = Mock(
                 return_value=['<first py_file>', '<second py_file>']
             )
 

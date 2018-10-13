@@ -127,6 +127,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         'hadoop_log_dirs',
         'hadoop_streaming_jar',
         'hadoop_tmp_dir',
+        'spark_deploy_mode',
         'spark_master',
     }
 
@@ -178,6 +179,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             super(HadoopJobRunner, self)._default_opts(),
             dict(
                 hadoop_tmp_dir='tmp/mrjob',
+                spark_deploy_mode='client',
                 spark_master='yarn',
             )
         )
@@ -370,6 +372,8 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         to self._upload_mgr."""
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
+        for path in self._py_files():
+            self._upload_mgr.add(path)
 
     def _upload_local_files_to_hdfs(self):
         """Copy files managed by self._upload_mgr to HDFS
@@ -536,9 +540,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
                 self._interpolate_input_and_output(step['args'], step_num))
 
         return args
-
-    def _spark_submit_arg_prefix(self):
-        return ['--master', self._opts['spark_master']]
 
     def _env_for_step(self, step_num):
         step = self._get_step(step_num)

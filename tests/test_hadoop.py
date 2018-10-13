@@ -1226,14 +1226,18 @@ class SparkPyFilesTestCase(MockHadoopTestCase):
             runner._add_job_files_for_upload()
 
             self.assertEqual(
-                runner._spark_py_files(),
+                runner._py_files(),
                 [egg1_path, egg2_path, runner._create_mrjob_zip()]
             )
 
-            # the py_files get uploaded anyway since they appear in
-            # _upload_mgr.
+            # pass the URI of the *uploaded* py_files to Spark
             self.assertIn(egg1_path, runner._upload_mgr.path_to_uri())
             self.assertIn(egg2_path, runner._upload_mgr.path_to_uri())
+
+            egg_uris = ','.join(runner._upload_mgr.uri(path)
+                                for path in runner._py_files())
+
+            self.assertIn(egg_uris, runner._spark_submit_args(0))
 
 
 class SetupLineEncodingTestCase(MockHadoopTestCase):
@@ -1537,21 +1541,44 @@ class FindBinariesAndJARsTestCase(SandboxedTestCase):
             self.assertTrue(self.get_spark_submit_bin.called)
 
 
-class SparkSubmitArgPrefixTestCase(MockHadoopTestCase):
+class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
 
     def test_default(self):
-        runner = HadoopJobRunner()
+        mr_job = MRNullSpark(['-r', 'hadoop'])
+        mr_job.sandbox()
 
-        self.assertEqual(
-            runner._spark_submit_arg_prefix(),
-            ['--master', 'yarn'])
+        with mr_job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+            self.assertEqual(
+                runner._spark_submit_args(0)[:4],
+                ['--master', 'yarn', '--deploy-mode', 'client']
+            )
 
-    def test_spark_master(self):
-        runner = HadoopJobRunner(spark_master='local')
+    def test_spark_master_opt(self):
+        # these are hard-coded and always the same
+        mr_job = MRNullSpark(['-r', 'hadoop', '--spark-master', 'local'])
+        mr_job.sandbox()
 
-        self.assertEqual(
-            runner._spark_submit_arg_prefix(),
-            ['--master', 'local'])
+        with mr_job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+            self.assertEqual(
+                runner._spark_submit_args(0)[:4],
+                ['--master', 'local', '--deploy-mode', 'client']
+            )
+
+    def test_spark_deploy_mode_opt(self):
+        # these are hard-coded and always the same
+        mr_job = MRNullSpark(['-r', 'hadoop',
+                              '--spark-deploy-mode', 'cluster'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            self.assertEqual(
+                runner._spark_submit_args(0)[:4],
+                ['--master', 'yarn', '--deploy-mode', 'cluster']
+            )
 
 
 class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):

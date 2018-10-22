@@ -79,7 +79,7 @@ class MRJob(MRJobLauncher):
 
     @classmethod
     def _usage(cls):
-        return "usage: %(prog)s [options] [input files]"
+        return "%(prog)s [options] [input files]"
 
     ### Defining one-step streaming jobs ###
 

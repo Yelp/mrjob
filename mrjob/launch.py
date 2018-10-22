@@ -149,7 +149,7 @@ class MRJobLauncher(object):
     @classmethod
     def _usage(cls):
         """Command line usage string for this class"""
-        return ("usage: mrjob run [script path|executable path|--help]"
+        return ("mrjob run [script path|executable path|--help]"
                 " [options] [input files]")
 
     def _print_help(self, options):

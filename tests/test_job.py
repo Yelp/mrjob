@@ -1316,6 +1316,17 @@ class PrintHelpTestCase(SandboxedTestCase):
         output = self.stdout.getvalue()
         self.assertIn('--reducer-cmd-2', output)
 
+    def test_dont_print_usage_usage(self):
+        # regression test for #1866
+        MRCmdJob(['--help'])
+        self.exit.assert_called_once_with(0)
+
+        output = self.stdout.getvalue()
+        first_line = output.split('\n')[0]
+
+        self.assertTrue(first_line.startswith('usage: '))
+        self.assertNotIn('usage', first_line[len('usage: '):])
+
 
 class RunnerKwargsTestCase(TestCase):
     # ensure that switches exist for every option passed to runners

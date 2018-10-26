@@ -54,6 +54,7 @@ from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
+from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _client_error_status
@@ -213,6 +214,8 @@ _INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
 # use to disable multipart uploading
 _HUGE_PART_THRESHOLD = 2 ** 256
 
+# where to find the history log in HDFS
+_YARN_HDFS_HISTORY_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging/history'
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
@@ -674,10 +677,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     ssh_bin=self._opts['ssh_bin'],
                     ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
+                # we'll set hadoop_bin later, once the cluster is set up
+                self._hadoop_fs = HadoopFilesystem(hadoop_bin=[])
+
+                # put _hadoop_fs last because it tries to handle all URIs
                 self._fs = CompositeFilesystem(
-                    self._ssh_fs, s3_fs, LocalFilesystem())
+                    self._ssh_fs, s3_fs, self._hadoop_fs, LocalFilesystem())
             else:
                 self._ssh_fs = None
+                self._hadoop_fs = None
                 self._fs = CompositeFilesystem(s3_fs, LocalFilesystem())
 
         return self._fs
@@ -717,6 +725,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # old SSH tunnel isn't valid for this cluster (see #1549)
         if self._ssh_proc:
             self._kill_ssh_tunnel()
+
+        # don't try to connect to HDFS on the old cluster
+        if self._hadoop_fs:
+            self._hadoop_fs.set_hadoop_bin([])
 
         self._launch_emr_job()
 
@@ -833,6 +845,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # part size is in MB, as the minimum is 5 MB
         return int((self._opts['cloud_part_size_mb'] or 0) * 1024 * 1024)
 
+    def _set_up_ssh_tunnel_and_hdfs(self):
+        if self._hadoop_fs:
+            self._hadoop_fs.set_hadoop_bin(self._ssh_hadoop_bin())
+        self._set_up_ssh_tunnel()
+
     def _ssh_tunnel_config(self):
         """Look up AMI version, and return a dict with the following keys:
 
@@ -880,7 +897,29 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             '-o', 'UserKnownHostsFile=%s' % os.devnull,
         ] + self._ssh_tunnel_opts(bind_port) + [
             '-i', self._opts['ec2_key_pair_file'],
-            ('hadoop@%s' % host),
+            'hadoop@%s' % host,
+        ]
+
+    def _ssh_hadoop_bin(self):
+        if not self._cluster_id:
+            return []
+
+        if not (self._opts['ec2_key_pair_file'], self._opts['ssh_bin']):
+            return []
+
+        host = self._address_of_master()
+        if not host:
+            return []
+
+        return self._opts['ssh_bin'] + [
+            '-o', 'VerifyHostKeyDNS=no',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'ExitOnForwardFailure=yes',
+            '-o', 'UserKnownHostsFile=%s' % os.devnull,
+            '-i', self._opts['ec2_key_pair_file'],
+            '-q',  # don't care about SSH warnings, we just want hadoop
+            'hadoop@%s' % host,
+            'hadoop',
         ]
 
     def _job_tracker_url(self):
@@ -1496,7 +1535,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # (this happens with pooling). See #1115
         cluster = self._describe_cluster()
         if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
-            self._set_up_ssh_tunnel()
+            self._set_up_ssh_tunnel_and_hdfs()
 
         # treat master node setup as step -1
         start = 0
@@ -1558,7 +1597,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 # we can open the ssh tunnel if cluster is ready (see #1115)
                 if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
-                    self._set_up_ssh_tunnel()
+                    self._set_up_ssh_tunnel_and_hdfs()
 
                 log.info('  PENDING (cluster is %s%s)' % (
                     cluster['Status']['State'], reason_desc))
@@ -1573,7 +1612,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                         _boto3_now() - start)
 
                 # now is the time to tunnel, if we haven't already
-                self._set_up_ssh_tunnel()
+                self._set_up_ssh_tunnel_and_hdfs()
                 log.info('  RUNNING%s' % time_running_desc)
 
                 # don't log progress for master node setup step, because
@@ -1841,30 +1880,27 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
-        # History logs have different paths on the 4.x AMIs.
-        #
-        # Disabling until we can effectively fetch these logs over SSH;
-        # on 4.3.0 there are permissions issues (see #1244), and
-        # on 4.0.0 the logs aren't on the filesystem at all (see #1253).
-        #
-        # Unlike on 3.x, the history logs *are* available on S3, but they're
-        # not useful enough to justify the wait when SSH is set up
 
         if version_gte(self.get_image_version(), '4'):
+            hdfs_dir_name = _YARN_HDFS_HISTORY_LOG_DIR
             # on 4.0.0 (and possibly other versions before 4.3.0)
             # history logs aren't on the filesystem. See #1253
             dir_name = 'hadoop-mapreduce/history'
             s3_dir_name = 'hadoop-mapreduce/history'
         elif version_gte(self.get_image_version(), '3'):
-            # on the 3.x AMIs, the history log lives inside HDFS and isn't
-            # copied to S3.
-            return iter([])
+            # on the 3.x AMIs, the history log is on HDFS only (not even S3)
+            hdfs_dir_name = _YARN_HDFS_HISTORY_LOG_DIR
+            dir_name = None
+            s3_dir_name = None
         else:
+            # 2.x AMIs don't use YARN, so no point in checking HDFS
+            hdfs_dir_name = None
             dir_name = 'hadoop/history'
             s3_dir_name = 'jobs'
 
         return self._stream_log_dirs(
             'history log',
+            hdfs_dir_name=hdfs_dir_name,
             dir_name=dir_name,
             s3_dir_name=s3_dir_name)
 
@@ -1939,6 +1975,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             s3_dir_name=posixpath.join('steps', step_id))
 
     def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name,
+                         hdfs_dir_name=None,
                          ssh_to_workers=False):
         """Stream log dirs for any kind of log.
 
@@ -1951,6 +1988,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         if not self._read_logs():
             return
+
+        # used to fetch history logs off HDFS
+        if hdfs_dir_name and self.fs.can_handle_path(hdfs_dir_name):
+            yield hdfs_dir_name
 
         if dir_name and self.fs.can_handle_path('ssh:///'):
             ssh_host = self._address_of_master()
@@ -2664,7 +2705,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _get_app_versions(self):
         """Returns a map from lowercase app name to version for our cluster.
 
-        This only works for non-'hadoop' apps on 4.x AMIs and later.
+        For apps other than Hadoop, this only works for AMI 4.x and later.
         """
         return self._get_cluster_info('app_versions')
 

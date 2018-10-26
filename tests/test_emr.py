@@ -4700,8 +4700,7 @@ class MasterPrivateIPTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            # no cluster yet
-            self.assertRaises(AssertionError, runner._master_private_ip)
+            self.assertIsNone(runner._master_private_ip())
 
             self.launch(runner)
 

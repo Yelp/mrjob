@@ -4330,7 +4330,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         super(WaitForStepsToCompleteTestCase, self).setUp()
 
         # mock out setting up SSH tunnel
-        self.start(patch.object(EMRJobRunner, '_set_up_ssh_tunnel'))
+        self.start(patch.object(EMRJobRunner, '_set_up_ssh_tunnel_and_hdfs'))
 
         # mock out logging
         self.start(patch('mrjob.emr.log'))
@@ -4358,7 +4358,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         runner._wait_for_steps_to_complete()
 
         self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 2)
-        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel.called)
+        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel_and_hdfs.called)
         self.assertEqual(len(runner._log_interpretations), 2)
         self.assertIsNone(runner._mns_log_interpretation)
 
@@ -4377,7 +4377,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         self.assertIsNotNone(runner._master_node_setup_script_path)
 
         self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 3)
-        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel.called)
+        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel_and_hdfs.called)
         self.assertEqual(len(runner._log_interpretations), 2)
         self.assertIsNotNone(runner._mns_log_interpretation)
         self.assertEqual(runner._mns_log_interpretation['no_job'], True)
@@ -4399,7 +4399,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         # is RUNNING
 
         # stop the test as soon as SSH tunnel is set up
-        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         runner = self.make_runner()
 
@@ -4417,7 +4417,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         # tests #1115
 
         # stop the test as soon as SSH tunnel is set up
-        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         runner = self.make_runner()
         mock_cluster = self.mock_emr_clusters[runner._cluster_id]
@@ -4433,7 +4433,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         # tests #1115
 
         # stop the test as soon as SSH tunnel is set up
-        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         runner = self.make_runner()
         mock_cluster = self.mock_emr_clusters[runner._cluster_id]
@@ -4449,7 +4449,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         # tests #1115
 
         # stop the test as soon as SSH tunnel is set up
-        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         # put steps from previous job on cluster
         previous_runner = self.make_runner()

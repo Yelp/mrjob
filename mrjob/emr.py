@@ -873,23 +873,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if not host:
             return
 
-        # if ssh detects that a host key has changed, it will silently not
-        # open the tunnel, so make a fake empty known_hosts file and use that.
-        # (you can actually use /dev/null as your known hosts file, but
-        # that's UNIX-specific)
-        fake_known_hosts_file = os.path.join(
-            self._get_local_tmp_dir(), 'fake_ssh_known_hosts')
-        # blank out the file, if it exists
-        f = open(fake_known_hosts_file, 'w')
-        f.close()
-        log.debug('Created empty ssh known-hosts file: %s' % (
-            fake_known_hosts_file,))
-
         return self._opts['ssh_bin'] + [
             '-o', 'VerifyHostKeyDNS=no',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'ExitOnForwardFailure=yes',
-            '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
+            '-o', 'UserKnownHostsFile=%s' % os.devnull,
         ] + self._ssh_tunnel_opts(bind_port) + [
             '-i', self._opts['ec2_key_pair_file'],
             ('hadoop@%s' % host),

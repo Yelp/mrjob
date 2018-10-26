@@ -17,5 +17,5 @@ install:
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
 # command to run tests
-script: python -m unittest discover -v
+script: python -m unittest discover
 sudo: false

@@ -62,6 +62,7 @@ from mrjob.fs.s3 import _endpoint_url
 from mrjob.fs.s3 import _get_bucket_region
 from mrjob.fs.s3 import _wrap_aws_client
 from mrjob.fs.ssh import SSHFilesystem
+from mrjob.hadoop import _DEFAULT_YARN_HDFS_LOG_DIR
 from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import _FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
@@ -1882,14 +1883,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Yield lists of directories to look for the history log in."""
 
         if version_gte(self.get_image_version(), '4'):
-            hdfs_dir_name = _YARN_HDFS_HISTORY_LOG_DIR
+            hdfs_dir_name = 'history'
             # on 4.0.0 (and possibly other versions before 4.3.0)
             # history logs aren't on the filesystem. See #1253
             dir_name = 'hadoop-mapreduce/history'
             s3_dir_name = 'hadoop-mapreduce/history'
         elif version_gte(self.get_image_version(), '3'):
-            # on the 3.x AMIs, the history log is on HDFS only (not even S3)
-            hdfs_dir_name = _YARN_HDFS_HISTORY_LOG_DIR
+            # on the 3.x AMIs, the history log is on HDFS only
+            # (not even S3)
+            hdfs_dir_name = 'history'
             dir_name = None
             s3_dir_name = None
         else:
@@ -1990,8 +1992,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             return
 
         # used to fetch history logs off HDFS
-        if hdfs_dir_name and self.fs.can_handle_path(hdfs_dir_name):
-            yield hdfs_dir_name
+        if (hdfs_dir_name and
+                self.fs.can_handle_path(_DEFAULT_YARN_HDFS_LOG_DIR)):
+
+            hdfs_log_dir = posixpath.join(
+                _DEFAULT_YARN_HDFS_LOG_DIR, hdfs_dir_name)
+
+            log.info('Looking for %s in %s...' % (log_desc, hdfs_log_dir))
+            yield [hdfs_log_dir]
 
         if dir_name and self.fs.can_handle_path('ssh:///'):
             ssh_host = self._address_of_master()

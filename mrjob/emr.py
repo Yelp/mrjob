@@ -902,10 +902,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         ]
 
     def _ssh_hadoop_bin(self):
-        if not self._cluster_id:
-            return []
-
-        if not (self._opts['ec2_key_pair_file'], self._opts['ssh_bin']):
+        if not (self._opts['ec2_key_pair_file'] and
+                self._opts['ssh_bin']):
             return []
 
         host = self._address_of_master()
@@ -2724,7 +2722,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _get_cluster_info(self, key):
         if not self._cluster_id:
-            raise AssertionError('cluster has not yet been created')
+            return None
+
         cache = self._cluster_to_cache[self._cluster_id]
 
         if not cache.get(key):

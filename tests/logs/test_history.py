@@ -13,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
-
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _match_history_log_path
 from mrjob.logs.history import _parse_pre_yarn_history_log
@@ -22,13 +20,13 @@ from mrjob.logs.history import _parse_pre_yarn_history_records
 from mrjob.logs.history import _parse_pre_yarn_counters
 from mrjob.logs.history import _parse_yarn_history_log
 
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BasicTestCase
 from tests.py2 import Mock
 from tests.py2 import patch
 
 
 # path matching
-class MatchHistoryLogTestCase(TestCase):
+class MatchHistoryLogTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_match_history_log_path(''), None)
@@ -102,7 +100,7 @@ class MatchHistoryLogTestCase(TestCase):
             None)
 
 
-class InterpretHistoryLogTestCase(PatcherTestCase):
+class InterpretHistoryLogTestCase(BasicTestCase):
 
     def setUp(self):
         super(InterpretHistoryLogTestCase, self).setUp()
@@ -191,7 +189,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
 
 
 # log parsing
-class ParseYARNHistoryLogTestCase(TestCase):
+class ParseYARNHistoryLogTestCase(BasicTestCase):
 
     JOB_COUNTER_LINES = [
         '{"type":"JOB_FINISHED","event":{'
@@ -358,7 +356,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
         )
 
 
-class ParsePreYARNHistoryLogTestCase(TestCase):
+class ParsePreYARNHistoryLogTestCase(BasicTestCase):
     JOB_COUNTER_LINES = [
         'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564"'
         ' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
@@ -500,7 +498,7 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
 
 
 # edge cases in pre-YARN history record parsing
-class ParsePreYARNHistoryRecordsTestCase(TestCase):
+class ParsePreYARNHistoryRecordsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(list(_parse_pre_yarn_history_records([])), [])
@@ -618,7 +616,7 @@ class ParsePreYARNHistoryRecordsTestCase(TestCase):
 
 
 # edge cases in pre-YARN counter parsing
-class ParsePreYARNCountersTestCase(TestCase):
+class ParsePreYARNCountersTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_pre_yarn_counters(''), {})

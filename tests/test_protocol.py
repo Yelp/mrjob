@@ -16,7 +16,7 @@
 
 """Make sure all of our protocols work as advertised."""
 import unittest
-from unittest import TestCase
+from tests.sandbox import BasicTestCase
 from unittest import skipIf
 
 from mrjob.protocol import BytesProtocol
@@ -90,7 +90,7 @@ PICKLE_KEYS_AND_VALUES = REPR_KEYS_AND_VALUES + [
 ]
 
 
-class ProtocolTestCase(TestCase):
+class ProtocolTestCase(BasicTestCase):
 
     def assertRoundTripOK(self, protocol, key, value):
         """Assert that we can encode and decode the given key and value,
@@ -112,7 +112,7 @@ class ProtocolTestCase(TestCase):
         self.assertRaises(Exception, protocol.read, data)
 
 
-class JSONProtocolAliasesTestCase(TestCase):
+class JSONProtocolAliasesTestCase(BasicTestCase):
 
     def test_use_ujson_or_simplejson_if_installed(self):
         # these aliases are determined at compile time, so there
@@ -343,7 +343,7 @@ class PickleValueProtocolTestCase(ProtocolTestCase):
     # no tests of what encoded data looks like; pickle is an opaque protocol
 
 
-class RawProtocolAliasesTestCase(TestCase):
+class RawProtocolAliasesTestCase(BasicTestCase):
 
     def test_raw_protocol_aliases(self):
         if PY2:

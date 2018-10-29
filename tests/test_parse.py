@@ -17,7 +17,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from io import BytesIO
-from unittest import TestCase
 
 from mrjob.parse import _parse_port_range_list
 from mrjob.parse import _parse_progress_from_job_tracker
@@ -28,8 +27,10 @@ from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 
+from tests.sandbox import BasicTestCase
 
-class ParseMRJobStderrTestCase(TestCase):
+
+class ParseMRJobStderrTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(parse_mr_job_stderr(BytesIO()),
@@ -99,7 +100,7 @@ class ParseMRJobStderrTestCase(TestCase):
              'other': [line.decode('ascii') for line in BAD_LINES]})
 
 
-class PortRangeListTestCase(TestCase):
+class PortRangeListTestCase(BasicTestCase):
     def test_port_range_list(self):
         self.assertEqual(_parse_port_range_list('1234'), [1234])
         self.assertEqual(_parse_port_range_list('123,456,789'), [123, 456, 789])
@@ -117,7 +118,7 @@ class PortRangeListTestCase(TestCase):
                           'Athens:Alexandria')
 
 
-class URITestCase(TestCase):
+class URITestCase(BasicTestCase):
     def test_is_uri(self):
         self.assertEqual(is_uri('notauri!'), False)
         self.assertEqual(is_uri('they://did/the/monster/mash'), True)
@@ -153,7 +154,7 @@ class URITestCase(TestCase):
                          ('s3', 'bucket', '/', '', '', ''))
 
 
-class JobTrackerProgressTestCase(TestCase):
+class JobTrackerProgressTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_progress_from_job_tracker(b''), (None, None))
@@ -202,7 +203,7 @@ class JobTrackerProgressTestCase(TestCase):
                          (None, None))
 
 
-class ResourceManagerProgressTestCase(TestCase):
+class ResourceManagerProgressTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_progress_from_resource_manager(b''), None)

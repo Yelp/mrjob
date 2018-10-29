@@ -21,17 +21,14 @@ import stat
 import sys
 from io import BytesIO
 from shutil import make_archive
-from unittest import TestCase
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
-from mrjob.py2 import StringIO
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
-from mrjob.util import log_to_stream
 
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_filter_job import MRFilterJob
@@ -48,7 +45,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.quiet import no_handlers_for_logger
+from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
@@ -65,6 +62,8 @@ class ArgsForSparkStepTestCase(SandboxedTestCase):
     # just test the structure of _args_for_spark_step()
 
     def setUp(self):
+        super(ArgsForSparkStepTestCase, self).setUp()
+
         self.mock_get_spark_submit_bin = self.start(patch(
             'mrjob.bin.MRJobBinRunner.get_spark_submit_bin',
             return_value=['<spark-submit bin>']))
@@ -105,7 +104,7 @@ class ArgsForSparkStepTestCase(SandboxedTestCase):
         self._test_step(1)
 
 
-class BootstrapMRJobTestCase(TestCase):
+class BootstrapMRJobTestCase(BasicTestCase):
     # this just tests _bootstrap_mrjob() (i.e. whether to bootstrap mrjob);
     # actual testing of bootstrapping is in test_local
 
@@ -236,14 +235,13 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
              '-D', 'mapred.jobtracker.maxtasks.per.job=1'])
 
         with job.make_runner() as runner:
-            with no_handlers_for_logger('mrjob.runner'):
-                with patch.object(runner,
-                                  'get_hadoop_version', return_value='2.7.1'):
-                    self.assertEqual(
-                        runner._hadoop_args_for_step(0),
-                        ['-D', 'mapred.jobtracker.maxtasks.per.job=1',
-                         '-D', 'mapreduce.jobtracker.maxtasks.perjob=1'
-                         ])
+            with patch.object(runner,
+                              'get_hadoop_version', return_value='2.7.1'):
+                self.assertEqual(
+                    runner._hadoop_args_for_step(0),
+                    ['-D', 'mapred.jobtracker.maxtasks.per.job=1',
+                     '-D', 'mapreduce.jobtracker.maxtasks.perjob=1'
+                     ])
 
     def test_jobconf_from_step(self):
         jobconf = {'FOO': 'bar', 'BAZ': 'qux'}
@@ -289,7 +287,7 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
             )
 
 
-class InterpreterTestCase(TestCase):
+class InterpreterTestCase(BasicTestCase):
 
     def test_default(self):
         runner = MRJobBinRunner()
@@ -606,8 +604,7 @@ class SetupTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as r:
-            with no_handlers_for_logger('mrjob.local'):
-                r.run()
+            r.run()
 
             path_to_size = dict(job.parse_output(r.cat_output()))
 
@@ -623,8 +620,7 @@ class SetupTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as r:
-            with no_handlers_for_logger('mrjob.local'):
-                r.run()
+            r.run()
 
             path_to_size = dict(job.parse_output(r.cat_output()))
 
@@ -785,20 +781,16 @@ class SetupTestCase(SandboxedTestCase):
         ])
         job.sandbox()
 
-        with no_handlers_for_logger('mrjob.local'):
-            stderr = StringIO()
-            log_to_stream('mrjob.local', stderr, debug=True)
+        with job.make_runner() as r:
+            r.run()
 
-            with job.make_runner() as r:
-                r.run()
+            output = b''.join(r.cat_output())
 
-                output = b''.join(r.cat_output())
+            # stray ouput should be in stderr files, not the job's output
+            self.assertNotIn(b'stray output', output)
 
-                # stray ouput should be in stderr files, not the job's output
-                self.assertNotIn(b'stray output', output)
-
-                with open(r._task_stderr_path('mapper', 0, 0), 'rb') as stderr:
-                    self.assertIn(b'stray output', stderr.read())
+            with open(r._task_stderr_path('mapper', 0, 0), 'rb') as stderr:
+                self.assertIn(b'stray output', stderr.read())
 
 
 class SetupWrapperScriptContentTestCase(SandboxedTestCase):
@@ -1565,24 +1557,22 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 class CreateMrjobZipTestCase(SandboxedTestCase):
 
     def test_create_mrjob_zip(self):
-        with no_handlers_for_logger('mrjob.runner'):
-            with LocalMRJobRunner(conf_paths=[]) as runner:
-                mrjob_zip_path = runner._create_mrjob_zip()
-                mrjob_zip = ZipFile(mrjob_zip_path)
-                contents = mrjob_zip.namelist()
+        with LocalMRJobRunner(conf_paths=[]) as runner:
+            mrjob_zip_path = runner._create_mrjob_zip()
+            mrjob_zip = ZipFile(mrjob_zip_path)
+            contents = mrjob_zip.namelist()
 
-                for path in contents:
-                    self.assertEqual(path[:6], 'mrjob/')
+            for path in contents:
+                self.assertEqual(path[:6], 'mrjob/')
 
-                self.assertIn('mrjob/job.py', contents)
-                for filename in contents:
-                    self.assertFalse(filename.endswith('.pyc'),
-                                     msg="%s ends with '.pyc'" % filename)
+            self.assertIn('mrjob/job.py', contents)
+            for filename in contents:
+                self.assertFalse(filename.endswith('.pyc'),
+                                 msg="%s ends with '.pyc'" % filename)
 
     def test_mrjob_zip_compiles(self):
         runner = LocalMRJobRunner()
-        with no_handlers_for_logger('mrjob.runner'):
-            mrjob_zip = runner._create_mrjob_zip()
+        mrjob_zip = runner._create_mrjob_zip()
 
         ZipFile(mrjob_zip).extractall(self.tmp_dir)
 

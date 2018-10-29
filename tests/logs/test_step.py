@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import errno
-from unittest import TestCase
 
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _interpret_emr_step_stderr
@@ -24,13 +23,10 @@ from mrjob.logs.step import _match_emr_step_syslog_path
 from mrjob.logs.step import _match_emr_step_stderr_path
 from mrjob.logs.step import _parse_indented_counters
 from mrjob.logs.step import _parse_step_syslog
-from mrjob.py2 import StringIO
-from mrjob.util import log_to_stream
 
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.quiet import no_handlers_for_logger
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BasicTestCase
 
 
 # abbreviated version of real output from Hadoop 2.7.0.
@@ -116,7 +112,7 @@ PARSED_NOT_A_VALID_JAR_LOG_LINES = dict(
 )
 
 
-class ParseStepSyslogTestCase(TestCase):
+class ParseStepSyslogTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_step_syslog([]), {})
@@ -138,7 +134,7 @@ class ParseStepSyslogTestCase(TestCase):
         )
 
 
-class InterpretHadoopJarCommandStderrTestCase(TestCase):
+class InterpretHadoopJarCommandStderrTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_interpret_hadoop_jar_command_stderr([]), {})
@@ -318,7 +314,12 @@ class InterpretHadoopJarCommandStderrTestCase(TestCase):
             _interpret_hadoop_jar_command_stderr, yield_lines())
 
 
-class ParseIndentedCountersTestCase(TestCase):
+class ParseIndentedCountersTestCase(BasicTestCase):
+
+    def setUp(self):
+        super(ParseIndentedCountersTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.logs.step.log'))
 
     def test_empty(self):
         self.assertEqual(_parse_indented_counters([]), {})
@@ -349,18 +350,14 @@ class ParseIndentedCountersTestCase(TestCase):
             '    FILE: Number of bytes read=86',
         ]
 
-        with no_handlers_for_logger('mrjob.logs.step'):
-            stderr = StringIO()
-            log_to_stream('mrjob.logs.step', stderr)
+        self.assertEqual(_parse_indented_counters(lines), {
+            'File System Counters': {
+                'FILE: Number of bytes read': 86,
+            },
+        })
 
-            self.assertEqual(_parse_indented_counters(lines), {
-                'File System Counters': {
-                    'FILE: Number of bytes read': 86,
-                },
-            })
-
-            # header shouldn't freak it out
-            self.assertEqual(stderr.getvalue(), '')
+        # header shouldn't freak it out
+        self.assertFalse(self.log.warning.called)
 
     def test_indentation_is_required(self):
         lines = [
@@ -368,15 +365,11 @@ class ParseIndentedCountersTestCase(TestCase):
             '   FILE: Number of bytes read=8',
         ]
 
-        with no_handlers_for_logger('mrjob.logs.step'):
-            stderr = StringIO()
-            log_to_stream('mrjob.logs.step', stderr)
+        # counter line is interpreted as group
+        self.assertEqual(_parse_indented_counters(lines), {})
 
-            # counter line is interpreted as group
-            self.assertEqual(_parse_indented_counters(lines), {})
-
-            # should complain
-            self.assertNotEqual(stderr.getvalue(), '')
+        # should complain
+        self.assertTrue(self.log.warning.called)
 
     def test_no_empty_groups(self):
         lines = [
@@ -392,7 +385,7 @@ class ParseIndentedCountersTestCase(TestCase):
         })
 
 
-class MatchEMRStepSyslogPathTestCase(TestCase):
+class MatchEMRStepSyslogPathTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_match_emr_step_syslog_path(''), None)
@@ -435,7 +428,7 @@ class MatchEMRStepSyslogPathTestCase(TestCase):
 # this is currently almost identical to MatchEMRStepSyslogPathTestCase,
 # but that could change (for example, previous versions of the code
 # ignored rotated stderr logs)
-class MatchEMRStepStderrPathTestCase(TestCase):
+class MatchEMRStepStderrPathTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_match_emr_step_stderr_path(''), None)
@@ -475,7 +468,7 @@ class MatchEMRStepStderrPathTestCase(TestCase):
             _match_emr_step_stderr_path(syslog_path), None)
 
 
-class InterpretEMRStepSyslogTestCase(PatcherTestCase):
+class InterpretEMRStepSyslogTestCase(BasicTestCase):
 
     def setUp(self):
         super(InterpretEMRStepSyslogTestCase, self).setUp()
@@ -632,7 +625,7 @@ class InterpretEMRStepSyslogTestCase(PatcherTestCase):
     maxDiff = None
 
 
-class InterpretEMRStepStderrTestCase(PatcherTestCase):
+class InterpretEMRStepStderrTestCase(BasicTestCase):
 
     def setUp(self):
         super(InterpretEMRStepStderrTestCase, self).setUp()

@@ -18,7 +18,6 @@
 """Test configuration parsing and option combining"""
 import os
 import os.path
-from unittest import TestCase
 from unittest import skipIf
 
 import mrjob.conf
@@ -44,8 +43,7 @@ from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_confs
 
 from tests.py2 import patch
-from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
+from tests.sandbox import BasicTestCase
 from tests.sandbox import SandboxedTestCase
 
 
@@ -124,9 +122,8 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         with open(dot_mrjob_path, 'w') as f:
             f.write('{"runners": {"foo": {"bar": "baz"}}}')
 
-        with no_handlers_for_logger('mrjob.conf'):
-            self.assertEqual(load_mrjob_conf(),
-                             {'runners': {'foo': {'bar': 'baz'}}})
+        self.assertEqual(load_mrjob_conf(),
+                         {'runners': {'foo': {'bar': 'baz'}}})
         self.assertEqual(load_opts_from_mrjob_conf('foo')[0][1],
                          {'bar': 'baz'})
 
@@ -135,18 +132,17 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         with open(conf_path, 'w') as f:
             f.write('{"runners": {"foo": {"qux": "quux"}}}')
 
-        with no_handlers_for_logger('mrjob.conf'):
-            self.assertEqual(
-                load_mrjob_conf(conf_path=conf_path),
-                {'runners': {'foo': {'qux': 'quux'}}})
+        self.assertEqual(
+            load_mrjob_conf(conf_path=conf_path),
+            {'runners': {'foo': {'qux': 'quux'}}})
+
         self.assertEqual(
             load_opts_from_mrjob_conf('foo', conf_path=conf_path)[0][1],
             {'qux': 'quux'})
         # test missing options
-        with logger_disabled('mrjob.conf'):
-            self.assertEqual(
-                load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
-                {})
+        self.assertEqual(
+            load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
+            {})
 
     def test_duplicate_conf_path(self):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
@@ -327,8 +323,8 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
 
         with open(conf_path, 'w') as f:
             dump_mrjob_conf(conf, f)
-        with no_handlers_for_logger('mrjob.conf'):
-            self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
+
+        self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
 
     def test_round_trip(self):
         self._test_round_trip({'runners': {'foo': {'qux': 'quux'}}})
@@ -384,7 +380,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
             self.assertIn('If your mrjob.conf is in YAML', e.msg)
 
 
-class CombineValuesTestCase(TestCase):
+class CombineValuesTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_values(), None)
@@ -411,7 +407,7 @@ class CombineValuesTestCase(TestCase):
         self.assertEqual(combine_values(set([1]), set()), set())
 
 
-class CombineDictsTestCase(TestCase):
+class CombineDictsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_dicts(), {})
@@ -464,7 +460,7 @@ class CombineDictsTestCase(TestCase):
                           combine_dicts, ClearedValue({'USER': 'dave'}))
 
 
-class CombineCmdsTestCase(TestCase):
+class CombineCmdsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_cmds(), None)
@@ -495,7 +491,7 @@ class CombineCmdsTestCase(TestCase):
         self.assertEqual(combine_cmds(u'wunderbar!'), ['wunderbar!'])
 
 
-class CombineEnvsTestCase(TestCase):
+class CombineEnvsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_envs(), {})
@@ -542,7 +538,7 @@ class CombineEnvsTestCase(TestCase):
              'PS1': '\w> '})
 
 
-class CombineJobconfsTestCase(TestCase):
+class CombineJobconfsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_jobconfs(), {})
@@ -610,7 +606,7 @@ class CombineJobconfsTestCase(TestCase):
                           combine_jobconfs, ClearedValue(dict(foo='bar')))
 
 
-class CombineLocalEnvsTestCase(TestCase):
+class CombineLocalEnvsTestCase(BasicTestCase):
 
     def setUp(self):
         self.set_os_pathsep()
@@ -640,7 +636,7 @@ class CombineLocalEnvsTestCase(TestCase):
              'PS1': '\w> '})
 
 
-class CombineListsTestCase(TestCase):
+class CombineListsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_lists(), [])
@@ -665,7 +661,7 @@ class CombineListsTestCase(TestCase):
                          [1, 2, 3, 4, 5, 6])
 
 
-class CombineOptsTestCase(TestCase):
+class CombineOptsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_opts(combiners={}), {})
@@ -765,7 +761,7 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
 
 
 @skipIf(mrjob.conf.yaml is None, 'no yaml module')
-class LoadYAMLWithClearTag(TestCase):
+class LoadYAMLWithClearTag(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_load_yaml_with_clear_tag(''),
@@ -854,7 +850,7 @@ class LoadYAMLWithClearTag(TestCase):
             {'foo': ['bar', {'baz': ClearedValue('qux')}]})
 
 
-class FixClearTag(TestCase):
+class FixClearTag(BasicTestCase):
 
     def test_none(self):
         self.assertEqual(_fix_clear_tags(None), None)

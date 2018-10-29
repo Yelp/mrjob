@@ -19,10 +19,10 @@ from mrjob.logs.mixin import _log_parsing_task_log
 
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BasicTestCase
 
 
-class LogInterpretationMixinTestCase(PatcherTestCase):
+class LogInterpretationMixinTestCase(BasicTestCase):
 
     class MockRunner(Mock, LogInterpretationMixin):
         pass

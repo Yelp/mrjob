@@ -14,6 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import print_function
+
+from functools import partial
+import logging
 import os
 import os.path
 import random
@@ -25,9 +29,9 @@ from unittest import TestCase
 
 import mrjob
 from mrjob import runner
+from mrjob.util import NullHandler
 
 from tests.py2 import patch
-from tests.quiet import add_null_handler_to_root_logger
 
 
 # simple config that also silences 'no config options for runner' logging
@@ -74,7 +78,27 @@ def random_seed(seed):
         random.setstate(state)
 
 
-class PatcherTestCase(TestCase):
+class BasicTestCase(TestCase):
+    """All mrjob tests should inherit from this or a subclass, so we don't
+    get extraneous logging messages while running the tests.
+
+    This also adds the :py:meth:`start` method, which insures that patches
+    are always reverted after the test completes (e.g.
+     ``self.start(patch('foo.bar', ...))`)
+    """
+    def setUp(self):
+        """disable all logging handlers
+        """
+        # Extra logging messages were cluttering Travis CI. See #1793
+        super(BasicTestCase, self).setUp()
+
+        for name in ['', '__main__', 'mrjob']:
+            log = logging.getLogger(name)
+            self.start(patch.object(log, 'handlers', []))
+
+            if not name:
+                # add a dummy handler to the root logger
+                log.addHandler(NullHandler())
 
     def start(self, patcher):
         """Add the given patcher to this test case's cleanup actions,
@@ -88,15 +112,13 @@ class PatcherTestCase(TestCase):
         return mock
 
 
-class EmptyMrjobConfTestCase(PatcherTestCase):
+class EmptyMrjobConfTestCase(BasicTestCase):
 
     # set to None if you don't want load_opts_from_mrjob_confs patched
     MRJOB_CONF_CONTENTS = EMPTY_MRJOB_CONF
 
     def setUp(self):
         super(EmptyMrjobConfTestCase, self).setUp()
-
-        add_null_handler_to_root_logger()
 
         if self.MRJOB_CONF_CONTENTS is not None:
             self.mrjob_conf_patcher = mrjob_conf_patcher(

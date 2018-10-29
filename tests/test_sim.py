@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from io import BytesIO
-from unittest import TestCase
 import gzip
 import os
 import os.path
@@ -31,6 +30,7 @@ from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_word_count import MRWordCount
 from tests.py2 import patch
+from tests.sandbox import BasicTestCase
 from tests.sandbox import SandboxedTestCase
 
 
@@ -138,7 +138,7 @@ class MRJobFileOptionsTestCase(SandboxedTestCase):
             self.assertEqual(output, [2])
 
 
-class NoMRJobConfTestCase(TestCase):
+class NoMRJobConfTestCase(BasicTestCase):
 
     def test_no_mrjob_confs(self):
         with patch.object(

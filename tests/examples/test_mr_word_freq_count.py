@@ -12,14 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
-
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 
 from tests.job import run_job
+from tests.sandbox import BasicTestCase
 
 
-class MRWordFreqCountTestCase(TestCase):
+class MRWordFreqCountTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(run_job(MRWordFreqCount()), {})

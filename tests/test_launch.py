@@ -21,7 +21,6 @@ import os
 import sys
 from subprocess import Popen
 from subprocess import PIPE
-from unittest import TestCase
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
@@ -35,7 +34,7 @@ from tests.mr_runner import MRRunner
 from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.quiet import no_handlers_for_logger
+from tests.sandbox import BasicTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
 
@@ -178,7 +177,7 @@ class RunJobTestCase(SandboxedTestCase):
         self.assertEqual(launcher.stderr.getvalue(), b'')
 
 
-class CommandLineArgsTestCase(TestCase):
+class CommandLineArgsTestCase(BasicTestCase):
 
     def test_shouldnt_exit_when_invoked_as_object(self):
         self.assertRaises(ValueError, MRJobLauncher, args=['--quux', 'baz'])
@@ -375,29 +374,27 @@ class CommandLineArgsTestCase(TestCase):
         self.assertRaises(ValueError, MRCustomJobLauncher, args=[])
 
 
-class TestToolLogging(TestCase):
+class TestToolLogging(BasicTestCase):
     """ Verify the behavior of logging configuration for CLI tools
     """
     def test_default_options(self):
-        with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', StringIO()) as stderr:
-                MRJob.set_up_logging()
-                log = logging.getLogger('__main__')
-                log.info('INFO')
-                log.debug('DEBUG')
-                self.assertEqual(stderr.getvalue(), 'INFO\n')
+        with patch.object(sys, 'stderr', StringIO()) as stderr:
+            MRJob.set_up_logging()
+            log = logging.getLogger('__main__')
+            log.info('INFO')
+            log.debug('DEBUG')
+            self.assertEqual(stderr.getvalue(), 'INFO\n')
 
     def test_verbose(self):
-        with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', StringIO()) as stderr:
-                MRJob.set_up_logging(verbose=True)
-                log = logging.getLogger('__main__')
-                log.info('INFO')
-                log.debug('DEBUG')
-                self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
+        with patch.object(sys, 'stderr', StringIO()) as stderr:
+            MRJob.set_up_logging(verbose=True)
+            log = logging.getLogger('__main__')
+            log.info('INFO')
+            log.debug('DEBUG')
+            self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
 
 
-class TestPassThroughRunner(TestCase):
+class TestPassThroughRunner(BasicTestCase):
 
     def get_value(self, job):
         job.sandbox()
@@ -419,7 +416,7 @@ class TestPassThroughRunner(TestCase):
         self.assertEqual(self.get_value(MRRunner(['-r', 'local'])), 'local')
 
 
-class StdStreamTestCase(TestCase):
+class StdStreamTestCase(BasicTestCase):
 
     def test_normal_python(self):
         launcher = MRJobLauncher(args=['/path/to/script'])

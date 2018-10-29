@@ -21,7 +21,6 @@ from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
 from subprocess import PIPE
-from unittest import TestCase
 
 from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound
@@ -45,10 +44,8 @@ from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.logs.errors import _pick_error
 from mrjob.py2 import PY2
-from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
-from mrjob.util import log_to_stream
 from mrjob.util import save_current_environment
 
 from tests.mock_google import MockGoogleTestCase
@@ -64,8 +61,7 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import call
 from tests.py2 import mock
 from tests.py2 import patch
-from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
+from tests.sandbox import BasicTestCase
 from tests.sandbox import mrjob_conf_patcher
 
 # used to match command lines
@@ -249,20 +245,20 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v'])
         mr_job.sandbox()
 
-        with no_handlers_for_logger('mrjob.dataproc'):
-            stderr = StringIO()
-            log_to_stream('mrjob.dataproc', stderr)
+        log = self.start(patch('mrjob.dataproc.log'))
 
-            self.mock_jobs_succeed = False
+        self.mock_jobs_succeed = False
 
-            with mr_job.make_runner() as runner:
-                self.assertIsInstance(runner, DataprocJobRunner)
+        with mr_job.make_runner() as runner:
+            self.assertIsInstance(runner, DataprocJobRunner)
 
-                self.assertRaises(StepFailedException, runner.run)
+            self.assertRaises(StepFailedException, runner.run)
 
-                self.assertIn(' => ERROR\n', stderr.getvalue())
+            info = ''.join(
+                [a[0] + '\n' for a, kw in log.info.call_args_list])
+            self.assertIn(' => ERROR\n', info)
 
-                cluster_id = runner.get_cluster_id()
+            cluster_id = runner.get_cluster_id()
 
         # job should get terminated
         cluster = runner._get_cluster(cluster_id)
@@ -367,8 +363,7 @@ class ExistingClusterTestCase(MockGoogleTestCase):
         with mr_job.make_runner() as runner2:
             self.assertIsInstance(runner2, DataprocJobRunner)
 
-            with logger_disabled('mrjob.dataproc'):
-                self.assertRaises(StepFailedException, runner2.run)
+            self.assertRaises(StepFailedException, runner2.run)
 
             cluster2 = runner2._get_cluster(runner2._cluster_id)
             self.assertEqual(_cluster_state_name(cluster2.status.state),
@@ -412,12 +407,11 @@ class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
             self.assertEqual(runner.get_hadoop_version(), hadoop_version)
 
     def test_hadoop_version_option_does_nothing(self):
-        with logger_disabled('mrjob.dataproc'):
-            with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
-                runner.run()
-                self.assertEqual(runner.get_image_version(),
-                                 _DEFAULT_IMAGE_VERSION)
-                self.assertEqual(runner.get_hadoop_version(), '2.7.2')
+        with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
+            runner.run()
+            self.assertEqual(runner.get_image_version(),
+                             _DEFAULT_IMAGE_VERSION)
+            self.assertEqual(runner.get_hadoop_version(), '2.7.2')
 
 
 class AvailabilityZoneConfigTestCase(MockGoogleTestCase):
@@ -1263,32 +1257,29 @@ class CleanUpJobTestCase(MockGoogleTestCase):
             self.assertFalse(m['_cleanup_job'].called)
 
     def test_kill_cluster(self):
-        with no_handlers_for_logger('mrjob.dataproc'):
-            r = self._quick_runner()
-            with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_delete_cluster') as m:
-                r._cleanup_cluster()
-                self.assertTrue(m.called)
+        r = self._quick_runner()
+        with patch.object(mrjob.dataproc.DataprocJobRunner,
+                          '_delete_cluster') as m:
+            r._cleanup_cluster()
+            self.assertTrue(m.called)
 
     def test_kill_cluster_if_successful(self):
         # If they are setting up the cleanup to kill the cluster, mrjob should
         # kill the cluster independent of job success.
-        with no_handlers_for_logger('mrjob.dataproc'):
-            r = self._quick_runner()
-            with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_delete_cluster') as m:
-                r._ran_job = True
-                r._cleanup_cluster()
-                self.assertTrue(m.called)
+        r = self._quick_runner()
+        with patch.object(mrjob.dataproc.DataprocJobRunner,
+                          '_delete_cluster') as m:
+            r._ran_job = True
+            r._cleanup_cluster()
+            self.assertTrue(m.called)
 
     def test_kill_persistent_cluster(self):
-        with no_handlers_for_logger('mrjob.dataproc'):
-            r = self._quick_runner()
-            with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_delete_cluster') as m:
-                r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
-                r._cleanup_cluster()
-                self.assertTrue(m.called)
+        r = self._quick_runner()
+        with patch.object(mrjob.dataproc.DataprocJobRunner,
+                          '_delete_cluster') as m:
+            r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
+            r._cleanup_cluster()
+            self.assertTrue(m.called)
 
 
 class BootstrapPythonTestCase(MockGoogleTestCase):
@@ -1787,7 +1778,7 @@ class FailedTaskContainerIDsTestCase(MockLogEntriesTestCase):
             [])
 
 
-class FixTracebackTestCase(TestCase):
+class FixTracebackTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_fix_traceback(''), '')
@@ -1815,7 +1806,7 @@ class FixTracebackTestCase(TestCase):
         self.assertEqual(_fix_traceback(message), message)
 
 
-class FixJavaStackTraceTestCase(TestCase):
+class FixJavaStackTraceTestCase(BasicTestCase):
 
     STACK_TRACE = (
         'Diagnostics report from attempt_1525195653111_0001_m_000000_3:'

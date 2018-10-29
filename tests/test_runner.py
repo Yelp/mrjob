@@ -44,22 +44,15 @@ from tests.sandbox import mrjob_conf_patcher
 
 class WithStatementTestCase(BaseTestCase):
 
-    def setUp(self):
-        self.local_tmp_dir = None
-
-    def tearDown(self):
-        if self.local_tmp_dir:
-            shutil.rmtree(self.local_tmp_dir)
-            self.local_tmp_dir = None
-
     def _test_cleanup_after_with_statement(self, mode, should_exist):
-        with InlineMRJobRunner(cleanup=mode, conf_paths=[]) as runner:
-            self.local_tmp_dir = runner._get_local_tmp_dir()
-            self.assertTrue(os.path.exists(self.local_tmp_dir))
+        local_tmp_dir = None
 
-        self.assertEqual(os.path.exists(self.local_tmp_dir), should_exist)
-        if not should_exist:
-            self.local_tmp_dir = None
+        with InlineMRJobRunner(cleanup=mode, conf_paths=[]) as runner:
+            local_tmp_dir = runner._get_local_tmp_dir()
+            self.assertTrue(os.path.exists(local_tmp_dir))
+
+        # leaving the with: block activates cleanup
+        self.assertEqual(os.path.exists(local_tmp_dir), should_exist)
 
     def test_cleanup_all(self):
         self._test_cleanup_after_with_statement(['ALL'], False)
@@ -89,12 +82,16 @@ class WithStatementTestCase(BaseTestCase):
 class TestJobName(BaseTestCase):
 
     def setUp(self):
+        super(TestJobName, self).setUp()
+
         self.blank_out_environment()
         self.monkey_patch_getuser()
 
     def tearDown(self):
         self.restore_getuser()
         self.restore_environment()
+
+        super(TestJobName, self).tearDown()
 
     def blank_out_environment(self):
         self._old_environ = os.environ.copy()

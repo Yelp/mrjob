@@ -471,18 +471,6 @@ class StepsPythonBinTestCase(BaseTestCase):
 
 class LocalBootstrapMrjobTestCase(BaseTestCase):
 
-    def setUp(self):
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
     def test_loading_bootstrapped_mrjob_library(self):
         # track the dir we're loading mrjob from rather than the full path
         # to deal with edge cases where we load from the .py file,

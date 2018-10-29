@@ -3055,7 +3055,7 @@ class BootstrapPythonTestCase(MockBoto3TestCase):
 
                 if not PY2:
                     warnings = ''.join(
-                        a[0] + '\n' for a, kw in log.call_args_list)
+                        a[0] + '\n' for a, kw in log.warnings.call_args_list)
                     self.assertIn('will probably not work', warnings)
 
     def _assert_never_installs_python3(self, *args):

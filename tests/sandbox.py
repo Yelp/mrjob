@@ -31,7 +31,6 @@ import mrjob
 from mrjob import runner
 
 from tests.py2 import patch
-from tests.quiet import add_null_handler_to_root_logger
 
 
 # simple config that also silences 'no config options for runner' logging
@@ -113,8 +112,6 @@ class EmptyMrjobConfTestCase(BaseTestCase):
 
     def setUp(self):
         super(EmptyMrjobConfTestCase, self).setUp()
-
-        add_null_handler_to_root_logger()
 
         if self.MRJOB_CONF_CONTENTS is not None:
             self.mrjob_conf_patcher = mrjob_conf_patcher(

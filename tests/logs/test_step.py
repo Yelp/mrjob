@@ -25,11 +25,9 @@ from mrjob.logs.step import _match_emr_step_stderr_path
 from mrjob.logs.step import _parse_indented_counters
 from mrjob.logs.step import _parse_step_syslog
 from mrjob.py2 import StringIO
-from mrjob.util import log_to_stream
 
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import BaseTestCase
 
 
@@ -320,6 +318,11 @@ class InterpretHadoopJarCommandStderrTestCase(BaseTestCase):
 
 class ParseIndentedCountersTestCase(BaseTestCase):
 
+    def setUp(self):
+        super(ParseIndentedCountersTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.logs.step.log'))
+
     def test_empty(self):
         self.assertEqual(_parse_indented_counters([]), {})
 
@@ -349,18 +352,14 @@ class ParseIndentedCountersTestCase(BaseTestCase):
             '    FILE: Number of bytes read=86',
         ]
 
-        with no_handlers_for_logger('mrjob.logs.step'):
-            stderr = StringIO()
-            log_to_stream('mrjob.logs.step', stderr)
+        self.assertEqual(_parse_indented_counters(lines), {
+            'File System Counters': {
+                'FILE: Number of bytes read': 86,
+            },
+        })
 
-            self.assertEqual(_parse_indented_counters(lines), {
-                'File System Counters': {
-                    'FILE: Number of bytes read': 86,
-                },
-            })
-
-            # header shouldn't freak it out
-            self.assertEqual(stderr.getvalue(), '')
+        # header shouldn't freak it out
+        self.assertFalse(self.log.warning.called)
 
     def test_indentation_is_required(self):
         lines = [
@@ -368,15 +367,11 @@ class ParseIndentedCountersTestCase(BaseTestCase):
             '   FILE: Number of bytes read=8',
         ]
 
-        with no_handlers_for_logger('mrjob.logs.step'):
-            stderr = StringIO()
-            log_to_stream('mrjob.logs.step', stderr)
+        # counter line is interpreted as group
+        self.assertEqual(_parse_indented_counters(lines), {})
 
-            # counter line is interpreted as group
-            self.assertEqual(_parse_indented_counters(lines), {})
-
-            # should complain
-            self.assertNotEqual(stderr.getvalue(), '')
+        # should complain
+        self.assertTrue(self.log.warning.called)
 
     def test_no_empty_groups(self):
         lines = [

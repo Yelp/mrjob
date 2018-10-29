@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _match_history_log_path
@@ -28,7 +28,7 @@ from tests.py2 import patch
 
 
 # path matching
-class MatchHistoryLogTestCase(TestCase):
+class MatchHistoryLogTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_match_history_log_path(''), None)
@@ -191,7 +191,7 @@ class InterpretHistoryLogTestCase(BaseTestCase):
 
 
 # log parsing
-class ParseYARNHistoryLogTestCase(TestCase):
+class ParseYARNHistoryLogTestCase(BaseTestCase):
 
     JOB_COUNTER_LINES = [
         '{"type":"JOB_FINISHED","event":{'
@@ -358,7 +358,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
         )
 
 
-class ParsePreYARNHistoryLogTestCase(TestCase):
+class ParsePreYARNHistoryLogTestCase(BaseTestCase):
     JOB_COUNTER_LINES = [
         'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564"'
         ' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
@@ -500,7 +500,7 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
 
 
 # edge cases in pre-YARN history record parsing
-class ParsePreYARNHistoryRecordsTestCase(TestCase):
+class ParsePreYARNHistoryRecordsTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(list(_parse_pre_yarn_history_records([])), [])
@@ -618,7 +618,7 @@ class ParsePreYARNHistoryRecordsTestCase(TestCase):
 
 
 # edge cases in pre-YARN counter parsing
-class ParsePreYARNCountersTestCase(TestCase):
+class ParsePreYARNCountersTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_pre_yarn_counters(''), {})

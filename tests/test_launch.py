@@ -21,7 +21,7 @@ import os
 import sys
 from subprocess import Popen
 from subprocess import PIPE
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
@@ -178,7 +178,7 @@ class RunJobTestCase(SandboxedTestCase):
         self.assertEqual(launcher.stderr.getvalue(), b'')
 
 
-class CommandLineArgsTestCase(TestCase):
+class CommandLineArgsTestCase(BaseTestCase):
 
     def test_shouldnt_exit_when_invoked_as_object(self):
         self.assertRaises(ValueError, MRJobLauncher, args=['--quux', 'baz'])
@@ -375,7 +375,7 @@ class CommandLineArgsTestCase(TestCase):
         self.assertRaises(ValueError, MRCustomJobLauncher, args=[])
 
 
-class TestToolLogging(TestCase):
+class TestToolLogging(BaseTestCase):
     """ Verify the behavior of logging configuration for CLI tools
     """
     def test_default_options(self):
@@ -397,7 +397,7 @@ class TestToolLogging(TestCase):
                 self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
 
 
-class TestPassThroughRunner(TestCase):
+class TestPassThroughRunner(BaseTestCase):
 
     def get_value(self, job):
         job.sandbox()
@@ -419,7 +419,7 @@ class TestPassThroughRunner(TestCase):
         self.assertEqual(self.get_value(MRRunner(['-r', 'local'])), 'local')
 
 
-class StdStreamTestCase(TestCase):
+class StdStreamTestCase(BaseTestCase):
 
     def test_normal_python(self):
         launcher = MRJobLauncher(args=['/path/to/script'])

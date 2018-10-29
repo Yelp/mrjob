@@ -24,7 +24,7 @@ from os.path import dirname
 from os.path import join
 from subprocess import Popen
 from subprocess import PIPE
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob

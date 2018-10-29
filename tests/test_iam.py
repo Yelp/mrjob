@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.iam import _MRJOB_SERVICE_ROLE
 
@@ -24,7 +24,7 @@ from tests.mock_boto3.iam import MockIAMClient
 # IAM stuff is mostly tested by test_emr.py, but we don't test what happens if
 # there are already enough IAM objects to cause pagination
 
-class PaginationTestCase(TestCase):
+class PaginationTestCase(BaseTestCase):
 
     def test_many_instance_profiles(self):
         client = MockIAMClient()

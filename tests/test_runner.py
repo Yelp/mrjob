@@ -20,7 +20,7 @@ import os.path
 import shutil
 import tarfile
 from time import sleep
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 from unittest import skipIf
 
 import mrjob.conf
@@ -46,7 +46,7 @@ from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 
 
-class WithStatementTestCase(TestCase):
+class WithStatementTestCase(BaseTestCase):
 
     def setUp(self):
         self.local_tmp_dir = None
@@ -90,7 +90,7 @@ class WithStatementTestCase(TestCase):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
 
 
-class TestJobName(TestCase):
+class TestJobName(BaseTestCase):
 
     def setUp(self):
         self.blank_out_environment()

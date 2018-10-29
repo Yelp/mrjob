@@ -13,14 +13,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.retry import RetryWrapper
 
 from tests.py2 import Mock
 
 
-class RetryWrapperTestCase(TestCase):
+class RetryWrapperTestCase(BaseTestCase):
     def test_success(self):
         a1 = Mock()
         a1.f = Mock(__name__='f', side_effect=None)

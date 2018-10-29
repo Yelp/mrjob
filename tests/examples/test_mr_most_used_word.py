@@ -11,14 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.examples.mr_most_used_word import MRMostUsedWord
 
 from tests.job import run_job
 
 
-class MRMostUsedWordTestCase(TestCase):
+class MRMostUsedWordTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(run_job(MRMostUsedWord()), {})

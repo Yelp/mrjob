@@ -21,7 +21,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
 from subprocess import PIPE
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound
@@ -1787,7 +1787,7 @@ class FailedTaskContainerIDsTestCase(MockLogEntriesTestCase):
             [])
 
 
-class FixTracebackTestCase(TestCase):
+class FixTracebackTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_fix_traceback(''), '')
@@ -1815,7 +1815,7 @@ class FixTracebackTestCase(TestCase):
         self.assertEqual(_fix_traceback(message), message)
 
 
-class FixJavaStackTraceTestCase(TestCase):
+class FixJavaStackTraceTestCase(BaseTestCase):
 
     STACK_TRACE = (
         'Diagnostics report from attempt_1525195653111_0001_m_000000_3:'

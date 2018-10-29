@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from tests.sandbox import BaseTestCase
 from tests.py2 import Mock
@@ -23,7 +23,7 @@ from mrjob.logs.bootstrap import _match_emr_bootstrap_stderr_path
 from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
 
 
-class CheckForNonzeroReturnCodeTestCase(TestCase):
+class CheckForNonzeroReturnCodeTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(
@@ -55,7 +55,7 @@ class CheckForNonzeroReturnCodeTestCase(TestCase):
             None)
 
 
-class MatchEMRBootstrapStderrPathTestCase(TestCase):
+class MatchEMRBootstrapStderrPathTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(

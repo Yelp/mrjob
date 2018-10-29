@@ -14,12 +14,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.py2 import to_unicode
 
 
-class ToUnicodeTestCase(TestCase):
+class ToUnicodeTestCase(BaseTestCase):
 
     def test_None(self):
         self.assertRaises(TypeError, to_unicode, None)

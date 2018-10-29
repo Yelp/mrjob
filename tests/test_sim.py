@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from io import BytesIO
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 import gzip
 import os
 import os.path
@@ -138,7 +138,7 @@ class MRJobFileOptionsTestCase(SandboxedTestCase):
             self.assertEqual(output, [2])
 
 
-class NoMRJobConfTestCase(TestCase):
+class NoMRJobConfTestCase(BaseTestCase):
 
     def test_no_mrjob_confs(self):
         with patch.object(

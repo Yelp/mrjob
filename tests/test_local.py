@@ -27,7 +27,7 @@ from multiprocessing import cpu_count
 from os.path import exists
 from os.path import join
 from subprocess import check_call
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 from unittest import skipIf
 
 from warcio.warcwriter import WARCWriter
@@ -374,7 +374,7 @@ class TimeoutException(Exception):
     pass
 
 
-class ExitWithoutExceptionTestCase(TestCase):
+class ExitWithoutExceptionTestCase(BaseTestCase):
 
     def test_exit_42_job(self):
         mr_job = MRExit42Job(['--no-conf', '--runner=local'])
@@ -437,7 +437,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
                     sorted([b'1\tnull\n', b'1\t"bar"\n']))
 
 
-class StepsPythonBinTestCase(TestCase):
+class StepsPythonBinTestCase(BaseTestCase):
 
     def test_echo_as_steps_python_bin(self):
         mr_job = MRTwoStepJob(
@@ -470,7 +470,7 @@ class StepsPythonBinTestCase(TestCase):
             self.assertRaises(ValueError, runner._get_steps)
 
 
-class LocalBootstrapMrjobTestCase(TestCase):
+class LocalBootstrapMrjobTestCase(BaseTestCase):
 
     def setUp(self):
         self.make_tmp_dir()
@@ -801,7 +801,7 @@ class FilterTestCase(SandboxedTestCase):
             self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
 
 
-class SetupLineEncodingTestCase(TestCase):
+class SetupLineEncodingTestCase(BaseTestCase):
 
     def test_setup_wrapper_script_uses_local_line_endings(self):
         job = MRTwoStepJob(['-r', 'local', '--setup', 'true'])

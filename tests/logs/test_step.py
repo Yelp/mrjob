@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import errno
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _interpret_emr_step_stderr
@@ -116,7 +116,7 @@ PARSED_NOT_A_VALID_JAR_LOG_LINES = dict(
 )
 
 
-class ParseStepSyslogTestCase(TestCase):
+class ParseStepSyslogTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_step_syslog([]), {})
@@ -138,7 +138,7 @@ class ParseStepSyslogTestCase(TestCase):
         )
 
 
-class InterpretHadoopJarCommandStderrTestCase(TestCase):
+class InterpretHadoopJarCommandStderrTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_interpret_hadoop_jar_command_stderr([]), {})
@@ -318,7 +318,7 @@ class InterpretHadoopJarCommandStderrTestCase(TestCase):
             _interpret_hadoop_jar_command_stderr, yield_lines())
 
 
-class ParseIndentedCountersTestCase(TestCase):
+class ParseIndentedCountersTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_indented_counters([]), {})
@@ -392,7 +392,7 @@ class ParseIndentedCountersTestCase(TestCase):
         })
 
 
-class MatchEMRStepSyslogPathTestCase(TestCase):
+class MatchEMRStepSyslogPathTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_match_emr_step_syslog_path(''), None)
@@ -435,7 +435,7 @@ class MatchEMRStepSyslogPathTestCase(TestCase):
 # this is currently almost identical to MatchEMRStepSyslogPathTestCase,
 # but that could change (for example, previous versions of the code
 # ignored rotated stderr logs)
-class MatchEMRStepStderrPathTestCase(TestCase):
+class MatchEMRStepStderrPathTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_match_emr_step_stderr_path(''), None)

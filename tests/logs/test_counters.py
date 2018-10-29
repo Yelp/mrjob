@@ -13,13 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.step import _parse_indented_counters
 
 
-class FormatCountersTestCase(TestCase):
+class FormatCountersTestCase(BaseTestCase):
 
     COUNTERS = {
         'File System Counters': {

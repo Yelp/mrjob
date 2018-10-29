@@ -23,7 +23,7 @@ import os.path
 from io import BytesIO
 from subprocess import check_call
 from subprocess import PIPE
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 import mrjob.step
 from mrjob.conf import combine_dicts
@@ -87,7 +87,7 @@ class MockHadoopTestCase(SandboxedTestCase):
         self.add_mrjob_to_pythonpath()
 
 
-class TestFullyQualifyHDFSPath(TestCase):
+class TestFullyQualifyHDFSPath(BaseTestCase):
 
     def test_empty(self):
         with patch('getpass.getuser') as getuser:

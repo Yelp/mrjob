@@ -17,7 +17,7 @@
 """Test compatibility switching between different Hadoop versions"""
 import os
 from distutils.version import LooseVersion
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import jobconf_from_env
@@ -31,7 +31,7 @@ from tests.py2 import patch
 from tests.sandbox import BaseTestCase
 
 
-class JobConfFromEnvTestCase(TestCase):
+class JobConfFromEnvTestCase(BaseTestCase):
 
     def setUp(self):
         p = patch.object(os, 'environ', {})
@@ -63,7 +63,7 @@ class JobConfFromEnvTestCase(TestCase):
         self.assertEqual(jobconf_from_env('user.defined', 'beauty'), 'beauty')
 
 
-class JobConfFromDictTestCase(TestCase):
+class JobConfFromDictTestCase(BaseTestCase):
 
     def test_get_old_hadoop_jobconf(self):
         jobconf = {'user.name': 'Edsger W. Dijkstra'}
@@ -91,7 +91,7 @@ class JobConfFromDictTestCase(TestCase):
             jobconf_from_dict({}, 'user.defined', 'beauty'), 'beauty')
 
 
-class TranslateJobConfTestCase(TestCase):
+class TranslateJobConfTestCase(BaseTestCase):
 
     def test_translate_jobconf(self):
         self.assertEqual(translate_jobconf('user.name', '0.20'),
@@ -194,7 +194,7 @@ class TranslateJobConfDictTestCase(BaseTestCase):
         self.assertFalse(self.log.warning.called)
 
 
-class TranslateJobConfForAllVersionsTestCase(TestCase):
+class TranslateJobConfForAllVersionsTestCase(BaseTestCase):
 
     def test_translate_jobconf_for_all_versions(self):
         self.assertEqual(translate_jobconf_for_all_versions('user.name'),
@@ -203,7 +203,7 @@ class TranslateJobConfForAllVersionsTestCase(TestCase):
                          ['foo.bar'])
 
 
-class UsesYarnTestCase(TestCase):
+class UsesYarnTestCase(BaseTestCase):
 
     def test_uses_yarn(self):
         self.assertEqual(uses_yarn('0.22'), False)
@@ -213,7 +213,7 @@ class UsesYarnTestCase(TestCase):
         self.assertEqual(uses_yarn('2.0.0'), True)
 
 
-class MapVersionTestCase(TestCase):
+class MapVersionTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertRaises(ValueError, map_version, '0.5.0', None)

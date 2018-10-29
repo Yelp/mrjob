@@ -19,7 +19,7 @@ import sys
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 import boto3
 from dateutil.parser import parse
@@ -77,7 +77,7 @@ class AuditUsageTestCase(ToolTestCase):
         self.assertEqual(self.describe_cluster_sleep.call_count, 1)
 
 
-class ClusterToFullSummaryTestCase(TestCase):
+class ClusterToFullSummaryTestCase(BaseTestCase):
 
     maxDiff = None  # show whole diff when tests fail
 
@@ -823,7 +823,7 @@ class ClusterToFullSummaryTestCase(TestCase):
         })
 
 
-class SubdivideIntervalByDateTestCase(TestCase):
+class SubdivideIntervalByDateTestCase(BaseTestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
@@ -886,7 +886,7 @@ class SubdivideIntervalByDateTestCase(TestCase):
         )
 
 
-class SubdivideIntervalByHourTestCase(TestCase):
+class SubdivideIntervalByHourTestCase(BaseTestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
@@ -947,7 +947,7 @@ class SubdivideIntervalByHourTestCase(TestCase):
         )
 
 
-class PercentTestCase(TestCase):
+class PercentTestCase(BaseTestCase):
 
     def test_basic(self):
         self.assertEqual(62.5, _percent(5, 8))

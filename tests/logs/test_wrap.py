@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 
 from mrjob.logs.task import _match_task_log_path
 from mrjob.logs.wrap import _cat_log_lines
@@ -107,7 +107,7 @@ class CatLogsTestCase(BaseTestCase):
         self.assertFalse(self.mock_log.warning.called)
 
 
-class LsLogsTestCase(TestCase):
+class LsLogsTestCase(BaseTestCase):
 
     def setUp(self):
         super(LsLogsTestCase, self).setUp()

@@ -18,7 +18,7 @@
 """Test configuration parsing and option combining"""
 import os
 import os.path
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 from unittest import skipIf
 
 import mrjob.conf
@@ -384,7 +384,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
             self.assertIn('If your mrjob.conf is in YAML', e.msg)
 
 
-class CombineValuesTestCase(TestCase):
+class CombineValuesTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_values(), None)
@@ -411,7 +411,7 @@ class CombineValuesTestCase(TestCase):
         self.assertEqual(combine_values(set([1]), set()), set())
 
 
-class CombineDictsTestCase(TestCase):
+class CombineDictsTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_dicts(), {})
@@ -464,7 +464,7 @@ class CombineDictsTestCase(TestCase):
                           combine_dicts, ClearedValue({'USER': 'dave'}))
 
 
-class CombineCmdsTestCase(TestCase):
+class CombineCmdsTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_cmds(), None)
@@ -495,7 +495,7 @@ class CombineCmdsTestCase(TestCase):
         self.assertEqual(combine_cmds(u'wunderbar!'), ['wunderbar!'])
 
 
-class CombineEnvsTestCase(TestCase):
+class CombineEnvsTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_envs(), {})
@@ -542,7 +542,7 @@ class CombineEnvsTestCase(TestCase):
              'PS1': '\w> '})
 
 
-class CombineJobconfsTestCase(TestCase):
+class CombineJobconfsTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_jobconfs(), {})
@@ -610,7 +610,7 @@ class CombineJobconfsTestCase(TestCase):
                           combine_jobconfs, ClearedValue(dict(foo='bar')))
 
 
-class CombineLocalEnvsTestCase(TestCase):
+class CombineLocalEnvsTestCase(BaseTestCase):
 
     def setUp(self):
         self.set_os_pathsep()
@@ -640,7 +640,7 @@ class CombineLocalEnvsTestCase(TestCase):
              'PS1': '\w> '})
 
 
-class CombineListsTestCase(TestCase):
+class CombineListsTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_lists(), [])
@@ -665,7 +665,7 @@ class CombineListsTestCase(TestCase):
                          [1, 2, 3, 4, 5, 6])
 
 
-class CombineOptsTestCase(TestCase):
+class CombineOptsTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_opts(combiners={}), {})
@@ -765,7 +765,7 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
 
 
 @skipIf(mrjob.conf.yaml is None, 'no yaml module')
-class LoadYAMLWithClearTag(TestCase):
+class LoadYAMLWithClearTag(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_load_yaml_with_clear_tag(''),
@@ -854,7 +854,7 @@ class LoadYAMLWithClearTag(TestCase):
             {'foo': ['bar', {'baz': ClearedValue('qux')}]})
 
 
-class FixClearTag(TestCase):
+class FixClearTag(BaseTestCase):
 
     def test_none(self):
         self.assertEqual(_fix_clear_tags(None), None)

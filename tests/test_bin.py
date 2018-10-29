@@ -21,7 +21,7 @@ import stat
 import sys
 from io import BytesIO
 from shutil import make_archive
-from unittest import TestCase
+from tests.sandbox import BaseTestCase
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
@@ -105,7 +105,7 @@ class ArgsForSparkStepTestCase(SandboxedTestCase):
         self._test_step(1)
 
 
-class BootstrapMRJobTestCase(TestCase):
+class BootstrapMRJobTestCase(BaseTestCase):
     # this just tests _bootstrap_mrjob() (i.e. whether to bootstrap mrjob);
     # actual testing of bootstrapping is in test_local
 
@@ -289,7 +289,7 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
             )
 
 
-class InterpreterTestCase(TestCase):
+class InterpreterTestCase(BaseTestCase):
 
     def test_default(self):
         runner = MRJobBinRunner()

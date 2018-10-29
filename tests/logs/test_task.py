@@ -26,7 +26,7 @@ from mrjob.logs.task import _parse_task_syslog
 from tests.py2 import call
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BaseTestCase
 
 
 class MatchTaskLogPathTestCase(TestCase):
@@ -130,7 +130,7 @@ class MatchTaskLogPathTestCase(TestCase):
 
 # test how _ls_task_logs() and _ls_spark_task_logs() filter by
 # error_attempt_id
-class LsTaskLogsTestCase(PatcherTestCase):
+class LsTaskLogsTestCase(BaseTestCase):
 
     def setUp(self):
         super(LsTaskLogsTestCase, self).setUp()
@@ -235,7 +235,7 @@ class LsTaskLogsTestCase(PatcherTestCase):
             [self.mock_paths[2]])
 
 
-class InterpretTaskLogsTestCase(PatcherTestCase):
+class InterpretTaskLogsTestCase(BaseTestCase):
 
     maxDiff = None
 
@@ -641,7 +641,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         )
 
 
-class InterpretSparkTaskLogsTestCase(PatcherTestCase):
+class InterpretSparkTaskLogsTestCase(BaseTestCase):
 
     maxDiff = None
 

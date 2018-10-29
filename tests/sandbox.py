@@ -14,10 +14,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import print_function
+
+from functools import partial
+import logging
 import os
 import os.path
 import random
 import stat
+import sys
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from shutil import rmtree
@@ -74,7 +79,20 @@ def random_seed(seed):
         random.setstate(state)
 
 
-class PatcherTestCase(TestCase):
+class BaseTestCase(TestCase):
+    """All tests in MRJob should inherit from this or a subclass."""
+
+    def setUp(self):
+        """disable logging
+
+        if you need to test logging, mock out the logger for the
+        relevant module: ``self.log = self.start(patch('mrjob.job.logging'))``
+        """
+        # Extra logging messages were cluttering Travis CI. See #1793
+        super(BaseTestCase, self)
+
+        logging.disable(logging.CRITICAL)
+        self.addCleanup(partial(logging.disable, logging.NOTSET))
 
     def start(self, patcher):
         """Add the given patcher to this test case's cleanup actions,
@@ -88,7 +106,7 @@ class PatcherTestCase(TestCase):
         return mock
 
 
-class EmptyMrjobConfTestCase(PatcherTestCase):
+class EmptyMrjobConfTestCase(BaseTestCase):
 
     # set to None if you don't want load_opts_from_mrjob_confs patched
     MRJOB_CONF_CONTENTS = EMPTY_MRJOB_CONF

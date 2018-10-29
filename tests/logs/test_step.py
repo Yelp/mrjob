@@ -30,7 +30,7 @@ from mrjob.util import log_to_stream
 from tests.py2 import Mock
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BaseTestCase
 
 
 # abbreviated version of real output from Hadoop 2.7.0.
@@ -475,7 +475,7 @@ class MatchEMRStepStderrPathTestCase(TestCase):
             _match_emr_step_stderr_path(syslog_path), None)
 
 
-class InterpretEMRStepSyslogTestCase(PatcherTestCase):
+class InterpretEMRStepSyslogTestCase(BaseTestCase):
 
     def setUp(self):
         super(InterpretEMRStepSyslogTestCase, self).setUp()
@@ -632,7 +632,7 @@ class InterpretEMRStepSyslogTestCase(PatcherTestCase):
     maxDiff = None
 
 
-class InterpretEMRStepStderrTestCase(PatcherTestCase):
+class InterpretEMRStepStderrTestCase(BaseTestCase):
 
     def setUp(self):
         super(InterpretEMRStepStderrTestCase, self).setUp()

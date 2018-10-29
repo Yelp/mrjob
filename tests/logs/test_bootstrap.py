@@ -14,7 +14,7 @@
 # limitations under the License.
 from unittest import TestCase
 
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BaseTestCase
 from tests.py2 import Mock
 from tests.py2 import patch
 
@@ -121,7 +121,7 @@ class MatchEMRBootstrapStderrPathTestCase(TestCase):
         )
 
 
-class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
+class InterpretEMRBootstrapStderrTestCase(BaseTestCase):
 
     def setUp(self):
         super(InterpretEMRBootstrapStderrTestCase, self).setUp()

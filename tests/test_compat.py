@@ -28,7 +28,7 @@ from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_yarn
 
 from tests.py2 import patch
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BaseTestCase
 
 
 class JobConfFromEnvTestCase(TestCase):
@@ -117,7 +117,7 @@ class TranslateJobConfTestCase(TestCase):
         self.assertRaises(TypeError, translate_jobconf, 'foo.bar', None)
 
 
-class TranslateJobConfDictTestCase(PatcherTestCase):
+class TranslateJobConfDictTestCase(BaseTestCase):
 
     # jobconf with spooooky mix of Hadoop 1 and Hadoop 2 variables
     JOBCONF = {

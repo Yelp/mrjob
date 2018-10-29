@@ -22,7 +22,7 @@ from mrjob.logs.history import _parse_pre_yarn_history_records
 from mrjob.logs.history import _parse_pre_yarn_counters
 from mrjob.logs.history import _parse_yarn_history_log
 
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BaseTestCase
 from tests.py2 import Mock
 from tests.py2 import patch
 
@@ -102,7 +102,7 @@ class MatchHistoryLogTestCase(TestCase):
             None)
 
 
-class InterpretHistoryLogTestCase(PatcherTestCase):
+class InterpretHistoryLogTestCase(BaseTestCase):
 
     def setUp(self):
         super(InterpretHistoryLogTestCase, self).setUp()

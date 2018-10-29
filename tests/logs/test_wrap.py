@@ -24,10 +24,10 @@ from mrjob.util import log_to_stream
 from tests.py2 import patch
 from tests.py2 import Mock
 from tests.quiet import no_handlers_for_logger
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BaseTestCase
 
 
-class CatLogsTestCase(PatcherTestCase):
+class CatLogsTestCase(BaseTestCase):
 
     def setUp(self):
         super(CatLogsTestCase, self)

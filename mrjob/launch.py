@@ -203,9 +203,6 @@ class MRJobLauncher(object):
         :param bool verbose: If true, set log level to ``DEBUG`` (default is
                              ``INFO``)
         :param bool stream: Stream to log to (default is ``sys.stderr``)
-
-        This will also set up a null log handler for boto3, so we don't get
-        warnings if boto3 tries to log about throttling and whatnot.
         """
         if quiet:
             log_to_null(name='mrjob')

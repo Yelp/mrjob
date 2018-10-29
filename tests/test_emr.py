@@ -3528,6 +3528,9 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
             'mrjob.emr.EMRJobRunner.get_hadoop_version',
             return_value='2.4.0'))
 
+        self.set_up_ssh_tunnel = self.start(patch(
+            'mrjob.emr.EMRJobRunner._set_up_ssh_tunnel'))
+
         self.ssh_worker_hosts = self.start(patch(
             'mrjob.emr.EMRJobRunner._ssh_worker_hosts',
             return_value=['core1', 'core2', 'task1']))
@@ -3592,6 +3595,7 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
 
     def _test_stream_history_log_dirs(
             self, ssh, image_version=_DEFAULT_IMAGE_VERSION,
+            expected_hdfs_dir_name='history',
             expected_dir_name='hadoop/history',
             expected_s3_dir_name='jobs',
             read_logs=True):
@@ -3601,12 +3605,28 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
                               read_logs=read_logs)
         self.get_image_version.return_value = image_version
 
+        # have to be able to access HDFS to reach history logs
+        runner._set_up_ssh_tunnel_and_hdfs()
+
         self.log.info.reset_mock()
 
         results = runner._stream_history_log_dirs()
 
         if read_logs:
-            if ssh:
+            if ssh and expected_hdfs_dir_name:
+                self.log.info.reset_mock()
+
+                self.assertEqual(next(results), [
+                    'hdfs:///tmp/hadoop-yarn/staging/' + expected_hdfs_dir_name
+                ])
+                self.assertFalse(
+                    self._wait_for_logs_on_s3.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for history log in' +
+                    ' hdfs:///tmp/hadoop-yarn/staging/' +
+                    expected_hdfs_dir_name + '...')
+
+            if ssh and expected_dir_name:
                 self.log.info.reset_mock()
 
                 self.assertEqual(next(results), [
@@ -3618,17 +3638,18 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
                     'Looking for history log in /mnt/var/log/' +
                     expected_dir_name + ' on master...')
 
-            self.log.info.reset_mock()
+            if expected_s3_dir_name:
+                self.log.info.reset_mock()
 
-            self.assertEqual(next(results), [
-                's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
-            ])
-            self.assertTrue(
-                self._wait_for_logs_on_s3.called)
-            self.log.info.assert_called_once_with(
-                'Looking for history log in'
-                ' s3://bucket/logs/j-CLUSTERID/' +
-                expected_s3_dir_name + '...')
+                self.assertEqual(next(results), [
+                    's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
+                ])
+                self.assertTrue(
+                    self._wait_for_logs_on_s3.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for history log in'
+                    ' s3://bucket/logs/j-CLUSTERID/' +
+                    expected_s3_dir_name + '...')
         else:
             self.assertFalse(self._wait_for_logs_on_s3.called)
             self.assertFalse(self.log.info.called)
@@ -3637,30 +3658,53 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
 
     def test_stream_history_log_dirs_from_2_x_amis_with_ssh(self):
         self._test_stream_history_log_dirs(
-            image_version='2.4.11', ssh=True)
+            ssh=True, image_version='2.4.11',
+            expected_hdfs_dir_name=None)
 
     def test_stream_history_log_dirs_from_2_x_amis_without_ssh(self):
         self._test_stream_history_log_dirs(
-            image_version='2.4.11', ssh=False)
+            ssh=False, image_version='2.4.11',
+            expected_hdfs_dir_name=None)
 
-    def test_cant_stream_history_log_dirs_from_3_x_amis(self):
-        runner = EMRJobRunner(image_version='3.11.0')
-        self.get_image_version.return_value = '3.11.0'
-        results = runner._stream_history_log_dirs()
-        self.assertRaises(StopIteration, next, results)
+    def test_stream_history_log_dirs_from_3_x_amis_with_ssh(self):
+        self._test_stream_history_log_dirs(
+            ssh=False, image_version='3.11.0',
+            expected_dir_name=None,
+            expected_s3_dir_name=None)
 
-    def test_stream_history_log_dirs_from_4_x_amis(self):
+    def test_stream_history_log_dirs_from_3_x_amis_without_ssh(self):
+        self._test_stream_history_log_dirs(
+            ssh=False, image_version='3.11.0',
+            expected_dir_name=None,
+            expected_s3_dir_name=None)
+
+    def test_stream_history_log_dirs_from_4_x_amis_with_ssh(self):
         self._test_stream_history_log_dirs(
             ssh=True, image_version='4.3.0',
             expected_dir_name='hadoop-mapreduce/history',
             expected_s3_dir_name='hadoop-mapreduce/history')
 
+    def test_stream_history_log_dirs_from_4_x_amis_without_ssh(self):
+        self._test_stream_history_log_dirs(
+            ssh=False, image_version='4.3.0',
+            expected_dir_name='hadoop-mapreduce/history',
+            expected_s3_dir_name='hadoop-mapreduce/history')
+
+    def test_stream_history_log_dirs_from_default_ami_with_ssh(self):
+        self._test_stream_history_log_dirs(
+            ssh=True,
+            expected_dir_name='hadoop-mapreduce/history',
+            expected_s3_dir_name='hadoop-mapreduce/history')
+
+    def test_stream_history_log_dirs_from_default_ami_without_ssh(self):
+        self._test_stream_history_log_dirs(
+            ssh=False,
+            expected_dir_name='hadoop-mapreduce/history',
+            expected_s3_dir_name='hadoop-mapreduce/history')
+
     def test_stream_history_log_dirs_no_read_logs(self):
         self._test_stream_history_log_dirs(
-            ssh=True, image_version='4.3.0',
-            expected_dir_name='hadoop-mapreduce/history',
-            expected_s3_dir_name='hadoop-mapreduce/history',
-            read_logs=False)
+            ssh=True, read_logs=False)
 
     def _test_stream_step_log_dirs(self, ssh, read_logs=True):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
@@ -4273,7 +4317,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         super(WaitForStepsToCompleteTestCase, self).setUp()
 
         # mock out setting up SSH tunnel
-        self.start(patch.object(EMRJobRunner, '_set_up_ssh_tunnel'))
+        self.start(patch.object(EMRJobRunner, '_set_up_ssh_tunnel_and_hdfs'))
 
         # mock out logging
         self.start(patch('mrjob.emr.log'))
@@ -4301,7 +4345,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         runner._wait_for_steps_to_complete()
 
         self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 2)
-        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel.called)
+        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel_and_hdfs.called)
         self.assertEqual(len(runner._log_interpretations), 2)
         self.assertIsNone(runner._mns_log_interpretation)
 
@@ -4320,7 +4364,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         self.assertIsNotNone(runner._master_node_setup_script_path)
 
         self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 3)
-        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel.called)
+        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel_and_hdfs.called)
         self.assertEqual(len(runner._log_interpretations), 2)
         self.assertIsNotNone(runner._mns_log_interpretation)
         self.assertEqual(runner._mns_log_interpretation['no_job'], True)
@@ -4342,7 +4386,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         # is RUNNING
 
         # stop the test as soon as SSH tunnel is set up
-        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         runner = self.make_runner()
 
@@ -4360,7 +4404,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         # tests #1115
 
         # stop the test as soon as SSH tunnel is set up
-        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         runner = self.make_runner()
         mock_cluster = self.mock_emr_clusters[runner._cluster_id]
@@ -4376,7 +4420,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         # tests #1115
 
         # stop the test as soon as SSH tunnel is set up
-        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         runner = self.make_runner()
         mock_cluster = self.mock_emr_clusters[runner._cluster_id]
@@ -4392,7 +4436,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         # tests #1115
 
         # stop the test as soon as SSH tunnel is set up
-        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         # put steps from previous job on cluster
         previous_runner = self.make_runner()
@@ -4643,8 +4687,7 @@ class MasterPrivateIPTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            # no cluster yet
-            self.assertRaises(AssertionError, runner._master_private_ip)
+            self.assertIsNone(runner._master_private_ip())
 
             self.launch(runner)
 

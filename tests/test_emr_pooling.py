@@ -2025,7 +2025,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
 
-    def test_restart_ssh_tunnel_on_launch(self):
+    def test_reset_ssh_tunnel_and_hadoop_fs_on_launch(self):
         # regression test for #1549
         ssh_tunnel_cluster_ids = []
 
@@ -2046,13 +2046,24 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             side_effect=_kill_ssh_tunnel,
             autospec=True))
 
+        # also test reset of _hadoop_fs
+        def _address_of_master(self):
+            return '%s-master' % self._cluster_id
+
+        mock_address_of_master = self.start(patch(
+            'mrjob.emr.EMRJobRunner._address_of_master',
+            side_effect=_address_of_master, autospec=True))
+
         cluster_id = self.make_pooled_cluster()
         self.mock_emr_self_termination.add(cluster_id)
 
-        job = MRTwoStepJob(['-r', 'emr'])
+        job = MRTwoStepJob(['-r', 'emr', '--ec2-key-pair-file', os.devnull])
         job.sandbox()
 
         with job.make_runner() as runner:
+            self.assertTrue(runner._hadoop_fs)
+            self.assertEqual(runner._hadoop_fs._hadoop_bin, [])
+
             runner.run()
 
             # tried to add steps to pooled cluster, had to try again
@@ -2064,6 +2075,11 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.assertEqual(len(mock_kill_ssh_tunnel.call_args_list), 1)
             self.assertEqual(ssh_tunnel_cluster_ids,
                              [cluster_id, runner.get_cluster_id()])
+
+            self.assertNotEqual(runner._hadoop_fs._hadoop_bin, [])
+            self.assertIn('hadoop@%s-master' % runner.get_cluster_id(),
+                          runner._hadoop_fs._hadoop_bin)
+
 
     def test_join_pooled_cluster_after_self_termination(self):
         # cluster 1 should be preferable

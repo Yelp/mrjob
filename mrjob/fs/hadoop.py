@@ -60,20 +60,30 @@ class HadoopFilesystem(Filesystem):
     def __init__(self, hadoop_bin=None):
         """Create a Hadoop filesystem
 
-        :param hadoop_bin: ``hadoop`` binary, as a list of args
+        :param hadoop_bin: ``hadoop`` binary, as a list of args. If set to
+                           ``None``, we'll auto-detect the Hadoop binary.
+                           If set to ``[]``, this FS will be disabled
+                           until you call :py:meth:`set_hadoop_bin`.
         """
         super(HadoopFilesystem, self).__init__()
         self._hadoop_bin = hadoop_bin
         self._hadoop_version = None  # cache for get_hadoop_version()
 
     def can_handle_path(self, path):
+        if not (self._hadoop_bin or self._hadoop_bin is None):
+            return False
+
         return is_uri(path)
 
     def get_hadoop_bin(self):
         """Return the hadoop binary, searching for it if need be."""
-        if not self._hadoop_bin:
+        if self._hadoop_bin is None:
             self._hadoop_bin = self._find_hadoop_bin()
         return self._hadoop_bin
+
+    def set_hadoop_bin(self, hadoop_bin):
+        """Manually set the hadoop binary, as a list of args."""
+        self._hadoop_bin = hadoop_bin
 
     def _find_hadoop_bin(self):
         """Look for the hadoop binary in any plausible place. If all

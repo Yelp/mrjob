@@ -56,8 +56,6 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
 from tests.py2 import patch
-from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
@@ -415,26 +413,25 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
                                '-r', 'local'])
         mr_job.sandbox(stdin=[b'bar\n'])
 
-        with no_handlers_for_logger():
-            with mr_job.make_runner() as runner:
-                runner.run()
+        with mr_job.make_runner() as runner:
+            runner.run()
 
-                # expect python -v crud in stderr
+            # expect python -v crud in stderr
 
-                with open(runner._task_stderr_path('mapper', 0, 0)) as lines:
-                    self.assertTrue(any(
-                        'import mrjob' in line or  # Python 2
-                        "import 'mrjob'" in line
-                        for line in lines))
+            with open(runner._task_stderr_path('mapper', 0, 0)) as lines:
+                self.assertTrue(any(
+                    'import mrjob' in line or  # Python 2
+                    "import 'mrjob'" in line
+                    for line in lines))
 
-                with open(runner._task_stderr_path('mapper', 0, 0)) as lines:
-                    self.assertTrue(any(
-                        '#' in line for line in lines))
+            with open(runner._task_stderr_path('mapper', 0, 0)) as lines:
+                self.assertTrue(any(
+                    '#' in line for line in lines))
 
-                # should still get expected results
-                self.assertEqual(
-                    sorted(to_lines(runner.cat_output())),
-                    sorted([b'1\tnull\n', b'1\t"bar"\n']))
+            # should still get expected results
+            self.assertEqual(
+                sorted(to_lines(runner.cat_output())),
+                sorted([b'1\tnull\n', b'1\t"bar"\n']))
 
 
 class StepsPythonBinTestCase(BaseTestCase):
@@ -522,8 +519,7 @@ class LocalBootstrapMrjobTestCase(BaseTestCase):
                 self.assertEqual(runner._opts['bootstrap_mrjob'], False)
                 local_tmp_dir = os.path.realpath(runner._get_local_tmp_dir())
                 try:
-                    with no_handlers_for_logger():
-                        runner.run()
+                    runner.run()
                 except StepFailedException:
                     # this is what happens when mrjob isn't installed elsewhere
                     return
@@ -811,13 +807,12 @@ class SetupLineEncodingTestCase(BaseTestCase):
         # that use unix line endings anyway. So monitor open() instead
         with patch(
                 'mrjob.sim.open', create=True, side_effect=open) as m_open:
-            with logger_disabled('mrjob.local'):
-                with job.make_runner() as runner:
-                    runner.run()
+            with job.make_runner() as runner:
+                runner.run()
 
-                    self.assertIn(
-                        call(runner._setup_wrapper_script_path, 'w'),
-                        m_open.mock_calls)
+                self.assertIn(
+                    call(runner._setup_wrapper_script_path, 'w'),
+                    m_open.mock_calls)
 
 
 class LocalModeSortValuesTestCase(SortValuesTestCase):

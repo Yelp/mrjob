@@ -56,8 +56,6 @@ from tests.py2 import call
 from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch
-from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import BaseTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
@@ -902,15 +900,14 @@ class FileOptionsTestCase(SandboxedTestCase):
 
         mr_job.sandbox(stdin=stdin)
 
-        with logger_disabled('mrjob.local'):
-            with mr_job.make_runner() as runner:
-                # make sure our file gets placed in the working dir
-                self.assertIn(n_file_path, runner._working_dir_mgr.paths())
+        with mr_job.make_runner() as runner:
+            # make sure our file gets placed in the working dir
+            self.assertIn(n_file_path, runner._working_dir_mgr.paths())
 
-                runner.run()
-                output = set()
-                for _, value in mr_job.parse_output(runner.cat_output()):
-                    output.add(value)
+            runner.run()
+            output = set()
+            for _, value in mr_job.parse_output(runner.cat_output()):
+                output.add(value)
 
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 

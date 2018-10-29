@@ -44,8 +44,6 @@ from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_confs
 
 from tests.py2 import patch
-from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 
 
@@ -124,9 +122,8 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         with open(dot_mrjob_path, 'w') as f:
             f.write('{"runners": {"foo": {"bar": "baz"}}}')
 
-        with no_handlers_for_logger('mrjob.conf'):
-            self.assertEqual(load_mrjob_conf(),
-                             {'runners': {'foo': {'bar': 'baz'}}})
+        self.assertEqual(load_mrjob_conf(),
+                         {'runners': {'foo': {'bar': 'baz'}}})
         self.assertEqual(load_opts_from_mrjob_conf('foo')[0][1],
                          {'bar': 'baz'})
 
@@ -135,18 +132,17 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         with open(conf_path, 'w') as f:
             f.write('{"runners": {"foo": {"qux": "quux"}}}')
 
-        with no_handlers_for_logger('mrjob.conf'):
-            self.assertEqual(
-                load_mrjob_conf(conf_path=conf_path),
-                {'runners': {'foo': {'qux': 'quux'}}})
+        self.assertEqual(
+            load_mrjob_conf(conf_path=conf_path),
+            {'runners': {'foo': {'qux': 'quux'}}})
+
         self.assertEqual(
             load_opts_from_mrjob_conf('foo', conf_path=conf_path)[0][1],
             {'qux': 'quux'})
         # test missing options
-        with logger_disabled('mrjob.conf'):
-            self.assertEqual(
-                load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
-                {})
+        self.assertEqual(
+            load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
+            {})
 
     def test_duplicate_conf_path(self):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
@@ -327,8 +323,8 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
 
         with open(conf_path, 'w') as f:
             dump_mrjob_conf(conf, f)
-        with no_handlers_for_logger('mrjob.conf'):
-            self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
+
+        self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
 
     def test_round_trip(self):
         self._test_round_trip({'runners': {'foo': {'qux': 'quux'}}})

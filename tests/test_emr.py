@@ -79,7 +79,6 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import call
 from tests.py2 import patch
-from tests.quiet import logger_disabled
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
@@ -418,8 +417,7 @@ class ExistingClusterTestCase(MockBoto3TestCase):
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
             self.prepare_runner_for_ssh(runner)
-            with logger_disabled('mrjob.emr'):
-                self.assertRaises(StepFailedException, runner.run)
+            self.assertRaises(StepFailedException, runner.run)
 
             for _ in range(10):
                 self.simulate_emr_progress(runner.get_cluster_id())
@@ -611,8 +609,7 @@ class IAMTestCase(MockBoto3TestCase):
 
         self.start(patch('boto3.client', side_effect=forbidding_boto3_client))
 
-        with logger_disabled('mrjob.emr'):
-            cluster = self.run_and_get_cluster()
+        cluster = self.run_and_get_cluster()
 
         self.assertTrue(any(args == ('iam',)
                             for args, kwargs in boto3.client.call_args_list))
@@ -744,12 +741,11 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
             self.assertEqual(cluster.get('RunningAmiVersion'), None)
 
     def test_hadoop_version_option_does_nothing(self):
-        with logger_disabled('mrjob.emr'):
-            with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
-                runner.run()
-                self.assertEqual(runner.get_image_version(),
-                                 _DEFAULT_IMAGE_VERSION)
-                self.assertEqual(runner.get_hadoop_version(), '2.8.4')
+        with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
+            runner.run()
+            self.assertEqual(runner.get_image_version(),
+                             _DEFAULT_IMAGE_VERSION)
+            self.assertEqual(runner.get_hadoop_version(), '2.8.4')
 
 
 class CustomAmiTestCase(MockBoto3TestCase):
@@ -3405,13 +3401,12 @@ class SetupLineEncodingTestCase(MockBoto3TestCase):
         # that use unix line endings anyway. So monitor open() instead
         with patch(
                 'mrjob.runner.open', create=True, side_effect=open) as m_open:
-            with logger_disabled('mrjob.emr'):
-                with job.make_runner() as runner:
-                    runner.run()
+            with job.make_runner() as runner:
+                runner.run()
 
-                    self.assertIn(
-                        call(runner._setup_wrapper_script_path, 'wb'),
-                        m_open.mock_calls)
+                self.assertIn(
+                    call(runner._setup_wrapper_script_path, 'wb'),
+                    m_open.mock_calls)
 
 
 class WaitForLogsOnS3TestCase(MockBoto3TestCase):

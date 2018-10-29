@@ -38,7 +38,6 @@ from tests.mr_counting_job import MRCountingJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import patch
-from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
@@ -847,21 +846,19 @@ class TestExtraKwargs(ConfigFilesTestCase):
         self.path = self.save_conf('config', self.CONFIG)
 
     def test_extra_kwargs_in_mrjob_conf_okay(self):
-        with logger_disabled('mrjob.runner'):
-            runner = InlineMRJobRunner(conf_paths=[self.path])
-            self.assertEqual(runner._opts['setup'], ['echo foo'])
-            self.assertNotIn('qux', runner._opts)
+        runner = InlineMRJobRunner(conf_paths=[self.path])
+        self.assertEqual(runner._opts['setup'], ['echo foo'])
+        self.assertNotIn('qux', runner._opts)
 
     def test_extra_kwargs_passed_in_directly_okay(self):
-        with logger_disabled('mrjob.runner'):
-            runner = InlineMRJobRunner(
-                foo='bar',
-                local_tmp_dir='/var/tmp',
-                conf_paths=[],
-            )
+        runner = InlineMRJobRunner(
+            foo='bar',
+            local_tmp_dir='/var/tmp',
+            conf_paths=[],
+        )
 
-            self.assertEqual(runner._opts['local_tmp_dir'], '/var/tmp')
-            self.assertNotIn('bar', runner._opts)
+        self.assertEqual(runner._opts['local_tmp_dir'], '/var/tmp')
+        self.assertNotIn('bar', runner._opts)
 
 
 class OptDebugPrintoutTestCase(ConfigFilesTestCase):

@@ -35,7 +35,6 @@ from tests.mr_runner import MRRunner
 from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
 
@@ -379,22 +378,20 @@ class TestToolLogging(BaseTestCase):
     """ Verify the behavior of logging configuration for CLI tools
     """
     def test_default_options(self):
-        with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', StringIO()) as stderr:
-                MRJob.set_up_logging()
-                log = logging.getLogger('__main__')
-                log.info('INFO')
-                log.debug('DEBUG')
-                self.assertEqual(stderr.getvalue(), 'INFO\n')
+        with patch.object(sys, 'stderr', StringIO()) as stderr:
+            MRJob.set_up_logging()
+            log = logging.getLogger('__main__')
+            log.info('INFO')
+            log.debug('DEBUG')
+            self.assertEqual(stderr.getvalue(), 'INFO\n')
 
     def test_verbose(self):
-        with no_handlers_for_logger('__main__'):
-            with patch.object(sys, 'stderr', StringIO()) as stderr:
-                MRJob.set_up_logging(verbose=True)
-                log = logging.getLogger('__main__')
-                log.info('INFO')
-                log.debug('DEBUG')
-                self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
+        with patch.object(sys, 'stderr', StringIO()) as stderr:
+            MRJob.set_up_logging(verbose=True)
+            log = logging.getLogger('__main__')
+            log.info('INFO')
+            log.debug('DEBUG')
+            self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
 
 
 class TestPassThroughRunner(BaseTestCase):

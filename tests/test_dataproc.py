@@ -63,7 +63,6 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import call
 from tests.py2 import mock
 from tests.py2 import patch
-from tests.quiet import logger_disabled
 from tests.sandbox import mrjob_conf_patcher
 
 # used to match command lines
@@ -365,8 +364,7 @@ class ExistingClusterTestCase(MockGoogleTestCase):
         with mr_job.make_runner() as runner2:
             self.assertIsInstance(runner2, DataprocJobRunner)
 
-            with logger_disabled('mrjob.dataproc'):
-                self.assertRaises(StepFailedException, runner2.run)
+            self.assertRaises(StepFailedException, runner2.run)
 
             cluster2 = runner2._get_cluster(runner2._cluster_id)
             self.assertEqual(_cluster_state_name(cluster2.status.state),
@@ -410,12 +408,11 @@ class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
             self.assertEqual(runner.get_hadoop_version(), hadoop_version)
 
     def test_hadoop_version_option_does_nothing(self):
-        with logger_disabled('mrjob.dataproc'):
-            with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
-                runner.run()
-                self.assertEqual(runner.get_image_version(),
-                                 _DEFAULT_IMAGE_VERSION)
-                self.assertEqual(runner.get_hadoop_version(), '2.7.2')
+        with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
+            runner.run()
+            self.assertEqual(runner.get_image_version(),
+                             _DEFAULT_IMAGE_VERSION)
+            self.assertEqual(runner.get_hadoop_version(), '2.7.2')
 
 
 class AvailabilityZoneConfigTestCase(MockGoogleTestCase):

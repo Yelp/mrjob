@@ -1474,6 +1474,8 @@ class TestSSHLs(MockBoto3TestCase):
 class NoBoto3TestCase(SandboxedTestCase):
 
     def setUp(self):
+        super(NoBoto3TestCase, self).setUp()
+
         self.start(patch('mrjob.emr.boto3', None))
         self.start(patch('mrjob.fs.s3.boto3', None))
 

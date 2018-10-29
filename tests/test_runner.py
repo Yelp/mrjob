@@ -31,7 +31,6 @@ from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
 from mrjob.py2 import StringIO
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
-from mrjob.util import log_to_stream
 from mrjob.util import to_lines
 
 from tests.mock_boto3 import MockBoto3TestCase
@@ -40,7 +39,6 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import patch
 from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
@@ -655,17 +653,18 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
 
 class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
 
+    def setUp(self):
+        super(MultipleConfigFilesMachineryTestCase, self).setUp()
+        self.log = self.start(patch('mrjob.conf.log'))
+
     def test_empty_runner_error(self):
         conf = dict(runner=dict(local=dict(local_tmp_dir='/tmp')))
         path = self.save_conf('basic', conf)
 
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.conf', stderr)
-            InlineMRJobRunner(conf_paths=[path])
-            self.assertEqual(
-                "No configs specified for inline runner\n",
-                stderr.getvalue())
+        InlineMRJobRunner(conf_paths=[path])
+
+        self.log.warning.assert_called_once_with(
+            'No configs specified for inline runner')
 
     def test_conf_contain_only_include_file(self):
         """If a config file only include other configuration files
@@ -701,13 +700,8 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
         }
         path = self.save_conf('twoincludefiles', conf)
 
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.conf', stderr)
-            InlineMRJobRunner(conf_paths=[path])
-            self.assertEqual(
-                "",
-                stderr.getvalue())
+        InlineMRJobRunner(conf_paths=[path])
+        self.assertFalse(self.log.called)
 
 
 class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
@@ -873,15 +867,14 @@ class TestExtraKwargs(ConfigFilesTestCase):
 class OptDebugPrintoutTestCase(ConfigFilesTestCase):
 
     def test_option_debug_printout(self):
-        stderr = StringIO()
+        log = self.start(patch('mrjob.runner.log'))
 
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.runner', stderr, debug=True)
+        InlineMRJobRunner(owner='dave')
 
-            InlineMRJobRunner(owner='dave')
+        debug = ''.join(a[0] + '\n' for a, kw in log.debug.call_args_list)
 
-        self.assertIn("'owner'", stderr.getvalue())
-        self.assertIn("'dave'", stderr.getvalue())
+        self.assertIn("'owner'", debug)
+        self.assertIn("'dave'", debug)
 
 
 class DeprecatedFileUploadArgsTestCase(SandboxedTestCase):

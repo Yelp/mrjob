@@ -341,7 +341,6 @@ class MRJobRunner(object):
             check_input_paths=True,
             cleanup=['ALL'],
             cleanup_on_failure=['NONE'],
-            local_tmp_dir=tempfile.gettempdir(),
             owner=owner,
         )
 
@@ -725,7 +724,10 @@ class MRJobRunner(object):
         """Create a tmp directory on the local filesystem that will be
         cleaned up by self.cleanup()"""
         if not self._local_tmp_dir:
-            path = os.path.join(self._opts['local_tmp_dir'], self._job_key)
+            tmp_dir = (self._opts['local_tmp_dir'] or
+                       tempfile.gettempdir())
+
+            path = os.path.join(tmp_dir, self._job_key)
             log.info('Creating temp directory %s' % path)
             if os.path.isdir(path):
                 shutil.rmtree(path)

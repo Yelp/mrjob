@@ -849,7 +849,11 @@ _RUNNER_OPTS = dict(
     ),
     local_tmp_dir=dict(
         combiner=combine_paths,
-        # no switches, use $TMPDIR etc.
+        switches=[
+            (['--local-tmp-dir'], dict(
+                help='temp directory on local filesystem',
+            )),
+        ],
     ),
     master_instance_bid_price=dict(
         cloud_role='launch',

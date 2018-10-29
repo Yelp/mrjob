@@ -18,10 +18,10 @@ from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
 
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class CheckForNonzeroReturnCodeTestCase(BaseTestCase):
+class CheckForNonzeroReturnCodeTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(
@@ -53,7 +53,7 @@ class CheckForNonzeroReturnCodeTestCase(BaseTestCase):
             None)
 
 
-class MatchEMRBootstrapStderrPathTestCase(BaseTestCase):
+class MatchEMRBootstrapStderrPathTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(
@@ -119,7 +119,7 @@ class MatchEMRBootstrapStderrPathTestCase(BaseTestCase):
         )
 
 
-class InterpretEMRBootstrapStderrTestCase(BaseTestCase):
+class InterpretEMRBootstrapStderrTestCase(BasicTestCase):
 
     def setUp(self):
         super(InterpretEMRBootstrapStderrTestCase, self).setUp()

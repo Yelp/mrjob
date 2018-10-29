@@ -35,7 +35,7 @@ from tests.mr_runner import MRRunner
 from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
 
@@ -184,7 +184,7 @@ class RunJobWithLoggingTestCase(TestCase):
         self.assertIn(b'Step failed', launcher.stderr.getvalue())
 
 
-class CommandLineArgsTestCase(BaseTestCase):
+class CommandLineArgsTestCase(BasicTestCase):
 
     def test_shouldnt_exit_when_invoked_as_object(self):
         self.assertRaises(ValueError, MRJobLauncher, args=['--quux', 'baz'])
@@ -402,7 +402,7 @@ class TestToolLogging(TestCase):
             self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
 
 
-class TestPassThroughRunner(BaseTestCase):
+class TestPassThroughRunner(BasicTestCase):
 
     def get_value(self, job):
         job.sandbox()
@@ -424,7 +424,7 @@ class TestPassThroughRunner(BaseTestCase):
         self.assertEqual(self.get_value(MRRunner(['-r', 'local'])), 'local')
 
 
-class StdStreamTestCase(BaseTestCase):
+class StdStreamTestCase(BasicTestCase):
 
     def test_normal_python(self):
         launcher = MRJobLauncher(args=['/path/to/script'])

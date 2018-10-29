@@ -47,7 +47,7 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import call
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.test_bin import PYTHON_BIN
@@ -86,7 +86,7 @@ class MockHadoopTestCase(SandboxedTestCase):
         self.add_mrjob_to_pythonpath()
 
 
-class TestFullyQualifyHDFSPath(BaseTestCase):
+class TestFullyQualifyHDFSPath(BasicTestCase):
 
     def test_empty(self):
         with patch('getpass.getuser') as getuser:

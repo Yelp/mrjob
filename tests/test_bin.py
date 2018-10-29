@@ -45,7 +45,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
@@ -102,7 +102,7 @@ class ArgsForSparkStepTestCase(SandboxedTestCase):
         self._test_step(1)
 
 
-class BootstrapMRJobTestCase(BaseTestCase):
+class BootstrapMRJobTestCase(BasicTestCase):
     # this just tests _bootstrap_mrjob() (i.e. whether to bootstrap mrjob);
     # actual testing of bootstrapping is in test_local
 
@@ -285,7 +285,7 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
             )
 
 
-class InterpreterTestCase(BaseTestCase):
+class InterpreterTestCase(BasicTestCase):
 
     def test_default(self):
         runner = MRJobBinRunner()

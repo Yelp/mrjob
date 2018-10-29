@@ -16,10 +16,10 @@
 # limitations under the License.
 from mrjob.py2 import to_unicode
 
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class ToUnicodeTestCase(BaseTestCase):
+class ToUnicodeTestCase(BasicTestCase):
 
     def test_None(self):
         self.assertRaises(TypeError, to_unicode, None)

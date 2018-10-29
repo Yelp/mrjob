@@ -18,13 +18,13 @@ import json
 from mrjob.iam import _MRJOB_SERVICE_ROLE
 
 from tests.mock_boto3.iam import MockIAMClient
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
 # IAM stuff is mostly tested by test_emr.py, but we don't test what happens if
 # there are already enough IAM objects to cause pagination
 
-class PaginationTestCase(BaseTestCase):
+class PaginationTestCase(BasicTestCase):
 
     def test_many_instance_profiles(self):
         client = MockIAMClient()

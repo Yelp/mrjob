@@ -31,7 +31,7 @@ from mrjob.tools.emr.audit_usage import _subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
 
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.tools.emr import ToolTestCase
 
 
@@ -77,7 +77,7 @@ class AuditUsageTestCase(ToolTestCase):
         self.assertEqual(self.describe_cluster_sleep.call_count, 1)
 
 
-class ClusterToFullSummaryTestCase(BaseTestCase):
+class ClusterToFullSummaryTestCase(BasicTestCase):
 
     maxDiff = None  # show whole diff when tests fail
 
@@ -823,7 +823,7 @@ class ClusterToFullSummaryTestCase(BaseTestCase):
         })
 
 
-class SubdivideIntervalByDateTestCase(BaseTestCase):
+class SubdivideIntervalByDateTestCase(BasicTestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
@@ -886,7 +886,7 @@ class SubdivideIntervalByDateTestCase(BaseTestCase):
         )
 
 
-class SubdivideIntervalByHourTestCase(BaseTestCase):
+class SubdivideIntervalByHourTestCase(BasicTestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
@@ -947,7 +947,7 @@ class SubdivideIntervalByHourTestCase(BaseTestCase):
         )
 
 
-class PercentTestCase(BaseTestCase):
+class PercentTestCase(BasicTestCase):
 
     def test_basic(self):
         self.assertEqual(62.5, _percent(5, 8))

@@ -16,10 +16,10 @@
 from mrjob.retry import RetryWrapper
 
 from tests.py2 import Mock
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class RetryWrapperTestCase(BaseTestCase):
+class RetryWrapperTestCase(BasicTestCase):
     def test_success(self):
         a1 = Mock()
         a1.f = Mock(__name__='f', side_effect=None)

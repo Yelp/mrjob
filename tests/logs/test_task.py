@@ -24,10 +24,10 @@ from mrjob.logs.task import _parse_task_syslog
 from tests.py2 import call
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class MatchTaskLogPathTestCase(BaseTestCase):
+class MatchTaskLogPathTestCase(BasicTestCase):
 
     PRE_YARN_STDERR_PATH = (
         '/userlogs/attempt_201512232143_0008_m_000001_3/stderr')
@@ -128,7 +128,7 @@ class MatchTaskLogPathTestCase(BaseTestCase):
 
 # test how _ls_task_logs() and _ls_spark_task_logs() filter by
 # error_attempt_id
-class LsTaskLogsTestCase(BaseTestCase):
+class LsTaskLogsTestCase(BasicTestCase):
 
     def setUp(self):
         super(LsTaskLogsTestCase, self).setUp()
@@ -233,7 +233,7 @@ class LsTaskLogsTestCase(BaseTestCase):
             [self.mock_paths[2]])
 
 
-class InterpretTaskLogsTestCase(BaseTestCase):
+class InterpretTaskLogsTestCase(BasicTestCase):
 
     maxDiff = None
 
@@ -639,7 +639,7 @@ class InterpretTaskLogsTestCase(BaseTestCase):
         )
 
 
-class InterpretSparkTaskLogsTestCase(BaseTestCase):
+class InterpretSparkTaskLogsTestCase(BasicTestCase):
 
     maxDiff = None
 
@@ -1006,7 +1006,7 @@ class InterpretSparkTaskLogsTestCase(BaseTestCase):
         )
 
 
-class ParseTaskSyslogTestCase(BaseTestCase):
+class ParseTaskSyslogTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_task_syslog([]), {})
@@ -1159,7 +1159,7 @@ class ParseTaskSyslogTestCase(BaseTestCase):
         )
 
 
-class ParseTaskStderrTestCase(BaseTestCase):
+class ParseTaskStderrTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_task_stderr([]), None)

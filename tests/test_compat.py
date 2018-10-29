@@ -27,10 +27,10 @@ from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_yarn
 
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class JobConfFromEnvTestCase(BaseTestCase):
+class JobConfFromEnvTestCase(BasicTestCase):
 
     def setUp(self):
         p = patch.object(os, 'environ', {})
@@ -62,7 +62,7 @@ class JobConfFromEnvTestCase(BaseTestCase):
         self.assertEqual(jobconf_from_env('user.defined', 'beauty'), 'beauty')
 
 
-class JobConfFromDictTestCase(BaseTestCase):
+class JobConfFromDictTestCase(BasicTestCase):
 
     def test_get_old_hadoop_jobconf(self):
         jobconf = {'user.name': 'Edsger W. Dijkstra'}
@@ -90,7 +90,7 @@ class JobConfFromDictTestCase(BaseTestCase):
             jobconf_from_dict({}, 'user.defined', 'beauty'), 'beauty')
 
 
-class TranslateJobConfTestCase(BaseTestCase):
+class TranslateJobConfTestCase(BasicTestCase):
 
     def test_translate_jobconf(self):
         self.assertEqual(translate_jobconf('user.name', '0.20'),
@@ -116,7 +116,7 @@ class TranslateJobConfTestCase(BaseTestCase):
         self.assertRaises(TypeError, translate_jobconf, 'foo.bar', None)
 
 
-class TranslateJobConfDictTestCase(BaseTestCase):
+class TranslateJobConfDictTestCase(BasicTestCase):
 
     # jobconf with spooooky mix of Hadoop 1 and Hadoop 2 variables
     JOBCONF = {
@@ -193,7 +193,7 @@ class TranslateJobConfDictTestCase(BaseTestCase):
         self.assertFalse(self.log.warning.called)
 
 
-class TranslateJobConfForAllVersionsTestCase(BaseTestCase):
+class TranslateJobConfForAllVersionsTestCase(BasicTestCase):
 
     def test_translate_jobconf_for_all_versions(self):
         self.assertEqual(translate_jobconf_for_all_versions('user.name'),
@@ -202,7 +202,7 @@ class TranslateJobConfForAllVersionsTestCase(BaseTestCase):
                          ['foo.bar'])
 
 
-class UsesYarnTestCase(BaseTestCase):
+class UsesYarnTestCase(BasicTestCase):
 
     def test_uses_yarn(self):
         self.assertEqual(uses_yarn('0.22'), False)
@@ -212,7 +212,7 @@ class UsesYarnTestCase(BaseTestCase):
         self.assertEqual(uses_yarn('2.0.0'), True)
 
 
-class MapVersionTestCase(BaseTestCase):
+class MapVersionTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertRaises(ValueError, map_version, '0.5.0', None)

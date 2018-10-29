@@ -38,12 +38,12 @@ from mrjob.util import unique
 from mrjob.util import which
 
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import random_seed
 
 
-class ToLinesTestCase(BaseTestCase):
+class ToLinesTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(
@@ -90,7 +90,7 @@ class ToLinesTestCase(BaseTestCase):
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
 
-class CmdLineTestCase(BaseTestCase):
+class CmdLineTestCase(BasicTestCase):
 
     def test_cmd_line(self):
         self.assertEqual(cmd_line(['cut', '-f', 2, '-d', ' ']),
@@ -103,7 +103,7 @@ class CmdLineTestCase(BaseTestCase):
 # expand_path() is tested by tests.test_conf.CombineAndExpandPathsTestCase
 
 
-class FileExtTestCase(BaseTestCase):
+class FileExtTestCase(BasicTestCase):
 
     def test_file_ext(self):
         self.assertEqual(file_ext('foo.zip'), '.zip')
@@ -114,7 +114,7 @@ class FileExtTestCase(BaseTestCase):
         self.assertEqual(file_ext('README.txt,v'), '.txt,v')
 
 
-class ParseAndSaveOptionsTestCase(BaseTestCase):
+class ParseAndSaveOptionsTestCase(BasicTestCase):
 
     def setUp(self):
         self.setup_options()
@@ -254,7 +254,7 @@ class DeprecatedReadInputTestCase(SandboxedTestCase):
                           read_input(os.path.join(self.tmpdir, 'lions*')))
 
 
-class SafeEvalTestCase(BaseTestCase):
+class SafeEvalTestCase(BasicTestCase):
 
     def test_simple_data_structures(self):
         # try unrepr-ing a bunch of simple data structures
@@ -289,7 +289,7 @@ class SafeEvalTestCase(BaseTestCase):
                              range_type(3))
 
 
-class ArchiveTestCase(BaseTestCase):
+class ArchiveTestCase(BasicTestCase):
 
     def setUp(self):
         self.setup_tmp_dir()
@@ -534,7 +534,7 @@ class DeprecatedReadFileTestCase(SandboxedTestCase):
         self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
 
 
-class RandomIdentifierTestCase(BaseTestCase):
+class RandomIdentifierTestCase(BasicTestCase):
 
     def test_format(self):
         with random_seed(0):
@@ -548,7 +548,7 @@ class RandomIdentifierTestCase(BaseTestCase):
             self.assertNotEqual(random_identifier(), random_identifier())
 
 
-class UniqueTestCase(BaseTestCase):
+class UniqueTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(list(unique([])), [])

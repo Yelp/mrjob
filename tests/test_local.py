@@ -56,7 +56,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
@@ -436,7 +436,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
                 sorted([b'1\tnull\n', b'1\t"bar"\n']))
 
 
-class StepsPythonBinTestCase(BaseTestCase):
+class StepsPythonBinTestCase(BasicTestCase):
 
     def test_echo_as_steps_python_bin(self):
         mr_job = MRTwoStepJob(
@@ -469,7 +469,7 @@ class StepsPythonBinTestCase(BaseTestCase):
             self.assertRaises(ValueError, runner._get_steps)
 
 
-class LocalBootstrapMrjobTestCase(BaseTestCase):
+class LocalBootstrapMrjobTestCase(BasicTestCase):
 
     def test_loading_bootstrapped_mrjob_library(self):
         # track the dir we're loading mrjob from rather than the full path
@@ -787,7 +787,7 @@ class FilterTestCase(SandboxedTestCase):
             self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
 
 
-class SetupLineEncodingTestCase(BaseTestCase):
+class SetupLineEncodingTestCase(BasicTestCase):
 
     def test_setup_wrapper_script_uses_local_line_endings(self):
         job = MRTwoStepJob(['-r', 'local', '--setup', 'true'])

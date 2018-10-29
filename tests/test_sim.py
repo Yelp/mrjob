@@ -30,7 +30,7 @@ from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_word_count import MRWordCount
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import SandboxedTestCase
 
 
@@ -138,7 +138,7 @@ class MRJobFileOptionsTestCase(SandboxedTestCase):
             self.assertEqual(output, [2])
 
 
-class NoMRJobConfTestCase(BaseTestCase):
+class NoMRJobConfTestCase(BasicTestCase):
 
     def test_no_mrjob_confs(self):
         with patch.object(

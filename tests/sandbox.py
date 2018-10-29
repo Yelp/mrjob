@@ -77,7 +77,7 @@ def random_seed(seed):
         random.setstate(state)
 
 
-class BaseTestCase(TestCase):
+class BasicTestCase(TestCase):
     """All tests in MRJob should inherit from this or a subclass, unless
     they require logging to be enabled (e.g. testing a MRJob's stderr)."""
 
@@ -88,7 +88,7 @@ class BaseTestCase(TestCase):
         relevant module: ``self.log = self.start(patch('mrjob.job.logging'))``
         """
         # Extra logging messages were cluttering Travis CI. See #1793
-        super(BaseTestCase, self)
+        super(BasicTestCase, self)
 
         logging.disable(logging.CRITICAL)
         self.addCleanup(partial(logging.disable, logging.NOTSET))
@@ -105,7 +105,7 @@ class BaseTestCase(TestCase):
         return mock
 
 
-class EmptyMrjobConfTestCase(BaseTestCase):
+class EmptyMrjobConfTestCase(BasicTestCase):
 
     # set to None if you don't want load_opts_from_mrjob_confs patched
     MRJOB_CONF_CONTENTS = EMPTY_MRJOB_CONF

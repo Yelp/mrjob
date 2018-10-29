@@ -43,7 +43,6 @@ from mrjob.py2 import StringIO
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import SparkStep
-from mrjob.util import log_to_stream
 
 from tests.job import run_job
 from tests.mr_hadoop_format_job import MRHadoopFormatJob

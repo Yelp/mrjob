@@ -31,6 +31,10 @@ class StepPickingTestCase(MockBoto3TestCase):
         self.log = self.start(
             patch('mrjob.tools.diagnose.log'))
 
+        # don't print logging messages when we start the diagnose tool
+        self.log_to_stream = self.start(
+            patch('mrjob.launch.log_to_stream'))
+
     def test_single_failed_step(self):
         self.mock_emr_clusters['j-MOCKCLUSTER0'] = dict(
             _Steps=[

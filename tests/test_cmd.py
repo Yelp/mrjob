@@ -24,10 +24,10 @@ from mrjob.tools.emr import terminate_cluster
 from mrjob.tools.emr import terminate_idle_clusters
 
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class CommandTestCase(BaseTestCase):
+class CommandTestCase(BasicTestCase):
 
     def setUp(self):
         def error(msg=None):

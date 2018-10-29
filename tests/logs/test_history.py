@@ -20,13 +20,13 @@ from mrjob.logs.history import _parse_pre_yarn_history_records
 from mrjob.logs.history import _parse_pre_yarn_counters
 from mrjob.logs.history import _parse_yarn_history_log
 
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.py2 import Mock
 from tests.py2 import patch
 
 
 # path matching
-class MatchHistoryLogTestCase(BaseTestCase):
+class MatchHistoryLogTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_match_history_log_path(''), None)
@@ -100,7 +100,7 @@ class MatchHistoryLogTestCase(BaseTestCase):
             None)
 
 
-class InterpretHistoryLogTestCase(BaseTestCase):
+class InterpretHistoryLogTestCase(BasicTestCase):
 
     def setUp(self):
         super(InterpretHistoryLogTestCase, self).setUp()
@@ -189,7 +189,7 @@ class InterpretHistoryLogTestCase(BaseTestCase):
 
 
 # log parsing
-class ParseYARNHistoryLogTestCase(BaseTestCase):
+class ParseYARNHistoryLogTestCase(BasicTestCase):
 
     JOB_COUNTER_LINES = [
         '{"type":"JOB_FINISHED","event":{'
@@ -356,7 +356,7 @@ class ParseYARNHistoryLogTestCase(BaseTestCase):
         )
 
 
-class ParsePreYARNHistoryLogTestCase(BaseTestCase):
+class ParsePreYARNHistoryLogTestCase(BasicTestCase):
     JOB_COUNTER_LINES = [
         'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564"'
         ' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
@@ -498,7 +498,7 @@ class ParsePreYARNHistoryLogTestCase(BaseTestCase):
 
 
 # edge cases in pre-YARN history record parsing
-class ParsePreYARNHistoryRecordsTestCase(BaseTestCase):
+class ParsePreYARNHistoryRecordsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(list(_parse_pre_yarn_history_records([])), [])
@@ -616,7 +616,7 @@ class ParsePreYARNHistoryRecordsTestCase(BaseTestCase):
 
 
 # edge cases in pre-YARN counter parsing
-class ParsePreYARNCountersTestCase(BaseTestCase):
+class ParsePreYARNCountersTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_pre_yarn_counters(''), {})

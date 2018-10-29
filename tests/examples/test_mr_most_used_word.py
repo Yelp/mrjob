@@ -14,10 +14,10 @@
 from mrjob.examples.mr_most_used_word import MRMostUsedWord
 
 from tests.job import run_job
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class MRMostUsedWordTestCase(BaseTestCase):
+class MRMostUsedWordTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(run_job(MRMostUsedWord()), {})

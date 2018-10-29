@@ -26,7 +26,7 @@ from mrjob.logs.step import _parse_step_syslog
 
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
 # abbreviated version of real output from Hadoop 2.7.0.
@@ -112,7 +112,7 @@ PARSED_NOT_A_VALID_JAR_LOG_LINES = dict(
 )
 
 
-class ParseStepSyslogTestCase(BaseTestCase):
+class ParseStepSyslogTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_step_syslog([]), {})
@@ -134,7 +134,7 @@ class ParseStepSyslogTestCase(BaseTestCase):
         )
 
 
-class InterpretHadoopJarCommandStderrTestCase(BaseTestCase):
+class InterpretHadoopJarCommandStderrTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_interpret_hadoop_jar_command_stderr([]), {})
@@ -314,7 +314,7 @@ class InterpretHadoopJarCommandStderrTestCase(BaseTestCase):
             _interpret_hadoop_jar_command_stderr, yield_lines())
 
 
-class ParseIndentedCountersTestCase(BaseTestCase):
+class ParseIndentedCountersTestCase(BasicTestCase):
 
     def setUp(self):
         super(ParseIndentedCountersTestCase, self).setUp()
@@ -385,7 +385,7 @@ class ParseIndentedCountersTestCase(BaseTestCase):
         })
 
 
-class MatchEMRStepSyslogPathTestCase(BaseTestCase):
+class MatchEMRStepSyslogPathTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_match_emr_step_syslog_path(''), None)
@@ -428,7 +428,7 @@ class MatchEMRStepSyslogPathTestCase(BaseTestCase):
 # this is currently almost identical to MatchEMRStepSyslogPathTestCase,
 # but that could change (for example, previous versions of the code
 # ignored rotated stderr logs)
-class MatchEMRStepStderrPathTestCase(BaseTestCase):
+class MatchEMRStepStderrPathTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_match_emr_step_stderr_path(''), None)
@@ -468,7 +468,7 @@ class MatchEMRStepStderrPathTestCase(BaseTestCase):
             _match_emr_step_stderr_path(syslog_path), None)
 
 
-class InterpretEMRStepSyslogTestCase(BaseTestCase):
+class InterpretEMRStepSyslogTestCase(BasicTestCase):
 
     def setUp(self):
         super(InterpretEMRStepSyslogTestCase, self).setUp()
@@ -625,7 +625,7 @@ class InterpretEMRStepSyslogTestCase(BaseTestCase):
     maxDiff = None
 
 
-class InterpretEMRStepStderrTestCase(BaseTestCase):
+class InterpretEMRStepStderrTestCase(BasicTestCase):
 
     def setUp(self):
         super(InterpretEMRStepStderrTestCase, self).setUp()

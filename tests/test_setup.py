@@ -23,10 +23,10 @@ from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class ParseSetupCmdTestCase(BaseTestCase):
+class ParseSetupCmdTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(parse_setup_cmd(''), [])
@@ -188,7 +188,7 @@ class ParseSetupCmdTestCase(BaseTestCase):
             ValueError, parse_setup_cmd, 'foo\\')
 
 
-class ParseLegacyHashPathTestCase(BaseTestCase):
+class ParseLegacyHashPathTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertRaises(ValueError, parse_legacy_hash_path, 'archive', '')
@@ -259,7 +259,7 @@ class ParseLegacyHashPathTestCase(BaseTestCase):
             parse_legacy_hash_path, 'file', 'foo#bar/baz')
 
 
-class NameUniquelyTestCase(BaseTestCase):
+class NameUniquelyTestCase(BasicTestCase):
 
     def test_no_empty_names(self):
         self.assertEqual(name_uniquely(''), '1')
@@ -354,7 +354,7 @@ class NameUniquelyTestCase(BaseTestCase):
             name_uniquely(os.path.join('foo', 'bar', '')), 'bar')
 
 
-class UploadDirManagerTestCase(BaseTestCase):
+class UploadDirManagerTestCase(BasicTestCase):
 
     def test_empty(self):
         sd = UploadDirManager('hdfs:///')
@@ -440,7 +440,7 @@ class UploadDirManagerTestCase(BaseTestCase):
                           '._foo': 'hdfs:///foo'})
 
 
-class WorkingDirManagerTestCase(BaseTestCase):
+class WorkingDirManagerTestCase(BasicTestCase):
 
     def test_empty(self):
         wd = WorkingDirManager()

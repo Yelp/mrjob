@@ -15,10 +15,10 @@
 from mrjob.logs.log4j import _parse_hadoop_log4j_records
 from mrjob.py2 import StringIO
 
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class ParseHadoopLog4JRecordsCase(BaseTestCase):
+class ParseHadoopLog4JRecordsCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(list(_parse_hadoop_log4j_records([])), [])

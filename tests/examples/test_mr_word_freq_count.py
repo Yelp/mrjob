@@ -15,10 +15,10 @@
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 
 from tests.job import run_job
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class MRWordFreqCountTestCase(BaseTestCase):
+class MRWordFreqCountTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(run_job(MRWordFreqCount()), {})

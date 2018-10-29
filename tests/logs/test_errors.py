@@ -16,10 +16,10 @@ from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _merge_and_sort_errors
 from mrjob.logs.errors import _pick_error
 
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class PickErrorTestCase(BaseTestCase):
+class PickErrorTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_pick_error({}), None)
@@ -159,7 +159,7 @@ class PickErrorTestCase(BaseTestCase):
         )
 
 
-class MergeAndSortErrorsTestCase(BaseTestCase):
+class MergeAndSortErrorsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_merge_and_sort_errors([]), [])
@@ -291,7 +291,7 @@ class MergeAndSortErrorsTestCase(BaseTestCase):
         )
 
 
-class FormatErrorTestCase(BaseTestCase):
+class FormatErrorTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_format_error({}), '')

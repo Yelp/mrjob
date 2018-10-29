@@ -43,7 +43,7 @@ from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_confs
 
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import SandboxedTestCase
 
 
@@ -380,7 +380,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
             self.assertIn('If your mrjob.conf is in YAML', e.msg)
 
 
-class CombineValuesTestCase(BaseTestCase):
+class CombineValuesTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_values(), None)
@@ -407,7 +407,7 @@ class CombineValuesTestCase(BaseTestCase):
         self.assertEqual(combine_values(set([1]), set()), set())
 
 
-class CombineDictsTestCase(BaseTestCase):
+class CombineDictsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_dicts(), {})
@@ -460,7 +460,7 @@ class CombineDictsTestCase(BaseTestCase):
                           combine_dicts, ClearedValue({'USER': 'dave'}))
 
 
-class CombineCmdsTestCase(BaseTestCase):
+class CombineCmdsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_cmds(), None)
@@ -491,7 +491,7 @@ class CombineCmdsTestCase(BaseTestCase):
         self.assertEqual(combine_cmds(u'wunderbar!'), ['wunderbar!'])
 
 
-class CombineEnvsTestCase(BaseTestCase):
+class CombineEnvsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_envs(), {})
@@ -538,7 +538,7 @@ class CombineEnvsTestCase(BaseTestCase):
              'PS1': '\w> '})
 
 
-class CombineJobconfsTestCase(BaseTestCase):
+class CombineJobconfsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_jobconfs(), {})
@@ -606,7 +606,7 @@ class CombineJobconfsTestCase(BaseTestCase):
                           combine_jobconfs, ClearedValue(dict(foo='bar')))
 
 
-class CombineLocalEnvsTestCase(BaseTestCase):
+class CombineLocalEnvsTestCase(BasicTestCase):
 
     def setUp(self):
         self.set_os_pathsep()
@@ -636,7 +636,7 @@ class CombineLocalEnvsTestCase(BaseTestCase):
              'PS1': '\w> '})
 
 
-class CombineListsTestCase(BaseTestCase):
+class CombineListsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_lists(), [])
@@ -661,7 +661,7 @@ class CombineListsTestCase(BaseTestCase):
                          [1, 2, 3, 4, 5, 6])
 
 
-class CombineOptsTestCase(BaseTestCase):
+class CombineOptsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(combine_opts(combiners={}), {})
@@ -761,7 +761,7 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
 
 
 @skipIf(mrjob.conf.yaml is None, 'no yaml module')
-class LoadYAMLWithClearTag(BaseTestCase):
+class LoadYAMLWithClearTag(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_load_yaml_with_clear_tag(''),
@@ -850,7 +850,7 @@ class LoadYAMLWithClearTag(BaseTestCase):
             {'foo': ['bar', {'baz': ClearedValue('qux')}]})
 
 
-class FixClearTag(BaseTestCase):
+class FixClearTag(BasicTestCase):
 
     def test_none(self):
         self.assertEqual(_fix_clear_tags(None), None)

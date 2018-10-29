@@ -23,7 +23,7 @@ from mrjob.step import SparkStep
 from mrjob.step import SparkScriptStep
 from mrjob.step import StepFailedException
 
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
 # functions we don't really care about the values of
@@ -45,7 +45,7 @@ def spark_func(input_path, output_path):
     pass
 
 
-class StepFailedExceptionTestCase(BaseTestCase):
+class StepFailedExceptionTestCase(BasicTestCase):
 
     def test_empty(self):
         ex = StepFailedException()
@@ -83,7 +83,7 @@ class StepFailedExceptionTestCase(BaseTestCase):
             "StepFailedException(step_desc='Master node setup step')")
 
 
-class JarStepTestCase(BaseTestCase):
+class JarStepTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertRaises(TypeError, JarStep)
@@ -122,7 +122,7 @@ class JarStepTestCase(BaseTestCase):
         self.assertRaises(TypeError, JarStep, 'dora.jar', pickle='dill')
 
 
-class MRStepInitTestCase(BaseTestCase):
+class MRStepInitTestCase(BasicTestCase):
 
     ### Basic behavior ###
 
@@ -248,7 +248,7 @@ class MRStepInitTestCase(BaseTestCase):
         self._test_conflict(reducer_cmd='cat', reducer=identity_reducer)
 
 
-class MRStepGetItemTestCase(BaseTestCase):
+class MRStepGetItemTestCase(BasicTestCase):
 
     def test_get_identity_mapper(self):
         # this is the weird behavior
@@ -261,7 +261,7 @@ class MRStepGetItemTestCase(BaseTestCase):
                          identity_mapper)
 
 
-class MRStepDescriptionTestCase(BaseTestCase):
+class MRStepDescriptionTestCase(BasicTestCase):
 
     def test_render_mapper(self):
         self.assertEqual(
@@ -406,7 +406,7 @@ class MRStepDescriptionTestCase(BaseTestCase):
         )
 
 
-class SparkStepTestCase(BaseTestCase):
+class SparkStepTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertRaises(TypeError, SparkStep)
@@ -455,7 +455,7 @@ class SparkStepTestCase(BaseTestCase):
         self.assertRaises(TypeError, SparkJarStep, jar='dora.jar')
 
 
-class SparkJarStepTestCase(BaseTestCase):
+class SparkJarStepTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertRaises(TypeError, SparkJarStep)
@@ -523,7 +523,7 @@ class SparkJarStepTestCase(BaseTestCase):
         self.assertRaises(TypeError, SparkJarStep, 'dora.jar', spark='*')
 
 
-class SparkScriptStepTestCase(BaseTestCase):
+class SparkScriptStepTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertRaises(TypeError, SparkScriptStep)

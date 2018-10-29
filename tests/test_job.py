@@ -54,7 +54,7 @@ from tests.mr_upload_attrs_job import MRUploadAttrsJob
 from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
@@ -123,7 +123,7 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
         self.assertEqual(results[0][1], num_inputs * 10 * 10 * 2)
 
 
-class ParseOutputTestCase(BaseTestCase):
+class ParseOutputTestCase(BasicTestCase):
 
     def test_default_protocol(self):
         job = MRJob()
@@ -180,7 +180,7 @@ class ParseOutputLine(SandboxedTestCase):
         self.assertEqual(self.log.warning.call_count, 1)
 
 
-class NoTzsetTestCase(BaseTestCase):
+class NoTzsetTestCase(BasicTestCase):
 
     def setUp(self):
         self.remove_time_tzset()
@@ -202,7 +202,7 @@ class NoTzsetTestCase(BaseTestCase):
         MRJob()
 
 
-class CountersAndStatusTestCase(BaseTestCase):
+class CountersAndStatusTestCase(BasicTestCase):
 
     def test_counters_and_status(self):
         mr_job = MRJob().sandbox()
@@ -265,7 +265,7 @@ class CountersAndStatusTestCase(BaseTestCase):
                           'girl; interrupted': {'movie': 1}})
 
 
-class ProtocolsTestCase(BaseTestCase):
+class ProtocolsTestCase(BasicTestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.
 
@@ -447,7 +447,7 @@ class ProtocolErrorsTestCase(EmptyMrjobConfTestCase):
         self.assertJobRaisesExceptionOnUnencodableOutput()
 
 
-class PickProtocolsTestCase(BaseTestCase):
+class PickProtocolsTestCase(BasicTestCase):
 
     def _yield_none(self, *args, **kwargs):
         yield None
@@ -600,7 +600,7 @@ class PickProtocolsTestCase(BaseTestCase):
              dict(mapper=(JSONProtocol, JSONValueProtocol))])
 
 
-class JobConfTestCase(BaseTestCase):
+class JobConfTestCase(BasicTestCase):
 
     class MRJobConfJob(MRJob):
         JOBCONF = {'mapred.foo': 'garply',
@@ -674,7 +674,7 @@ class JobConfTestCase(BaseTestCase):
                           'mapred.baz': 'foo'})
 
 
-class LibjarsTestCase(BaseTestCase):
+class LibjarsTestCase(BasicTestCase):
 
     def test_default(self):
         job = MRJob()
@@ -744,7 +744,7 @@ class MRSortValuesAndMore(MRSortValues):
     }
 
 
-class HadoopFormatTestCase(BaseTestCase):
+class HadoopFormatTestCase(BasicTestCase):
 
     # MRHadoopFormatJob is imported above
 
@@ -782,7 +782,7 @@ class HadoopFormatTestCase(BaseTestCase):
                          'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
 
 
-class PartitionerTestCase(BaseTestCase):
+class PartitionerTestCase(BasicTestCase):
 
     class MRPartitionerJob(MRJob):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
@@ -800,7 +800,7 @@ class PartitionerTestCase(BaseTestCase):
             'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
 
 
-class IsTaskTestCase(BaseTestCase):
+class IsTaskTestCase(BasicTestCase):
 
     def test_is_task(self):
         self.assertEqual(MRJob().is_task(), False)
@@ -811,7 +811,7 @@ class IsTaskTestCase(BaseTestCase):
         self.assertEqual(MRJob(['--steps']).is_task(), False)
 
 
-class StepNumTestCase(BaseTestCase):
+class StepNumTestCase(BasicTestCase):
 
     def test_two_step_job_end_to_end(self):
         # represent input as a list so we can reuse it
@@ -986,7 +986,7 @@ class RunJobTestCase(SandboxedTestCase):
         self.assertNotEqual(os.listdir(self.tmp_dir), [])
 
 
-class BadMainTestCase(BaseTestCase):
+class BadMainTestCase(BasicTestCase):
     """Ensure that the user cannot do anything but just call MRYourJob.run()
     from __main__()"""
 
@@ -996,7 +996,7 @@ class BadMainTestCase(BaseTestCase):
         sys.argv = sys.argv[:-1]
 
 
-class ProtocolTypeTestCase(BaseTestCase):
+class ProtocolTypeTestCase(BasicTestCase):
 
     class StrangeJob(MRJob):
 
@@ -1027,7 +1027,7 @@ class ProtocolTypeTestCase(BaseTestCase):
             warnings[2].startswith('OUTPUT_PROTOCOL should be a class'))
 
 
-class StepsTestCase(BaseTestCase):
+class StepsTestCase(BasicTestCase):
 
     class SteppyJob(MRJob):
 
@@ -1162,7 +1162,7 @@ class StepsTestCase(BaseTestCase):
         self.assertEqual(j.steps(), [MRStep(reducer=j.reducer)])
 
 
-class RunSparkTestCase(BaseTestCase):
+class RunSparkTestCase(BasicTestCase):
 
     def test_spark(self):
         job = MRJob(['--spark', 'input_dir', 'output_dir'])
@@ -1328,7 +1328,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('usage', first_line[len('usage: '):])
 
 
-class RunnerKwargsTestCase(BaseTestCase):
+class RunnerKwargsTestCase(BasicTestCase):
     # ensure that switches exist for every option passed to runners
 
     NON_OPTION_KWARGS = set([

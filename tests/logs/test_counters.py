@@ -16,10 +16,10 @@
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.step import _parse_indented_counters
 
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class FormatCountersTestCase(BaseTestCase):
+class FormatCountersTestCase(BasicTestCase):
 
     COUNTERS = {
         'File System Counters': {

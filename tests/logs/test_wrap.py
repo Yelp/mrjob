@@ -19,10 +19,10 @@ from mrjob.logs.wrap import _ls_logs
 
 from tests.py2 import patch
 from tests.py2 import Mock
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class CatLogsTestCase(BaseTestCase):
+class CatLogsTestCase(BasicTestCase):
 
     def setUp(self):
         super(CatLogsTestCase, self)
@@ -102,7 +102,7 @@ class CatLogsTestCase(BaseTestCase):
         self.assertFalse(self.mock_log.warning.called)
 
 
-class LsLogsTestCase(BaseTestCase):
+class LsLogsTestCase(BasicTestCase):
 
     def setUp(self):
         super(LsLogsTestCase, self).setUp()

@@ -61,7 +61,7 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import call
 from tests.py2 import mock
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import mrjob_conf_patcher
 
 # used to match command lines
@@ -1778,7 +1778,7 @@ class FailedTaskContainerIDsTestCase(MockLogEntriesTestCase):
             [])
 
 
-class FixTracebackTestCase(BaseTestCase):
+class FixTracebackTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_fix_traceback(''), '')
@@ -1806,7 +1806,7 @@ class FixTracebackTestCase(BaseTestCase):
         self.assertEqual(_fix_traceback(message), message)
 
 
-class FixJavaStackTraceTestCase(BaseTestCase):
+class FixJavaStackTraceTestCase(BasicTestCase):
 
     STACK_TRACE = (
         'Diagnostics report from attempt_1525195653111_0001_m_000000_3:'

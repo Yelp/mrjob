@@ -16,10 +16,10 @@
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class EC2InstanceTypeTestCase(BaseTestCase):
+class EC2InstanceTypeTestCase(BasicTestCase):
 
     def test_ec2_instance_dicts_match(self):
         self.assertEqual(

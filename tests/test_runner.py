@@ -36,13 +36,13 @@ from tests.mr_counting_job import MRCountingJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import patch
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 
 
-class WithStatementTestCase(BaseTestCase):
+class WithStatementTestCase(BasicTestCase):
 
     def _test_cleanup_after_with_statement(self, mode, should_exist):
         local_tmp_dir = None
@@ -79,7 +79,7 @@ class WithStatementTestCase(BaseTestCase):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
 
 
-class TestJobName(BaseTestCase):
+class TestJobName(BasicTestCase):
 
     def setUp(self):
         super(TestJobName, self).setUp()

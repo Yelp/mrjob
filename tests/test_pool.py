@@ -17,10 +17,10 @@
 from mrjob.pool import _legacy_pool_hash_and_name
 from mrjob.pool import _pool_hash_and_name
 
-from tests.sandbox import BaseTestCase
+from tests.sandbox import BasicTestCase
 
 
-class TestPoolHashAndName(BaseTestCase):
+class TestPoolHashAndName(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_pool_hash_and_name({}), (None, None))
@@ -49,7 +49,7 @@ class TestPoolHashAndName(BaseTestCase):
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
 
-class TestLegacyPoolHashAndName(BaseTestCase):
+class TestLegacyPoolHashAndName(BasicTestCase):
 
     def test_empty(self):
         actions = []

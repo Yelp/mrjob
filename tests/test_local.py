@@ -28,6 +28,7 @@ from os.path import exists
 from os.path import join
 from subprocess import check_call
 from tests.sandbox import BaseTestCase
+from unittest import TestCase
 from unittest import skipIf
 
 from warcio.warcwriter import WARCWriter
@@ -372,7 +373,8 @@ class TimeoutException(Exception):
     pass
 
 
-class ExitWithoutExceptionTestCase(BaseTestCase):
+class ExitWithoutExceptionTestCase(TestCase):
+    # inheriting directly from TestCase so we don't disable logging
 
     def test_exit_42_job(self):
         mr_job = MRExit42Job(['--no-conf', '--runner=local'])

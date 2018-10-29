@@ -21,7 +21,7 @@ import os
 import sys
 from subprocess import Popen
 from subprocess import PIPE
-from tests.sandbox import BaseTestCase
+from unittest import TestCase
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
@@ -35,6 +35,7 @@ from tests.mr_runner import MRRunner
 from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
 
@@ -105,28 +106,30 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
 
 ### Test cases ###
 
+def make_launcher(*args):
+    """Helper for test cases below.
+
+    Make a launcher, add a mock runner (``launcher.mock_runner``), and
+    set it up so that ``launcher.make_runner().__enter__()`` returns
+    ``launcher.mock_runner()``.
+    """
+    launcher = MRJobLauncher(args=['--no-conf', ''] + list(args))
+    launcher.sandbox()
+
+    launcher.mock_runner = Mock()
+    launcher.mock_runner.cat_output.return_value = [b'a line\n']
+
+    launcher.make_runner = MagicMock()  # include __enter__
+    launcher.make_runner.return_value.__enter__.return_value = (
+        launcher.mock_runner)
+
+    return launcher
+
 
 class RunJobTestCase(SandboxedTestCase):
 
-    def _make_launcher(self, *args):
-        """Make a launcher, add a mock runner (``launcher.mock_runner``), and
-        set it up so that ``launcher.make_runner().__enter__()`` returns
-        ``launcher.mock_runner()``.
-        """
-        launcher = MRJobLauncher(args=['--no-conf', ''] + list(args))
-        launcher.sandbox()
-
-        launcher.mock_runner = Mock()
-        launcher.mock_runner.cat_output.return_value = [b'a line\n']
-
-        launcher.make_runner = MagicMock()  # include __enter__
-        launcher.make_runner.return_value.__enter__.return_value = (
-            launcher.mock_runner)
-
-        return launcher
-
     def test_output(self):
-        launcher = self._make_launcher()
+        launcher = make_launcher()
 
         launcher.run_job()
 
@@ -134,7 +137,7 @@ class RunJobTestCase(SandboxedTestCase):
         self.assertEqual(launcher.stderr.getvalue(), b'')
 
     def test_no_cat_output(self):
-        launcher = self._make_launcher('--no-cat-output')
+        launcher = make_launcher('--no-cat-output')
 
         launcher.run_job()
 
@@ -142,7 +145,7 @@ class RunJobTestCase(SandboxedTestCase):
         self.assertEqual(launcher.stderr.getvalue(), b'')
 
     def test_output_dir_implies_no_cat_output(self):
-        launcher = self._make_launcher('--output-dir', self.tmp_dir)
+        launcher = make_launcher('--output-dir', self.tmp_dir)
 
         launcher.run_job()
 
@@ -150,7 +153,7 @@ class RunJobTestCase(SandboxedTestCase):
         self.assertEqual(launcher.stderr.getvalue(), b'')
 
     def test_output_dir_with_explicit_cat_output(self):
-        launcher = self._make_launcher(
+        launcher = make_launcher(
             '--output-dir', self.tmp_dir, '--cat-output')
 
         launcher.run_job()
@@ -158,23 +161,27 @@ class RunJobTestCase(SandboxedTestCase):
         self.assertEqual(launcher.stdout.getvalue(), b'a line\n')
         self.assertEqual(launcher.stderr.getvalue(), b'')
 
-    def test_exit_on_step_failure(self):
-        launcher = self._make_launcher()
-        launcher.mock_runner.run.side_effect = StepFailedException
-
-        self.assertRaises(SystemExit, launcher.run_job)
-
-        self.assertEqual(launcher.stdout.getvalue(), b'')
-        self.assertIn(b'Step failed', launcher.stderr.getvalue())
-
     def test_pass_through_other_exceptions(self):
-        launcher = self._make_launcher()
+        launcher = make_launcher()
         launcher.mock_runner.run.side_effect = OSError
 
         self.assertRaises(OSError, launcher.run_job)
 
         self.assertEqual(launcher.stdout.getvalue(), b'')
         self.assertEqual(launcher.stderr.getvalue(), b'')
+
+
+class RunJobWithLoggingTestCase(TestCase):
+    # inherit directly from TestCase so logging stays enabled
+
+    def test_exit_on_step_failure(self):
+        launcher = make_launcher()
+        launcher.mock_runner.run.side_effect = StepFailedException
+
+        self.assertRaises(SystemExit, launcher.run_job)
+
+        self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertIn(b'Step failed', launcher.stderr.getvalue())
 
 
 class CommandLineArgsTestCase(BaseTestCase):
@@ -374,7 +381,8 @@ class CommandLineArgsTestCase(BaseTestCase):
         self.assertRaises(ValueError, MRCustomJobLauncher, args=[])
 
 
-class TestToolLogging(BaseTestCase):
+class TestToolLogging(TestCase):
+    # inheriting directly from TestCase because we need logging
     """ Verify the behavior of logging configuration for CLI tools
     """
     def test_default_options(self):

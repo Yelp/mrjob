@@ -90,7 +90,7 @@ class BasicTestCase(TestCase):
         """disable all logging handlers
         """
         # Extra logging messages were cluttering Travis CI. See #1793
-        super(BasicTestCase, self)
+        super(BasicTestCase, self).setUp()
 
         for name in ['', '__main__', 'mrjob']:
             log = logging.getLogger(name)

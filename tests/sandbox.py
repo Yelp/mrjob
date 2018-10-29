@@ -14,6 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import print_function
+
+from functools import partial
+import logging
 import os
 import os.path
 import random
@@ -27,7 +31,6 @@ import mrjob
 from mrjob import runner
 
 from tests.py2 import patch
-from tests.quiet import add_null_handler_to_root_logger
 
 
 # simple config that also silences 'no config options for runner' logging
@@ -74,7 +77,21 @@ def random_seed(seed):
         random.setstate(state)
 
 
-class PatcherTestCase(TestCase):
+class BaseTestCase(TestCase):
+    """All tests in MRJob should inherit from this or a subclass, unless
+    they require logging to be enabled (e.g. testing a MRJob's stderr)."""
+
+    def setUp(self):
+        """disable logging
+
+        if you need to test logging, mock out the logger for the
+        relevant module: ``self.log = self.start(patch('mrjob.job.logging'))``
+        """
+        # Extra logging messages were cluttering Travis CI. See #1793
+        super(BaseTestCase, self)
+
+        logging.disable(logging.CRITICAL)
+        self.addCleanup(partial(logging.disable, logging.NOTSET))
 
     def start(self, patcher):
         """Add the given patcher to this test case's cleanup actions,
@@ -88,15 +105,13 @@ class PatcherTestCase(TestCase):
         return mock
 
 
-class EmptyMrjobConfTestCase(PatcherTestCase):
+class EmptyMrjobConfTestCase(BaseTestCase):
 
     # set to None if you don't want load_opts_from_mrjob_confs patched
     MRJOB_CONF_CONTENTS = EMPTY_MRJOB_CONF
 
     def setUp(self):
         super(EmptyMrjobConfTestCase, self).setUp()
-
-        add_null_handler_to_root_logger()
 
         if self.MRJOB_CONF_CONTENTS is not None:
             self.mrjob_conf_patcher = mrjob_conf_patcher(

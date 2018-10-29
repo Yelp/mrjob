@@ -24,7 +24,6 @@ from os.path import dirname
 from os.path import join
 from subprocess import Popen
 from subprocess import PIPE
-from unittest import TestCase
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
@@ -43,7 +42,6 @@ from mrjob.py2 import StringIO
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import SparkStep
-from mrjob.util import log_to_stream
 
 from tests.job import run_job
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
@@ -56,8 +54,7 @@ from tests.mr_upload_attrs_job import MRUploadAttrsJob
 from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch
-from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
+from tests.sandbox import BaseTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 
@@ -126,7 +123,7 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
         self.assertEqual(results[0][1], num_inputs * 10 * 10 * 2)
 
 
-class ParseOutputTestCase(TestCase):
+class ParseOutputTestCase(BaseTestCase):
 
     def test_default_protocol(self):
         job = MRJob()
@@ -183,7 +180,7 @@ class ParseOutputLine(SandboxedTestCase):
         self.assertEqual(self.log.warning.call_count, 1)
 
 
-class NoTzsetTestCase(TestCase):
+class NoTzsetTestCase(BaseTestCase):
 
     def setUp(self):
         self.remove_time_tzset()
@@ -205,7 +202,7 @@ class NoTzsetTestCase(TestCase):
         MRJob()
 
 
-class CountersAndStatusTestCase(TestCase):
+class CountersAndStatusTestCase(BaseTestCase):
 
     def test_counters_and_status(self):
         mr_job = MRJob().sandbox()
@@ -268,7 +265,7 @@ class CountersAndStatusTestCase(TestCase):
                           'girl; interrupted': {'movie': 1}})
 
 
-class ProtocolsTestCase(TestCase):
+class ProtocolsTestCase(BaseTestCase):
     # not putting these in their own files because we're not going to invoke
     # it as a script anyway.
 
@@ -450,7 +447,7 @@ class ProtocolErrorsTestCase(EmptyMrjobConfTestCase):
         self.assertJobRaisesExceptionOnUnencodableOutput()
 
 
-class PickProtocolsTestCase(TestCase):
+class PickProtocolsTestCase(BaseTestCase):
 
     def _yield_none(self, *args, **kwargs):
         yield None
@@ -603,7 +600,7 @@ class PickProtocolsTestCase(TestCase):
              dict(mapper=(JSONProtocol, JSONValueProtocol))])
 
 
-class JobConfTestCase(TestCase):
+class JobConfTestCase(BaseTestCase):
 
     class MRJobConfJob(MRJob):
         JOBCONF = {'mapred.foo': 'garply',
@@ -677,7 +674,7 @@ class JobConfTestCase(TestCase):
                           'mapred.baz': 'foo'})
 
 
-class LibjarsTestCase(TestCase):
+class LibjarsTestCase(BaseTestCase):
 
     def test_default(self):
         job = MRJob()
@@ -747,7 +744,7 @@ class MRSortValuesAndMore(MRSortValues):
     }
 
 
-class HadoopFormatTestCase(TestCase):
+class HadoopFormatTestCase(BaseTestCase):
 
     # MRHadoopFormatJob is imported above
 
@@ -785,7 +782,7 @@ class HadoopFormatTestCase(TestCase):
                          'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
 
 
-class PartitionerTestCase(TestCase):
+class PartitionerTestCase(BaseTestCase):
 
     class MRPartitionerJob(MRJob):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
@@ -803,7 +800,7 @@ class PartitionerTestCase(TestCase):
             'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
 
 
-class IsTaskTestCase(TestCase):
+class IsTaskTestCase(BaseTestCase):
 
     def test_is_task(self):
         self.assertEqual(MRJob().is_task(), False)
@@ -814,7 +811,7 @@ class IsTaskTestCase(TestCase):
         self.assertEqual(MRJob(['--steps']).is_task(), False)
 
 
-class StepNumTestCase(TestCase):
+class StepNumTestCase(BaseTestCase):
 
     def test_two_step_job_end_to_end(self):
         # represent input as a list so we can reuse it
@@ -901,15 +898,14 @@ class FileOptionsTestCase(SandboxedTestCase):
 
         mr_job.sandbox(stdin=stdin)
 
-        with logger_disabled('mrjob.local'):
-            with mr_job.make_runner() as runner:
-                # make sure our file gets placed in the working dir
-                self.assertIn(n_file_path, runner._working_dir_mgr.paths())
+        with mr_job.make_runner() as runner:
+            # make sure our file gets placed in the working dir
+            self.assertIn(n_file_path, runner._working_dir_mgr.paths())
 
-                runner.run()
-                output = set()
-                for _, value in mr_job.parse_output(runner.cat_output()):
-                    output.add(value)
+            runner.run()
+            output = set()
+            for _, value in mr_job.parse_output(runner.cat_output()):
+                output.add(value)
 
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))
 
@@ -990,7 +986,7 @@ class RunJobTestCase(SandboxedTestCase):
         self.assertNotEqual(os.listdir(self.tmp_dir), [])
 
 
-class BadMainTestCase(TestCase):
+class BadMainTestCase(BaseTestCase):
     """Ensure that the user cannot do anything but just call MRYourJob.run()
     from __main__()"""
 
@@ -1000,7 +996,7 @@ class BadMainTestCase(TestCase):
         sys.argv = sys.argv[:-1]
 
 
-class ProtocolTypeTestCase(TestCase):
+class ProtocolTypeTestCase(BaseTestCase):
 
     class StrangeJob(MRJob):
 
@@ -1014,20 +1010,24 @@ class ProtocolTypeTestCase(TestCase):
             return JSONProtocol()
 
     def test_attrs_should_be_classes(self):
-        with no_handlers_for_logger('mrjob.job'):
-            stderr = StringIO()
-            log_to_stream('mrjob.job', stderr)
-            job = self.StrangeJob()
-            self.assertIsInstance(job.input_protocol(), JSONProtocol)
-            self.assertIsInstance(job.internal_protocol(), JSONProtocol)
-            self.assertIsInstance(job.output_protocol(), JSONProtocol)
-            logs = stderr.getvalue()
-            self.assertIn('INPUT_PROTOCOL should be a class', logs)
-            self.assertIn('INTERNAL_PROTOCOL should be a class', logs)
-            self.assertIn('OUTPUT_PROTOCOL should be a class', logs)
+        log = self.start(patch('mrjob.job.log'))
+
+        job = self.StrangeJob()
+        self.assertIsInstance(job.input_protocol(), JSONProtocol)
+        self.assertIsInstance(job.internal_protocol(), JSONProtocol)
+        self.assertIsInstance(job.output_protocol(), JSONProtocol)
+
+        warnings = [args[0] for args, kwargs in log.warning.call_args_list]
+
+        self.assertTrue(
+            warnings[0].startswith('INPUT_PROTOCOL should be a class'))
+        self.assertTrue(
+            warnings[1].startswith('INTERNAL_PROTOCOL should be a class'))
+        self.assertTrue(
+            warnings[2].startswith('OUTPUT_PROTOCOL should be a class'))
 
 
-class StepsTestCase(TestCase):
+class StepsTestCase(BaseTestCase):
 
     class SteppyJob(MRJob):
 
@@ -1162,7 +1162,7 @@ class StepsTestCase(TestCase):
         self.assertEqual(j.steps(), [MRStep(reducer=j.reducer)])
 
 
-class RunSparkTestCase(TestCase):
+class RunSparkTestCase(BaseTestCase):
 
     def test_spark(self):
         job = MRJob(['--spark', 'input_dir', 'output_dir'])
@@ -1328,7 +1328,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('usage', first_line[len('usage: '):])
 
 
-class RunnerKwargsTestCase(TestCase):
+class RunnerKwargsTestCase(BaseTestCase):
     # ensure that switches exist for every option passed to runners
 
     NON_OPTION_KWARGS = set([

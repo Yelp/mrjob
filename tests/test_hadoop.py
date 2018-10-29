@@ -23,7 +23,6 @@ import os.path
 from io import BytesIO
 from subprocess import check_call
 from subprocess import PIPE
-from unittest import TestCase
 
 import mrjob.step
 from mrjob.conf import combine_dicts
@@ -48,7 +47,7 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import call
 from tests.py2 import patch
-from tests.quiet import logger_disabled
+from tests.sandbox import BaseTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.test_bin import PYTHON_BIN
@@ -87,7 +86,7 @@ class MockHadoopTestCase(SandboxedTestCase):
         self.add_mrjob_to_pythonpath()
 
 
-class TestFullyQualifyHDFSPath(TestCase):
+class TestFullyQualifyHDFSPath(BaseTestCase):
 
     def test_empty(self):
         with patch('getpass.getuser') as getuser:
@@ -1253,13 +1252,12 @@ class SetupLineEncodingTestCase(MockHadoopTestCase):
         # that use unix line endings anyway. So monitor open() instead
         with patch(
                 'mrjob.runner.open', create=True, side_effect=open) as m_open:
-            with logger_disabled('mrjob.hadoop'):
-                with job.make_runner() as runner:
-                    runner.run()
+            with job.make_runner() as runner:
+                runner.run()
 
-                    self.assertIn(
-                        call(runner._setup_wrapper_script_path, 'wb'),
-                        m_open.mock_calls)
+                self.assertIn(
+                    call(runner._setup_wrapper_script_path, 'wb'),
+                    m_open.mock_calls)
 
 
 class PickErrorTestCase(MockHadoopTestCase):

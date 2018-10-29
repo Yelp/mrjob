@@ -12,14 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
-
 from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _merge_and_sort_errors
 from mrjob.logs.errors import _pick_error
 
+from tests.sandbox import BaseTestCase
 
-class PickErrorTestCase(TestCase):
+
+class PickErrorTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_pick_error({}), None)
@@ -159,7 +159,7 @@ class PickErrorTestCase(TestCase):
         )
 
 
-class MergeAndSortErrorsTestCase(TestCase):
+class MergeAndSortErrorsTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_merge_and_sort_errors([]), [])
@@ -291,7 +291,7 @@ class MergeAndSortErrorsTestCase(TestCase):
         )
 
 
-class FormatErrorTestCase(TestCase):
+class FormatErrorTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_format_error({}), '')

@@ -13,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
-
 from mrjob.logs.task import _interpret_task_logs
 from mrjob.logs.task import _interpret_spark_task_logs
 from mrjob.logs.task import _ls_spark_task_logs
@@ -26,10 +24,10 @@ from mrjob.logs.task import _parse_task_syslog
 from tests.py2 import call
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BaseTestCase
 
 
-class MatchTaskLogPathTestCase(TestCase):
+class MatchTaskLogPathTestCase(BaseTestCase):
 
     PRE_YARN_STDERR_PATH = (
         '/userlogs/attempt_201512232143_0008_m_000001_3/stderr')
@@ -130,7 +128,7 @@ class MatchTaskLogPathTestCase(TestCase):
 
 # test how _ls_task_logs() and _ls_spark_task_logs() filter by
 # error_attempt_id
-class LsTaskLogsTestCase(PatcherTestCase):
+class LsTaskLogsTestCase(BaseTestCase):
 
     def setUp(self):
         super(LsTaskLogsTestCase, self).setUp()
@@ -235,7 +233,7 @@ class LsTaskLogsTestCase(PatcherTestCase):
             [self.mock_paths[2]])
 
 
-class InterpretTaskLogsTestCase(PatcherTestCase):
+class InterpretTaskLogsTestCase(BaseTestCase):
 
     maxDiff = None
 
@@ -641,7 +639,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         )
 
 
-class InterpretSparkTaskLogsTestCase(PatcherTestCase):
+class InterpretSparkTaskLogsTestCase(BaseTestCase):
 
     maxDiff = None
 
@@ -1008,7 +1006,7 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         )
 
 
-class ParseTaskSyslogTestCase(TestCase):
+class ParseTaskSyslogTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_task_syslog([]), {})
@@ -1161,7 +1159,7 @@ class ParseTaskSyslogTestCase(TestCase):
         )
 
 
-class ParseTaskStderrTestCase(TestCase):
+class ParseTaskStderrTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_task_stderr([]), None)

@@ -35,7 +35,6 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import patch
-from tests.quiet import logger_disabled
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_emr import CORE_SITE_EMR_CONFIGURATION
 from tests.test_emr import HADOOP_ENV_EMR_CONFIGURATION
@@ -1802,8 +1801,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
             self.prepare_runner_for_ssh(runner)
-            with logger_disabled('mrjob.emr'):
-                self.assertRaises(StepFailedException, runner.run)
+            self.assertRaises(StepFailedException, runner.run)
 
             for _ in range(10):
                 self.simulate_emr_progress(runner.get_cluster_id())
@@ -1833,8 +1831,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
             self.prepare_runner_for_ssh(runner)
-            with logger_disabled('mrjob.emr'):
-                self.assertRaises(StepFailedException, runner.run)
+            self.assertRaises(StepFailedException, runner.run)
 
             self.assertEqual(runner.get_cluster_id(), cluster_id)
 

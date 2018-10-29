@@ -13,21 +13,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest import TestCase
-
 from mrjob.logs.task import _match_task_log_path
 from mrjob.logs.wrap import _cat_log_lines
 from mrjob.logs.wrap import _ls_logs
-from mrjob.py2 import StringIO
-from mrjob.util import log_to_stream
 
 from tests.py2 import patch
 from tests.py2 import Mock
-from tests.quiet import no_handlers_for_logger
-from tests.sandbox import PatcherTestCase
+from tests.sandbox import BaseTestCase
 
 
-class CatLogsTestCase(PatcherTestCase):
+class CatLogsTestCase(BaseTestCase):
 
     def setUp(self):
         super(CatLogsTestCase, self)
@@ -107,7 +102,7 @@ class CatLogsTestCase(PatcherTestCase):
         self.assertFalse(self.mock_log.warning.called)
 
 
-class LsLogsTestCase(TestCase):
+class LsLogsTestCase(BaseTestCase):
 
     def setUp(self):
         super(LsLogsTestCase, self).setUp()
@@ -141,6 +136,8 @@ class LsLogsTestCase(TestCase):
             return dict(**kwargs)
 
         self.mock_matcher = Mock(side_effect=mock_matcher)
+
+        self.log = self.start(patch('mrjob.logs.wrap.log'))
 
     def _ls_logs(self, log_dir_stream, **kwargs):
         """Call _ls_logs() with self.mock_fs and self.mock_matcher,
@@ -264,16 +261,16 @@ class LsLogsTestCase(TestCase):
             ex
         ]
 
-        with no_handlers_for_logger('mrjob.logs.wrap'):
-            stderr = StringIO()
-            log_to_stream('mrjob.logs.wrap', stderr)
+        self.assertEqual(self._ls_logs([['/path/to/logs']]),
+                         [dict(path='/path/to/logs/oak')])
 
-            self.assertEqual(self._ls_logs([['/path/to/logs']]),
-                             [dict(path='/path/to/logs/oak')])
+        self.mock_fs.ls.assert_called_once_with('/path/to/logs')
 
-            self.mock_fs.ls.assert_called_once_with('/path/to/logs')
+        self.assertTrue(self.log.warning.called)
 
-            self.assertIn("couldn't ls() /path/to/logs", stderr.getvalue())
+        warnings = [a[0] for a, kw in self.log.warning.call_args_list]
+
+        self.assertTrue(warnings[0].startswith("couldn't ls() /path/to/logs"))
 
     def test_warn_on_io_error(self):
         self._test_recoverable_error(IOError())

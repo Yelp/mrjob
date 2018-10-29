@@ -20,7 +20,6 @@ import os.path
 import shutil
 import tarfile
 from time import sleep
-from unittest import TestCase
 from unittest import skipIf
 
 import mrjob.conf
@@ -29,9 +28,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
-from mrjob.py2 import StringIO
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
-from mrjob.util import log_to_stream
 from mrjob.util import to_lines
 
 from tests.mock_boto3 import MockBoto3TestCase
@@ -39,31 +36,23 @@ from tests.mr_counting_job import MRCountingJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import patch
-from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
+from tests.sandbox import BaseTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 
 
-class WithStatementTestCase(TestCase):
-
-    def setUp(self):
-        self.local_tmp_dir = None
-
-    def tearDown(self):
-        if self.local_tmp_dir:
-            shutil.rmtree(self.local_tmp_dir)
-            self.local_tmp_dir = None
+class WithStatementTestCase(BaseTestCase):
 
     def _test_cleanup_after_with_statement(self, mode, should_exist):
-        with InlineMRJobRunner(cleanup=mode, conf_paths=[]) as runner:
-            self.local_tmp_dir = runner._get_local_tmp_dir()
-            self.assertTrue(os.path.exists(self.local_tmp_dir))
+        local_tmp_dir = None
 
-        self.assertEqual(os.path.exists(self.local_tmp_dir), should_exist)
-        if not should_exist:
-            self.local_tmp_dir = None
+        with InlineMRJobRunner(cleanup=mode, conf_paths=[]) as runner:
+            local_tmp_dir = runner._get_local_tmp_dir()
+            self.assertTrue(os.path.exists(local_tmp_dir))
+
+        # leaving the with: block activates cleanup
+        self.assertEqual(os.path.exists(local_tmp_dir), should_exist)
 
     def test_cleanup_all(self):
         self._test_cleanup_after_with_statement(['ALL'], False)
@@ -90,15 +79,19 @@ class WithStatementTestCase(TestCase):
         self._test_cleanup_after_with_statement(['NONE', 'NONE'], True)
 
 
-class TestJobName(TestCase):
+class TestJobName(BaseTestCase):
 
     def setUp(self):
+        super(TestJobName, self).setUp()
+
         self.blank_out_environment()
         self.monkey_patch_getuser()
 
     def tearDown(self):
         self.restore_getuser()
         self.restore_environment()
+
+        super(TestJobName, self).tearDown()
 
     def blank_out_environment(self):
         self._old_environ = os.environ.copy()
@@ -655,17 +648,18 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
 
 class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
 
+    def setUp(self):
+        super(MultipleConfigFilesMachineryTestCase, self).setUp()
+        self.log = self.start(patch('mrjob.conf.log'))
+
     def test_empty_runner_error(self):
         conf = dict(runner=dict(local=dict(local_tmp_dir='/tmp')))
         path = self.save_conf('basic', conf)
 
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.conf', stderr)
-            InlineMRJobRunner(conf_paths=[path])
-            self.assertEqual(
-                "No configs specified for inline runner\n",
-                stderr.getvalue())
+        InlineMRJobRunner(conf_paths=[path])
+
+        self.log.warning.assert_called_once_with(
+            'No configs specified for inline runner')
 
     def test_conf_contain_only_include_file(self):
         """If a config file only include other configuration files
@@ -701,13 +695,8 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
         }
         path = self.save_conf('twoincludefiles', conf)
 
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.conf', stderr)
-            InlineMRJobRunner(conf_paths=[path])
-            self.assertEqual(
-                "",
-                stderr.getvalue())
+        InlineMRJobRunner(conf_paths=[path])
+        self.assertFalse(self.log.called)
 
 
 class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
@@ -853,35 +842,32 @@ class TestExtraKwargs(ConfigFilesTestCase):
         self.path = self.save_conf('config', self.CONFIG)
 
     def test_extra_kwargs_in_mrjob_conf_okay(self):
-        with logger_disabled('mrjob.runner'):
-            runner = InlineMRJobRunner(conf_paths=[self.path])
-            self.assertEqual(runner._opts['setup'], ['echo foo'])
-            self.assertNotIn('qux', runner._opts)
+        runner = InlineMRJobRunner(conf_paths=[self.path])
+        self.assertEqual(runner._opts['setup'], ['echo foo'])
+        self.assertNotIn('qux', runner._opts)
 
     def test_extra_kwargs_passed_in_directly_okay(self):
-        with logger_disabled('mrjob.runner'):
-            runner = InlineMRJobRunner(
-                foo='bar',
-                local_tmp_dir='/var/tmp',
-                conf_paths=[],
-            )
+        runner = InlineMRJobRunner(
+            foo='bar',
+            local_tmp_dir='/var/tmp',
+            conf_paths=[],
+        )
 
-            self.assertEqual(runner._opts['local_tmp_dir'], '/var/tmp')
-            self.assertNotIn('bar', runner._opts)
+        self.assertEqual(runner._opts['local_tmp_dir'], '/var/tmp')
+        self.assertNotIn('bar', runner._opts)
 
 
 class OptDebugPrintoutTestCase(ConfigFilesTestCase):
 
     def test_option_debug_printout(self):
-        stderr = StringIO()
+        log = self.start(patch('mrjob.runner.log'))
 
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.runner', stderr, debug=True)
+        InlineMRJobRunner(owner='dave')
 
-            InlineMRJobRunner(owner='dave')
+        debug = ''.join(a[0] + '\n' for a, kw in log.debug.call_args_list)
 
-        self.assertIn("'owner'", stderr.getvalue())
-        self.assertIn("'dave'", stderr.getvalue())
+        self.assertIn("'owner'", debug)
+        self.assertIn("'dave'", debug)
 
 
 class DeprecatedFileUploadArgsTestCase(SandboxedTestCase):

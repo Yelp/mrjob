@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from unittest import TestCase
 
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
@@ -24,9 +23,10 @@ from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 
 
-class ParseSetupCmdTestCase(TestCase):
+class ParseSetupCmdTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertEqual(parse_setup_cmd(''), [])
@@ -188,7 +188,7 @@ class ParseSetupCmdTestCase(TestCase):
             ValueError, parse_setup_cmd, 'foo\\')
 
 
-class ParseLegacyHashPathTestCase(TestCase):
+class ParseLegacyHashPathTestCase(BaseTestCase):
 
     def test_empty(self):
         self.assertRaises(ValueError, parse_legacy_hash_path, 'archive', '')
@@ -259,7 +259,7 @@ class ParseLegacyHashPathTestCase(TestCase):
             parse_legacy_hash_path, 'file', 'foo#bar/baz')
 
 
-class NameUniquelyTestCase(TestCase):
+class NameUniquelyTestCase(BaseTestCase):
 
     def test_no_empty_names(self):
         self.assertEqual(name_uniquely(''), '1')
@@ -354,7 +354,7 @@ class NameUniquelyTestCase(TestCase):
             name_uniquely(os.path.join('foo', 'bar', '')), 'bar')
 
 
-class UploadDirManagerTestCase(TestCase):
+class UploadDirManagerTestCase(BaseTestCase):
 
     def test_empty(self):
         sd = UploadDirManager('hdfs:///')
@@ -440,7 +440,7 @@ class UploadDirManagerTestCase(TestCase):
                           '._foo': 'hdfs:///foo'})
 
 
-class WorkingDirManagerTestCase(TestCase):
+class WorkingDirManagerTestCase(BaseTestCase):
 
     def test_empty(self):
         wd = WorkingDirManager()

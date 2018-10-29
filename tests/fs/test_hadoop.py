@@ -28,8 +28,6 @@ from tests.mockhadoop import get_mock_hdfs_root
 from tests.mockhadoop import main as mock_hadoop_main
 from tests.py2 import MagicMock
 from tests.py2 import patch
-
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 
 
@@ -229,8 +227,7 @@ class FindHadoopBinTestCase(SandboxedTestCase):
     def test_fallback(self):
         self.assertFalse(self.which.called)
 
-        with no_handlers_for_logger('mrjob.fs.hadoop'):
-            self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop'])
+        self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop'])
 
         self.which.assert_called_once_with('hadoop', path=None)
 
@@ -248,8 +245,7 @@ class FindHadoopBinTestCase(SandboxedTestCase):
         # okay to add after HadoopFilesystem() created; it hasn't looked yet
         hadoop_bin = self._add_hadoop_bin_for_envvar(envvar, *dirnames)
 
-        with no_handlers_for_logger('mrjob.fs.hadoop'):
-            self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_bin])
+        self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_bin])
 
     def test_hadoop_prefix(self):
         self._test_environment_variable('HADOOP_PREFIX', 'bin')
@@ -276,9 +272,8 @@ class FindHadoopBinTestCase(SandboxedTestCase):
 
         os.environ['PATH'] = ':'.join([hadoop_path1, hadoop_path2])
 
-        with no_handlers_for_logger('mrjob.fs.hadoop'):
-            self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_path1_bin])
-            self.assertNotEqual(self.fs.get_hadoop_bin(), [hadoop_path2_bin])
+        self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_path1_bin])
+        self.assertNotEqual(self.fs.get_hadoop_bin(), [hadoop_path2_bin])
 
     def test_hadoop_mapred_home(self):
         self._test_environment_variable('HADOOP_MAPRED_HOME', 'bin')
@@ -289,8 +284,7 @@ class FindHadoopBinTestCase(SandboxedTestCase):
     def test_other_environment_variable(self):
         self._add_hadoop_bin_for_envvar('HADOOP_YARN_MRJOB_DIR', 'bin')
 
-        with no_handlers_for_logger('mrjob.fs.hadoop'):
-            self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop'])
+        self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop'])
 
     # precedence tests
 

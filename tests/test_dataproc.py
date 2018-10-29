@@ -48,7 +48,6 @@ from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
-from mrjob.util import log_to_stream
 from mrjob.util import save_current_environment
 
 from tests.mock_google import MockGoogleTestCase
@@ -65,7 +64,6 @@ from tests.py2 import call
 from tests.py2 import mock
 from tests.py2 import patch
 from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 
 # used to match command lines
@@ -249,20 +247,20 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v'])
         mr_job.sandbox()
 
-        with no_handlers_for_logger('mrjob.dataproc'):
-            stderr = StringIO()
-            log_to_stream('mrjob.dataproc', stderr)
+        log = self.start(patch('mrjob.dataproc.log'))
 
-            self.mock_jobs_succeed = False
+        self.mock_jobs_succeed = False
 
-            with mr_job.make_runner() as runner:
-                self.assertIsInstance(runner, DataprocJobRunner)
+        with mr_job.make_runner() as runner:
+            self.assertIsInstance(runner, DataprocJobRunner)
 
-                self.assertRaises(StepFailedException, runner.run)
+            self.assertRaises(StepFailedException, runner.run)
 
-                self.assertIn(' => ERROR\n', stderr.getvalue())
+            info = ''.join(
+                [a[0] + '\n' for a, kw in log.info.call_args_list])
+            self.assertIn(' => ERROR\n', info)
 
-                cluster_id = runner.get_cluster_id()
+            cluster_id = runner.get_cluster_id()
 
         # job should get terminated
         cluster = runner._get_cluster(cluster_id)
@@ -1263,32 +1261,29 @@ class CleanUpJobTestCase(MockGoogleTestCase):
             self.assertFalse(m['_cleanup_job'].called)
 
     def test_kill_cluster(self):
-        with no_handlers_for_logger('mrjob.dataproc'):
-            r = self._quick_runner()
-            with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_delete_cluster') as m:
-                r._cleanup_cluster()
-                self.assertTrue(m.called)
+        r = self._quick_runner()
+        with patch.object(mrjob.dataproc.DataprocJobRunner,
+                          '_delete_cluster') as m:
+            r._cleanup_cluster()
+            self.assertTrue(m.called)
 
     def test_kill_cluster_if_successful(self):
         # If they are setting up the cleanup to kill the cluster, mrjob should
         # kill the cluster independent of job success.
-        with no_handlers_for_logger('mrjob.dataproc'):
-            r = self._quick_runner()
-            with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_delete_cluster') as m:
-                r._ran_job = True
-                r._cleanup_cluster()
-                self.assertTrue(m.called)
+        r = self._quick_runner()
+        with patch.object(mrjob.dataproc.DataprocJobRunner,
+                          '_delete_cluster') as m:
+            r._ran_job = True
+            r._cleanup_cluster()
+            self.assertTrue(m.called)
 
     def test_kill_persistent_cluster(self):
-        with no_handlers_for_logger('mrjob.dataproc'):
-            r = self._quick_runner()
-            with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_delete_cluster') as m:
-                r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
-                r._cleanup_cluster()
-                self.assertTrue(m.called)
+        r = self._quick_runner()
+        with patch.object(mrjob.dataproc.DataprocJobRunner,
+                          '_delete_cluster') as m:
+            r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
+            r._cleanup_cluster()
+            self.assertTrue(m.called)
 
 
 class BootstrapPythonTestCase(MockGoogleTestCase):

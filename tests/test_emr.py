@@ -58,7 +58,6 @@ from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import cmd_line
-from mrjob.util import log_to_stream
 
 import tests.mock_boto3
 import tests.mock_boto3.emr
@@ -81,7 +80,6 @@ from tests.py2 import Mock
 from tests.py2 import call
 from tests.py2 import patch
 from tests.quiet import logger_disabled
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
@@ -280,28 +278,25 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
         self.add_mock_s3_data({'walrus': {}})
         self.mock_emr_failures = set([('j-MOCKCLUSTER0', 0)])
 
-        with no_handlers_for_logger('mrjob.emr'):
-            stderr = StringIO()
-            log_to_stream('mrjob.emr', stderr)
+        log = self.start(patch('mrjob.emr.log'))
 
-            with mr_job.make_runner() as runner:
-                self.assertIsInstance(runner, EMRJobRunner)
+        with mr_job.make_runner() as runner:
+            self.assertIsInstance(runner, EMRJobRunner)
 
-                self.assertRaises(StepFailedException, runner.run)
-                self.assertIn('\n  FAILED\n',
-                              stderr.getvalue())
+            self.assertRaises(StepFailedException, runner.run)
+            log.info.assert_any_call('  FAILED')
 
-                for _ in range(10):
-                    self.simulate_emr_progress(runner.get_cluster_id())
-
-                cluster = runner._describe_cluster()
-                self.assertEqual(cluster['Status']['State'],
-                                 'TERMINATED_WITH_ERRORS')
-
-            # job should get terminated on cleanup
-            cluster_id = runner.get_cluster_id()
             for _ in range(10):
-                self.simulate_emr_progress(cluster_id)
+                self.simulate_emr_progress(runner.get_cluster_id())
+
+            cluster = runner._describe_cluster()
+            self.assertEqual(cluster['Status']['State'],
+                             'TERMINATED_WITH_ERRORS')
+
+        # job should get terminated on cleanup
+        cluster_id = runner.get_cluster_id()
+        for _ in range(10):
+            self.simulate_emr_progress(cluster_id)
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'TERMINATED_WITH_ERRORS')
@@ -2094,29 +2089,26 @@ class CleanupClusterTestCase(MockBoto3TestCase):
         return r
 
     def test_kill_cluster(self):
-        with no_handlers_for_logger('mrjob.emr'):
-            r = self._quick_runner()
-            with patch.object(EMRJobRunner, 'make_emr_client') as m:
-                r._cleanup_cluster()
-                self.assertTrue(m().terminate_job_flows.called)
+        r = self._quick_runner()
+        with patch.object(EMRJobRunner, 'make_emr_client') as m:
+            r._cleanup_cluster()
+            self.assertTrue(m().terminate_job_flows.called)
 
     def test_kill_cluster_if_successful(self):
         # If they are setting up the cleanup to kill the cluster, mrjob should
         # kill the cluster independent of job success.
-        with no_handlers_for_logger('mrjob.emr'):
-            r = self._quick_runner()
-            with patch.object(EMRJobRunner, 'make_emr_client') as m:
-                r._ran_job = True
-                r._cleanup_cluster()
-                self.assertTrue(m().terminate_job_flows.called)
+        r = self._quick_runner()
+        with patch.object(EMRJobRunner, 'make_emr_client') as m:
+            r._ran_job = True
+            r._cleanup_cluster()
+            self.assertTrue(m().terminate_job_flows.called)
 
     def test_kill_persistent_cluster(self):
-        with no_handlers_for_logger('mrjob.emr'):
-            r = self._quick_runner()
-            with patch.object(EMRJobRunner, 'make_emr_client') as m:
-                r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
-                r._cleanup_cluster()
-                self.assertTrue(m().terminate_job_flows.called)
+        r = self._quick_runner()
+        with patch.object(EMRJobRunner, 'make_emr_client') as m:
+            r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
+            r._cleanup_cluster()
+            self.assertTrue(m().terminate_job_flows.called)
 
 
 class JobWaitTestCase(MockBoto3TestCase):
@@ -3059,10 +3051,7 @@ class BootstrapPythonTestCase(MockBoto3TestCase):
     def _assert_tries_to_install_python3_on_py3(self, *args):
         mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
 
-        with no_handlers_for_logger('mrjob.emr'):
-            stderr = StringIO()
-            log_to_stream('mrjob.emr', stderr)
-
+        with patch('mrjob.emr.log') as log:
             with mr_job.make_runner() as runner:
                 self.assertEqual(runner._bootstrap_python(),
                                  self.EXPECTED_BOOTSTRAP)
@@ -3070,7 +3059,9 @@ class BootstrapPythonTestCase(MockBoto3TestCase):
                                  self.EXPECTED_BOOTSTRAP)
 
                 if not PY2:
-                    self.assertIn('will probably not work', stderr.getvalue())
+                    warnings = ''.join(
+                        a[0] + '\n' for a, kw in log.call_args_list)
+                    self.assertIn('will probably not work', warnings)
 
     def _assert_never_installs_python3(self, *args):
         mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
@@ -5565,13 +5556,11 @@ class EMRCredentialsObfuscationTestCase(MockBoto3TestCase):
     def get_debug_printout(self, **opts):
         stderr = StringIO()
 
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.runner', stderr, debug=True)
-
+        with patch('mrjob.runner.log') as log:
             # debug printout happens in constructor
             EMRJobRunner(**opts)
 
-        return stderr.getvalue()
+            return ''.join(a[0] + '\n' for a, kw in log.debug.call_args_list)
 
     def test_non_obfuscated_option_on_emr(self):
         printout = self.get_debug_printout(owner='dave')

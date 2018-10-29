@@ -29,6 +29,7 @@ from unittest import TestCase
 
 import mrjob
 from mrjob import runner
+from mrjob.util import NullHandler
 
 from tests.py2 import patch
 
@@ -78,20 +79,26 @@ def random_seed(seed):
 
 
 class BasicTestCase(TestCase):
-    """All tests in MRJob should inherit from this or a subclass, unless
-    they require logging to be enabled (e.g. testing a MRJob's stderr)."""
+    """All mrjob tests should inherit from this or a subclass, so we don't
+    get extraneous logging messages while running the tests.
 
+    This also adds the :py:meth:`start` method, which insures that patches
+    are always reverted after the test completes (e.g.
+     ``self.start(patch('foo.bar', ...))`)
+    """
     def setUp(self):
-        """disable logging
-
-        if you need to test logging, mock out the logger for the
-        relevant module: ``self.log = self.start(patch('mrjob.job.logging'))``
+        """disable all logging handlers
         """
         # Extra logging messages were cluttering Travis CI. See #1793
         super(BasicTestCase, self)
 
-        logging.disable(logging.CRITICAL)
-        self.addCleanup(partial(logging.disable, logging.NOTSET))
+        for name in ['', '__main__', 'mrjob']:
+            log = logging.getLogger(name)
+            self.start(patch.object(log, 'handlers', []))
+
+            if not name:
+                # add a dummy handler to the root logger
+                log.addHandler(NullHandler())
 
     def start(self, patcher):
         """Add the given patcher to this test case's cleanup actions,

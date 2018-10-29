@@ -17,17 +17,14 @@
 """Tests for LocalMRJobRunner"""
 import gzip
 import os
-import shutil
 import stat
 import sys
-import tempfile
 from io import BytesIO
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 from os.path import exists
 from os.path import join
 from subprocess import check_call
-from unittest import TestCase
 from unittest import skipIf
 
 from warcio.warcwriter import WARCWriter
@@ -373,8 +370,7 @@ class TimeoutException(Exception):
     pass
 
 
-class ExitWithoutExceptionTestCase(TestCase):
-    # inheriting directly from TestCase so we don't disable logging
+class ExitWithoutExceptionTestCase(BasicTestCase):
 
     def test_exit_42_job(self):
         mr_job = MRExit42Job(['--no-conf', '--runner=local'])

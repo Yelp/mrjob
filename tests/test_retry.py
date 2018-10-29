@@ -13,11 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.sandbox import BaseTestCase
-
 from mrjob.retry import RetryWrapper
 
 from tests.py2 import Mock
+from tests.sandbox import BaseTestCase
 
 
 class RetryWrapperTestCase(BaseTestCase):

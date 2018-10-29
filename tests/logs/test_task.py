@@ -13,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.sandbox import BaseTestCase
-
 from mrjob.logs.task import _interpret_task_logs
 from mrjob.logs.task import _interpret_spark_task_logs
 from mrjob.logs.task import _ls_spark_task_logs

@@ -12,11 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.sandbox import BaseTestCase
-
 from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _merge_and_sort_errors
 from mrjob.logs.errors import _pick_error
+
+from tests.sandbox import BaseTestCase
 
 
 class PickErrorTestCase(BaseTestCase):

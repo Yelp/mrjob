@@ -18,7 +18,6 @@
 """Test configuration parsing and option combining"""
 import os
 import os.path
-from tests.sandbox import BaseTestCase
 from unittest import skipIf
 
 import mrjob.conf
@@ -44,6 +43,7 @@ from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_confs
 
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 from tests.sandbox import SandboxedTestCase
 
 

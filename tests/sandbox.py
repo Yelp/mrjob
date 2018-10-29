@@ -22,7 +22,6 @@ import os
 import os.path
 import random
 import stat
-import sys
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from shutil import rmtree
@@ -80,7 +79,8 @@ def random_seed(seed):
 
 
 class BaseTestCase(TestCase):
-    """All tests in MRJob should inherit from this or a subclass."""
+    """All tests in MRJob should inherit from this or a subclass, unless
+    they require logging to be enabled (e.g. testing a MRJob's stderr)."""
 
     def setUp(self):
         """disable logging

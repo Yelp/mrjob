@@ -17,7 +17,6 @@
 """Test compatibility switching between different Hadoop versions"""
 import os
 from distutils.version import LooseVersion
-from tests.sandbox import BaseTestCase
 
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import jobconf_from_env

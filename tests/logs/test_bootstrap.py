@@ -12,15 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.sandbox import BaseTestCase
-
-from tests.sandbox import BaseTestCase
-from tests.py2 import Mock
-from tests.py2 import patch
-
 from mrjob.logs.bootstrap import _check_for_nonzero_return_code
 from mrjob.logs.bootstrap import _match_emr_bootstrap_stderr_path
 from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
+
+from tests.py2 import Mock
+from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 
 
 class CheckForNonzeroReturnCodeTestCase(BaseTestCase):

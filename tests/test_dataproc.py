@@ -21,7 +21,6 @@ from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
 from subprocess import PIPE
-from tests.sandbox import BaseTestCase
 
 from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound
@@ -45,7 +44,6 @@ from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.logs.errors import _pick_error
 from mrjob.py2 import PY2
-from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import save_current_environment
@@ -63,6 +61,7 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import call
 from tests.py2 import mock
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 from tests.sandbox import mrjob_conf_patcher
 
 # used to match command lines

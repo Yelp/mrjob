@@ -17,7 +17,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from io import BytesIO
-from tests.sandbox import BaseTestCase
 
 from mrjob.parse import _parse_port_range_list
 from mrjob.parse import _parse_progress_from_job_tracker
@@ -27,6 +26,8 @@ from mrjob.parse import is_uri
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
+
+from tests.sandbox import BaseTestCase
 
 
 class ParseMRJobStderrTestCase(BaseTestCase):

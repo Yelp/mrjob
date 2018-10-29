@@ -13,10 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.sandbox import BaseTestCase
-
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.step import _parse_indented_counters
+
+from tests.sandbox import BaseTestCase
 
 
 class FormatCountersTestCase(BaseTestCase):

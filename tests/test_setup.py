@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from tests.sandbox import BaseTestCase
 
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
@@ -24,6 +23,7 @@ from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 
 
 class ParseSetupCmdTestCase(BaseTestCase):

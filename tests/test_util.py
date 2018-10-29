@@ -23,7 +23,6 @@ import tempfile
 from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
-from tests.sandbox import BaseTestCase
 
 from mrjob.py2 import PY2
 from mrjob.util import cmd_line
@@ -39,6 +38,7 @@ from mrjob.util import unique
 from mrjob.util import which
 
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import random_seed
 

@@ -15,8 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for mrjob.step"""
-from tests.sandbox import BaseTestCase
-
 from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
@@ -24,6 +22,8 @@ from mrjob.step import SparkJarStep
 from mrjob.step import SparkStep
 from mrjob.step import SparkScriptStep
 from mrjob.step import StepFailedException
+
+from tests.sandbox import BaseTestCase
 
 
 # functions we don't really care about the values of

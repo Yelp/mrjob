@@ -13,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.sandbox import BaseTestCase
-
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _match_history_log_path
 from mrjob.logs.history import _parse_pre_yarn_history_log

@@ -19,7 +19,6 @@ import sys
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
-from tests.sandbox import BaseTestCase
 
 import boto3
 from dateutil.parser import parse
@@ -32,6 +31,7 @@ from mrjob.tools.emr.audit_usage import _subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
 
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 from tests.tools.emr import ToolTestCase
 
 

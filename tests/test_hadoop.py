@@ -23,7 +23,6 @@ import os.path
 from io import BytesIO
 from subprocess import check_call
 from subprocess import PIPE
-from tests.sandbox import BaseTestCase
 
 import mrjob.step
 from mrjob.conf import combine_dicts
@@ -48,6 +47,7 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import call
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.test_bin import PYTHON_BIN

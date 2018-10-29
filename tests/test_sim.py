@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from io import BytesIO
-from tests.sandbox import BaseTestCase
 import gzip
 import os
 import os.path
@@ -31,6 +30,7 @@ from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_word_count import MRWordCount
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 from tests.sandbox import SandboxedTestCase
 
 

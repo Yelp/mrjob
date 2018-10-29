@@ -27,7 +27,6 @@ from multiprocessing import cpu_count
 from os.path import exists
 from os.path import join
 from subprocess import check_call
-from tests.sandbox import BaseTestCase
 from unittest import TestCase
 from unittest import skipIf
 
@@ -57,6 +56,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher

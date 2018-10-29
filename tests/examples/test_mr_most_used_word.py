@@ -11,11 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.sandbox import BaseTestCase
-
 from mrjob.examples.mr_most_used_word import MRMostUsedWord
 
 from tests.job import run_job
+from tests.sandbox import BaseTestCase
 
 
 class MRMostUsedWordTestCase(BaseTestCase):

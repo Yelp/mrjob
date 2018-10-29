@@ -24,7 +24,6 @@ from os.path import dirname
 from os.path import join
 from subprocess import Popen
 from subprocess import PIPE
-from tests.sandbox import BaseTestCase
 
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
@@ -52,7 +51,6 @@ from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_upload_attrs_job import MRUploadAttrsJob
-from tests.py2 import call
 from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch

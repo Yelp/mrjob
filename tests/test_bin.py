@@ -21,14 +21,12 @@ import stat
 import sys
 from io import BytesIO
 from shutil import make_archive
-from tests.sandbox import BaseTestCase
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
-from mrjob.py2 import StringIO
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 
@@ -47,6 +45,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import patch
+from tests.sandbox import BaseTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher

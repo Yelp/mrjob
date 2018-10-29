@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import errno
-from tests.sandbox import BaseTestCase
 
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _interpret_emr_step_stderr
@@ -24,7 +23,6 @@ from mrjob.logs.step import _match_emr_step_syslog_path
 from mrjob.logs.step import _match_emr_step_stderr_path
 from mrjob.logs.step import _parse_indented_counters
 from mrjob.logs.step import _parse_step_syslog
-from mrjob.py2 import StringIO
 
 from tests.py2 import Mock
 from tests.py2 import patch

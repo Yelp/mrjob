@@ -52,7 +52,6 @@ from mrjob.parse import parse_s3_uri
 from mrjob.pool import _extract_tags
 from mrjob.protocol import JSONProtocol
 from mrjob.py2 import PY2
-from mrjob.py2 import StringIO
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
@@ -5549,8 +5548,6 @@ class ProgressHtmlOverSshTestCase(MockBoto3TestCase):
 class EMRCredentialsObfuscationTestCase(MockBoto3TestCase):
 
     def get_debug_printout(self, **opts):
-        stderr = StringIO()
-
         with patch('mrjob.runner.log') as log:
             # debug printout happens in constructor
             EMRJobRunner(**opts)

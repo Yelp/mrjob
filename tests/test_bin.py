@@ -62,6 +62,8 @@ class ArgsForSparkStepTestCase(SandboxedTestCase):
     # just test the structure of _args_for_spark_step()
 
     def setUp(self):
+        super(ArgsForSparkStepTestCase, self).setUp()
+
         self.mock_get_spark_submit_bin = self.start(patch(
             'mrjob.bin.MRJobBinRunner.get_spark_submit_bin',
             return_value=['<spark-submit bin>']))

@@ -179,15 +179,20 @@ Temp files and cleanup
 
 .. mrjob-opt::
     :config: local_tmp_dir
+    :switch: --local-tmp-dir
     :type: :ref:`path <data-type-path>`
     :set: all
     :default: value of :py:func:`tempfile.gettempdir`
 
     Alternate local temp directory.
 
-    There isn't a command-line switch for this option; just set
-    :envvar:`TMPDIR` or any other environment variable respected by
-    :py:func:`tempfile.gettempdir`.
+    ``--local-tmp-dir ''`` tells mrjob to ignore the config file
+    and use the default temp directory
+    (:py:func:`tempfile.gettempdir`)
+
+    .. versionchanged:: 0.6.6
+
+       Added `--local-tmp-dir` switch.
 
     .. versionchanged:: 0.5.0
 

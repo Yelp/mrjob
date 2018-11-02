@@ -1350,7 +1350,6 @@ class RunnerKwargsTestCase(BasicTestCase):
         'aws_access_key_id',
         'aws_secret_access_key',
         'aws_session_token',
-        'local_tmp_dir',
     ])
 
     def _test_runner_kwargs(self, runner_alias):

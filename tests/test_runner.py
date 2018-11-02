@@ -19,6 +19,7 @@ import os
 import os.path
 import shutil
 import tarfile
+import tempfile
 from time import sleep
 from unittest import skipIf
 
@@ -906,3 +907,49 @@ class InputManifestTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertRaises(ValueError, runner._get_steps)
+
+
+class LocalTmpDirTestCase(SandboxedTestCase):
+
+    def make_runner(self, *args):
+        mr_job = MRWordCount(args)
+        mr_job.sandbox()
+        return mr_job.make_runner()
+
+    def assert_local_tmp_in(self, runner, path):
+        self.assertEqual(
+            runner._get_local_tmp_dir(),
+            os.path.join(path, runner._job_key))
+
+    def test_default(self):
+        with self.make_runner() as runner:
+            self.assert_local_tmp_in(runner, tempfile.gettempdir())
+
+    def test_mrjob_conf(self):
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(inline=dict(
+                local_tmp_dir=self.tmp_dir)))))
+
+        with self.make_runner() as runner:
+            self.assert_local_tmp_in(runner, self.tmp_dir)
+
+    def test_blank_local_tmp_dir_means_default(self):
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(inline=dict(
+                local_tmp_dir='')))))
+
+        with self.make_runner() as runner:
+            self.assert_local_tmp_in(runner, tempfile.gettempdir())
+
+    def test_command_line_switch(self):
+        with self.make_runner(
+                '--local-tmp-dir', self.tmp_dir) as runner:
+            self.assert_local_tmp_in(runner, self.tmp_dir)
+
+    def test_command_line_can_blank_out_conf(self):
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(inline=dict(
+                local_tmp_dir=self.tmp_dir)))))
+
+        with self.make_runner('--local-tmp-dir', '') as runner:
+            self.assert_local_tmp_in(runner, tempfile.gettempdir())

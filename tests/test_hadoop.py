@@ -37,6 +37,7 @@ from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import get_mock_hadoop_cmd_args
 from tests.mockhadoop import get_mock_hdfs_root
 from tests.mr_jar_and_streaming import MRJarAndStreaming
+from tests.mr_jar_with_generic_args import MRJarWithGenericArgs
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_spark_jar import MRSparkJar
@@ -965,32 +966,41 @@ class ArgsForJarStepTestCase(MockHadoopTestCase):
                 runner.get_hadoop_bin() +
                 ['jar', jar_uri])
 
-    def test_libjars(self):
+    def test_no_generic_args_by_default(self):
+        # -D and --libjar are ignored unless you use GENERIC_ARGS. See #1863
+
         fake_jar = self.makefile('fake.jar')
         fake_libjar = self.makefile('fake_lib.jar')
 
         job = MRJustAJar(
-            ['-r', 'hadoop', '--jar', fake_jar, '--libjar', fake_libjar])
+            ['-r', 'hadoop', '--jar', fake_jar,
+             '-D', 'foo=bar', '--libjar', fake_libjar])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._args_for_jar_step(0),
                 runner.get_hadoop_bin() +
-                ['-libjars', fake_libjar, 'jar', fake_jar])
+                ['jar', fake_jar])
 
-    def test_jobconf(self):
+    def test_generic_args_interpolation(self):
         fake_jar = self.makefile('fake.jar')
+        fake_libjar = self.makefile('fake_lib.jar')
 
-        job = MRJustAJar(
-            ['-r', 'hadoop', '-D', 'foo=bar', '--jar', fake_jar])
+        job = MRJarWithGenericArgs(
+            ['-r', 'hadoop', '--jar', fake_jar,
+             '-D', 'foo=bar', '--libjar', fake_libjar])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._args_for_jar_step(0),
                 runner.get_hadoop_bin() +
-                ['-D', 'foo=bar', 'jar', fake_jar])
+                ['jar', fake_jar,
+                 'before',
+                 '-libjars', fake_libjar, '-D', 'foo=bar',
+                 'after']
+            )
 
     def test_input_output_interpolation(self):
         # TODO: rewrite this to just check the step args (see #1482)

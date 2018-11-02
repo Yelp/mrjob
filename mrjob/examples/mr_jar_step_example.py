@@ -25,6 +25,7 @@ import logging
 
 from mrjob.job import MRJob
 from mrjob.protocol import RawProtocol
+from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import JarStep
 from mrjob.step import MRStep
@@ -66,13 +67,13 @@ class MRJarStepExample(MRJob):
         if self.options.use_main_class:
             jar_step = JarStep(
                 jar=jar,
-                args=[INPUT, OUTPUT],
+                args=[GENERIC_ARGS, INPUT, OUTPUT],
                 main_class=_WORDCOUNT_MAIN_CLASS,
             )
         else:
             jar_step = JarStep(
                 jar=jar,
-                args=['wordcount', INPUT, OUTPUT],
+                args=['wordcount', GENERIC_ARGS, INPUT, OUTPUT],
             )
 
         return [

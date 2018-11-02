@@ -1357,9 +1357,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         jar = self._upload_uri_or_remote_path(step['jar'])
 
         args = (
-            # -libjars, -D comes before jar-specific args
-            self._hadoop_generic_args_for_step(step_num) +
-            self._interpolate_input_and_output(step['args'], step_num))
+            self._interpolate_step_args(step['args'], step_num))
 
         hadoop_jar_step = dict(Jar=jar, Args=args)
 

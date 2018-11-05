@@ -4,6 +4,59 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.6:
+
+0.6.6
+-----
+
+Fixes a longstanding bug where boolean :mrjob-opt:`jobconf` values
+were passed to Hadoop in Python format (``True`` instead of ``true``). You
+can now do safely do something like this:
+
+.. code-block:: yaml
+
+   runners:
+     emr:
+       jobconf:
+         mapreduce.output.fileoutputformat.compress: true
+
+whereas in prior versions of mrjob, you had to use ``"true"`` in quotes.
+
+Added ``-D`` as a synonym for ``--jobconf``, to match Hadoop.
+
+Added a ``--local-tmp-dir`` switch. If you set :mrjob-opt:`local_tmp_dir`
+to empty string, mrjob will use the system default.
+
+You can now pass multiple arguments to Hadoop ``--hadoop-args``
+(for example, ``--hadoop-args='-fs hdfs://namenode:port'``), rather
+than having to use ``--hadoop-arg`` one argument at time. ``--hadoop-arg``
+is now deprecated.
+
+Similarly, you can use ``--spark-args`` to pass arguments to
+``spark-submit`` in place of the now-deprecated ``--spark-arg``.
+
+mrjob no longer automatically passes generic arguments (``-D`` and
+``-libjars``) to :py:class:`~mrjob.step.JarStep`\s, because this confuses
+some JARs. If you want mrjob to pass generic arguments to a JAR, add
+:py:data:`~mrjob.step.GENERIC_ARGS` to your
+:py:class:`~mrjob.step.JarStep`\'s *args* keyword argument, like you would
+with :py:data:`~mrjob.step.INPUT` and :py:data:`~mrjob.step.OUTPUT`.
+
+The Hadoop runner now has a :mrjob-opt:`spark_deploy_mode` option.
+
+Fixed the ``usage: usage:`` typo in ``--help`` messages.
+
+:py:meth:`mrjob.job.MRJob.add_file_arg`
+can now take an explicit ``type=str`` (used to cause an error).
+
+The deprecated ``optparse`` emulation methods
+:py:meth:`~mrjob.job.MRJob.add_file_option` and
+:py:meth:`~mrjob.job.MRJob.add_passthrough_option`
+now support ``type='str'`` (used to only accept ``type='string'``).
+
+Fixed a permissions error that was breaking ``inline`` and ``local`` mode
+on some versions of Windows.
+
 .. _v0.6.5:
 
 0.6.5

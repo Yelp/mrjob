@@ -324,6 +324,10 @@ class MRJobLauncher(object):
         construct on your computer may not be readable from within
         Hadoop). Use SQLite databases instead. If all you need is an on-disk
         hash table, try out the :py:mod:`sqlite3dbm` module.
+
+        .. versionchanged:: 0.6.6
+
+           now accepts explicit ``type=str``
         """
         if kwargs.get('type') not in (None, str):
             raise ArgumentTypeError(
@@ -408,6 +412,10 @@ class MRJobLauncher(object):
 
         Like :py:meth:`add_file_arg` except that it emulates the
         old :py:mod:`optparse` interface (which is almost identical).
+
+        .. versionchanged:: 0.6.6
+
+           accepts ``type='str'`` (used to only accept ``type='string'``)
         """
         log.warning(
             'add_file_option() is deprecated and will be removed in'
@@ -420,6 +428,10 @@ class MRJobLauncher(object):
 
         Like :py:meth:`add_passthru_arg` except that it emulates the
         old :py:mod:`optparse` interface (which is almost identical).
+
+        .. versionchanged:: 0.6.6
+
+           accepts ``type='str'`` (used to only accept ``type='string'``)
         """
         log.warning(
             'add_passthrough_option() is deprecated and will be removed in'
@@ -432,6 +444,10 @@ class MRJobLauncher(object):
 
         Like :py:meth:`pass_arg_through` except that it emulates the
         old :py:mod:`optparse` interface (which is almost identical).
+
+        .. versionchanged:: 0.6.6
+
+           accepts ``type='str'`` (used to only accept ``type='string'``)
         """
         log.warning(
             'pass_through_option() is deprecated and will be removed in'

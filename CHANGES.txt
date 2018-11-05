@@ -7,7 +7,7 @@ v0.6.6, 2018-11-05 -- nicer options and switches
      command-line options (#1453)
    * JarSteps use GENERIC_ARGS to interpolate -D/-libjars (#1863)
    * add_file_arg() supports explicit type=str (#1858)
-   * add_*_option() methods support type='str' (#1857)
+   * *_option() methods support type='str' (#1857)
  * all runners:
    * py_files are always uploaded to HDFS/S3 (#1852)
    * options and switches:

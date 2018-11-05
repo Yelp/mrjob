@@ -1,3 +1,26 @@
+v0.6.6, 2018-11-05 -- nicer options and switches
+ * configs:
+   * boolean jobconf values in mrjob.conf now work correctly (#323)
+ * jobs:
+   * fixed "usage: usage: " in --help (#1866)
+   * overriding jobconf() and libjars() can no longer clobber
+     command-line options (#1453)
+   * JarSteps use GENERIC_ARGS to interpolate -D/-libjars (#1863)
+   * add_file_arg() supports explicit type=str (#1858)
+   * add_*_option() methods support type='str' (#1857)
+ * all runners:
+   * py_files are always uploaded to HDFS/S3 (#1852)
+   * options and switches:
+     * added -D as a synonym for --jobconf (#1839)
+     * added --local-tmp-dir switch (#1870)
+       * setting local_tmp_dir to '' uses default temp dir
+     * added --hadoop-args and --spark-args switches (#1844)
+       * --hadoop-arg and --spark-arg are now deprecated
+ * Hadoop runner:
+   * added spark_deploy_mode option (#1864)
+ * sim runners:
+   * fixed permission error on Windows (#1847)
+
 v0.6.5, 2018-09-07 -- custom AMIs
  * all runners:
    * can turn off log parsing with --no-read-logs (#1825)

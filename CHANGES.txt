@@ -1,6 +1,7 @@
 v0.6.6, 2018-11-05 -- nicer options and switches
  * configs:
    * boolean jobconf values in mrjob.conf now work correctly (#323)
+     * added mrjob.conf.combine_jobconfs()
  * jobs:
    * fixed "usage: usage: " in --help (#1866)
    * overriding jobconf() and libjars() can no longer clobber

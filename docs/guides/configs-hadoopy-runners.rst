@@ -49,7 +49,7 @@ and ``inline`` runners to some degree.
 .. mrjob-opt::
     :config: jobconf
     :switch: -D, --jobconf
-    :type: :ref:`dict <data-type-plain-dict>`
+    :type: :ref:`jobconf dict <data-type-jobconf-dict>`
     :set: all
     :default: ``{}``
 
@@ -61,6 +61,12 @@ and ``inline`` runners to some degree.
     .. versionchanged:: 0.6.6
 
        added the ``-D`` switch on the command line, to match Hadoop.
+
+    .. versionchanged:: 0.6.6
+
+       boolean ``true`` and ``false`` values in config files are
+       passed correctly to Hadoop (see
+       :ref:`JobConf dicts <data-type-jobconf-dict>`)
 
 
 Options available to hadoop and emr runners

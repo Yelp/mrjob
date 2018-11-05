@@ -197,6 +197,32 @@ than once, each has custom behavior described below.
     Values specified later override values specified earlier. Combined with
     :py:func:`~mrjob.conf.combine_dicts`.
 
+.. _data-type-jobconf-dict:
+
+**JobConf Dicts**
+
+.. versionadded:: 0.6.6
+
+   Like plain dicts except that non-string values are converted into a
+   format that Java understands. For example, the boolean value
+   ``true`` here:
+
+   .. code-block:: yaml
+
+      jobconf:
+        mapreduce.output.fileoutputformat.compress: true
+
+   gets passed through to Hadoop in Java format (``true``), not
+   Python format (``True``).
+
+   Keys whose values are ``None`` are not passed to Hadoop at all.
+
+.. warning::
+
+   Prior to version 0.6.6, you should use ``"true"`` and ``"false"``,
+   for boolean :mrjob-opt:`jobconf` values in config files, not
+   ``true`` and ``false``.
+
 .. _data-type-env-dict:
 
 **Environment variable dict**
@@ -228,6 +254,7 @@ than once, each has custom behavior described below.
     uses the local system separator (on Windows ``;``, on everything else still
     ``:``) instead of always using ``:``. In local mode, the function that
     combines config values is :py:func:`~mrjob.conf.combine_local_envs`.
+
 
 .. _multiple-config-files:
 

@@ -1232,9 +1232,6 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--s3-endpoint', output)
 
         # deprecated options
-
-        # currently there are no deprecated options to test against
-        #self.assertNotIn('--partitioner', output)
         self.assertIn('add --deprecated', output)
         self.assertNotIn('--deprecated DEPRECATED', output)
 
@@ -1251,9 +1248,6 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--s3-endpoint', output)
 
         # deprecated options
-
-        # currently there are no deprecated options to test against
-        #self.assertIn('--partitioner', output)
         self.assertNotIn('add --deprecated', output)
         self.assertIn('--deprecated', output)
 
@@ -1273,9 +1267,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--gcp-project', output)
 
         # deprecated options
-        #
-        # currently there aren't any
-        #self.assertNotIn('--bootstrap-cmd', output)
+        self.assertNotIn('--max-hours-idle', output)
 
     def test_deprecated_runner_help(self):
         MRJob(['--help', '-r', 'emr', '--deprecated'])
@@ -1293,9 +1285,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--gcp-project', output)
 
         # deprecated options
-        #
-        # currently there aren't any
-        #self.assertIn('--bootstrap-cmd', output)
+        self.assertIn('--max-hours-idle', output)
 
     def test_steps_help(self):
         MRJob(['--help', '--steps'])

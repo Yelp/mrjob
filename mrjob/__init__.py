@@ -130,6 +130,7 @@ __credits__ = [
     'Derek Wilson <jderekwilson@gmail.com>',
     'Tao Yu <taoyu@yelp.com>',
     'Andrea Zonca <andrea.zonca@gmail.com>',
+    'drulludanni <drulludanni5@gmail.com>',
 ]
 
 __version__ = '0.6.6.dev0'

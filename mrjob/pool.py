@@ -443,8 +443,8 @@ def _ebs_satisfies(actual, request):
     if not req_ebs_config:
         return True
 
-    if (req_ebs_config.get('EbsOptimized')
-            and not actual.get('EbsOptimized')):
+    if (req_ebs_config.get('EbsOptimized') and
+            not actual.get('EbsOptimized')):
         log.debug('    need EBS-optimized instances')
         return False
 

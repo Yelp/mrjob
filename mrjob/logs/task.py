@@ -205,7 +205,7 @@ def _ls_task_logs_helper(fs, log_dir_stream, is_spark,
 
     # yield logs that don't have both syslog and stderr
     for other_match in other_matches:
-        if not syslog_type in other_match:  # already yielded
+        if syslog_type not in other_match:  # already yielded
             yield other_match
 
 

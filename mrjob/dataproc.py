@@ -1304,7 +1304,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _manifest_download_commands(self):
         return [
             # TODO: SSH in and figure out how to use gsutil or similar
-            #('gs://*', 'gsutil cp'),
+            # ('gs://*', 'gsutil cp'),
             ('*://*', 'hadoop fs -copyToLocal'),
         ]
 

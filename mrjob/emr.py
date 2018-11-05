@@ -218,14 +218,15 @@ _HUGE_PART_THRESHOLD = 2 ** 256
 # where to find the history log in HDFS
 _YARN_HDFS_HISTORY_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging/history'
 
-# used to bail out and retry when a pooled cluster self-terminates
-class _PooledClusterSelfTerminatedException(Exception):
-    pass
-
 # mildly flexible regex to detect cluster self-termination. Termination of
 # non-master nodes won't shut down the cluster, so don't need to match that.
 _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*(node|instances) .* terminated.*$', re.I)
+
+
+# used to bail out and retry when a pooled cluster self-terminates
+class _PooledClusterSelfTerminatedException(Exception):
+    pass
 
 
 def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
@@ -2504,8 +2505,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # trying to be defensive about EMR adding a new step state.
             # Not entirely sure what to make of CANCEL_PENDING
             for step in steps:
-                if (step['Status']['State'] not in ('CANCELLED', 'INTERRUPTED')
-                        and not step['Status'].get('Timeline', {}).get(
+                if (step['Status']['State'] not in (
+                        'CANCELLED', 'INTERRUPTED') and
+                        not step['Status'].get('Timeline', {}).get(
                             'EndDateTime')):
                     log.debug('    unfinished steps')
                     return

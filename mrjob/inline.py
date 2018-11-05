@@ -22,7 +22,6 @@ import os
 import sys
 
 from mrjob.job import MRJob
-#from mrjob.parse import parse_mr_job_stderr
 from mrjob.sim import SimMRJobRunner
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
@@ -63,8 +62,8 @@ class InlineMRJobRunner(SimMRJobRunner):
         #
         # the base MRJob still isn't runnable, but this yields a more
         # useful error about the step having no mappers or reducers
-        if not (mrjob_cls is None or issubclass(mrjob_cls, MRJob)
-                or mrjob_cls.__module__ == '__main__'):
+        if not (mrjob_cls is None or issubclass(mrjob_cls, MRJob) or
+                mrjob_cls.__module__ == '__main__'):
             raise TypeError
 
         self._mrjob_cls = mrjob_cls

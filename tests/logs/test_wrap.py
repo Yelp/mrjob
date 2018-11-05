@@ -276,7 +276,7 @@ class LsLogsTestCase(BasicTestCase):
         self._test_recoverable_error(IOError())
 
     def test_warn_on_bad_ssh_binary(self):
-        #tests #1474
+        # tests #1474
         self._test_recoverable_error(OSError(2, 'No such file or directory'))
 
     def test_raise_other_exceptions(self):

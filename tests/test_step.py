@@ -288,14 +288,15 @@ class MRStepDescriptionTestCase(BasicTestCase):
             })
 
     def test_render_reducer_first_mapper_not_implied(self):
-        self.assertEqual(MRStep(
-            reducer=identity_reducer).description(1),
+        self.assertEqual(
+            MRStep(reducer=identity_reducer).description(1),
             {
                 'type': 'streaming',
                 'reducer': {
                     'type': 'script',
                 },
-            })
+            }
+        )
 
     def test_render_combiner(self):
         self.assertEqual(

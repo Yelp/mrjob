@@ -667,11 +667,13 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         # -libjar is now a supported feature. Maybe -verbose?
 
-        mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--libjar', 'containsJars.jar',
-                               '--hadoop-args=-verbose'] + list(args)
-                              + ['-', local_input_path, remote_input_path]
-                              + ['-D', 'x=y'])
+        mr_job = MRTwoStepJob([
+            '-r', 'hadoop', '-v',
+            '--no-conf', '--libjar', 'containsJars.jar',
+            '--hadoop-args=-verbose'] + list(args) +
+            ['-', local_input_path, remote_input_path] +
+            ['-D', 'x=y']
+        )
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -1368,7 +1370,6 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-libjar', 'qux.jar'])
-
 
 
 class LibjarsTestCase(MockHadoopTestCase):

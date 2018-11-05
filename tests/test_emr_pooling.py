@@ -2080,7 +2080,6 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.assertIn('hadoop@%s-master' % runner.get_cluster_id(),
                           runner._hadoop_fs._hadoop_bin)
 
-
     def test_join_pooled_cluster_after_self_termination(self):
         # cluster 1 should be preferable
         cluster1_id = self.make_pooled_cluster(num_core_instances=20)

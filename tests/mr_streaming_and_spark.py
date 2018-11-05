@@ -33,5 +33,6 @@ class MRStreamingAndSpark(MRJob):
             SparkStep(self.spark),
         ]
 
+
 if __name__ == '__main__':
     MRStreamingAndSpark.run()

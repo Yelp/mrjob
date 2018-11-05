@@ -21,8 +21,9 @@ if os.environ.get('PYTHONPATH'):
     sys.path = os.environ['PYTHONPATH'].split(os.pathsep) + sys.path
     warnings.simplefilter('ignore')
 
-import mrjob
-from mrjob.job import MRJob
+# noqa: we need these top-level imports to come *after* sys.path hacks
+import mrjob  # noqa
+from mrjob.job import MRJob  # noqa
 
 
 class MRJobWhereAreYou(MRJob):

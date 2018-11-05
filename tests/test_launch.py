@@ -73,6 +73,7 @@ class MRCustomJobLauncher(MRJobLauncher):
         self.add_file_arg('--accordian-file', dest='accordian_files',
                           action='append', default=[])
 
+
 # used to test old options() hooks
 class MRDeprecatedCustomJobLauncher(MRJobLauncher):
 

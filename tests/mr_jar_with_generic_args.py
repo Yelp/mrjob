@@ -19,6 +19,7 @@ from mrjob.job import MRJob
 from mrjob.step import GENERIC_ARGS
 from mrjob.step import JarStep
 
+
 class MRJarWithGenericArgs(MRJob):
 
     def configure_args(self):

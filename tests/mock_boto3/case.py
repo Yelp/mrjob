@@ -171,7 +171,6 @@ class MockBoto3TestCase(SandboxedTestCase):
 
         # re-initialize fs
         runner._fs = None
-        #runner.fs
 
     # TODO: this should be replaced
     def add_worker(self):

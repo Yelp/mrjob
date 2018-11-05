@@ -66,6 +66,7 @@ from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
+from tests.mr_jar_with_generic_args import MRJarWithGenericArgs
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_no_mapper import MRNoMapper
@@ -2523,7 +2524,7 @@ class JarStepTestCase(MockBoto3TestCase):
         with open(fake_libjar, 'w'):
             pass
 
-        job = MRJustAJar(
+        job = MRJarWithGenericArgs(
             ['-r', 'emr', '--jar', fake_jar, '--libjar', fake_libjar])
         job.sandbox()
 
@@ -2549,7 +2550,9 @@ class JarStepTestCase(MockBoto3TestCase):
             working_dir = runner._master_node_setup_working_dir()
 
             self.assertEqual(step_args,
-                             ['-libjars', working_dir + '/libfake.jar'])
+                             ['before',
+                              '-libjars', working_dir + '/libfake.jar',
+                              'after'])
 
     def test_jar_on_s3(self):
         self.add_mock_s3_data({'dubliners': {'whiskeyinthe.jar': b''}})

@@ -627,6 +627,13 @@ for that step. For example::
                 )
             ]
 
+.. versionchanged:: 0.6.6
+
+   mrjob no longer passes hadoop generic args (`-D` and `-libjars`) to
+   ``JarStep``\s. If you want them, add :py:data:`mrjob.step.GENERIC_ARGS`
+   to your ``JarStep``\'s *args*, and mrjob will automatically interpolate
+   them.
+
 :py:class:`~mrjob.step.JarStep` has no concept of :ref:`job-protocols`. If your
 jar reads input from a :py:class:`~mrjob.step.MRStep`, or writes input
 read by another :py:class:`~mrjob.step.MRStep`, it is up to those

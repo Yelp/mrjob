@@ -518,9 +518,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
         args.extend(self.get_hadoop_bin())
 
-        # -libjars, -D
-        args.extend(self._hadoop_generic_args_for_step(step_num))
-
         # special case for consistency with EMR runner.
         #
         # This might look less like duplicated code if we ever
@@ -537,7 +534,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
         if step.get('args'):
             args.extend(
-                self._interpolate_input_and_output(step['args'], step_num))
+                self._interpolate_step_args(step['args'], step_num))
 
         return args
 

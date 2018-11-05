@@ -21,20 +21,25 @@ This example works out-of-the box on EMR and Google Cloud Dataproc.
 This also only works on a single input path/directory, due to limitations
 of the example jar.
 """
+import logging
+
 from mrjob.job import MRJob
 from mrjob.protocol import RawProtocol
+from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import OUTPUT
 
 # use the file:// trick to access a jar hosted on the cloud
-_RUNNER_TO_EXAMPLES_JAR = dict(
-    dataproc='file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar',
-    emr='file:///home/hadoop/hadoop-examples.jar',
-)
+_EXAMPLES_JAR_URI = (
+    'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar')
+
+_EMR_HADOOP_PRE_4_X_JAR_URI = (
+    'file:///home/hadoop/hadoop-examples.jar')
 
 _WORDCOUNT_MAIN_CLASS = 'org.apache.hadoop.examples.WordCount'
+
 
 class MRJarStepExample(MRJob):
     """A contrived example that runs wordcount from the hadoop example
@@ -47,21 +52,28 @@ class MRJarStepExample(MRJob):
             '--use-main-class', dest='use_main_class',
             default=False, action='store_true')
 
-        self.pass_arg_through('--runner')
+        self.add_passthru_arg(
+            '--examples-jar', dest='examples_jar',
+            default=_EXAMPLES_JAR_URI,
+            help=('URI of Hadoop example jar. Usually the default'
+                  ' is fine, but on EMR, you should use '
+                  ' file:///home/hadoop/hadoop-examples.jar'
+                  ' with 3.x AMIs and earlier')
+        )
 
     def steps(self):
-        jar = _RUNNER_TO_EXAMPLES_JAR[self.options.runner]
+        jar = self.options.examples_jar
 
         if self.options.use_main_class:
             jar_step = JarStep(
                 jar=jar,
-                args=[INPUT, OUTPUT],
+                args=[GENERIC_ARGS, INPUT, OUTPUT],
                 main_class=_WORDCOUNT_MAIN_CLASS,
             )
         else:
             jar_step = JarStep(
                 jar=jar,
-                args=['wordcount', INPUT, OUTPUT],
+                args=['wordcount', GENERIC_ARGS, INPUT, OUTPUT],
             )
 
         return [

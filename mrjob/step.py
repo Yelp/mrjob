@@ -54,10 +54,15 @@ _SPARK_SCRIPT_STEP_KWARGS = ['args', 'script', 'spark_args']
 #: (if there are multiple paths, they'll be joined with commas)
 INPUT = '<input>'
 
-#: If this is passed as passed as an argument to :py:class:`JarStep` or
+#: If this is passed as an argument to :py:class:`JarStep` or
 #: py:class:`SparkScriptStep`, it'll be replaced
 #: with the step's output path
 OUTPUT = '<output>'
+
+#: If this is passed as an argument to :py:class:`JarStep`,
+#: it'll be replaced with generic hadoop args (-D and -libjar)
+GENERIC_ARGS = '<generic args>'
+
 
 log = logging.getLogger(__name__)
 

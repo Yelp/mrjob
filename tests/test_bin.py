@@ -27,6 +27,7 @@ from zipfile import ZIP_DEFLATED
 from mrjob.bin import MRJobBinRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
+from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 
@@ -1054,7 +1055,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
 
         # don't bother with actual input/output URIs, which
         # are tested elsewhere
-        def mock_interpolate_input_and_output(args, step_num):
+        def mock_interpolate_step_args(args, step_num):
             def interpolate(arg):
                 if arg == INPUT:
                     return '<step %d input>' % step_num
@@ -1066,8 +1067,8 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
             return [interpolate(arg) for arg in args]
 
         self.start(patch(
-            'mrjob.runner.MRJobRunner._interpolate_input_and_output',
-            side_effect=mock_interpolate_input_and_output))
+            'mrjob.bin.MRJobBinRunner._interpolate_step_args',
+            side_effect=mock_interpolate_step_args))
 
     def test_spark_mr_job(self):
         job = MRNullSpark(['-r', 'local'])
@@ -1153,6 +1154,17 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_script_args(0),
                 ['<step 0 output>', '<step 0 input>'])
+
+    def test_generic_args_not_okay(self):
+        # GENERIC_ARGS is only for JarSteps (they're Hadoop generic args)
+        job = MRSparkScript(['-r', 'local',
+                             '--script-arg', GENERIC_ARGS])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(
+                ValueError,
+                runner._spark_script_args, 0)
 
     def test_streaming_step_not_okay(self):
         job = MRTwoStepJob(['-r', 'local'])

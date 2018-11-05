@@ -17,7 +17,6 @@ import datetime
 import getpass
 import os
 import os.path
-import shutil
 import tarfile
 import tempfile
 from time import sleep

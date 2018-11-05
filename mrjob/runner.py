@@ -28,7 +28,6 @@ import sys
 import tarfile
 import tempfile
 
-import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import translate_jobconf_for_all_versions

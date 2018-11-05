@@ -2050,7 +2050,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         def _address_of_master(self):
             return '%s-master' % self._cluster_id
 
-        mock_address_of_master = self.start(patch(
+        self.start(patch(
             'mrjob.emr.EMRJobRunner._address_of_master',
             side_effect=_address_of_master, autospec=True))
 

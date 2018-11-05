@@ -21,8 +21,6 @@ This example works out-of-the box on EMR and Google Cloud Dataproc.
 This also only works on a single input path/directory, due to limitations
 of the example jar.
 """
-import logging
-
 from mrjob.job import MRJob
 from mrjob.protocol import RawProtocol
 from mrjob.step import GENERIC_ARGS

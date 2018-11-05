@@ -1026,6 +1026,11 @@ class MRJob(MRJobLauncher):
         expanded by the job runner (see :mrjob-opt:`libjars`).
 
         .. versionadded:: 0.5.3
+
+        .. versionchanged:: 0.6.6
+
+           re-defining this no longer clobbers command-line
+           ``--libjar`` options.
         """
         script_dir = os.path.dirname(self.mr_job_script())
 
@@ -1212,41 +1217,14 @@ class MRJob(MRJobLauncher):
 
     def jobconf(self):
         """``-D`` args to pass to hadoop streaming. This should be a map
-        from property name to value.
+        from property name to value. By default, returns :py:attr:`JOBCONF`.
 
-        By default, this combines :option:`jobconf` options from the command
-        lines with :py:attr:`JOBCONF`, with command line arguments taking
-        precedence.
+        .. versionchanged:: 0.6.6
 
-        We also blank out ``mapred.output.key.comparator.class``
-        and ``mapred.text.key.comparator.options`` to prevent interference
-        from :file:`mrjob.conf`.
-
-        :py:attr:`SORT_VALUES` *can* be overridden by :py:attr:`JOBCONF`, the
-        command line, and step-specific ``jobconf`` values.
-
-        For example, if you know your values are numbers, and want to sort
-        them in reverse, you could do::
-
-            SORT_VALUES = True
-
-            JOBCONF = {
-              'mapred.output.key.comparator.class':
-                  'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
-              'mapred.text.key.comparator.options': '-k1 -k2nr',
-            }
-
-        If you want to re-define this, it's strongly recommended that do
-        something like this, so as not to inadvertently disable
-        the :option:`jobconf` option::
-
-            def jobconf(self):
-                orig_jobconf = super(MyMRJobClass, self).jobconf()
-                custom_jobconf = ...
-
-                return mrjob.conf.combine_dicts(orig_jobconf, custom_jobconf)
+           re-defining longer clobbers command-line
+           ``--jobconf`` options.
         """
-        return self.JOBCONF
+        return dict(self.JOBCONF)
 
     ### Secondary Sort ###
 

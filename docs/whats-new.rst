@@ -24,6 +24,10 @@ whereas in prior versions of mrjob, you had to use ``"true"`` in quotes.
 
 Added ``-D`` as a synonym for ``--jobconf``, to match Hadoop.
 
+On EMR, if you have SSH set up (see :ref:`ssh-tunneling`)
+mrjob can fetch your history log directly from HDFS, allowing it
+to more quickly diagnose why your job failed.
+
 Added a ``--local-tmp-dir`` switch. If you set :mrjob-opt:`local_tmp_dir`
 to empty string, mrjob will use the system default.
 

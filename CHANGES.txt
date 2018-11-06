@@ -17,6 +17,8 @@ v0.6.6, 2018-11-05 -- nicer options and switches
        * setting local_tmp_dir to '' uses default temp dir
      * added --hadoop-args and --spark-args switches (#1844)
        * --hadoop-arg and --spark-arg are now deprecated
+ * EMR runner:
+   * can now fetch history log via SSH, eliminating wait for S3 (#1253)
  * Hadoop runner:
    * added spark_deploy_mode option (#1864)
  * sim runners:

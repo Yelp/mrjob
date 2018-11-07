@@ -17,6 +17,7 @@ for more information."""
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
+import codecs
 import inspect
 import itertools
 import json
@@ -434,9 +435,15 @@ class MRJob(MRJobLauncher):
         mr_job.execute()
 
     def execute(self):
-        # MRJob does Hadoop Streaming stuff, or defers to Launcher (superclass)
-        # if not otherwise instructed
+        # MRJob does Hadoop Streaming stuff, or defers to its superclass
+        # (MRJobLauncher) if not otherwise instructed
         if self.options.show_steps:
+            log_stream = codecs.getwriter('utf_8')(self.stderr)
+
+            self.set_up_logging(quiet=self.options.quiet,
+                                verbose=self.options.verbose,
+                                stream=log_stream)
+
             self.show_steps()
 
         elif self.options.run_mapper:
@@ -656,6 +663,8 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
+        log.warning('--steps is deprecated and going away in v0.7.0')
+
         # json only uses strings, but self.stdout only accepts bytes
         steps_json = json.dumps(self._steps_desc())
         if not isinstance(steps_json, bytes):

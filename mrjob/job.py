@@ -359,7 +359,10 @@ class MRJob(MRJobLauncher):
 
         kwargs.update(updates)
 
-        return [MRStep(**kwargs)]
+        if kwargs:
+            return [MRStep(**kwargs)]
+        else:
+            return []
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr.

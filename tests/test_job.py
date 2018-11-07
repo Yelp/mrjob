@@ -1333,6 +1333,7 @@ class RunnerKwargsTestCase(BasicTestCase):
         'partitioner',
         'sort_values',
         'stdin',
+        'steps',
         'step_output_dir',
     ])
 

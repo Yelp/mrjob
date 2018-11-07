@@ -493,10 +493,13 @@ class MRJobRunner(object):
         actual exception that caused the step to fail).
         """
         if not self._script_path:
-            raise AssertionError("No script to run!")
+            raise AssertionError('No script to run!')
 
         if self._ran_job:
-            raise AssertionError("Job already ran!")
+            raise AssertionError('Job already ran!')
+
+        if self._num_steps() == 0:
+            raise AssertionError('Job has no steps!')
 
         self._create_dir_archives()
         # TODO: no point in checking input paths if we're going to

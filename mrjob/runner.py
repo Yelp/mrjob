@@ -116,7 +116,8 @@ class MRJobRunner(object):
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 sort_values=None, stdin=None, step_output_dir=None,
+                 sort_values=None, stdin=None, steps=None,
+                 step_output_dir=None,
                  **opts):
         """All runners take the following keyword arguments:
 
@@ -191,6 +192,10 @@ class MRJobRunner(object):
                       get passed through to the runner. If for some reason
                       your lines are missing newlines, we'll add them;
                       this makes it easier to write automated tests.
+        :param steps: a list of descriptions of steps to run (see
+                      :py:meth:`mrjob.steps.MRStep.description`,
+                      :py:meth:`mrjob.steps.JarStep.description`, etc.
+                       for format).
         :type step_output_dir: str
         :param step_output_dir: An empty/non-existent directory where Hadoop
                                 should put output from all steps other than
@@ -321,8 +326,11 @@ class MRJobRunner(object):
         self._hadoop_input_format = hadoop_input_format
         self._hadoop_output_format = hadoop_output_format
 
-        # A cache for self._get_steps(); also useful as a test hook
+        # check and store *steps*
         self._steps = None
+        if steps is not None:
+            self._check_steps(steps)
+            self._steps = copy.deepcopy(steps)
 
         # this variable marks whether a cleanup has happened and this runner's
         # output stream is no longer available.
@@ -773,15 +781,17 @@ class MRJobRunner(object):
             return 'no_user'
 
     def _get_steps(self):
-        """Call the job script to find out how many steps it has, and whether
+        """If *steps* was not set at init time, call the job script to
+        find out how many steps it has, and whether
         there are mappers and reducers for each step. Validate its
         output.
 
         Returns output as described in :ref:`steps-format`.
-
-        Results are cached, so call this as many times as you want.
         """
         if self._steps is None:
+            log.warning(
+                'querying jobs for steps is deprecated and '
+                ' will go away in v0.7.0')
             steps = self._load_steps()
             self._check_steps(steps)
             self._steps = steps

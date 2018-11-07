@@ -488,6 +488,9 @@ class MRJob(MRJobLauncher):
         if self._runner_class().alias == 'inline':
             kwargs = dict(mrjob_cls=self.__class__, **kwargs)
 
+        # pass steps to runner (see #1845)
+        kwargs = dict(steps=self._steps_desc(), **kwargs)
+
         return kwargs
 
     def _get_step(self, step_num, expected_type):

@@ -904,8 +904,7 @@ class InputManifestTestCase(SandboxedTestCase):
     def test_only_first_step_can_use_mapper_raw(self):
         job = MRPhoneToURLToPhoneToURL('')
 
-        with job.make_runner() as runner:
-            self.assertRaises(ValueError, runner._get_steps)
+        self.assertRaises(ValueError, job.make_runner)
 
 
 class LocalTmpDirTestCase(SandboxedTestCase):

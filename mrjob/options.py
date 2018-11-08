@@ -1218,6 +1218,7 @@ _RUNNER_OPTS = dict(
     ),
     steps_python_bin=dict(
         combiner=combine_cmds,
+        deprecated=True,
         switches=[
             (['--steps-python-bin'], dict(
                 help=('Name/path of alternate python command to use to'

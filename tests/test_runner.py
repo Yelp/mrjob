@@ -29,6 +29,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
 from mrjob.job import MRJob
+from mrjob.step import MRStep
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import to_lines
 
@@ -954,6 +955,19 @@ class LocalTmpDirTestCase(SandboxedTestCase):
             self.assert_local_tmp_in(runner, tempfile.gettempdir())
 
 
+class MRCatsJob(MRJob):
+    # used below to test when passthru args are not needed
+
+    def configure_args(self):
+        super(MRCatsJob, self).configure_args()
+
+        self.arg_parser.add_argument(
+            '--num-cats', dest='num_cats', type=int, default=1)
+
+    def steps(self):
+        return [MRStep(mapper_cmd='cat')] * self.options.num_cats
+
+
 class PassStepsToRunnerTestCase(BasicTestCase):
 
     def setUp(self):
@@ -982,6 +996,17 @@ class PassStepsToRunnerTestCase(BasicTestCase):
 
             self.assertTrue(runner._steps)
             self.assertTrue(self.log.warning.called)
+
+    def test_command_steps(self):
+        job = MRCatsJob(['-r', 'local', '--num-cats', '3'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(len(runner._steps), 3)
+
+            runner.run()
+
+            self.assertFalse(self.log.warning.called)
 
     def test_no_steps(self):
         job = MRJob()

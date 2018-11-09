@@ -28,6 +28,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
+from mrjob.job import MRJob
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import to_lines
 
@@ -951,3 +952,44 @@ class LocalTmpDirTestCase(SandboxedTestCase):
 
         with self.make_runner('--local-tmp-dir', '') as runner:
             self.assert_local_tmp_in(runner, tempfile.gettempdir())
+
+
+class PassStepsToRunnerTestCase(BasicTestCase):
+
+    def setUp(self):
+        super(PassStepsToRunnerTestCase, self).setUp()
+        self.log = self.start(patch('mrjob.runner.log'))
+
+    def test_job_passes_in_steps(self):
+        job = MRWordCount()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._steps)
+
+            runner.run()
+
+            self.assertFalse(self.log.warning.called)
+
+    def test_load_steps(self):
+        job = MRWordCount()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._steps = None
+
+            runner.run()
+
+            self.assertTrue(runner._steps)
+            self.assertTrue(self.log.warning.called)
+
+    def test_no_steps(self):
+        job = MRJob()
+        job.sandbox()
+
+        # it's possible to make a runner with the base MRJob, but it has
+        # no steps
+        with job.make_runner() as runner:
+            self.assertEqual(runner._steps, [])
+
+            self.assertRaises(ValueError, runner.run)

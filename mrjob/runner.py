@@ -499,7 +499,7 @@ class MRJobRunner(object):
             raise AssertionError('Job already ran!')
 
         if self._num_steps() == 0:
-            raise AssertionError('Job has no steps!')
+            raise ValueError('Job has no steps!')
 
         self._create_dir_archives()
         # TODO: no point in checking input paths if we're going to

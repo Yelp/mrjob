@@ -860,7 +860,7 @@ class MRJob(MRJobLauncher):
         """
         super(MRJob, self).configure_args()
 
-        _add_step_args(self.arg_parser)
+        _add_step_args(self.arg_parser, include_deprecated=True)
 
     def is_task(self):
         """True if this is a mapper, combiner, reducer, or Spark script.
@@ -876,7 +876,7 @@ class MRJob(MRJobLauncher):
     def _print_help(self, options):
         """Implement --help --steps"""
         if options.show_steps:
-            _print_help_for_steps()
+            _print_help_for_steps(include_deprecated=self.options.deprecated)
         else:
             super(MRJob, self)._print_help(options)
 

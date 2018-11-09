@@ -278,6 +278,9 @@ _STEP_OPTS = dict(
     ),
 )
 
+# don't show these unless someone types --help --steps --deprecated
+_DEPRECATED_STEP_OPTS = {'show_steps'}
+
 # don't show these unless someone types --help --deprecated
 _DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
 
@@ -1504,9 +1507,11 @@ def _add_job_args(parser, include_deprecated=True):
         help='show this message and exit')
 
 
-def _add_step_args(parser):
+def _add_step_args(parser, include_deprecated=False):
     """Add switches that determine what part of the job a MRJob runs."""
     for dest, (args, kwargs) in _STEP_OPTS.items():
+        if dest in _DEPRECATED_STEP_OPTS and not include_deprecated:
+            continue
         kwargs = dict(dest=dest, **kwargs)
         parser.add_argument(*args, **kwargs)
 
@@ -1522,10 +1527,10 @@ def _print_help_for_runner(opt_names, include_deprecated=False):
     help_parser.print_help()
 
 
-def _print_help_for_steps():
+def _print_help_for_steps(include_deprecated=False):
     help_parser = ArgumentParser(usage=SUPPRESS, add_help=False)
 
-    _add_step_args(help_parser)
+    _add_step_args(help_parser, include_deprecated=include_deprecated)
 
     help_parser.print_help()
 

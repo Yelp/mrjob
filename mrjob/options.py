@@ -814,6 +814,7 @@ _RUNNER_OPTS = dict(
     ),
     interpreter=dict(
         combiner=combine_cmds,
+        deprecated=True,
         switches=[
             (['--interpreter'], dict(
                 help='Non-python command to run your script, e.g. "ruby".',
@@ -1212,6 +1213,7 @@ _RUNNER_OPTS = dict(
     ),
     steps_interpreter=dict(
         combiner=combine_cmds,
+        deprecated=True,
         switches=[
             (['--steps-interpreter'], dict(
                 help=("Non-Python command to use to query the job about its"

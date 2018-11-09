@@ -17,6 +17,7 @@ for more information."""
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
+import codecs
 import inspect
 import itertools
 import json
@@ -358,7 +359,10 @@ class MRJob(MRJobLauncher):
 
         kwargs.update(updates)
 
-        return [MRStep(**kwargs)]
+        if kwargs:
+            return [MRStep(**kwargs)]
+        else:
+            return []
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr.
@@ -434,9 +438,15 @@ class MRJob(MRJobLauncher):
         mr_job.execute()
 
     def execute(self):
-        # MRJob does Hadoop Streaming stuff, or defers to Launcher (superclass)
-        # if not otherwise instructed
+        # MRJob does Hadoop Streaming stuff, or defers to its superclass
+        # (MRJobLauncher) if not otherwise instructed
         if self.options.show_steps:
+            log_stream = codecs.getwriter('utf_8')(self.stderr)
+
+            self.set_up_logging(quiet=self.options.quiet,
+                                verbose=self.options.verbose,
+                                stream=log_stream)
+
             self.show_steps()
 
         elif self.options.run_mapper:
@@ -487,6 +497,9 @@ class MRJob(MRJobLauncher):
 
         if self._runner_class().alias == 'inline':
             kwargs = dict(mrjob_cls=self.__class__, **kwargs)
+
+        # pass steps to runner (see #1845)
+        kwargs = dict(steps=self._steps_desc(), **kwargs)
 
         return kwargs
 
@@ -653,6 +666,8 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
+        log.warning('--steps is deprecated and going away in v0.7.0')
+
         # json only uses strings, but self.stdout only accepts bytes
         steps_json = json.dumps(self._steps_desc())
         if not isinstance(steps_json, bytes):
@@ -845,7 +860,7 @@ class MRJob(MRJobLauncher):
         """
         super(MRJob, self).configure_args()
 
-        _add_step_args(self.arg_parser)
+        _add_step_args(self.arg_parser, include_deprecated=True)
 
     def is_task(self):
         """True if this is a mapper, combiner, reducer, or Spark script.
@@ -861,7 +876,7 @@ class MRJob(MRJobLauncher):
     def _print_help(self, options):
         """Implement --help --steps"""
         if options.show_steps:
-            _print_help_for_steps()
+            _print_help_for_steps(include_deprecated=self.options.deprecated)
         else:
             super(MRJob, self)._print_help(options)
 

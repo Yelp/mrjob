@@ -404,6 +404,11 @@ Job execution context
     :set: all
     :default: (current Python interpreter)
 
+    .. deprecated:: 0.6.7
+
+       In most cases, runners no longer query jobs for steps, so this
+       does nothing.
+
     Name/path of alternate python binary to use to query the job about its
     steps. Rarely needed. If not set, we use ``sys.executable`` (the current
     Python interpreter).

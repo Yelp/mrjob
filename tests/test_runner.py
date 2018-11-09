@@ -28,6 +28,8 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
+from mrjob.job import MRJob
+from mrjob.step import MRStep
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import to_lines
 
@@ -904,8 +906,7 @@ class InputManifestTestCase(SandboxedTestCase):
     def test_only_first_step_can_use_mapper_raw(self):
         job = MRPhoneToURLToPhoneToURL('')
 
-        with job.make_runner() as runner:
-            self.assertRaises(ValueError, runner._get_steps)
+        self.assertRaises(ValueError, job.make_runner)
 
 
 class LocalTmpDirTestCase(SandboxedTestCase):
@@ -952,3 +953,68 @@ class LocalTmpDirTestCase(SandboxedTestCase):
 
         with self.make_runner('--local-tmp-dir', '') as runner:
             self.assert_local_tmp_in(runner, tempfile.gettempdir())
+
+
+class MRCatsJob(MRJob):
+    # used below to test when passthru args are not needed
+
+    def configure_args(self):
+        super(MRCatsJob, self).configure_args()
+
+        self.arg_parser.add_argument(
+            '--num-cats', dest='num_cats', type=int, default=1)
+
+    def steps(self):
+        return [MRStep(mapper_cmd='cat')] * self.options.num_cats
+
+
+class PassStepsToRunnerTestCase(BasicTestCase):
+
+    def setUp(self):
+        super(PassStepsToRunnerTestCase, self).setUp()
+        self.log = self.start(patch('mrjob.runner.log'))
+
+    def test_job_passes_in_steps(self):
+        job = MRWordCount()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._steps)
+
+            runner.run()
+
+            self.assertFalse(self.log.warning.called)
+
+    def test_load_steps(self):
+        job = MRWordCount()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._steps = None
+
+            runner.run()
+
+            self.assertTrue(runner._steps)
+            self.assertTrue(self.log.warning.called)
+
+    def test_command_steps(self):
+        job = MRCatsJob(['-r', 'local', '--num-cats', '3'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(len(runner._steps), 3)
+
+            runner.run()
+
+            self.assertFalse(self.log.warning.called)
+
+    def test_no_steps(self):
+        job = MRJob()
+        job.sandbox()
+
+        # it's possible to make a runner with the base MRJob, but it has
+        # no steps
+        with job.make_runner() as runner:
+            self.assertEqual(runner._steps, [])
+
+            self.assertRaises(ValueError, runner.run)

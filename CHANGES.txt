@@ -234,6 +234,7 @@ v0.6.0, 2017-11-01 -- wave of deprecation
        * removed get_all_buckets() (use get_all_bucket_names())
        * removed get_s3_key()
        * removed get_s3_keys()
+       * removed make_s3_key()
    * mrjob.fs.ssh:
      * SSHFilesystem
        * removed ssh_slave_hosts()

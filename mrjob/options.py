@@ -859,7 +859,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--libjar'], dict(
                 action='append',
-                help=('Deprecated. Like -libjar, but only takes a'
+                help=('Deprecated. Like --libjars, but only takes a'
                       ' single JAR.'),
             )),
             (['--libjars'], dict(

@@ -1017,7 +1017,7 @@ class MRJob(MRJobLauncher):
     ### Libjars ###
 
     #: Optional list of paths of jar files to run our job with using Hadoop's
-    #: ``-libjar`` option.
+    #: ``-libjars`` option.
     #:
     #: ``~`` and environment variables
     #: in paths be expanded, and relative paths will be interpreted as
@@ -1032,7 +1032,7 @@ class MRJob(MRJobLauncher):
 
     def libjars(self):
         """Optional list of paths of jar files to run our job with using
-        Hadoop's ``-libjar`` option. Normally setting :py:attr:`LIBJARS`
+        Hadoop's ``-libjars`` option. Normally setting :py:attr:`LIBJARS`
         is sufficient. Paths from :py:attr:`LIBJARS` are interpreted as
         relative to the the directory containing the script (paths from the
         command-line are relative to the current working directory).

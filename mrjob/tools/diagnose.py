@@ -136,7 +136,7 @@ def _infer_step_type(step):
 
 
 def _make_arg_parser():
-    usage = '%(prog)s [opts] [--step-id STEP_ID] CLUSTER_ID'
+    usage = '%(prog)s diagnose [opts] [--step-id STEP_ID] CLUSTER_ID'
     description = (
         'Get probable cause of failure for step on CLUSTER_ID.'
         ' By default we look at the last failed step')

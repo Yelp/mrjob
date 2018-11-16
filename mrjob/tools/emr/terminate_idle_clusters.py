@@ -348,7 +348,7 @@ def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
 
 
 def _make_arg_parser():
-    usage = '%(prog)s [options]'
+    usage = '%(prog)s terminate-idle-clusters [options]'
     description = ('Terminate idle EMR clusters that meet the criteria'
                    ' passed in on the command line (or, by default,'
                    ' clusters that have been idle for one hour).')

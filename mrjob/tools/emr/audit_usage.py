@@ -100,7 +100,7 @@ def main(args=None):
 
 
 def _make_arg_parser():
-    usage = '%(prog)s [options]'
+    usage = '%(prog)s audit-emr-usage [options]'
     description = 'Print a giant report on EMR usage.'
 
     arg_parser = ArgumentParser(usage=usage, description=description)

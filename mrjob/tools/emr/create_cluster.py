@@ -231,7 +231,7 @@ def _runner_kwargs(cl_args=None):
 
 
 def _make_arg_parser():
-    usage = '%(prog)s [options]'
+    usage = '%(prog)s create-cluster [options]'
     description = (
         'Create a persistent EMR cluster to run jobs in, and print its ID to'
         ' stdout. WARNING: Do not run'

@@ -256,7 +256,7 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
 
 .. mrjob-opt::
    :config: applications
-   :switch: --application
+   :switch: --application, --applications
    :type: :ref:`string list <data-type-string-list>`
    :set: emr
    :default: ``[]``
@@ -275,6 +275,10 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
    .. versionchanged:: 0.5.9
 
       This used to be called *emr_applications*.
+
+   .. versionchanged:: 0.6.7
+
+      Added :option:`--applications` switch
 
 .. mrjob-opt::
     :config: bootstrap_actions

@@ -227,7 +227,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         mr_job = MRTestJobConf(['-r', self.RUNNER,
                                 '--no-bootstrap-mrjob',
                                 '-D=user.defined=something',
-                                '--file', upload_path,
+                                '--files', upload_path,
                                input_gz_path])
 
         mr_job.sandbox()
@@ -349,7 +349,7 @@ class DistributedCachePermissionsTestCase(SandboxedTestCase):
     def test_file_permissions(self):
         data_path = self.makefile('data')
 
-        job = MRFilePermissionsJob(['--file', data_path])
+        job = MRFilePermissionsJob(['--files', data_path])
         job.sandbox()
 
         with job.make_runner() as runner:

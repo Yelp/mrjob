@@ -33,7 +33,7 @@ class ClusterInspectionTestCase(ToolTestCase):
         self.assertEqual(
             _runner_kwargs(), {
                 'additional_emr_info': None,
-                'applications': [],
+                'applications': None,
                 'bootstrap': [],
                 'bootstrap_actions': [],
                 'bootstrap_mrjob': None,

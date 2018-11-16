@@ -4115,8 +4115,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
         job = MRTwoStepJob(
             ['-r', 'emr',
              '--image-version', '3.11.0',
-             '--application', 'Hadoop',
-             '--application', 'Mahout'])
+             '--applications', 'Hadoop,Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4124,9 +4123,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
 
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr',
-             '--application', 'Hadoop',
-             '--application', 'Mahout'])
+            ['-r', 'emr', '--applications', 'Hadoop,Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4142,8 +4139,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
 
     def test_implicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr',
-             '--application', 'Mahout'])
+            ['-r', 'emr', '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4357,9 +4353,9 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         with open(fake_jar, 'w'):
             pass
 
-        # --libjar is currently the only way to create the master
+        # --libjars is currently the only way to create the master
         # node setup script
-        runner = self.make_runner('--libjar', fake_jar)
+        runner = self.make_runner('--libjars', fake_jar)
 
         runner._add_master_node_setup_files_for_upload()
         runner._wait_for_steps_to_complete()
@@ -4955,8 +4951,7 @@ class UsesSparkTestCase(MockBoto3TestCase):
     def test_spark_and_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--image-version', '4.0.0',
-                            '--application', 'Mahout',
-                            '--application', 'Spark'])
+                            '--applications', 'Mahout,Spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5009,7 +5004,7 @@ class SparkPyFilesTestCase(MockBoto3TestCase):
 
         job = MRNullSpark([
             '-r', 'emr',
-            '--py-file', egg1_path, '--py-file', egg2_path])
+            '--py-files', '%s,%s' % (egg1_path, egg2_path)])
         job.sandbox()
 
         with job.make_runner() as runner:

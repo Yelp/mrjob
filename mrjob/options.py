@@ -152,6 +152,20 @@ class _CommaSeparatedListAction(Action):
         setattr(namespace, self.dest, items)
 
 
+class _AppendCommaSeparatedItemsAction(Action):
+    """action to parse a comma-separated list and append
+    each of them to an existing list.
+
+    This eliminates whitespace
+    """
+    def __call__(self, parser, namespace, value, option_string=None):
+        _default_to(namespace, self.dest, [])
+
+        items = [s.strip() for s in value.split(',') if s]
+
+        getattr(namespace, self.dest).extend(items)
+
+
 class _AppendArgsAction(Action):
     """action to parse one or more arguments and append them to a list."""
     def __call__(self, parser, namespace, value, option_string=None):
@@ -321,10 +335,11 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         combiner=combine_lists,
         switches=[
-            (['--application'], dict(
-                action='append',
-                help=('Additional applications to run on 4.x AMIs (e.g.'
-                      ' Ganglia, Mahout, Spark)'),
+            (['--applications', '--application'], dict(
+                action=_AppendCommaSeparatedItemsAction,
+                help=('Additional applications to run on 4.x and 5.x'
+                      ' AMIs, separated by commas (e.g.'
+                      ' "Ganglia,Spark")'),
             )),
         ],
     ),
@@ -683,18 +698,17 @@ _RUNNER_OPTS = dict(
     hadoop_extra_args=dict(
         combiner=combine_lists,
         switches=[
-            (['--hadoop-args'], dict(
-                action=_AppendArgsAction,
-                help=('One or more arguments to pass to the hadoop binary.'
-                      ' (e.g. --hadoop-args="-fs file:///").'),
-            )),
             (['--hadoop-arg'], dict(
                 action='append',
                 deprecated=True,
                 help=('Deprecated. Like --hadoop-args, but only takes one'
                       ' argument at a time.'),
             )),
-
+            (['--hadoop-args'], dict(
+                action=_AppendArgsAction,
+                help=('One or more arguments to pass to the hadoop binary.'
+                      ' (e.g. --hadoop-args="-fs file:///").'),
+            )),
         ],
     ),
     hadoop_log_dirs=dict(
@@ -814,6 +828,7 @@ _RUNNER_OPTS = dict(
     ),
     interpreter=dict(
         combiner=combine_cmds,
+        deprecated=True,
         switches=[
             (['--interpreter'], dict(
                 help='Non-python command to run your script, e.g. "ruby".',
@@ -844,9 +859,15 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--libjar'], dict(
                 action='append',
-                help=('Path of a JAR to pass to Hadoop with -libjar. On EMR,'
-                      ' this can also be a URI; use file:/// to reference JARs'
-                      ' already on the EMR cluster'),
+                help=('Deprecated. Like --libjars, but only takes a'
+                      ' single JAR.'),
+            )),
+            (['--libjars'], dict(
+                action=_AppendCommaSeparatedItemsAction,
+                help=('Paths of JARs to pass to Hadoop with -libjars,'
+                      ' separated by commas. On EMR,'
+                      ' these can also be URIs; use file:/// to'
+                      ' reference JARs already on the EMR cluster.')
             )),
         ],
     ),
@@ -1013,7 +1034,14 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--py-file'], dict(
                 action='append',
-                help='.zip or .egg file to add to PYTHONPATH'
+                deprecated=True,
+                help=('Deprecated. Like --py-files, but only'
+                      ' takes a single file.')
+            )),
+            (['--py-files'], dict(
+                action=_AppendCommaSeparatedItemsAction,
+                help=('.zip or .egg files to add to PYTHONPATH,'
+                      ' separated by commas'),
             )),
         ],
     ),
@@ -1125,16 +1153,16 @@ _RUNNER_OPTS = dict(
     spark_args=dict(
         combiner=combine_lists,
         switches=[
-            (['--spark-args'], dict(
-                action=_AppendArgsAction,
-                help=('One or more arguments to pass to spark-submit'
-                      ' (e.g. --spark-args="--properties-file my.conf").'),
-            )),
             (['--spark-arg'], dict(
                 action='append',
                 deprecated=True,
                 help=('Deprecated. Like --spark-args, but only takes one'
                       ' argument at a time.'),
+            )),
+            (['--spark-args'], dict(
+                action=_AppendArgsAction,
+                help=('One or more arguments to pass to spark-submit'
+                      ' (e.g. --spark-args="--properties-file my.conf").'),
             )),
         ],
     ),
@@ -1212,6 +1240,7 @@ _RUNNER_OPTS = dict(
     ),
     steps_interpreter=dict(
         combiner=combine_cmds,
+        deprecated=True,
         switches=[
             (['--steps-interpreter'], dict(
                 help=("Non-Python command to use to query the job about its"
@@ -1303,31 +1332,51 @@ _RUNNER_OPTS = dict(
     upload_archives=dict(
         combiner=combine_path_lists,
         switches=[
+            (['--archives'], dict(
+                action=_AppendCommaSeparatedItemsAction,
+                help=('Archives to unpack in the working directory of the'
+                      ' script, separated by commas. Use "#" to assign a'
+                      ' different name to each directory (e.g. '
+                      '"foo-libs.zip#lib,bar.tar.gz#bar")'),
+            )),
             (['--archive'], dict(
                 action='append',
-                help=('Unpack archive in the working directory of this script.'
-                      ' You can use --archive multiple times.'),
+                deprecated=True,
+                help='Deprecated. Like --archives, but only takes one file.',
             )),
         ],
     ),
     upload_dirs=dict(
         combiner=combine_path_lists,
         switches=[
+            (['--dirs'], dict(
+                action=_AppendCommaSeparatedItemsAction,
+                help=('Directories to tarball and unpack in the working'
+                      ' directory of the script, separated by commas. Append'
+                      '#<name> to each directory to assign a different name'
+                      ' (e.g. "foo#lib,bar#local-bar")'),
+            )),
             (['--dir'], dict(
                 action='append',
-                help=('Tarball the given directory and unpack the resulting'
-                      ' archive in the working directory of this script.'
-                      ' You can use --dir multiple times'),
+                deprecated=True,
+                help='Deprecated. Like --dirs, but only takes one directory.'
             )),
         ],
     ),
     upload_files=dict(
         combiner=combine_path_lists,
         switches=[
+            (['--files'], dict(
+                action=_AppendCommaSeparatedItemsAction,
+                help=('Files to copy to the working directory of the script,'
+                      ' separated by commas. Use "#"'
+                      ' to assign a different name to each file (e.g. '
+                      '"foo.db#bar.db")'),
+            )),
             (['--file'], dict(
                 action='append',
-                help=('Copy file to the working directory of this script. You'
-                      ' can use --file multiple times.'),
+                deprecated=True,
+                help='Deprecated. Like --files, but only takes one file.'
             )),
         ],
     ),

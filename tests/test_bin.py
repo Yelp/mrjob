@@ -1467,7 +1467,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
         job = MRNullSpark([
             '-r', 'local',
-            '--files', '%s#foo1,%s#foo2' % (foo1_path, foo2_path),
+            '--files', '%s#foo1,%s#bar' % (foo1_path, foo2_path),
             '--archives', baz_path,
             '--dirs', qux_path,
         ])

@@ -83,7 +83,7 @@ Options available to hadoop and emr runners
 
     .. versionchanged:: 0.6.6
 
-       Deprecated the `--hadoop-arg` switch in favor of `--hadoop-args`
+       Deprecated :option:`--hadoop-arg` in favor of :option:`--hadoop-args`
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar
@@ -115,17 +115,21 @@ Options available to hadoop and emr runners
 
 .. mrjob-opt::
    :config: libjars
-   :switch: --libjar
+   :switch: --libjars
    :type: :ref:`string list <data-type-string-list>`
    :set: all
    :default: ``[]``
 
-   List of paths of JARs to be passed to Hadoop with the ``-libjar`` switch.
+   List of paths of JARs to be passed to Hadoop with the ``-libjars`` switch.
 
    ``~`` and environment variables within paths will be resolved based on the
    local environment.
 
    .. versionadded:: 0.5.3
+
+   .. versionchanged:: 0.6.7
+
+       Deprecated :option:`--libjar` in favor of :option:`--libjars`
 
    .. note::
 
@@ -181,7 +185,7 @@ Options available to hadoop and emr runners
 
     .. versionchanged:: 0.6.6
 
-       Deprecated the `--spark-arg` switch in favor of `--spark-args`
+       Deprecated :option:`--spark-arg` in favor of :option:`--spark-args`
 
 
 Options available to hadoop runner only

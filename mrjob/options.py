@@ -335,13 +335,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         combiner=combine_lists,
         switches=[
-            (['--application'], dict(
-                action='append',
-                deprecated=True,
-                help=('Deprecated. Like --applications, but only one'
-                      ' application at a time.'),
-            )),
-            (['--applications'], dict(
+            (['--applications', '--application'], dict(
                 action=_AppendCommaSeparatedItemsAction,
                 help=('Additional applications to run on 4.x and 5.x'
                       ' AMIs, separated by commas (e.g.'

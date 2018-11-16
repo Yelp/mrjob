@@ -584,8 +584,8 @@ class SetupTestCase(SandboxedTestCase):
 
     def test_file_upload(self):
         job = MROSWalkJob(['-r', 'local',
-                           '--file', self.foo_sh,
-                           '--file', self.foo_sh + '#bar.sh',
+                           '--files', '%s,%s#bar.sh' % (
+                               self.foo_sh, self.foo_sh)
                            ])
         job.sandbox()
 
@@ -599,8 +599,8 @@ class SetupTestCase(SandboxedTestCase):
 
     def test_archive_upload(self):
         job = MROSWalkJob(['-r', 'local',
-                           '--archive', self.foo_tar_gz,
-                           '--archive', self.foo_tar_gz + '#foo',
+                           '--archives', '%s,%s#foo' % (
+                               self.foo_tar_gz, self.foo_tar_gz)
                            ])
         job.sandbox()
 
@@ -616,8 +616,9 @@ class SetupTestCase(SandboxedTestCase):
 
     def test_dir_upload(self):
         job = MROSWalkJob(['-r', 'local',
-                           '--dir', self.foo_dir,
-                           '--dir', self.foo_dir + '#bar'])
+                           '--dirs', '%s,%s#bar' % (
+                               self.foo_dir, self.foo_dir)
+                           ])
         job.sandbox()
 
         with job.make_runner() as r:
@@ -1466,10 +1467,9 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
         job = MRNullSpark([
             '-r', 'local',
-            '--file', foo1_path + '#foo1',
-            '--file', foo2_path + '#bar',
-            '--archive', baz_path,
-            '--dir', qux_path,
+            '--files', '%s#foo1,%s#foo2' % (foo1_path, foo2_path),
+            '--archives', baz_path,
+            '--dirs', qux_path,
         ])
         job.sandbox()
 

@@ -1602,7 +1602,7 @@ class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
 
         job = MRNullSpark(['-r', 'hadoop',
                            '--spark-master', 'local',
-                           '--archive', fake_archive])
+                           '--archives', fake_archive])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1615,7 +1615,7 @@ class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
 
         job = MRTwoStepJob(['-r', 'hadoop',
                             '--spark-master', 'local',
-                            '--archive', fake_archive])
+                            '--archives', fake_archive])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1628,7 +1628,7 @@ class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
 
         job = MRNullSpark(['-r', 'hadoop',
                            '--spark-master', 'yarn',
-                           '--archive', fake_archive])
+                           '--archives', fake_archive])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1641,7 +1641,7 @@ class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
 
         job = MRNullSpark(['-r', 'hadoop',
                            '--spark-master', 'local',
-                           '--file', fake_file])
+                           '--files', fake_file])
         job.sandbox()
 
         with job.make_runner() as runner:

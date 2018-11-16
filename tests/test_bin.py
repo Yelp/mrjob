@@ -1349,6 +1349,18 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         fake_libjar = self.makefile('fake_lib.jar')
 
         job = MRNullSpark(
+            ['-r', 'local', '--libjars', fake_libjar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                ['--jars', fake_libjar] +
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+
+    def test_deprecated_libjar_switch(self):
+        job = MRNullSpark(
             ['-r', 'local', '--libjar', fake_libjar])
         job.sandbox()
 

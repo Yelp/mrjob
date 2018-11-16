@@ -4353,9 +4353,9 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         with open(fake_jar, 'w'):
             pass
 
-        # --libjar is currently the only way to create the master
+        # --libjars is currently the only way to create the master
         # node setup script
-        runner = self.make_runner('--libjar', fake_jar)
+        runner = self.make_runner('--libjars', fake_jar)
 
         runner._add_master_node_setup_files_for_upload()
         runner._wait_for_steps_to_complete()

@@ -1618,10 +1618,10 @@ class PoolMatchingTestCase(MockBoto3TestCase):
                         EndDateTime='definitely not none')))
         ]
 
-        # --libjar makes this a two-step job, which won't fit
+        # --libjars makes this a two-step job, which won't fit
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--libjar', 's3:///poohs-house/HUNNY.jar'],
+            '--libjars', 's3:///poohs-house/HUNNY.jar'],
             job_class=MRWordCount)
 
     def test_bearly_space_for_master_node_setup(self):
@@ -1643,7 +1643,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         # now there's space for two steps
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--libjar', 's3://poohs-house/HUNNY.jar'],
+            '--libjars', 's3://poohs-house/HUNNY.jar'],
             job_class=MRWordCount)
 
     def test_dont_join_idle_with_pending_steps(self):

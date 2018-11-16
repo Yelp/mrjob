@@ -681,10 +681,11 @@ class LibjarsTestCase(BasicTestCase):
 
         self.assertEqual(job._runner_kwargs()['libjars'], [])
 
-    def test_libjar_option(self):
-        job = MRJob(['--libjar', 'honey.jar'])
+    def test_libjars_switch(self):
+        job = MRJob(['--libjars', 'honey.jar,dora.jar'])
 
-        self.assertEqual(job._runner_kwargs()['libjars'], ['honey.jar'])
+        self.assertEqual(job._runner_kwargs()['libjars'],
+                         ['honey.jar', 'dora.jar'])
 
     def test_libjars_attr(self):
         with patch.object(MRJob, 'LIBJARS', ['/left/dora.jar']):
@@ -695,7 +696,7 @@ class LibjarsTestCase(BasicTestCase):
 
     def test_libjars_attr_plus_option(self):
         with patch.object(MRJob, 'LIBJARS', ['/left/dora.jar']):
-            job = MRJob(['--libjar', 'honey.jar'])
+            job = MRJob(['--libjars', 'honey.jar'])
 
             self.assertEqual(job._runner_kwargs()['libjars'],
                              ['/left/dora.jar', 'honey.jar'])
@@ -726,7 +727,7 @@ class LibjarsTestCase(BasicTestCase):
 
     def test_cant_override_libjars_on_command_line(self):
         with patch.object(MRJob, 'libjars', return_value=['honey.jar']):
-            job = MRJob(['--libjar', 'cookie.jar'])
+            job = MRJob(['--libjars', 'cookie.jar'])
 
             # ignore switch, don't resolve relative path
             self.assertEqual(job._runner_kwargs()['libjars'],

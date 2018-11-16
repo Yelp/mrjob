@@ -335,17 +335,17 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         combiner=combine_lists,
         switches=[
-            (['--applications'], dict(
-                action=_AppendCommaSeparatedItemsAction,
-                help=('Additional applications to run on 4.x and 5.x'
-                      ' AMIs, separated by commas (e.g.'
-                      ' "Ganglia,Spark")'),
-            )),
             (['--application'], dict(
                 action='append',
                 deprecated=True,
                 help=('Deprecated. Like --applications, but only one'
                       ' application at a time.'),
+            )),
+            (['--applications'], dict(
+                action=_AppendCommaSeparatedItemsAction,
+                help=('Additional applications to run on 4.x and 5.x'
+                      ' AMIs, separated by commas (e.g.'
+                      ' "Ganglia,Spark")'),
             )),
         ],
     ),
@@ -704,18 +704,17 @@ _RUNNER_OPTS = dict(
     hadoop_extra_args=dict(
         combiner=combine_lists,
         switches=[
-            (['--hadoop-args'], dict(
-                action=_AppendArgsAction,
-                help=('One or more arguments to pass to the hadoop binary.'
-                      ' (e.g. --hadoop-args="-fs file:///").'),
-            )),
             (['--hadoop-arg'], dict(
                 action='append',
                 deprecated=True,
                 help=('Deprecated. Like --hadoop-args, but only takes one'
                       ' argument at a time.'),
             )),
-
+            (['--hadoop-args'], dict(
+                action=_AppendArgsAction,
+                help=('One or more arguments to pass to the hadoop binary.'
+                      ' (e.g. --hadoop-args="-fs file:///").'),
+            )),
         ],
     ),
     hadoop_log_dirs=dict(
@@ -864,17 +863,17 @@ _RUNNER_OPTS = dict(
     libjars=dict(
         combiner=combine_path_lists,
         switches=[
+            (['--libjar'], dict(
+                action='append',
+                help=('Deprecated. Like -libjar, but only takes a'
+                      ' single JAR.'),
+            )),
             (['--libjars'], dict(
                 action=_AppendCommaSeparatedItemsAction,
                 help=('Paths of JARs to pass to Hadoop with -libjars,'
                       ' separated by commas. On EMR,'
                       ' these can also be URIs; use file:/// to'
                       ' reference JARs already on the EMR cluster.')
-            )),
-            (['--libjar'], dict(
-                action='append',
-                help=('Deprecated. Like -libjar, but only takes a'
-                      ' single JAR.'),
             )),
         ],
     ),
@@ -1039,16 +1038,16 @@ _RUNNER_OPTS = dict(
     py_files=dict(
         combiner=combine_path_lists,
         switches=[
-            (['--py-files'], dict(
-                action=_AppendCommaSeparatedItemsAction,
-                help=('.zip or .egg files to add to PYTHONPATH,'
-                      ' separated by commas'),
-            )),
             (['--py-file'], dict(
                 action='append',
                 deprecated=True,
                 help=('Deprecated. Like --py-files, but only'
                       ' takes a single file.')
+            )),
+            (['--py-files'], dict(
+                action=_AppendCommaSeparatedItemsAction,
+                help=('.zip or .egg files to add to PYTHONPATH,'
+                      ' separated by commas'),
             )),
         ],
     ),
@@ -1160,16 +1159,16 @@ _RUNNER_OPTS = dict(
     spark_args=dict(
         combiner=combine_lists,
         switches=[
-            (['--spark-args'], dict(
-                action=_AppendArgsAction,
-                help=('One or more arguments to pass to spark-submit'
-                      ' (e.g. --spark-args="--properties-file my.conf").'),
-            )),
             (['--spark-arg'], dict(
                 action='append',
                 deprecated=True,
                 help=('Deprecated. Like --spark-args, but only takes one'
                       ' argument at a time.'),
+            )),
+            (['--spark-args'], dict(
+                action=_AppendArgsAction,
+                help=('One or more arguments to pass to spark-submit'
+                      ' (e.g. --spark-args="--properties-file my.conf").'),
             )),
         ],
     ),

@@ -163,7 +163,7 @@ class _AppendCommaSeparatedItemsAction(Action):
 
         items = [s.strip() for s in value.split(',') if s]
 
-        getattr(namespace, self.dest).extend(args)
+        getattr(namespace, self.dest).extend(items)
 
 
 class _AppendArgsAction(Action):

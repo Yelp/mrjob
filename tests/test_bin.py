@@ -847,7 +847,7 @@ class PyFilesTestCase(SandboxedTestCase):
         egg1_path = self.makefile('dragon.egg')
 
         job = MRNullSpark(['-r', 'local', '--no-bootstrap-mrjob',
-                           '--py-file', egg1_path)])
+                           '--py-file', egg1_path])
         job.sandbox()
 
         with job.make_runner() as runner:

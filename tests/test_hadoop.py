@@ -669,7 +669,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         mr_job = MRTwoStepJob([
             '-r', 'hadoop', '-v',
-            '--no-conf', '--libjar', 'containsJars.jar',
+            '--no-conf', '--libjars', 'containsJars.jar',
             '--hadoop-args=-verbose'] + list(args) +
             ['-', local_input_path, remote_input_path] +
             ['-D', 'x=y']
@@ -969,14 +969,14 @@ class ArgsForJarStepTestCase(MockHadoopTestCase):
                 ['jar', jar_uri])
 
     def test_no_generic_args_by_default(self):
-        # -D and --libjar are ignored unless you use GENERIC_ARGS. See #1863
+        # -D and --libjars are ignored unless you use GENERIC_ARGS. See #1863
 
         fake_jar = self.makefile('fake.jar')
         fake_libjar = self.makefile('fake_lib.jar')
 
         job = MRJustAJar(
             ['-r', 'hadoop', '--jar', fake_jar,
-             '-D', 'foo=bar', '--libjar', fake_libjar])
+             '-D', 'foo=bar', '--libjars', fake_libjar])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -991,7 +991,7 @@ class ArgsForJarStepTestCase(MockHadoopTestCase):
 
         job = MRJarWithGenericArgs(
             ['-r', 'hadoop', '--jar', fake_jar,
-             '-D', 'foo=bar', '--libjar', fake_libjar])
+             '-D', 'foo=bar', '--libjars', fake_libjar])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1229,7 +1229,7 @@ class SparkPyFilesTestCase(MockHadoopTestCase):
 
         job = MRNullSpark([
             '-r', 'hadoop',
-            '--py-file', egg1_path, '--py-file', egg2_path])
+            '--py-files', '%s,%s' % (egg1_path, egg2_path)])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1392,7 +1392,7 @@ class LibjarsTestCase(MockHadoopTestCase):
     def test_one_jar(self):
         job = MRWordCount([
             '-r', 'hadoop',
-            '--libjar', '/path/to/a.jar',
+            '--libjars', '/path/to/a.jar',
         ])
         job.sandbox()
 
@@ -1406,8 +1406,8 @@ class LibjarsTestCase(MockHadoopTestCase):
     def test_two_jars(self):
         job = MRWordCount([
             '-r', 'hadoop',
-            '--libjar', '/path/to/a.jar',
-            '--libjar', '/path/to/b.jar',
+            '--libjars', '/path/to/a.jar',
+            '--libjars', '/path/to/b.jar',
         ])
         job.sandbox()
 
@@ -1602,7 +1602,7 @@ class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
 
         job = MRNullSpark(['-r', 'hadoop',
                            '--spark-master', 'local',
-                           '--archive', fake_archive])
+                           '--archives', fake_archive])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1615,7 +1615,7 @@ class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
 
         job = MRTwoStepJob(['-r', 'hadoop',
                             '--spark-master', 'local',
-                            '--archive', fake_archive])
+                            '--archives', fake_archive])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1628,7 +1628,7 @@ class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
 
         job = MRNullSpark(['-r', 'hadoop',
                            '--spark-master', 'yarn',
-                           '--archive', fake_archive])
+                           '--archives', fake_archive])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1641,7 +1641,7 @@ class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
 
         job = MRNullSpark(['-r', 'hadoop',
                            '--spark-master', 'local',
-                           '--file', fake_file])
+                           '--files', fake_file])
         job.sandbox()
 
         with job.make_runner() as runner:

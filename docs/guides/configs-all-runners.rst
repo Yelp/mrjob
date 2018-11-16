@@ -54,7 +54,7 @@ options related to file uploading.
 
 .. mrjob-opt::
    :config: py_files
-   :switch: --py-file
+   :switch: --py-files
    :type: :ref:`path list <data-type-path-list>`
    :set: all
    :default: ``[]``
@@ -66,9 +66,13 @@ options related to file uploading.
 
    .. versionadded:: 0.5.7
 
+   .. versionchanged:: 0.6.7
+
+      Deprecated :option:`--py-file` in favor of :option:`--py-files`
+
 .. mrjob-opt::
     :config: upload_archives
-    :switch: --archive
+    :switch: --archives
     :type: :ref:`path list <data-type-path-list>`
     :set: all
     :default: ``[]``
@@ -85,9 +89,13 @@ options related to file uploading.
 
        This works with Spark as well.
 
+    .. versionchanged:: 0.6.7
+
+       Deprecated :option:`--archive` in favor of :option:`--archives`
+
 .. mrjob-opt::
     :config: upload_dirs
-    :switch: --dir
+    :switch: --dirs
     :type: :ref:`path list <data-type-path-list>`
     :set: all
     :default: ``[]``
@@ -104,9 +112,14 @@ options related to file uploading.
 
     .. versionadded:: 0.5.8
 
+    .. versionchanged:: 0.6.7
+
+       Deprecated :option:`--dir` in favor of :option:`--dirs`
+
+
 .. mrjob-opt::
     :config: upload_files
-    :switch: --file
+    :switch: --files
     :type: :ref:`path list <data-type-path-list>`
     :set: all
     :default: ``[]``
@@ -130,6 +143,9 @@ options related to file uploading.
 
        This works with Spark as well.
 
+    .. versionchanged:: 0.6.7
+
+       Deprecated :option:`--file` in favor of :option:`--files`
 
 Temp files and cleanup
 ======================

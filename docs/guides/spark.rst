@@ -122,9 +122,9 @@ to access files on S3.
 Passing in libraries
 --------------------
 
-Use ``--py-file`` to pass in ``.zip`` or ``.egg`` files full of Python code::
+Use ``--py-files`` to pass in ``.zip`` or ``.egg`` files full of Python code::
 
-  python your_mr_spark_job -r hadoop --py-file lib1.zip --py-file lib2.egg
+  python your_mr_spark_job -r hadoop --py-files lib1.zip,lib2.egg
 
 Or set :mrjob-opt:`py_files` in ``mrjob.conf``.
 

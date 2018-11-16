@@ -584,8 +584,8 @@ class SetupTestCase(SandboxedTestCase):
 
     def test_file_upload(self):
         job = MROSWalkJob(['-r', 'local',
-                           '--file', self.foo_sh,
-                           '--file', self.foo_sh + '#bar.sh',
+                           '--files', '%s,%s#bar.sh' % (
+                               self.foo_sh, self.foo_sh)
                            ])
         job.sandbox()
 
@@ -599,8 +599,8 @@ class SetupTestCase(SandboxedTestCase):
 
     def test_archive_upload(self):
         job = MROSWalkJob(['-r', 'local',
-                           '--archive', self.foo_tar_gz,
-                           '--archive', self.foo_tar_gz + '#foo',
+                           '--archives', '%s,%s#foo' % (
+                               self.foo_tar_gz, self.foo_tar_gz)
                            ])
         job.sandbox()
 
@@ -616,8 +616,9 @@ class SetupTestCase(SandboxedTestCase):
 
     def test_dir_upload(self):
         job = MROSWalkJob(['-r', 'local',
-                           '--dir', self.foo_dir,
-                           '--dir', self.foo_dir + '#bar'])
+                           '--dirs', '%s,%s#bar' % (
+                               self.foo_dir, self.foo_dir)
+                           ])
         job.sandbox()
 
         with job.make_runner() as r:
@@ -684,7 +685,7 @@ class SetupTestCase(SandboxedTestCase):
     def test_py_file(self):
         job = MROSWalkJob([
             '-r', 'local',
-            '--py-file', self.foo_zip,
+            '--py-files', self.foo_zip,
         ])
         job.sandbox()
 
@@ -834,7 +835,7 @@ class PyFilesTestCase(SandboxedTestCase):
         egg2_path = self.makefile('horton.egg')
 
         job = MRNullSpark(['-r', 'local',
-                           '--py-file', egg1_path, '--py-file', egg2_path])
+                           '--py-files', '%s,%s' % (egg1_path, egg2_path)])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -842,6 +843,16 @@ class PyFilesTestCase(SandboxedTestCase):
                 runner._py_files(),
                 [egg1_path, egg2_path, runner._create_mrjob_zip()]
             )
+
+    def test_deprecated_py_file_switch(self):
+        egg1_path = self.makefile('dragon.egg')
+
+        job = MRNullSpark(['-r', 'local', '--no-bootstrap-mrjob',
+                           '--py-file', egg1_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._py_files(), [egg1_path])
 
     def test_no_bootstrap_mrjob(self):
         job = MRNullSpark(['-r', 'local',
@@ -866,7 +877,7 @@ class PyFilesTestCase(SandboxedTestCase):
         egg_path = self.makefile('horton.egg')
 
         job = MRNullSpark(['-r', 'local',
-                           '--py-file', egg_path + '#mayzie.egg'])
+                           '--py-files', egg_path + '#mayzie.egg'])
         job.sandbox()
 
         self.assertRaises(ValueError, job.make_runner)
@@ -1349,6 +1360,20 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         fake_libjar = self.makefile('fake_lib.jar')
 
         job = MRNullSpark(
+            ['-r', 'local', '--libjars', fake_libjar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                ['--jars', fake_libjar] +
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+
+    def test_deprecated_libjar_switch(self):
+        fake_libjar = self.makefile('fake_lib.jar')
+
+        job = MRNullSpark(
             ['-r', 'local', '--libjar', fake_libjar])
         job.sandbox()
 
@@ -1442,10 +1467,9 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
         job = MRNullSpark([
             '-r', 'local',
-            '--file', foo1_path + '#foo1',
-            '--file', foo2_path + '#bar',
-            '--archive', baz_path,
-            '--dir', qux_path,
+            '--files', '%s#foo1,%s#bar' % (foo1_path, foo2_path),
+            '--archives', baz_path,
+            '--dirs', qux_path,
         ])
         job.sandbox()
 
@@ -1535,7 +1559,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             )
 
             # should handle cmdenv and --class
-            # but not set PYSPARK_PYTHON or --py-file
+            # but not set PYSPARK_PYTHON or --py-files
             self.assertEqual(
                 runner._spark_submit_args(0), (
                     ['--class', 'foo.Bar'] +

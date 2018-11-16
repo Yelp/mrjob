@@ -60,7 +60,7 @@ INPUT = '<input>'
 OUTPUT = '<output>'
 
 #: If this is passed as an argument to :py:class:`JarStep`,
-#: it'll be replaced with generic hadoop args (-D and -libjar)
+#: it'll be replaced with generic hadoop args (-D and -libjars)
 GENERIC_ARGS = '<generic args>'
 
 

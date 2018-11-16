@@ -681,10 +681,11 @@ class LibjarsTestCase(BasicTestCase):
 
         self.assertEqual(job._runner_kwargs()['libjars'], [])
 
-    def test_libjar_option(self):
-        job = MRJob(['--libjar', 'honey.jar'])
+    def test_libjars_switch(self):
+        job = MRJob(['--libjars', 'honey.jar,dora.jar'])
 
-        self.assertEqual(job._runner_kwargs()['libjars'], ['honey.jar'])
+        self.assertEqual(job._runner_kwargs()['libjars'],
+                         ['honey.jar', 'dora.jar'])
 
     def test_libjars_attr(self):
         with patch.object(MRJob, 'LIBJARS', ['/left/dora.jar']):
@@ -695,7 +696,7 @@ class LibjarsTestCase(BasicTestCase):
 
     def test_libjars_attr_plus_option(self):
         with patch.object(MRJob, 'LIBJARS', ['/left/dora.jar']):
-            job = MRJob(['--libjar', 'honey.jar'])
+            job = MRJob(['--libjars', 'honey.jar'])
 
             self.assertEqual(job._runner_kwargs()['libjars'],
                              ['/left/dora.jar', 'honey.jar'])
@@ -726,7 +727,7 @@ class LibjarsTestCase(BasicTestCase):
 
     def test_cant_override_libjars_on_command_line(self):
         with patch.object(MRJob, 'libjars', return_value=['honey.jar']):
-            job = MRJob(['--libjar', 'cookie.jar'])
+            job = MRJob(['--libjars', 'cookie.jar'])
 
             # ignore switch, don't resolve relative path
             self.assertEqual(job._runner_kwargs()['libjars'],
@@ -1410,7 +1411,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         class TestJob(MRJob):
             FILES = ['/tmp/foo.db']
 
-        job = TestJob(['--file', 'foo/bar.txt'])
+        job = TestJob(['--files', 'foo/bar.txt'])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1519,7 +1520,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def files(self):
                 return ['foo/bar.txt']
 
-        job = TestJob(['--file', 'baz.txt'])
+        job = TestJob(['--files', 'baz.txt'])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1548,7 +1549,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         class TestJob(MRJob):
             DIRS = ['/tmp']
 
-        job = TestJob(['--dir', 'foo'])
+        job = TestJob(['--dirs', 'foo'])
 
         self.assertEqual(
             job._runner_kwargs()['upload_dirs'],
@@ -1608,7 +1609,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def dirs(self):
                 return ['/tmp']
 
-        job = TestJob(['--dir', 'stuff_dir'])
+        job = TestJob(['--dirs', 'stuff_dir'])
 
         self.assertEqual(
             job._runner_kwargs()['upload_dirs'],
@@ -1633,7 +1634,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         class TestJob(MRJob):
             ARCHIVES = ['/tmp/dir.tar.gz']
 
-        job = TestJob(['--archive', 'foo.zip'])
+        job = TestJob(['--archives', 'foo.zip'])
 
         self.assertEqual(
             job._runner_kwargs()['upload_archives'],
@@ -1695,7 +1696,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def archives(self):
                 return ['/tmp/dir.tar.gz']
 
-        job = TestJob(['--archive', 'stuff.zip'])
+        job = TestJob(['--archives', 'stuff.zip'])
 
         self.assertEqual(
             job._runner_kwargs()['upload_archives'],
@@ -1724,3 +1725,15 @@ class UploadAttrsTestCase(SandboxedTestCase):
             run_job(MRRot13Lib(), b'The quick brown fox'),
             {None: 'Gur dhvpx oebja sbk\n'}
         )
+
+    def test_deprecated_archive_dir_file_switches(self):
+        job = MRJob(['--archive', 'stuff.zip',
+                     '--dir', 'foo',
+                     '--file', 'foo/bar.txt'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'], ['stuff.zip'])
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'], ['foo'])
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'], ['foo/bar.txt'])

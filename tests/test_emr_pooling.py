@@ -321,8 +321,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
-            '--application', 'Ganglia',
-            '--application', 'Mahout'])
+            '--applications', 'Ganglia,Mahout'])
 
     def test_application_matching_is_case_insensitive(self):
         _, cluster_id = self.make_pooled_cluster(

@@ -4115,8 +4115,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
         job = MRTwoStepJob(
             ['-r', 'emr',
              '--image-version', '3.11.0',
-             '--application', 'Hadoop',
-             '--application', 'Mahout'])
+             '--applications', 'Hadoop,Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4124,9 +4123,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
 
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr',
-             '--application', 'Hadoop',
-             '--application', 'Mahout'])
+            ['-r', 'emr', '--applications', 'Hadoop,Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4142,8 +4139,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
 
     def test_implicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr',
-             '--application', 'Mahout'])
+            ['-r', 'emr', '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4955,8 +4951,7 @@ class UsesSparkTestCase(MockBoto3TestCase):
     def test_spark_and_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--image-version', '4.0.0',
-                            '--application', 'Mahout',
-                            '--application', 'Spark'])
+                            '--applications', 'Mahout,Spark'])
         job.sandbox()
 
         with job.make_runner() as runner:

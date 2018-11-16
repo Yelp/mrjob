@@ -18,7 +18,7 @@
 
 Usage::
 
-    mrjob terminate-cluster [options] j-CLUSTERID
+    mrjob terminate-cluster [options] CLUSTER_ID
 
 Terminate an existing EMR cluster.
 
@@ -72,9 +72,10 @@ def main(cl_args=None):
 
 
 def _make_arg_parser():
+    usage = '%(prog)s terminate-cluster [options] CLUSTER_ID'
     description = 'Terminate an existing EMR cluster.'
 
-    arg_parser = ArgumentParser(description=description)
+    arg_parser = ArgumentParser(usage=usage, description=description)
 
     arg_parser.add_argument(
         '-t', '--test', dest='test', default=False,

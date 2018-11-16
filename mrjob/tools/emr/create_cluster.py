@@ -231,12 +231,10 @@ def _runner_kwargs(cl_args=None):
 
 
 def _make_arg_parser():
-    usage = '%(prog)s [options]'
+    usage = '%(prog)s create-cluster [options]'
     description = (
         'Create a persistent EMR cluster to run jobs in, and print its ID to'
-        ' stdout. WARNING: Do not run'
-        ' this without mrjob terminate-idle-clusters in your'
-        ' crontab; clusters left idle can quickly become expensive!')
+        ' stdout.')
     arg_parser = ArgumentParser(usage=usage, description=description)
 
     _add_basic_args(arg_parser)

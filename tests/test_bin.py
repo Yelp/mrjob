@@ -1370,6 +1370,8 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     cmdenv=dict(PYSPARK_PYTHON='mypy')))
 
     def test_deprecated_libjar_switch(self):
+        fake_libjar = self.makefile('fake_lib.jar')
+
         job = MRNullSpark(
             ['-r', 'local', '--libjar', fake_libjar])
         job.sandbox()

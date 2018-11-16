@@ -1229,7 +1229,7 @@ class SparkPyFilesTestCase(MockHadoopTestCase):
 
         job = MRNullSpark([
             '-r', 'hadoop',
-            '--py-file', egg1_path, '--py-file', egg2_path])
+            '--py-files', '%s,%s' % (egg1_path, egg2_path)])
         job.sandbox()
 
         with job.make_runner() as runner:

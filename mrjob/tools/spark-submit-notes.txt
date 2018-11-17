@@ -13,13 +13,11 @@ opts that are just aliases for mrjob opts:
 --jars (libjars)
 --conf (jobconf)
 
-opts where mrjob should have switches in plural form anyhow:
+opts than can be used as-is
 
 --py-files (py_files)
 --files (upload_files)
 --archives (upload_archives)
-
-(should also add --libjars, like --jars above)
 
 opts that can be passed through directly to Spark
 

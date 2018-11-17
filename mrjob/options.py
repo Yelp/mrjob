@@ -840,9 +840,8 @@ _RUNNER_OPTS = dict(
         switches=[
             (['-D', '--jobconf'], dict(
                 action=_KeyValueAction,
-                help=('-D arg to pass through to hadoop streaming; should'
-                      ' take the form KEY=VALUE. You can use -D'
-                      ' multiple times.'),
+                help=('passed through to hadoop streaming as -D and to Spark'
+                      ' as --conf. Should take the form KEY=VALUE'),
             )),
         ],
     ),

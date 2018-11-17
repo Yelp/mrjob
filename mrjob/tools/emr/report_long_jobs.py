@@ -243,7 +243,7 @@ def _format_timedelta(time):
 
 
 def _make_arg_parser():
-    usage = '%(prog)s [options]'
+    usage = '%(prog)s report-long-jobs [options]'
     description = ('Report jobs running for more than a certain number of'
                    ' hours (by default, %.1f). This can help catch buggy jobs'
                    ' and Hadoop/EMR operational issues.' % DEFAULT_MIN_HOURS)

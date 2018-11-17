@@ -61,7 +61,7 @@ from mrjob.util import shlex_split
 
 
 def main(cl_args=None):
-    usage = 'usage: %(prog)s CLUSTER_ID [options] "command string"'
+    usage = 'usage: %(prog)s boss CLUSTER_ID [options] "command string"'
     description = ('Run a command on the master and all worker nodes of an EMR'
                    ' cluster. Store stdout/stderr for results in OUTPUT_DIR.')
 

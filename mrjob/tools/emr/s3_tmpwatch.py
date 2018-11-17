@@ -115,11 +115,12 @@ def _process_time(time):
 
 
 def _make_arg_parser():
+    usage = '%(prog)s s3-tmpwatch [options] TIME_UNTOUCHED URI [URI ...]'
     description = (
         'Delete all files at one or more URIs that are older than a'
         ' specified time.')
 
-    arg_parser = ArgumentParser(description=description)
+    arg_parser = ArgumentParser(usage=usage, description=description)
 
     arg_parser.add_argument(
         '-t', '--test', dest='test', default=False,
@@ -131,7 +132,7 @@ def _make_arg_parser():
         help='The time threshold for removing'
         ' files. A number with an optional'
         ' single-character suffix specifying the units: m for minutes, h for'
-        ' hours, d for days.  If no suffix is specified, time is in hours.')
+        ' hours, d for days. If no suffix is specified, time is in hours.')
 
     arg_parser.add_argument(
         dest='uris', nargs='+',

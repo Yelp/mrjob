@@ -21,21 +21,24 @@ try:
     from setuptools import setup
     setup  # quiet "redefinition of unused ..." warning from pyflakes
     # arguments that distutils doesn't understand
+    google_requirements = [
+        'google-cloud-dataproc>=0.2.0',
+        'google-cloud-logging>=1.5.0',
+        'google-cloud-storage>=1.9.0',
+    ]
     setuptools_kwargs = {
         'extras_require': {
             'ujson': ['ujson'],
+            'google': google_requirements
         },
         'install_requires': [
             'boto3>=1.4.6',
             'botocore>=1.6.0',
             'PyYAML>=3.08',
-            'google-cloud-dataproc>=0.2.0',
-            'google-cloud-logging>=1.5.0',
-            'google-cloud-storage>=1.9.0',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
-        'tests_require': ['simplejson', 'ujson', 'warcio'],
+        'tests_require': ['simplejson', 'ujson', 'warcio'] + google_requirements
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 

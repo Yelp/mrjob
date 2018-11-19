@@ -655,6 +655,17 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    emr_backoff=dict(
+        switches=[
+            (['--emr-backoff'], dict(
+                help=('Number of seconds to wait after an EMR throttling'
+                      ' error. This wait-time exponentiates each occurrence by'
+                      ' 1.5x until we hit 20 occurrences (e.g. emr_backoff=5'
+                      ' will wait up to 5*1.5^20/60/60 ~= 4.5 hours).'),
+                type=float,
+            )),
+        ],
+    ),
     enable_emr_debugging=dict(
         cloud_role='launch',
         switches=[

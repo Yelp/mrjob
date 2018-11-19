@@ -311,6 +311,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'ec2_key_pair_file',
         'emr_action_on_failure',
         'emr_api_params',
+        'emr_backoff',
         'emr_configurations',
         'emr_endpoint',
         'enable_emr_debugging',
@@ -449,6 +450,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 check_cluster_every=30,
                 cleanup_on_failure=['JOB'],
                 cloud_fs_sync_secs=5.0,
+                emr_backoff=20,
                 image_version=_DEFAULT_IMAGE_VERSION,
                 num_core_instances=0,
                 num_task_instances=0,
@@ -2680,7 +2682,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # #1799: don't retry faster than EMR checks the API
         return _wrap_aws_client(raw_emr_client,
-                                min_backoff=self._opts['check_cluster_every'])
+                                min_backoff=self._opts['emr_backoff'])
 
     def _describe_cluster(self):
         emr_client = self.make_emr_client()

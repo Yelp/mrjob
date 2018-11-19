@@ -475,6 +475,7 @@ class VisibleToAllUsersTestCase(MockBoto3TestCase):
 
     def test_force_to_bool(self):
         VISIBLE_MRJOB_CONF = {'runners': {'emr': {
+            'emr_backoff': 0.01,  # must be non-zero
             'check_cluster_every': 0.00,
             'cloud_fs_sync_secs': 0.00,
             'visible_to_all_users': 1,  # should be True
@@ -788,6 +789,7 @@ class CustomAmiTestCase(MockBoto3TestCase):
 class AvailabilityZoneTestCase(MockBoto3TestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
+        'emr_backoff': 0.01,  # must be non-zero
         'check_cluster_every': 0.00,
         'cloud_fs_sync_secs': 0.00,
         'zone': 'PUPPYLAND',
@@ -2491,6 +2493,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBoto3TestCase):
 class JarStepTestCase(MockBoto3TestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
+        'emr_backoff': 0.01,  # must be non-zero
         'check_cluster_every': 0.00,
         'cloud_fs_sync_secs': 0.00,
     }}}
@@ -3308,6 +3311,7 @@ class EMRTagsTestCase(MockBoto3TestCase):
 
     def test_command_line_overrides_config(self):
         TAGS_MRJOB_CONF = {'runners': {'emr': {
+            'emr_backoff': 0.01,  # must be non-zero
             'check_cluster_every': 0.00,
             'cloud_fs_sync_secs': 0.00,
             'tags': {
@@ -5748,11 +5752,7 @@ class EMRClientBackoffTest(MockBoto3TestCase):
         self.sleep.assert_called_with(expected_backoff)
 
     def test_default_backoff(self):
-        self._test_backoff(30)  # default value of check_cluster_every
+        self._test_backoff(20)  # default value of emr_backoff
 
-    def test_large_check_cluster_every(self):
-        self._test_backoff(1000, check_cluster_every=1000)
-
-    def test_small_check_cluster_every(self):
-        # minimum backoff is always 20
-        self._test_backoff(20, check_cluster_every=1)
+    def test_large_emr_backoff(self):
+        self._test_backoff(1000, emr_backoff=1000)

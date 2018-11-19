@@ -250,7 +250,7 @@ v0.6.0, 2017-11-01 -- wave of deprecation
        * removed mr() (use mrjob.step.MRStep)
        * removed *job_runner_kwargs()
        * removed --partitioner switch
-       * removed OutputGroups (#1611):
+       * removed OptionGroups (#1611):
          * removed all_option_groups()
          * removed *_opt_group attributes
    * mrjob.options:

@@ -321,6 +321,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
+        'master_setup',
         'mins_to_end_of_hour',
         'pool_clusters',
         'pool_name',
@@ -784,8 +785,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         Create the master node setup script if necessary.
         """
-        # currently, only used by libjars; see #1336 for how we might open
-        # this up more generally
         for path in self._opts['libjars']:
             # passthrough for libjars already on EMR
             if path.startswith('file:///'):
@@ -793,6 +792,16 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
             self._master_node_setup_mgr.add('file', path)
             self._upload_mgr.add(path)
+
+        # Ensure we upload any upload_files referenced in any command
+        name_to_paths = self._working_dir_mgr.name_to_path('file')
+        for cmd in self._opts['master_setup'] or []:
+            for token in cmd.split(' '):
+                token = token.strip()
+                if token in name_to_paths:
+                    self._master_node_setup_mgr.add(
+                        'file', name_to_paths[token], name=token)
+                    self._upload_mgr.add(name_to_paths[token])
 
         self._create_master_node_setup_script_if_needed()
         if self._master_node_setup_script_path:
@@ -2222,8 +2231,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._master_node_setup_script_path:
             return
 
-        # currently, the only thing this script does is upload files
-        if not self._master_node_setup_mgr.paths():
+        # If we have no files to upload and no commands to execute,
+        # then no need to create the script
+        if not self._master_node_setup_mgr.paths() \
+            and not self._opts['master_setup']:
             return
 
         # create script
@@ -2269,7 +2280,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # imitate Hadoop Distributed Cache
             out.append('  chmod u+rx %s' % pipes.quote(name))
 
-        # at some point we will probably run commands as well (see #1336)
+        # Add master setup commands to the script
+        if self._opts['master_setup']:
+            # Make env variables available to the commands in master setup
+            for envvar in self._opts['cmdenv'] or {}:
+                out.append('  %s=%s' % (
+                    envvar, pipes.quote(self._opts['cmdenv'][envvar])))
+
+            for command in self._opts['master_setup']:
+                out.append('  %s' % command)
 
         out.append('} 1>&2')  # stdout -> stderr for ease of error log parsing
 

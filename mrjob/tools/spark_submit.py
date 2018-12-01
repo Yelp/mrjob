@@ -40,7 +40,7 @@ _DESCRIPTION = 'Submit a spark job using mrjob runners'
 # display in default help message
 
 # the only runners that support spark scripts/jars
-_SPARK_RUNNERS = ('dataproc', 'emr', 'hadoop')
+_SPARK_RUNNERS = ('emr', 'hadoop')
 
 # the default spark runner to use
 _DEFAULT_RUNNER = 'hadoop'
@@ -252,6 +252,8 @@ def _make_arg_parser():
     #_add_help_arg(parser)
 
     # add runner opts
+
+    # TODO: just add all runner opts, don't display the irrelevant ones
     runner_opt_names = (
         set(_RUNNER_OPTS) - set(_HARD_CODED_OPTS) - _IRRELEVANT_OPT_NAMES)
     _add_runner_args(parser, runner_opt_names)

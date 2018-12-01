@@ -13,12 +13,20 @@
 # limitations under the License.
 """Submit a spark job using mrjob runners."""
 from argparse import ArgumentParser
+from logging import getLogger
 
+from mrjob.conf import combine_lists
 from mrjob.job import MRJob
 from mrjob.options import _RUNNER_OPTS
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
+from mrjob.options import _parse_raw_args
 from mrjob.runner import _runner_class
+from mrjob.step import SparkJarStep
+from mrjob.step import SparkScriptStep
+
+log = getLogger(__name__)
+
 
 _USAGE = ('%(prog)s spark-submit [-r <runner>] [options]'
           ' <python file | app jar> [app arguments]')
@@ -117,6 +125,14 @@ _SPARK_SUBMIT_SWITCHES = dict(
     upload_files='--files',
 )
 
+# not a runner opt or one that's passed straight through to spark
+_STEP_OPT_NAMES = {'main_class'}
+
+# arguments that are passed straight through to spark-submit
+_SPARK_ARG_OPT_NAMES = (
+    set(_SPARK_SUBMIT_SWITCHES) - set(_RUNNER_OPTS) - _STEP_OPT_NAMES)
+
+
 
 _SWITCH_ALIASES = {
     '--master': '--spark-master',
@@ -132,16 +148,12 @@ _HARD_CODED_OPTS = dict(
 )
 
 # these only work on inline/local runners, which we don't support
-_IRRELEVANT_OPTS = {'hadoop_version', 'num_cores', 'sort_bin'}
+_IRRELEVANT_OPT_NAMES = {'hadoop_version', 'num_cores', 'sort_bin'}
 
 
 def main(cl_args=None):
     parser = _make_arg_parser()
     options = parser.parse_args(cl_args)
-
-    print(options)
-
-    return
 
     MRJob.set_up_logging(
         quiet=options.quiet,
@@ -149,11 +161,65 @@ def main(cl_args=None):
     )
 
     runner_class = _runner_class(options.runner)
-    runner_kwargs = _get_runner_kwargs(options, runner_class)
 
-    runner = runner_class(**runner_kwargs)
+    kwargs = _get_runner_opt_kwargs(options, runner_class)
+    kwargs['step'] = _get_step(options)
+    kwargs['spark_args'] = combine_lists(
+        kwargs.get('spark_args'), _get_spark_args(parser, cl_args))
+    kwargs.update(_HARD_CODED_OPTS)
+
+    runner = runner_class(**kwargs)
 
     runner.run()
+
+
+def _get_runner_kwargs(options, parser, runner_class):
+    kwargs = _get_runner_opt_kwargs(options, runner_class)
+
+    kwargs['step'] = _get_step(options)
+
+    kwargs['spark_args'] = combine_lists(
+        kwargs.get('spark_args'), _get_spark_args(parser, cl_args))
+
+    kwargs.update(_HARD_CODED_OPTS)
+
+    return kwargs
+
+
+def _get_runner_opt_kwargs(options, runner_class):
+    """Extract the options for the given runner class from *options*."""
+    return {opt_name: getattr(options, opt_name)
+            for opt_name in runner_class.OPT_NAMES
+            if hasattr(options, opt_name)}
+
+
+def _get_step(options):
+    """Extract the step from the runner options."""
+    args = options.args
+    main_class = options.main_class
+    script_or_jar = options.script_or_jar
+
+    if script_or_jar.lower().endswith('.jar'):
+        return SparkJarStep(args=args, jar=script_or_jar,
+                            main_class=main_class)
+    elif script_or_jar.lower().endswith('.py'):
+        return SparkScriptStep(args=args, script=script_or_jar)
+    else:
+        raise ValueError('%s appears not to be a JAR or Python script' %
+                         options.script_or_jar)
+
+
+def _get_spark_args(parser, cl_args):
+    raw_args = _parse_raw_args(parser, cl_args)
+
+    spark_args = []
+
+    for dest, option_string, args in raw_args:
+        if dest in _SPARK_ARG_OPT_NAMES:
+            spark_args.append(option_string)
+            spark_args.extend(args)
+
+    return spark_args
 
 
 def _add_spark_submit_arg(parser, opt_name):
@@ -187,7 +253,7 @@ def _make_arg_parser():
 
     # add runner opts
     runner_opt_names = (
-        set(_RUNNER_OPTS) - set(_HARD_CODED_OPTS) - _IRRELEVANT_OPTS)
+        set(_RUNNER_OPTS) - set(_HARD_CODED_OPTS) - _IRRELEVANT_OPT_NAMES)
     _add_runner_args(parser, runner_opt_names)
 
     # add spark-specific opts (without colliding with runner opts)
@@ -211,9 +277,6 @@ def _add_help_arg(parser):
     parser.add_argument(
         '-h', '--help', dest='help', action='store_true',
         help='show this message and exit')
-
-
-
 
 
 def _make_basic_help_arg_parser():

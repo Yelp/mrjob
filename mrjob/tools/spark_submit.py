@@ -17,6 +17,7 @@ from argparse import ArgumentParser
 from mrjob.job import MRJob
 from mrjob.options import _RUNNER_OPTS
 from mrjob.options import _add_basic_args
+from mrjob.options import _add_runner_args
 from mrjob.runner import _runner_class
 
 _USAGE = ('%(prog)s spark-submit [-r <runner>] [options]'
@@ -30,6 +31,11 @@ _DESCRIPTION = 'Submit a spark job using mrjob runners'
 # then add runner opts (other than check_input_paths) but don't
 # display in default help message
 
+# the only runners that support spark scripts/jars
+_SPARK_RUNNERS = ('dataproc', 'emr', 'hadoop')
+
+# the default spark runner to use
+_DEFAULT_RUNNER = 'hadoop'
 
 
 _SPARK_SUBMIT_ARG_GROUPS = [
@@ -120,11 +126,13 @@ _SWITCH_ALIASES = {
 }
 
 
+# these options don't make any sense with Spark scripts
+_HARD_CODED_OPTS = dict(
+    check_input_paths=False
+)
 
-_CORE_OPTS = {
-
-
-}
+# these only work on inline/local runners, which we don't support
+_IRRELEVANT_OPTS = {'hadoop_version', 'num_cores', 'sort_bin'}
 
 
 def main(cl_args=None):
@@ -133,20 +141,22 @@ def main(cl_args=None):
 
     print(options)
 
+    return
+
     MRJob.set_up_logging(
         quiet=options.quiet,
         verbose=options.verbose,
     )
 
     runner_class = _runner_class(options.runner)
-    runner_kwargs = _get_runner_kwargs(options)
+    runner_kwargs = _get_runner_kwargs(options, runner_class)
 
     runner = runner_class(**runner_kwargs)
 
     runner.run()
 
 
-def _add_spark_submit_arg(opt_name, parser_or_group):
+def _add_spark_submit_arg(parser, opt_name):
     opt_string = _SPARK_SUBMIT_SWITCHES[opt_name]
 
     kwargs = dict(dest=opt_name)
@@ -159,16 +169,61 @@ def _add_spark_submit_arg(opt_name, parser_or_group):
             if opt_alias in opt_strings:
                 kwargs.update(opt_kwargs)
 
-    parser_or_group.add_argument(opt_string, **kwargs)
+    parser.add_argument(opt_string, **kwargs)
 
 
 def _make_arg_parser():
+    # this parser is never used for help messages, so ordering,
+    # usage, etc. don't matter
+    parser = ArgumentParser()#add_help=False)
+
+    # add positional arguments
+    parser.add_argument(dest='script_or_jar')
+    parser.add_argument(dest='args', nargs='*')
+
+    _add_basic_args(parser)
+    _add_runner_alias_arg(parser)
+    #_add_help_arg(parser)
+
+    # add runner opts
+    runner_opt_names = (
+        set(_RUNNER_OPTS) - set(_HARD_CODED_OPTS) - _IRRELEVANT_OPTS)
+    _add_runner_args(parser, runner_opt_names)
+
+    # add spark-specific opts (without colliding with runner opts)
+    for opt_name, switch in _SPARK_SUBMIT_SWITCHES.items():
+        if opt_name in runner_opt_names and switch not in _SWITCH_ALIASES:
+            continue
+        _add_spark_submit_arg(parser, opt_name)
+
+    return parser
+
+
+def _add_runner_alias_arg(parser):
+    parser.add_argument(
+        '-r', '--runner', dest='runner',
+        default=_DEFAULT_RUNNER,
+        choices=_SPARK_RUNNERS,
+        help=('Where to run the job (default: %(default)s")'))
+
+
+def _add_help_arg(parser):
+    parser.add_argument(
+        '-h', '--help', dest='help', action='store_true',
+        help='show this message and exit')
+
+
+
+
+
+def _make_basic_help_arg_parser():
     parser = ArgumentParser(usage=_USAGE, description=_DESCRIPTION)
 
-    parser.add_argument(
-        '-r', '--runner', dest='runner', default='hadoop',
-        choices=('hadoop', 'emr', 'dataproc'),
-        help=('Where to run the job (default: %(default)s")'))
+    parser.add_argument(dest='script_or_jar')
+
+    parser.add_argument(dest='args', nargs='*')
+
+    _add_runner_alias_arg(parser)
 
     for group_desc, opt_names in _SPARK_SUBMIT_ARG_GROUPS:
         if group_desc is None:
@@ -177,7 +232,7 @@ def _make_arg_parser():
             parser_or_group = parser.add_argument_group(group_desc)
 
         for opt_name in opt_names:
-            _add_spark_submit_arg(opt_name, parser_or_group)
+            _add_spark_submit_arg(parser_or_group, opt_name)
 
         if group_desc is None:
             _add_basic_args(parser)

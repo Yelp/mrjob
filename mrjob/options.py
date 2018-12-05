@@ -25,6 +25,7 @@ from argparse import Action
 from argparse import ArgumentParser
 from argparse import SUPPRESS
 from logging import getLogger
+from os import devnull
 
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts

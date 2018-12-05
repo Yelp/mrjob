@@ -492,7 +492,7 @@ class MRJobRunner(object):
         :py:class:`~mrjob.inline.InlineMRJobRunner`, where we raise the
         actual exception that caused the step to fail).
         """
-        if not self._script_path:
+        if not (self._script_path or self._steps):
             raise AssertionError('No script to run!')
 
         if self._ran_job:
@@ -1220,8 +1220,6 @@ def _blank_out_conflicting_opts(opt_list, opt_names, conflicting_opts=None):
             blank_out = True
 
     return opt_list
-
-
 
 
 def _runner_class(alias):

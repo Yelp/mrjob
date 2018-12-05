@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Submit a spark job using mrjob runners."""
+import os
 from argparse import ArgumentParser
 from logging import getLogger
 
@@ -94,7 +95,6 @@ _SPARK_SUBMIT_OPT_NAMES = {
     for opt_name in opt_names
 }
 
-
 _SPARK_SUBMIT_SWITCHES = dict(
     driver_class_path='--driver-class-path',
     driver_cores='--driver-cores',
@@ -143,12 +143,11 @@ _SWITCH_ALIASES = {
 
 
 # these options don't make any sense with Spark scripts
+
+# TODO: suppress this in --help
 _HARD_CODED_OPTS = dict(
     check_input_paths=False
 )
-
-# these only work on inline/local runners, which we don't support
-_IRRELEVANT_OPT_NAMES = {'hadoop_version', 'num_cores', 'sort_bin'}
 
 
 def main(cl_args=None):
@@ -163,9 +162,11 @@ def main(cl_args=None):
     runner_class = _runner_class(options.runner)
 
     kwargs = _get_runner_opt_kwargs(options, runner_class)
-    kwargs['step'] = _get_step(options)
+    kwargs['input_paths'] = [os.devnull]
+    kwargs['steps'] = [_get_step(options).description()]
     kwargs['spark_args'] = combine_lists(
         kwargs.get('spark_args'), _get_spark_args(parser, cl_args))
+
     kwargs.update(_HARD_CODED_OPTS)
 
     runner = runner_class(**kwargs)
@@ -248,26 +249,22 @@ def _make_arg_parser():
     parser.add_argument(dest='args', nargs='*')
 
     _add_basic_args(parser)
-    _add_runner_alias_arg(parser)
+    _add_runner_name_arg(parser)
     #_add_help_arg(parser)
 
     # add runner opts
-
-    # TODO: just add all runner opts, don't display the irrelevant ones
-    runner_opt_names = (
-        set(_RUNNER_OPTS) - set(_HARD_CODED_OPTS) - _IRRELEVANT_OPT_NAMES)
-    _add_runner_args(parser, runner_opt_names)
+    _add_runner_args(parser)
 
     # add spark-specific opts (without colliding with runner opts)
     for opt_name, switch in _SPARK_SUBMIT_SWITCHES.items():
-        if opt_name in runner_opt_names and switch not in _SWITCH_ALIASES:
+        if opt_name in _RUNNER_OPTS and switch not in _SWITCH_ALIASES:
             continue
         _add_spark_submit_arg(parser, opt_name)
 
     return parser
 
 
-def _add_runner_alias_arg(parser):
+def _add_runner_name_arg(parser):
     parser.add_argument(
         '-r', '--runner', dest='runner',
         default=_DEFAULT_RUNNER,
@@ -288,7 +285,7 @@ def _make_basic_help_arg_parser():
 
     parser.add_argument(dest='args', nargs='*')
 
-    _add_runner_alias_arg(parser)
+    _add_runner_name_arg(parser)
 
     for group_desc, opt_names in _SPARK_SUBMIT_ARG_GROUPS:
         if group_desc is None:

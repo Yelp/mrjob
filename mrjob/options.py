@@ -1178,7 +1178,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--spark-master'], dict(
                 help=('--master argument to spark-submit (e.g. '
-                      'spark://host:port, local. Default is yarn'),
+                      'spark://host:port, local). Default is "yarn"'),
             )),
         ],
     ),

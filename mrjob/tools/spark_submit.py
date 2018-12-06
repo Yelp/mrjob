@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Submit a spark job using mrjob runners."""
+from __future__ import print_function
+
 import os
+import sys
 from argparse import ArgumentParser
 from logging import getLogger
 
@@ -33,6 +36,13 @@ _USAGE = ('%(prog)s spark-submit [-r <runner>] [options]'
           ' <python file | app jar> [app arguments]')
 
 _DESCRIPTION = 'Submit a spark job using mrjob runners'
+
+_BASIC_HELP_EPILOG = (
+    'To see help for a specific runner, use --help -r <runner name>')
+
+_DEPRECATED_OPT_HELP = (
+    'To include help for deprecated options, add --deprecated')
+
 
 # for spark-submit args, just need switches and help message
 # (which can be patched into runner opts with same dest name)
@@ -155,12 +165,17 @@ def main(cl_args=None):
     parser = _make_arg_parser()
     options = parser.parse_args(cl_args)
 
+    if options.help or not options.script_or_jar:
+        _print_help(options)
+        sys.exit(0)
+
     MRJob.set_up_logging(
         quiet=options.quiet,
         verbose=options.verbose,
     )
 
-    runner_class = _runner_class(options.runner)
+    runner_alias = options.runner or _DEFAULT_RUNNER
+    runner_class = _runner_class(runner_alias)
 
     kwargs = _get_runner_opt_kwargs(options, runner_class)
     kwargs['input_paths'] = [os.devnull]
@@ -243,15 +258,16 @@ def _add_spark_submit_arg(parser, opt_name):
 def _make_arg_parser():
     # this parser is never used for help messages, so ordering,
     # usage, etc. don't matter
-    parser = ArgumentParser()#add_help=False)
+    parser = ArgumentParser(add_help=False)
 
     # add positional arguments
-    parser.add_argument(dest='script_or_jar')
+    parser.add_argument(dest='script_or_jar', nargs='?')
     parser.add_argument(dest='args', nargs='*')
 
     _add_basic_args(parser)
-    _add_runner_name_arg(parser)
-    #_add_help_arg(parser)
+    _add_runner_alias_arg(parser)
+    _add_help_arg(parser)
+    _add_deprecated_arg(parser)
 
     # add runner opts
     _add_runner_args(parser)
@@ -265,12 +281,13 @@ def _make_arg_parser():
     return parser
 
 
-def _add_runner_name_arg(parser):
+def _add_runner_alias_arg(parser):
+    # we can't set default here because -r also affects help
     parser.add_argument(
         '-r', '--runner', dest='runner',
-        default=_DEFAULT_RUNNER,
         choices=_SPARK_RUNNERS,
-        help=('Where to run the job (default: %(default)s")'))
+        help=('Where to run the job (default: "%s")'
+              % _DEFAULT_RUNNER))
 
 
 def _add_help_arg(parser):
@@ -279,14 +296,42 @@ def _add_help_arg(parser):
         help='show this message and exit')
 
 
-def _make_basic_help_arg_parser():
-    parser = ArgumentParser(usage=_USAGE, description=_DESCRIPTION)
+def _add_deprecated_arg(parser):
+    parser.add_argument(
+        '--deprecated', dest='deprecated', action='store_true',
+        help='include help for deprecated options')
 
-    parser.add_argument(dest='script_or_jar')
 
-    parser.add_argument(dest='args', nargs='*')
+def _print_help(options):
+    if options.runner:
+        _print_help_for_runner(options.runner, options.deprecated)
+    else:
+        _print_basic_help(options.deprecated)
 
-    _add_runner_name_arg(parser)
+
+def _print_help_for_runner(runner_alias, include_deprecated=False):
+    # TODO: finish this
+    print('<help for %s runner>' % runner_alias)
+
+
+def _print_basic_help(include_deprecated=False):
+    _make_basic_help_arg_parser(include_deprecated).print_help()
+
+    if not include_deprecated:
+        print()
+        print(_DEPRECATED_OPT_HELP)
+
+
+def _make_basic_help_arg_parser(include_deprecated=False):
+    """Make an arg parser that's used only for printing basic help.
+
+    This prints help very similar to spark-submit itself. Runner args
+    are not included unless they are also spark-submit args (e.g. --py-files)
+    """
+    parser = ArgumentParser(usage=_USAGE, description=_DESCRIPTION,
+                            epilog=_BASIC_HELP_EPILOG, add_help=False)
+
+    _add_runner_alias_arg(parser)
 
     for group_desc, opt_names in _SPARK_SUBMIT_ARG_GROUPS:
         if group_desc is None:
@@ -299,6 +344,11 @@ def _make_basic_help_arg_parser():
 
         if group_desc is None:
             _add_basic_args(parser)
+            _add_help_arg(parser)
+            if include_deprecated:
+                _add_deprecated_arg(parser)
+
+
             # TODO: add --deprecated and --help
 
     return parser

@@ -111,6 +111,12 @@ def _s3_tmpwatch(args):
     main(args)
 
 
+@_command('spark-submit', 'Submit Spark jobs')
+def _spark_submit(args):
+    from mrjob.tools.spark_submit import main
+    main(args)
+
+
 @_command('terminate-idle-clusters', 'Terminate idle EMR clusters')
 def _terminate_idle_clusters(args):
     from mrjob.tools.emr.terminate_idle_clusters import main

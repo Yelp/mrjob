@@ -45,6 +45,7 @@ from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
+from mrjob.step import OUTPUT
 from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import to_lines
@@ -510,7 +511,11 @@ class MRJobRunner(object):
         self._run()
         self._ran_job = True
 
-        log.info('job output is in %s' % self._output_dir)
+        last_step = self._get_steps()[-1]
+
+        # only print this message if the last step uses our output dir
+        if 'args' not in last_step or OUTPUT in last_step['args']:
+            log.info('job output is in %s' % self._output_dir)
 
     def cat_output(self):
         """Stream the jobs output, as a stream of ``bytes``. If there are

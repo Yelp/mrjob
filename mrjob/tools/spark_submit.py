@@ -146,7 +146,8 @@ _SWITCH_ALIASES = {
 
 # TODO: suppress this in --help
 _HARD_CODED_OPTS = dict(
-    check_input_paths=False
+    check_input_paths=False,
+    output_dir=None,
 )
 
 

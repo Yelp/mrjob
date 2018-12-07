@@ -42,9 +42,6 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
 
         self.runner_log = self.start(patch('mrjob.runner.log'))
 
-    def get_runner(self):
-        return self.runner_class.return_value
-
     def get_runner_kwargs(self):
         return self.runner_class.call_args_list[-1][1]
 
@@ -65,5 +62,43 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
                 script='foo.py',
                 spark_args=[],
                 type='spark_script',
+            )
+        ])
+
+    def test_jar_step(self):
+        spark_submit_main(['dora.jar', 'arg1', 'arg2', 'arg3'])
+
+        self.assertEqual(self.runner_class.alias, 'hadoop')
+
+        self.assertTrue(self.runner_class.called)
+        self.assertTrue(self.runner_class.return_value.run.called)
+
+        kwargs = self.get_runner_kwargs()
+
+        self.assertEqual(kwargs['steps'], [
+            dict(
+                args=['arg1', 'arg2', 'arg3'],
+                jar='dora.jar',
+                jobconf={},
+                main_class=None,
+                spark_args=[],
+                type='spark_jar',
+            )
+        ])
+
+    def test_jar_main_class(self):
+        spark_submit_main(['dora.jar', '--class', 'Backpack',
+                           'arg1', 'arg2', 'arg3'])
+
+        kwargs = self.get_runner_kwargs()
+
+        self.assertEqual(kwargs['steps'], [
+            dict(
+                args=['arg1', 'arg2', 'arg3'],
+                jar='dora.jar',
+                jobconf={},
+                main_class='Backpack',
+                spark_args=[],
+                type='spark_jar',
             )
         ])

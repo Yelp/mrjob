@@ -16,25 +16,54 @@ from mrjob.runner import _runner_class
 from mrjob.tools.spark_submit import main as spark_submit_main
 
 from tests.py2 import Mock
+from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
 
-def SparkSubmitToolTestCase(SandboxedTestCase):
+class SparkSubmitToolTestCase(SandboxedTestCase):
 
     def setUp(self):
         super(SparkSubmitToolTestCase, self).setUp()
 
-        self.mock_runner = Mock()
+        self.runner_class = None
 
         def _mock_runner_class(runner_alias):
             rc = _runner_class(runner_alias)
-            self.mock_runner.OPT_NAMES = set(rc.OPT_NAMES)
-            return self.mock_runner
 
-        self.start(patch('mrjob.tools.spark_submit._runner_class',
-                         mock_runner_class))
+            self.runner_class = Mock()
+            self.runner_class.alias = rc.alias
+            self.runner_class.OPT_NAMES = rc.OPT_NAMES
+
+            return self.runner_class
+
+        self.runner_class = self.start(patch(
+            'mrjob.tools.spark_submit._runner_class',
+            side_effect=_mock_runner_class))
 
         self.runner_log = self.start(patch('mrjob.runner.log'))
 
-    def mock_runner_kwargs(self):
-        return self.mock_runner.call_args_list[-1][1]
+    def get_runner(self):
+        return self.runner_class.return_value
+
+    def get_runner_kwargs(self):
+        return self.runner_class.call_args_list[-1][1]
+
+    def test_basic_end_to_end(self):
+        spark_submit_main(['foo.py', 'arg1', 'arg2'])
+
+        self.assertEqual(self.runner_class.alias, 'hadoop')
+
+        self.assertTrue(self.runner_class.called)
+        self.assertTrue(self.runner_class.return_value.run.called)
+
+        kwargs = self.get_runner_kwargs()
+
+        self.assertEqual(kwargs['steps'], [
+            dict(
+                args=['arg1', 'arg2'],
+                jobconf={},
+                script='foo.py',
+                spark_args=[],
+                type='spark_script',
+            )
+        ])

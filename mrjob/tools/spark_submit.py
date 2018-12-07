@@ -239,6 +239,7 @@ _SWITCH_ALIASES = {
 _HARD_CODED_OPTS = dict(
     check_input_paths=False,
     output_dir=None,
+    setup=None,  # currently does nothing on Spark
 )
 
 

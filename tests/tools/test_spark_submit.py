@@ -229,12 +229,15 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self.assertEqual(kwargs['check_input_paths'], False)
         self.assertEqual(kwargs['input_paths'], [os.devnull])
         self.assertEqual(kwargs['output_dir'], None)
+        self.assertEqual(kwargs['setup'], None)
 
     def test_no_switches_for_hard_coded_kwargs(self):
         self.assertRaises(MockSystemExit, spark_submit_main,
                           ['--check-input-paths', 'foo.py', 'arg1'])
         self.assertRaises(MockSystemExit, spark_submit_main,
-                          ['--output-dir', 'foo.py', 'arg1'])
+                          ['--output-dir', 'out', 'foo.py', 'arg1'])
+        self.assertRaises(MockSystemExit, spark_submit_main,
+                          ['--setup', 'true', 'foo.py', 'arg1'])
 
     def test_help_arg(self):
         with patch('mrjob.tools.spark_submit._print_basic_help') as pbh:

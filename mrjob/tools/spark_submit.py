@@ -392,6 +392,9 @@ def _print_help(options, runner_class):
 def _print_help_for_runner(runner_class, include_deprecated=False):
     help_parser = ArgumentParser(usage=SUPPRESS, add_help=False)
 
+    arg_group = help_parser.add_argument_group(
+        'optional switches for %s runner' % runner_class.alias)
+
     # don't include hard-coded opts or opts in basic help
     opt_names = runner_class.OPT_NAMES - set(_HARD_CODED_OPTS)
 
@@ -404,7 +407,7 @@ def _print_help_for_runner(runner_class, include_deprecated=False):
         for k, v in _SWITCH_ALIASES.items()
     }
 
-    _add_runner_args(help_parser, opt_names,
+    _add_runner_args(arg_group, opt_names,
                      include_deprecated=include_deprecated,
                      customize_switches=customize_switches,
                      suppress_switches=suppress_switches)

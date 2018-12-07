@@ -254,29 +254,16 @@ def main(cl_args=None):
     )
 
     kwargs = _get_runner_opt_kwargs(options, runner_class)
-    kwargs['input_paths'] = [os.devnull]
-    kwargs['steps'] = [_get_step(options).description()]
-    kwargs['spark_args'] = combine_lists(
-        kwargs.get('spark_args'), _get_spark_args(parser, cl_args))
-
     kwargs.update(_HARD_CODED_OPTS)
+
+    kwargs['input_paths'] = [os.devnull]
+
+    step = _get_step(options, parser, cl_args)
+    kwargs['steps'] = [step.description()]
 
     runner = runner_class(**kwargs)
 
     runner.run()
-
-
-def _get_runner_kwargs(options, parser, runner_class):
-    kwargs = _get_runner_opt_kwargs(options, runner_class)
-
-    kwargs['step'] = _get_step(options)
-
-    kwargs['spark_args'] = combine_lists(
-        kwargs.get('spark_args'), _get_spark_args(parser, cl_args))
-
-    kwargs.update(_HARD_CODED_OPTS)
-
-    return kwargs
 
 
 def _get_runner_opt_kwargs(options, runner_class):
@@ -286,17 +273,22 @@ def _get_runner_opt_kwargs(options, runner_class):
             if hasattr(options, opt_name)}
 
 
-def _get_step(options):
+def _get_step(options, parser, cl_args):
     """Extract the step from the runner options."""
     args = options.args
     main_class = options.main_class
+    spark_args = _get_spark_args(parser, cl_args)
     script_or_jar = options.script_or_jar
 
     if script_or_jar.lower().endswith('.jar'):
-        return SparkJarStep(args=args, jar=script_or_jar,
-                            main_class=main_class)
-    elif script_or_jar.lower().endswith('.py'):
-        return SparkScriptStep(args=args, script=script_or_jar)
+        return SparkJarStep(args=args,
+                            jar=script_or_jar,
+                            main_class=main_class,
+                            spark_args=spark_args)
+    elif script_or_jar.lower().split('.')[-1].startswith('py'):
+        return SparkScriptStep(args=args,
+                               script=script_or_jar,
+                               spark_args=spark_args)
     else:
         raise ValueError('%s appears not to be a JAR or Python script' %
                          options.script_or_jar)
@@ -384,9 +376,10 @@ def _add_deprecated_arg(parser):
 def _print_help(options, runner_class):
     if options.help and options.runner:
         # if user specifies -r without -h, show basic help
-        _print_help_for_runner(runner_class, options.deprecated)
+        _print_help_for_runner(runner_class,
+                               include_deprecated=options.deprecated)
     else:
-        _print_basic_help(options.deprecated)
+        _print_basic_help(include_deprecated=options.deprecated)
 
 
 def _print_help_for_runner(runner_class, include_deprecated=False):

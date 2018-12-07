@@ -1049,9 +1049,8 @@ _RUNNER_OPTS = dict(
         combiner=combine_cmds,
         switches=[
             (['--python-bin'], dict(
-                help=('Alternate python command for Python mappers/reducers.'
-                      ' You can include arguments, e.g. --python-bin "python'
-                      ' -v"'),
+                help=('Alternate python command. You can include arguments,'
+                      ' e.g. --python-bin "python -v"'),
             )),
         ],
     ),

@@ -240,6 +240,7 @@ _HARD_CODED_OPTS = dict(
     check_input_paths=False,
     output_dir=None,
     setup=None,  # currently does nothing on Spark
+    task_python_bin=None,  # without setup, same as python_bin
 )
 
 

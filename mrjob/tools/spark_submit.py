@@ -335,9 +335,9 @@ def _add_spark_submit_arg(parser, opt_name):
 
 
 def _make_arg_parser():
-    # this parser is never used for help messages, so ordering,
-    # usage, etc. don't matter
-    parser = ArgumentParser(add_help=False)
+    # this parser is never used for help messages, but
+    # will show usage on error
+    parser = ArgumentParser(usage=_USAGE, add_help=False)
 
     # add positional arguments
     parser.add_argument(dest='script_or_jar', nargs='?')

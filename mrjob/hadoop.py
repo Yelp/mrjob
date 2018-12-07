@@ -121,7 +121,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
     alias = 'hadoop'
 
     OPT_NAMES = MRJobBinRunner.OPT_NAMES | {
-        'bootstrap_spark',
         'hadoop_bin',
         'hadoop_extra_args',
         'hadoop_log_dirs',

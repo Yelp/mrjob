@@ -17,9 +17,11 @@ from __future__ import print_function
 import os
 
 from mrjob.runner import _runner_class
+from mrjob.step import StepFailedException
 from mrjob.tools.spark_submit import main as spark_submit_main
 
 from tests.mock_boto3.case import MockBoto3TestCase
+from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
@@ -36,10 +38,13 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
 
         self.runner_class = None
 
+        self.runner = MagicMock()
+
         def _mock_runner_class(runner_alias):
             rc = _runner_class(runner_alias)
 
             self.runner_class = Mock()
+            self.runner_class.return_value = self.runner
             self.runner_class.alias = rc.alias
             self.runner_class.OPT_NAMES = rc.OPT_NAMES
 
@@ -71,7 +76,7 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self.assertEqual(self.runner_class.alias, 'hadoop')
 
         self.assertTrue(self.runner_class.called)
-        self.assertTrue(self.runner_class.return_value.run.called)
+        self.assertTrue(self.runner.run.called)
 
         kwargs = self.get_runner_kwargs()
 
@@ -91,7 +96,7 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self.assertEqual(self.runner_class.alias, 'hadoop')
 
         self.assertTrue(self.runner_class.called)
-        self.assertTrue(self.runner_class.return_value.run.called)
+        self.assertTrue(self.runner.run.called)
 
         kwargs = self.get_runner_kwargs()
 
@@ -129,7 +134,7 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self.assertEqual(self.runner_class.alias, 'emr')
 
         self.assertTrue(self.runner_class.called)
-        self.assertTrue(self.runner_class.return_value.run.called)
+        self.assertTrue(self.runner.run.called)
 
     def test_no_script_args_okay(self):
         spark_submit_main(['foo.py'])
@@ -220,6 +225,17 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
 
         self.assertIn('region', kwargs)
         self.assertNotIn('hadoop_bin', kwargs)
+
+    def test_cleanup_called(self):
+        spark_submit_main(['-r', 'emr', 'foo.py', 'arg1'])
+        self.assertTrue(self.runner.cleanup.called)
+
+    def test_cleanup_called_even_if_run_failed(self):
+        self.runner.run.side_effect = StepFailedException
+
+        self.assertRaises(StepFailedException, spark_submit_main,
+                          ['-r', 'emr', 'foo.py', 'arg1'])
+        self.assertTrue(self.runner.cleanup.called)
 
     def test_hard_coded_kwargs(self):
         spark_submit_main(['foo.py', 'arg1'])

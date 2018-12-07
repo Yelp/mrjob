@@ -270,8 +270,10 @@ def main(cl_args=None):
 
     runner = runner_class(**kwargs)
 
-    runner.run()
-
+    try:
+        runner.run()
+    finally:
+        runner.cleanup()
 
 def _get_runner_opt_kwargs(options, runner_class):
     """Extract the options for the given runner class from *options*."""

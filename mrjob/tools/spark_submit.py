@@ -346,7 +346,8 @@ def _make_arg_parser():
     _add_deprecated_arg(parser)
 
     # add runner opts
-    _add_runner_args(parser)
+    runner_opt_names = set(_RUNNER_OPTS) - set(_HARD_CODED_OPTS)
+    _add_runner_args(parser, opt_names=runner_opt_names)
 
     # add spark-specific opts (without colliding with runner opts)
     for opt_name, switch in _SPARK_SUBMIT_SWITCHES.items():

@@ -14,6 +14,8 @@
 """Test the spark-submit script."""
 from __future__ import print_function
 
+import os
+
 from mrjob.runner import _runner_class
 from mrjob.tools.spark_submit import main as spark_submit_main
 
@@ -51,8 +53,9 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         # don't actually want to exit after printing help
         self.exit = self.start(patch('sys.exit', side_effect=MockSystemExit))
 
-        # also probably better not to print
-        self.print = self.start(patch('mrjob.tools.spark_submit.print'))
+        # don't actually print
+        self.print_message = self.start(patch(
+            'argparse.ArgumentParser._print_message'))
 
     def get_runner_kwargs(self):
         return self.runner_class.call_args_list[-1][1]
@@ -204,14 +207,38 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         # arg with custom parser
         self.assertEqual(kwargs['py_files'], ['bar.py', 'baz.py'])
 
-    def test_basic_help(self):
+    def test_filters_runner_kwargs(self):
+        # may want to change this behavior; see #1898
+        spark_submit_main(['-r', 'emr', 'foo.py', 'arg1'])
+
+        kwargs = self.get_runner_kwargs()
+
+        self.assertIn('region', kwargs)
+        self.assertNotIn('hadoop_bin', kwargs)
+
+    def test_hard_coded_kwargs(self):
+        spark_submit_main(['foo.py', 'arg1'])
+
+        kwargs = self.get_runner_kwargs()
+
+        self.assertEqual(kwargs['check_input_paths'], False)
+        self.assertEqual(kwargs['input_paths'], [os.devnull])
+        self.assertEqual(kwargs['output_dir'], None)
+
+    def test_no_switches_for_hard_coded_kwargs(self):
+        self.assertRaises(MockSystemExit, spark_submit_main,
+                          ['--check-input-paths', 'foo.py', 'arg1'])
+        self.assertRaises(MockSystemExit, spark_submit_main,
+                          ['--output-dir', 'foo.py', 'arg1'])
+
+    def test_help_arg(self):
         with patch('mrjob.tools.spark_submit._print_basic_help') as pbh:
             self.assertRaises(MockSystemExit, spark_submit_main, ['-h'])
 
             self.exit.assert_called_once_with(0)
             pbh.assert_called_once_with(include_deprecated=False)
 
-    def test_help_runner(self):
+    def test_help_arg_with_runner(self):
         with patch('mrjob.tools.spark_submit._print_help_for_runner') as phfr:
             self.assertRaises(MockSystemExit, spark_submit_main,
                               ['-h', '-r', 'emr'])
@@ -228,13 +255,15 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
             pbh.assert_called_once_with(include_deprecated=False)
 
     def test_no_script_prints_basic_help_even_with_runner(self):
-        # to get runner help, you have to do --help --runner ...
+        # to get runner help, you have to do -h -r <alias>
         with patch('mrjob.tools.spark_submit._print_basic_help') as pbh:
             self.assertRaises(MockSystemExit, spark_submit_main,
                               ['-r', 'emr'])
 
             self.exit.assert_called_once_with(0)
             pbh.assert_called_once_with(include_deprecated=False)
+
+
 
 
 # add end-to-end test on EMR

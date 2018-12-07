@@ -19,6 +19,7 @@ import os
 from mrjob.runner import _runner_class
 from mrjob.tools.spark_submit import main as spark_submit_main
 
+from tests.mock_boto3.case import MockBoto3TestCase
 from tests.py2 import Mock
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
@@ -52,6 +53,10 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
 
         # don't actually want to exit after printing help
         self.exit = self.start(patch('sys.exit', side_effect=MockSystemExit))
+
+        # don't set up logging
+        self.set_up_logging = self.start(
+            patch('mrjob.job.MRJob.set_up_logging'))
 
         # don't actually print
         self.print_message = self.start(patch(
@@ -264,6 +269,35 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
             pbh.assert_called_once_with(include_deprecated=False)
 
 
+class SparkSubmitToEMRTestCase(MockBoto3TestCase):
 
+    def setUp(self):
+        super(SparkSubmitToEMRTestCase, self).setUp()
 
-# add end-to-end test on EMR
+        # don't set up logging
+        self.set_up_logging = self.start(
+            patch('mrjob.job.MRJob.set_up_logging'))
+
+    def test_end_to_end(self):
+        script_path = self.makefile('foo.py')
+
+        spark_submit_main(
+            ['-r', 'emr', script_path, 'arg1'])
+
+        emr_client = self.client('emr')
+
+        cluster_ids = [c['Id'] for c in
+                       emr_client.list_clusters()['Clusters']]
+        self.assertEqual(len(cluster_ids), 1)
+        cluster_id = cluster_ids[0]
+
+        steps = emr_client.list_steps(ClusterId=cluster_id)['Steps']
+        self.assertEqual(len(steps), 1)
+        step = steps[0]
+
+        self.assertEqual(step['Status']['State'], 'COMPLETED')
+        step_args = step['Config']['Args']
+
+        self.assertEqual(step_args[0], 'spark-submit')
+        self.assertEqual(step_args[-1], 'arg1')
+        self.assertTrue(step_args[-2].endswith('/foo.py'))

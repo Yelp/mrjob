@@ -77,21 +77,6 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
             )
         ])
 
-    def test_no_args_okay(self):
-        spark_submit_main(['foo.py'])
-
-        kwargs = self.get_runner_kwargs()
-
-        self.assertEqual(kwargs['steps'], [
-            dict(
-                args=[],
-                jobconf={},
-                script='foo.py',
-                spark_args=[],
-                type='spark_script',
-            )
-        ])
-
     def test_jar_step(self):
         spark_submit_main(['dora.jar', 'arg1', 'arg2', 'arg3'])
 
@@ -127,6 +112,29 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
                 main_class='Backpack',
                 spark_args=[],
                 type='spark_jar',
+            )
+        ])
+
+    def test_set_runner_class(self):
+        spark_submit_main(['-r', 'emr', 'foo.py', 'arg1'])
+
+        self.assertEqual(self.runner_class.alias, 'emr')
+
+        self.assertTrue(self.runner_class.called)
+        self.assertTrue(self.runner_class.return_value.run.called)
+
+    def test_no_script_args_okay(self):
+        spark_submit_main(['foo.py'])
+
+        kwargs = self.get_runner_kwargs()
+
+        self.assertEqual(kwargs['steps'], [
+            dict(
+                args=[],
+                jobconf={},
+                script='foo.py',
+                spark_args=[],
+                type='spark_script',
             )
         ])
 
@@ -179,7 +187,22 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
 
         self.assertEqual(kwargs['jobconf'], dict(foo='BAR'))
 
-    # test help
+    def test_runner_kwargs(self):
+        spark_submit_main(['--hadoop-bin', 'super-hadoop',
+                           '--master', 'local',
+                           '--py-files', 'bar.py,baz.py',
+                           'foo.py', 'arg1'])
+
+        kwargs = self.get_runner_kwargs()
+
+        # regular old runner arg
+        self.assertEqual(kwargs['hadoop_bin'], 'super-hadoop')
+
+        # spark alias for mrjob opt
+        self.assertEqual(kwargs['spark_master'], 'local')
+
+        # arg with custom parser
+        self.assertEqual(kwargs['py_files'], ['bar.py', 'baz.py'])
 
     def test_basic_help(self):
         with patch('mrjob.tools.spark_submit._print_basic_help') as pbh:

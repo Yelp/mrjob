@@ -77,6 +77,7 @@ _SPARK_SUBMIT_ARG_GROUPS = [
         'repositories',
         'py_files',
         'upload_files',
+        'cmdenv',
         'jobconf',
         'properties_file',
         'driver_memory',
@@ -114,6 +115,8 @@ _SPARK_SUBMIT_ARG_GROUPS = [
 
 # lightly modified versions of help messages from spark-submit
 _SPARK_SUBMIT_ARG_HELP = dict(
+    cmdenv=('Arbitrary environment variable to set inside Spark, in the'
+            ' format NAME=VALUE.'),
     driver_class_path=('Extra class path entries to pass to the driver. Note'
                        ' that jars added with --jars are automatically'
                        ' included in the classpath.'),
@@ -128,7 +131,8 @@ _SPARK_SUBMIT_ARG_HELP = dict(
                     ' or all available cores on the worker in standalone'
                     ' mode)'),
     executor_memory='Memory per executor (e.g. 1000M, 2G) (Default: 1G).',
-    jobconf='Arbitrary Spark configuration property.',
+    jobconf=('Arbitrary Spark configuration property, in the format'
+             ' PROP=VALUE.'),
     keytab=('The full path to the file that contains the keytab for the'
             ' principal specified above. This keytab will be copied to'
             ' the node running the Application Master via the Secure'
@@ -181,6 +185,7 @@ _SPARK_SUBMIT_OPT_NAMES = {
 }
 
 _SPARK_SUBMIT_SWITCHES = dict(
+    cmdenv='--cmdenv',
     driver_class_path='--driver-class-path',
     driver_cores='--driver-cores',
     driver_java_options='--driver-java-options',

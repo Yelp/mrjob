@@ -539,8 +539,8 @@ _RUNNER_OPTS = dict(
             (['--cmdenv'], dict(
                 action=_KeyValueAction,
                 help=('Set an environment variable for your job inside Hadoop '
-                      'streaming. Must take the form KEY=VALUE. You can use'
-                      ' --cmdenv multiple times.'),
+                      'streaming/Spark. Must take the form KEY=VALUE.'
+                      ' You can use --cmdenv multiple times.'),
             )),
         ],
     ),

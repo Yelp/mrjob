@@ -396,7 +396,7 @@ def _print_help_for_runner(runner_class, include_deprecated=False):
     help_parser = ArgumentParser(usage=SUPPRESS, add_help=False)
 
     arg_group = help_parser.add_argument_group(
-        'optional switches for %s runner' % runner_class.alias)
+        'optional arguments for %s runner' % runner_class.alias)
 
     # don't include hard-coded opts or opts in basic help
     opt_names = runner_class.OPT_NAMES - set(_HARD_CODED_OPTS)

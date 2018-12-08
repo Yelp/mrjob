@@ -63,9 +63,21 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self.set_up_logging = self.start(
             patch('mrjob.job.MRJob.set_up_logging'))
 
-        # don't actually print
-        self.print_message = self.start(patch(
-            'argparse.ArgumentParser._print_message'))
+        # save printout, rather than actually printing
+        self.printout = ''
+
+        def _mock_print_message(self_, message, file=None):
+            self.printout += message
+
+
+        self.start(patch('argparse.ArgumentParser._print_message',
+                         _mock_print_message))
+
+        def _mock_print(s=''):
+            self.printout += s + '\n'
+
+        self.start(patch('mrjob.tools.spark_submit.print',
+                         _mock_print))
 
     def get_runner_kwargs(self):
         return self.runner_class.call_args_list[-1][1]
@@ -258,37 +270,74 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self.assertRaises(MockSystemExit, spark_submit_main,
                           ['--task-python-bin', 'pypy', 'foo.py', 'arg1'])
 
-    def test_help_arg(self):
-        with patch('mrjob.tools.spark_submit._print_basic_help') as pbh:
-            self.assertRaises(MockSystemExit, spark_submit_main, ['-h'])
+    def _assert_prints_basic_help(self, args, include_deprecated=False):
+        self.assertRaises(MockSystemExit, spark_submit_main, args)
+        self.exit.assert_called_once_with(0)
 
-            self.exit.assert_called_once_with(0)
-            pbh.assert_called_once_with(include_deprecated=False)
+        self.assertTrue(self.printout.startswith('usage:'))
+
+        # has spark switches
+        self.assertIn('--jars', self.printout)
+        self.assertIn('--name', self.printout)
+        self.assertIn('--py-files', self.printout)
+        # but not runner switches or aliases
+        self.assertNotIn('--python-bin', self.printout)
+        self.assertNotIn('--libjars', self.printout)
+
+        # --deprecated appears either way; either it appears as
+        # a switch, or as a message at the end explaining how
+        # to use it with --help
+        if include_deprecated:
+            self.assertIn('--deprecated', self.printout[:-50])
+        else:
+            self.assertIn('--deprecated', self.printout[-50:])
+
+    def _assert_prints_runner_help(self, args, runner_alias,
+                                   expect_switches=(),
+                                   dont_expect_switches=()):
+        self.assertRaises(MockSystemExit, spark_submit_main, args)
+        self.exit.assert_called_once_with(0)
+
+        # doesn't show usage, should include runner name in first line
+        first_line = self.printout.split('\n')[0]
+        self.assertIn('optional arguments', first_line)
+        self.assertIn(runner_alias, first_line)
+
+        # has runner switches
+        self.assertIn('--python-bin', self.printout)
+        self.assertIn('--libjars', self.printout)
+
+        # but not basic spark switches
+        self.assertNotIn('--name', self.printout)
+
+        for switch in expect_switches:
+            self.assertIn(switch, self.printout)
+
+        for switch in dont_expect_switches:
+            self.assertNotIn(switch, self.printout)
+
+    def test_help_arg(self):
+        self._assert_prints_basic_help(['-h'])
+
+    def test_help_arg_with_deprecated(self):
+         self._assert_prints_basic_help(['-h', '--deprecated'],
+                                        include_deprecated=True)
 
     def test_help_arg_with_runner(self):
-        with patch('mrjob.tools.spark_submit._print_help_for_runner') as phfr:
-            self.assertRaises(MockSystemExit, spark_submit_main,
-                              ['-h', '-r', 'emr'])
+        self._assert_prints_runner_help(
+            ['-h', '-r', 'emr'],
+            'emr',
+            expect_switches=['--region'],
+            # --hadoop-bin is not for emr, --py-file is deprecated
+            dont_expect_switches=['--hadoop-bin', '--py-file'])
 
-            self.exit.assert_called_once_with(0)
-            phfr.assert_called_once_with(self.runner_class,
-                                         include_deprecated=False)
-
-    def test_no_script_prints_basic_help(self):
-        with patch('mrjob.tools.spark_submit._print_basic_help') as pbh:
-            self.assertRaises(MockSystemExit, spark_submit_main, [])
-
-            self.exit.assert_called_once_with(0)
-            pbh.assert_called_once_with(include_deprecated=False)
-
-    def test_no_script_prints_basic_help_even_with_runner(self):
-        # to get runner help, you have to do -h -r <alias>
-        with patch('mrjob.tools.spark_submit._print_basic_help') as pbh:
-            self.assertRaises(MockSystemExit, spark_submit_main,
-                              ['-r', 'emr'])
-
-            self.exit.assert_called_once_with(0)
-            pbh.assert_called_once_with(include_deprecated=False)
+    def test_help_arg_with_runner_and_deprecated(self):
+        self._assert_prints_runner_help(
+            ['-h', '-r', 'emr', '--deprecated'],
+            'emr',
+            expect_switches=['--region', '--py-file'],
+            # we don't actually mention --deprecated in runner help
+            dont_expect_switches=['--hadoop-bin', '--deprecated'])
 
 
 class SparkSubmitToEMRTestCase(MockBoto3TestCase):

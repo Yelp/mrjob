@@ -1,0 +1,72 @@
+Usage: mrjob spark-submit [options] <app jar | python file> app arguments
+
+(no R file support)
+
+opts that go into the job definition:
+
+--class (main_class)
+
+opts that are just aliases for mrjob opts:
+
+--master (spark_master)
+--deploy-mode (spark_deploy_mode)
+--jars (libjars)
+--conf (jobconf)
+
+opts than can be used as-is
+
+--py-files (py_files)
+--files (upload_files)
+--archives (upload_archives)
+
+opts that can be passed through directly to Spark
+
+--name
+--packages
+--exclude-packages
+--repositories
+--driver-memory
+--driver-java-options
+--driver-library-path
+--driver-class-path
+--executor-memory
+--proxy-user
+--driver-cores
+--supervise
+--total-executor-cores
+--executor-cores
+--queue
+--num-executors
+--principal
+--keytab
+
+
+opts involving files, should see if we can pass them through
+
+--properties-file
+
+
+pass through to spark?
+
+--verbose  (possibly depending on runner)
+
+
+not relevant to submitting
+--version
+--kill
+--status
+
+
+all mrjob options basically make sense except check_input_paths
+
+for now, setting input_paths to os.devnull and setting check_input_paths to
+False would be enough
+
+
+
+
+
+Other notes:
+
+why doesn't cluster_id have cloud_role='launch'?
+same for cluster_properties?

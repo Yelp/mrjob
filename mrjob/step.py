@@ -235,7 +235,7 @@ class MRStep(object):
     def render_reducer(self):
         return self._render_substep('reducer_cmd', 'reducer_pre_filter')
 
-    def description(self, step_num):
+    def description(self, step_num=0):
         """Returns a dictionary representation of this step:
 
         .. code-block:: js
@@ -378,7 +378,7 @@ class _Step(object):
         else:
             return None
 
-    def description(self, other):
+    def description(self, step_num=0):
         """Return a dictionary representation of this step. See
         :ref:`steps-format` for examples."""
         result = dict(

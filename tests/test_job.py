@@ -1226,7 +1226,7 @@ class PrintHelpTestCase(SandboxedTestCase):
 
         output = self.stdout.getvalue()
         # basic option
-        self.assertIn('--conf', output)
+        self.assertIn('--conf-path', output)
 
         # not basic options
         self.assertNotIn('--step-num', output)
@@ -1242,7 +1242,7 @@ class PrintHelpTestCase(SandboxedTestCase):
 
         output = self.stdout.getvalue()
         # basic option
-        self.assertIn('--conf', output)
+        self.assertIn('--conf-path', output)
 
         # not basic options
         self.assertNotIn('--step-num', output)
@@ -1261,7 +1261,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertIn('--s3-endpoint', output)
 
         # not runner options
-        self.assertNotIn('--conf', output)
+        self.assertNotIn('--conf-path', output)
         self.assertNotIn('--step-num', output)
 
         # a runner option, but not for EMR
@@ -1279,7 +1279,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertIn('--s3-endpoint', output)
 
         # not runner options
-        self.assertNotIn('--conf', output)
+        self.assertNotIn('--conf-path', output)
         self.assertNotIn('--step-num', output)
 
         # a runner option, but not for EMR
@@ -1297,7 +1297,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertIn('--step-num', output)
 
         # not step options
-        self.assertNotIn('--conf', output)
+        self.assertNotIn('--conf-path', output)
         self.assertNotIn('--s3-endpoint', output)
 
     def test_passthrough_options(self):

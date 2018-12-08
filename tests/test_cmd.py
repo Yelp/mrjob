@@ -16,6 +16,8 @@
 # limitations under the License.
 from mrjob import cmd
 from mrjob import launch
+from mrjob.tools import diagnose
+from mrjob.tools import spark_submit
 from mrjob.tools.emr import audit_usage
 from mrjob.tools.emr import create_cluster
 from mrjob.tools.emr import report_long_jobs
@@ -54,6 +56,9 @@ class CommandTestCase(BasicTestCase):
     def test_audit_usage(self):
         self._test_main_call(audit_usage, 'audit-emr-usage')
 
+    def test_diagnose(self):
+        self._test_main_call(diagnose, 'diagnose')
+
     def test_create_cluster(self):
         self._test_main_call(create_cluster, 'create-cluster')
 
@@ -62,6 +67,9 @@ class CommandTestCase(BasicTestCase):
 
     def test_s3_tmpwatch(self):
         self._test_main_call(s3_tmpwatch, 's3-tmpwatch')
+
+    def test_spark_submit(self):
+        self._test_main_call(spark_submit, 'spark-submit')
 
     def test_terminate_idle_clusters(self):
         self._test_main_call(terminate_idle_clusters,

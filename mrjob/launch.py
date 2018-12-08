@@ -33,6 +33,7 @@ from mrjob.options import _optparse_kwargs_to_argparse
 from mrjob.options import _parse_raw_args
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
+from mrjob.runner import _runner_class
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
@@ -464,26 +465,15 @@ class MRJobLauncher(object):
 
         Defaults to ``'local'`` and disallows use of inline runner.
         """
-        if self.options.runner == 'dataproc':
-            from mrjob.dataproc import DataprocJobRunner
-            return DataprocJobRunner
-
-        elif self.options.runner == 'emr':
-            from mrjob.emr import EMRJobRunner
-            return EMRJobRunner
-
-        elif self.options.runner == 'hadoop':
-            from mrjob.hadoop import HadoopJobRunner
-            return HadoopJobRunner
+        if not self.options.runner:
+            return LocalMRJobRunner
 
         elif self.options.runner == 'inline':
-            raise ValueError("inline is not supported in the multi-lingual"
-                             " launcher.")
+             raise ValueError(
+                 "inline is not supported in the multi-lingual"
+                 " launcher.")
 
-        else:
-            # run locally by default
-            from mrjob.local import LocalMRJobRunner
-            return LocalMRJobRunner
+        return _runner_class(self.options.runner)
 
     def _runner_kwargs(self):
         # just use combine_dicts() and not combine_confs(); leave the

@@ -45,6 +45,7 @@ from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
+from mrjob.step import OUTPUT
 from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import to_lines
@@ -492,7 +493,7 @@ class MRJobRunner(object):
         :py:class:`~mrjob.inline.InlineMRJobRunner`, where we raise the
         actual exception that caused the step to fail).
         """
-        if not self._script_path:
+        if not (self._script_path or self._steps):
             raise AssertionError('No script to run!')
 
         if self._ran_job:
@@ -510,7 +511,11 @@ class MRJobRunner(object):
         self._run()
         self._ran_job = True
 
-        log.info('job output is in %s' % self._output_dir)
+        last_step = self._get_steps()[-1]
+
+        # only print this message if the last step uses our output dir
+        if 'args' not in last_step or OUTPUT in last_step['args']:
+            log.info('job output is in %s' % self._output_dir)
 
     def cat_output(self):
         """Stream the jobs output, as a stream of ``bytes``. If there are
@@ -1220,3 +1225,30 @@ def _blank_out_conflicting_opts(opt_list, opt_names, conflicting_opts=None):
             blank_out = True
 
     return opt_list
+
+
+def _runner_class(alias):
+    """Get the runner subclass corresponding to the given alias
+    (importing code only as needed)."""
+    if alias == 'dataproc':
+        from mrjob.dataproc import DataprocJobRunner
+        return DataprocJobRunner
+
+    elif alias == 'emr':
+        from mrjob.emr import EMRJobRunner
+        return EMRJobRunner
+
+    elif alias == 'hadoop':
+        from mrjob.hadoop import HadoopJobRunner
+        return HadoopJobRunner
+
+    elif alias == 'inline':
+        from mrjob.inline import InlineMRJobRunner
+        return InlineMRJobRunner
+
+    elif alias == 'local':
+        from mrjob.local import LocalMRJobRunner
+        return LocalMRJobRunner
+
+    else:
+        raise ValueError('bad runner alias: %s' % alias)

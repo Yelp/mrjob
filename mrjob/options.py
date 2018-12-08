@@ -25,6 +25,7 @@ from argparse import Action
 from argparse import ArgumentParser
 from argparse import SUPPRESS
 from logging import getLogger
+from os import devnull
 
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -538,8 +539,8 @@ _RUNNER_OPTS = dict(
             (['--cmdenv'], dict(
                 action=_KeyValueAction,
                 help=('Set an environment variable for your job inside Hadoop '
-                      'streaming. Must take the form KEY=VALUE. You can use'
-                      ' --cmdenv multiple times.'),
+                      'streaming/Spark. Must take the form KEY=VALUE.'
+                      ' You can use --cmdenv multiple times.'),
             )),
         ],
     ),
@@ -840,9 +841,8 @@ _RUNNER_OPTS = dict(
         switches=[
             (['-D', '--jobconf'], dict(
                 action=_KeyValueAction,
-                help=('-D arg to pass through to hadoop streaming; should'
-                      ' take the form KEY=VALUE. You can use -D'
-                      ' multiple times.'),
+                help=('passed through to hadoop streaming as -D and to Spark'
+                      ' as --conf. Should take the form KEY=VALUE'),
             )),
         ],
     ),
@@ -1049,9 +1049,8 @@ _RUNNER_OPTS = dict(
         combiner=combine_cmds,
         switches=[
             (['--python-bin'], dict(
-                help=('Alternate python command for Python mappers/reducers.'
-                      ' You can include arguments, e.g. --python-bin "python'
-                      ' -v"'),
+                help=('Alternate python command. You can include arguments,'
+                      ' e.g. --python-bin "python -v"'),
             )),
         ],
     ),
@@ -1178,7 +1177,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--spark-master'], dict(
                 help=('--master argument to spark-submit (e.g. '
-                      'spark://host:port, local. Default is yarn'),
+                      'spark://host:port, local). Default is "yarn"'),
             )),
         ],
     ),
@@ -1438,7 +1437,8 @@ def _filter_by_role(opt_names, *cloud_roles):
     }
 
 
-def _add_runner_args(parser, opt_names=None, include_deprecated=True):
+def _add_runner_args(parser, opt_names=None, include_deprecated=True,
+                     customize_switches=None, suppress_switches=None):
     """add switches for the given runner opts to the given
     ArgumentParser, alphabetically by destination. If *opt_names* is
     None, include all runner opts."""
@@ -1447,11 +1447,22 @@ def _add_runner_args(parser, opt_names=None, include_deprecated=True):
 
     for opt_name in sorted(opt_names):
         _add_runner_args_for_opt(
-            parser, opt_name, include_deprecated=include_deprecated)
+            parser, opt_name,
+            include_deprecated=include_deprecated,
+            customize_switches=customize_switches,
+            suppress_switches=suppress_switches
+        )
 
 
-def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True):
+def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True,
+                             customize_switches=None, suppress_switches=None):
     """Add switches for a single option (*opt_name*) to the given parser."""
+    if customize_switches is None:
+        customize_switches = {}
+
+    if suppress_switches is None:
+        suppress_switches = set()
+
     conf = _RUNNER_OPTS[opt_name]
 
     if conf.get('deprecated') and not include_deprecated:
@@ -1459,14 +1470,24 @@ def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True):
 
     switches = conf.get('switches') or []
 
+    def suppressed(switches):
+        return any(sw in suppress_switches for sw in switches)
+
     for args, kwargs in switches:
         kwargs = dict(kwargs)
+
+        # allow customization
+        for switch in args:
+            if switch in customize_switches:
+                kwargs.update(customize_switches[switch])
 
         deprecated_aliases = kwargs.pop('deprecated_aliases', None)
         deprecated = kwargs.pop('deprecated', False)
 
+        suppress = any(sw in suppress_switches for sw in args)
+
         # add this switch
-        if include_deprecated or not deprecated:
+        if (include_deprecated or not deprecated) and not suppressed(args):
             kwargs['dest'] = opt_name
 
             if kwargs.get('action') == 'append':
@@ -1477,7 +1498,8 @@ def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True):
             parser.add_argument(*args, **kwargs)
 
         # add a switch for deprecated aliases
-        if deprecated_aliases and include_deprecated:
+        if (deprecated_aliases and include_deprecated and
+                not suppressed(deprecated_aliases)):
             help = 'Deprecated alias%s for %s' % (
                 ('es' if len(deprecated_aliases) > 1 else ''),
                 args[-1])

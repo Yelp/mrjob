@@ -11,7 +11,118 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Submit a spark job using mrjob runners."""
+"""A drop-in replacement for :command:`spark-submit` that can use mrjob's
+runners. For example, you can submit your spark job to EMR just by adding
+``-r emr``.
+
+This also adds a couple of mrjob features that are not standard with
+:command:`spark-submit`: ``--cmdenv`` and ``--dirs``.
+
+Usage::
+
+    mrjob spark-submit [-r <runner>] [options] <python file | app jar>
+    [app arguments]
+
+Options::
+
+  -r {emr,hadoop}, --runner {emr,hadoop}
+                        Where to run the job (default: "hadoop")
+  --deploy-mode SPARK_DEPLOY_MODE
+                        Whether to launch the driver program locally
+                        ("client") or on one of the worker machines inside the
+                        cluster ("cluster") (Default: client).
+  --class MAIN_CLASS    Your application's main class (for Java / Scala apps).
+  --name NAME           The name of your application.
+  --jars LIBJARS        Comma-separated list of jars to include on the
+                        driverand executor classpaths.
+  --packages PACKAGES   Comma-separated list of maven coordinates of jars to
+                        include on the driver and executor classpaths. Will
+                        search the local maven repo, then maven central and
+                        any additional remote repositories given by
+                        --repositories. The format for the coordinates should
+                        be groupId:artifactId:version.
+  --exclude-packages EXCLUDE_PACKAGES
+                        Comma-separated list of groupId:artifactId, to exclude
+                        while resolving the dependencies provided in
+                        --packages to avoid dependency conflicts.
+  --repositories REPOSITORIES
+                        Comma-separated list of additional remote repositories
+                        to search for the maven coordinates given with
+                        --packages.
+  --py-files PY_FILES   Comma-separated list of .zip, .egg, or .py files to
+                        placeon the PYTHONPATH for Python apps.
+  --files UPLOAD_FILES  Comma-separated list of files to be placed in the
+                        working directory of each executor. File paths of
+                        these files in executors can be accessed via
+                        SparkFiles.get(fileName).
+  --cmdenv CMDENV       Arbitrary environment variable to set inside Spark, in
+                        the format NAME=VALUE.
+  --conf JOBCONF        Arbitrary Spark configuration property, in the format
+                        PROP=VALUE.
+  --properties-file PROPERTIES_FILE
+                        Path to a file from which to load extra properties. If
+                        not specified, this will look for conf/spark-
+                        defaults.conf.
+  --driver-memory DRIVER_MEMORY
+                        Memory for driver (e.g. 1000M, 2G) (Default: 1024M).
+  --driver-java-options DRIVER_JAVA_OPTIONS
+                        Extra Java options to pass to the driver.
+  --driver-library-path DRIVER_LIBRARY_PATH
+                        Extra library path entries to pass to the driver.
+  --driver-class-path DRIVER_CLASS_PATH
+                        Extra class path entries to pass to the driver. Note
+                        that jars added with --jars are automatically included
+                        in the classpath.
+  --executor-memory EXECUTOR_MEMORY
+                        Memory per executor (e.g. 1000M, 2G) (Default: 1G).
+  --proxy-user PROXY_USER
+                        User to impersonate when submitting the application.
+                        This argument does not work with --principal /
+                        --keytab.
+  -c CONF_PATHS, --conf-path CONF_PATHS
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
+  -q, --quiet           Don't print anything to stderr
+  -v, --verbose         print more messages to stderr
+  -h, --help            show this message and exit
+  --master SPARK_MASTER
+                        spark://host:port, mesos://host:port,
+                        yarn,k8s://https://host:port, or local (Default:
+                        yarn).
+  --driver-cores DRIVER_CORES
+                        Number of cores used by the driver (Default: 1).
+  --supervise           If given, restarts the driver on failure.
+  --total-executor-cores TOTAL_EXECUTOR_CORES
+                        Total cores for all executors.
+  --executor-cores EXECUTOR_CORES
+                        Number of cores per executor. (Default: 1 in YARN
+                        mode, or all available cores on the worker in
+                        standalone mode)
+  --queue QUEUE_NAME    The YARN queue to submit to (Default: "default").
+  --num-executors NUM_EXECUTORS
+                        Number of executors to launch (Default: 2). If dynamic
+                        allocation is enabled, the initial number of executors
+                        will be at least NUM.
+  --archives UPLOAD_ARCHIVES
+                        Comma-separated list of archives to be extracted into
+                        the working directory of each executor.
+  --dirs UPLOAD_DIRS    Comma-separated list of directors to be archived and
+                        then extracted into the working directory of each
+                        executor.
+  --principal PRINCIPAL
+                        Principal to be used to login to KDC, while running
+                        onsecure HDFS.
+  --keytab KEYTAB       The full path to the file that contains the keytab for
+                        the principal specified above. This keytab will be
+                        copied to the node running the Application Master via
+                        the Secure Distributed Cache, for renewing the login
+                        tickets and the delegation tokens periodically.
+
+This also supports the same runner-specific switches as
+:py:class:`~mrjob.job.MRJob`\s (e.g. ``--hadoop-bin``, ``--region``).
+
+.. versionadded:: 0.6.7
+"""
 from __future__ import print_function
 
 import os
@@ -36,7 +147,7 @@ log = getLogger(__name__)
 _USAGE = ('%(prog)s spark-submit [-r <runner>] [options]'
           ' <python file | app jar> [app arguments]')
 
-_DESCRIPTION = 'Submit a spark job locally or in the cloud'
+_DESCRIPTION = 'Submit a spark job to Hadoop or the cloud'
 
 _BASIC_HELP_EPILOG = (
     'To see help for a specific runner, use --help -r <runner name>')

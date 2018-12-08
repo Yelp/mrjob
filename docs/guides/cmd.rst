@@ -53,6 +53,13 @@ s3-tmpwatch
 
     .. automodule:: mrjob.tools.emr.s3_tmpwatch
 
+.. _spark-submit:
+
+spark-submit
+^^^^^^^^^^^^
+
+    .. automodule:: mrjob.tools.spark_submit
+
 terminate-cluster
 ^^^^^^^^^^^^^^^^^
 

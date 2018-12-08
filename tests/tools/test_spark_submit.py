@@ -76,8 +76,9 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         def _mock_print(s=''):
             self.printout += s + '\n'
 
+        # print() isn't considered part of the module in Python 3.4
         self.start(patch('mrjob.tools.spark_submit.print',
-                         _mock_print))
+                         _mock_print, create=True))
 
     def get_runner_kwargs(self):
         return self.runner_class.call_args_list[-1][1]

@@ -35,7 +35,8 @@ class MockS3Client(object):
                        and *time_modified* is a UTC
                        :py:class:`~datetime.datetime`. *location* is an
                        optional location constraint for the bucket
-                       (a region name).
+                       (a region name). *storage_class* is an optional
+                       non-Standard storage class (e.g. ``'GLACIER'``).
     """
     def __init__(self,
                  mock_s3_fs,
@@ -224,19 +225,24 @@ class MockS3Object(object):
         return {}
 
     def get(self):
-        key_data, mtime = self._get_key_data_and_mtime()
+        mock_keys = self._mock_bucket_keys('GetBucket')
+
+        if self.key not in mock_keys:
+            raise _no_such_key_error(self.key, 'GetObject')
+
+        mock_key = mock_keys[self.key]
 
         # fill in known attributes
         m = hashlib.md5()
-        m.update(key_data)
+        m.update(mock_key['body'])
 
         self.e_tag = '"%s"' % m.hexdigest()
-        self.last_modified = mtime
-        self.size = len(key_data)
-        self.storage_class = None
+        self.last_modified = mock_key['time_modified']
+        self.size = len(mock_key['body'])
+        self.storage_class = mock_key.get('storage_class')
 
         result = dict(
-            Body=MockStreamingBody(key_data),
+            Body=MockStreamingBody(mock_key['body']),
             ContentLength=self.size,
             ETag=self.e_tag,
             LastModified=self.last_modified,
@@ -298,17 +304,6 @@ class MockS3Object(object):
     def _check_bucket_exists(self, operation_name):
         if self.bucket_name not in self.meta.client.mock_s3_fs:
             raise _no_such_bucket_error(self.bucket_name, operation_name)
-
-    def _get_key_data_and_mtime(self):
-        """Return (key_data, time_modified)."""
-        mock_keys = self._mock_bucket_keys('GetBucket')
-
-        if self.key not in mock_keys:
-            raise _no_such_key_error(self.key, 'GetObject')
-
-        key_info = mock_keys[self.key]
-
-        return (key_info['body'], key_info['time_modified'])
 
 
 class MockStreamingBody(object):

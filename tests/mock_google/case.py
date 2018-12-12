@@ -133,9 +133,15 @@ class MockGoogleTestCase(SandboxedTestCase):
             resource = Resource(**resource)
 
         entry = StructEntry(
-            payload, logger, insert_id=insert_id, timestamp=timestamp,
-            labels=labels, severity=severity, http_request=http_request,
-            resource=resource)
+            http_request=http_request,
+            insert_id=insert_id,
+            labels=labels,
+            logger=logger,
+            payload=payload,
+            resource=resource,
+            severity=severity,
+            timestamp=timestamp,
+        )
 
         self.mock_log_entries.append(entry)
 

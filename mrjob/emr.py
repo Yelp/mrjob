@@ -667,7 +667,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         local filesystem.
         """
         if self._fs is None:
-            s3_fs = S3Filesystem(
+            self._s3_fs = S3Filesystem(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 aws_session_token=self._opts['aws_session_token'],
@@ -684,11 +684,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 # put _hadoop_fs last because it tries to handle all URIs
                 self._fs = CompositeFilesystem(
-                    self._ssh_fs, s3_fs, self._hadoop_fs, LocalFilesystem())
+                    self._ssh_fs, self._s3_fs, self._hadoop_fs,
+                    LocalFilesystem())
             else:
                 self._ssh_fs = None
                 self._hadoop_fs = None
-                self._fs = CompositeFilesystem(s3_fs, LocalFilesystem())
+                self._fs = CompositeFilesystem(
+                    self._s3_fs, LocalFilesystem())
 
         return self._fs
 
@@ -733,6 +735,28 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._hadoop_fs.set_hadoop_bin([])
 
         self._launch_emr_job()
+
+    def _check_input_path(self, path):
+        """Add a custom check for S3 paths to ensure they're not in
+        Glacier (which causes a cryptic error). See #1887."""
+        # handle non-S3 paths the usual way
+        if not is_s3_uri(path):
+            super(EMRJobRunner, self)._check_input_path(path)
+            return
+
+        exists = False
+
+        for uri, obj in self._s3_fs._ls(path):
+            exists = True
+
+            if obj.storage_class == 'GLACIER':
+                raise IOError(
+                    '%s is archived in Glacier and'
+                    ' cannot be read as input!' % uri)
+
+        if not exists:
+            raise IOError(
+                'Input path %s does not exist!' % (path,))
 
     def _check_output_not_exists(self):
         """Verify the output path does not already exist. This avoids

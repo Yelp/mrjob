@@ -72,7 +72,7 @@ See :py:mod:`mrjob.examples` for more examples.
 Running on your own Hadoop cluster
 ----------------------------------
 
-* Set up a hadoop cluster (see http://hadoop.apache.org/common/docs/current/)
+* Set up a hadoop cluster (see http://hadoop.apache.org/docs/current/)
 * Run your job with ``-r hadoop``::
 
     python your_mr_job_sub_class.py -r hadoop < input > output

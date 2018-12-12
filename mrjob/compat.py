@@ -24,7 +24,7 @@ from mrjob.py2 import string_types
 
 # lists alternative names for jobconf variables
 # full listing thanks to translation table in
-# http://hadoop.apache.org/common/docs/current/hadoop-project-dist/hadoop-common/DeprecatedProperties.html # noqa
+# http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/DeprecatedProperties.html # noqa
 
 log = logging.getLogger(__name__)
 

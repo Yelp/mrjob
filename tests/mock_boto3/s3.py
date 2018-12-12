@@ -18,10 +18,12 @@ from datetime import datetime
 from datetime import timedelta
 
 from botocore.exceptions import ClientError
+from botocore.exceptions import ParamValidationError
 from boto3.exceptions import S3UploadFailedError
 
 from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import _boto3_now
+from mrjob.py2 import string_types
 
 from .util import MockClientMeta
 
@@ -214,6 +216,41 @@ class MockS3Object(object):
         self.key = key
 
         self.meta = MockClientMeta(client=client)
+
+    def copy_from(self, CopySource, StorageClass=None):
+        # very limited emulation of copy_from, to allow archiving
+        # in Glacier
+
+        # CopySource may be a string or a dict
+        if isinstance(CopySource, string_types):
+            bucket, key = CopySource.split('/', 1)
+            CopySource = dict(Bucket=bucket, Key=key)
+
+        # validate CopySource
+        if not (isinstance(CopySource, dict) and
+                set(CopySource) >= {'Bucket', 'Key'}):
+            # this isn't the exact error message
+            raise ParamValidationError(
+                report='CopySource must include Bucket and Key')
+
+        # look up the source key
+        mock_source_bucket = self.meta.client.mock_s3_fs.get(
+            CopySource['Bucket'])
+        if not mock_source_bucket:
+            raise _no_such_bucket_error(CopySource['Bucket'], 'CopyObject')
+
+        mock_source_key = mock_source_bucket['keys'].get(CopySource('Key'))
+        if not mock_source_key:
+            raise _no_such_key_error(CopySource['Key'], 'CopyObject')
+
+        new_mock_key = dict(mock_source_key)
+        new_mock_key['time_modified'] = _boto3_now()
+        new_mock_key['storage_class'] = StorageClass
+
+        mock_bucket_keys = self._mock_bucket_keys('CopyObject')
+        mock_bucket_keys[self.key] = new_mock_key
+
+        return {}
 
     def delete(self):
         mock_keys = self._mock_bucket_keys('DeleteObject')

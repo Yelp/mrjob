@@ -93,11 +93,13 @@ class MockS3Client(object):
         return dict(Buckets=buckets)
 
 
-def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
+def add_mock_s3_data(mock_s3_fs, data,
+                     age=None, location=None, storage_class=None):
     """Update *mock_s3_fs* with a map from bucket name to key name to data.
 
     :param age: a timedelta
     :param location string: the bucket's location constraint (a region name)
+    :param storage_class string: storage class for all data added
     """
     age = age or timedelta(0)
     time_modified = _boto3_now() - age
@@ -110,8 +112,13 @@ def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
         for key_name, key_data in key_name_to_bytes.items():
             if not isinstance(key_data, bytes):
                 raise TypeError('mock s3 data must be bytes')
-            bucket['keys'][key_name] = dict(
+
+            mock_key = dict(
                 body=key_data, time_modified=time_modified)
+            if storage_class:
+                mock_key['storage_class'] = storage_class
+
+            bucket['keys'][key_name] = mock_key
 
         if location is not None:
             bucket['location'] = location

@@ -85,10 +85,11 @@ class MockBoto3TestCase(SandboxedTestCase):
 
         self.start(patch.object(time, 'sleep'))
 
-    def add_mock_s3_data(self, data, age=None, location=None):
+    def add_mock_s3_data(self, data,
+                         age=None, location=None, storage_class=None):
         """Update self.mock_s3_fs with a map from bucket name
         to key name to data."""
-        add_mock_s3_data(self.mock_s3_fs, data, age, location)
+        add_mock_s3_data(self.mock_s3_fs, data, age, location, storage_class)
 
     def add_mock_ec2_image(self, image):
         """Add information about a mock EC2 Image (AMI) to be returned by

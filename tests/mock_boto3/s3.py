@@ -232,13 +232,19 @@ class MockS3Object(object):
         self.e_tag = '"%s"' % m.hexdigest()
         self.last_modified = mtime
         self.size = len(key_data)
+        self.storage_class = None
 
-        return dict(
+        result = dict(
             Body=MockStreamingBody(key_data),
             ContentLength=self.size,
             ETag=self.e_tag,
             LastModified=self.last_modified,
         )
+
+        if self.storage_class is not None:
+            result['StorageClass'] = self.storage_class
+
+        return result
 
     def put(self, Body):
         if not isinstance(Body, bytes):

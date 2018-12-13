@@ -36,7 +36,9 @@ class MockS3Client(object):
                        :py:class:`~datetime.datetime`. *location* is an
                        optional location constraint for the bucket
                        (a region name). *storage_class* is an optional
-                       non-Standard storage class (e.g. ``'GLACIER'``).
+                       non-Standard storage class (e.g. ``'GLACIER'``),
+                       *restore* is an optional field showing whether
+                       the object has been restored or is being restored.
     """
     def __init__(self,
                  mock_s3_fs,
@@ -92,12 +94,17 @@ class MockS3Client(object):
 
 
 def add_mock_s3_data(mock_s3_fs, data,
-                     age=None, location=None, storage_class=None):
+                     age=None, location=None,
+                     storage_class=None,
+                     restore=None):
     """Update *mock_s3_fs* with a map from bucket name to key name to data.
 
     :param age: a timedelta
     :param location string: the bucket's location constraint (a region name)
     :param storage_class string: storage class for all data added
+    :param restore: x-amz-restore header (see
+                    https://docs.aws.amazon.com/AmazonS3/latest/API/\
+                    RESTObjectHEAD.html#RESTObjectHEAD-responses)
     """
     age = age or timedelta(0)
     time_modified = _boto3_now() - age
@@ -113,8 +120,11 @@ def add_mock_s3_data(mock_s3_fs, data,
 
             mock_key = dict(
                 body=key_data, time_modified=time_modified)
+
             if storage_class:
                 mock_key['storage_class'] = storage_class
+            if restore:
+                mock_key['restore'] = restore
 
             bucket['keys'][key_name] = mock_key
 
@@ -247,6 +257,7 @@ class MockS3Object(object):
         self.last_modified = mock_key['time_modified']
         self.size = len(mock_key['body'])
         self.storage_class = mock_key.get('storage_class')
+        self.restore = mock_key.get('restore')
 
         result = dict(
             Body=MockStreamingBody(mock_key['body']),
@@ -257,6 +268,9 @@ class MockS3Object(object):
 
         if self.storage_class is not None:
             result['StorageClass'] = self.storage_class
+
+        if self.restore is not None:
+            result['Restore'] = self.storage_class
 
         return result
 

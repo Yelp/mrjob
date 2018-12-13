@@ -5671,7 +5671,41 @@ class CheckInputPathsTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertRaises(StopIteration, runner.run)
 
-    def test_s3_path_in_glacier(self):
+    def test_s3_path_archived_in_glacier(self):
+        self.add_mock_s3_data(
+            {'walrus': {'data/foo': b'foo\n'}}, storage_class='GLACIER')
+
+        job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/foo'])
+
+        with job.make_runner() as runner:
+            self.assertRaises(IOError, runner.run)
+
+    def test_s3_path_being_restored_from_glacier(self):
+        # should fail: a restore request doesn't make something available
+        self.add_mock_s3_data(
+            {'walrus': {'data/foo': b'foo\n'}},
+            storage_class='GLACIER',
+            restore='ongoing-request="false"')
+
+        job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/foo'])
+
+        with job.make_runner() as runner:
+            self.assertRaises(IOError, runner.run)
+
+    def test_s3_path_restored_from_glacier(self):
+        # should succeed
+        self.add_mock_s3_data(
+            {'walrus': {'data/foo': b'foo\n'}},
+            storage_class='GLACIER',
+            restore=('ongoing-request="true",'
+                     ' expiry-date="Tue, May 23, 3030 00:00:00 GMT'))
+
+        job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/foo'])
+
+        with job.make_runner() as runner:
+            self.assertRaises(StopIteration, runner.run)
+
+    def test_all_paths_for_glacier_status(self):
         self.add_mock_s3_data({'walrus': {'data/one': b'one\n'}})
         self.add_mock_s3_data({'walrus': {'data/two': b'two\n'}},
                               storage_class='GLACIER')

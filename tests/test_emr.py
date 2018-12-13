@@ -5685,7 +5685,7 @@ class CheckInputPathsTestCase(MockBoto3TestCase):
         self.add_mock_s3_data(
             {'walrus': {'data/foo': b'foo\n'}},
             storage_class='GLACIER',
-            restore='ongoing-request="false"')
+            restore='ongoing-request="true"')
 
         job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/foo'])
 
@@ -5697,7 +5697,7 @@ class CheckInputPathsTestCase(MockBoto3TestCase):
         self.add_mock_s3_data(
             {'walrus': {'data/foo': b'foo\n'}},
             storage_class='GLACIER',
-            restore=('ongoing-request="true",'
+            restore=('ongoing-request="false",'
                      ' expiry-date="Tue, May 23, 3030 00:00:00 GMT'))
 
         job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/foo'])

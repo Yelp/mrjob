@@ -223,6 +223,9 @@ _YARN_HDFS_HISTORY_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging/history'
 _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*(node|instances) .* terminated.*$', re.I)
 
+# if this appears in an S3 object's "restore" field, the object
+# is available to read even if it's Glacier-archived
+_RESTORED_FROM_GLACIER = 'ongoing-request="false"'
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
@@ -749,7 +752,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for uri, obj in self._s3_fs._ls(path):
             exists = True
 
-            if obj.storage_class == 'GLACIER':
+            # we currently just look for 'ongoing-request="false"'
+            # in the *restore* field and ignore the expiration date
+            # (if the object has expired, the *restore* field won't be set).
+            #
+            # See #1887 for more discussion of checking expiration.
+            if obj.storage_class == 'GLACIER' and not (
+                    obj.restore and _RESTORED_FROM_GLACIER in obj.restore):
                 raise IOError(
                     '%s is archived in Glacier and'
                     ' cannot be read as input!' % uri)

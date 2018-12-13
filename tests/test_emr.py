@@ -5662,6 +5662,25 @@ class CheckInputPathsTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertRaises(StopIteration, runner.run)
 
+    def test_existing_s3_dir(self):
+        self.add_mock_s3_data({'walrus': {'data/one': b'one\n',
+                                          'data/two': b'two\n'}})
+
+        job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/'])
+
+        with job.make_runner() as runner:
+            self.assertRaises(StopIteration, runner.run)
+
+    def test_s3_path_in_glacier(self):
+        self.add_mock_s3_data({'walrus': {'data/one': b'one\n'}})
+        self.add_mock_s3_data({'walrus': {'data/two': b'two\n'}},
+                              storage_class='GLACIER')
+
+        job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/'])
+
+        with job.make_runner() as runner:
+            self.assertRaises(IOError, runner.run)
+
     def test_nonexistent_s3_path(self):
         job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/foo'])
 

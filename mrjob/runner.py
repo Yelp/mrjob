@@ -1016,15 +1016,21 @@ class MRJobRunner(object):
             return
 
         for path in self._input_paths:
-            if path == '-':
-                    continue  # STDIN always exists
+            self._check_input_path(path)
 
-            if not self.fs.can_handle_path(path):
-                continue  # e.g. non-S3 URIs on EMR
+    def _check_input_path(self, path):
+        """Raise :py:class:`IOError` if the given input does not exist or
+        is otherwise invalid. Override this to provide custom check
+        behavior."""
+        if path == '-':
+            return  # STDIN always exists
 
-            if not self.fs.exists(path):
-                raise IOError(
-                    'Input path %s does not exist!' % (path,))
+        if not self.fs.can_handle_path(path):
+            return  # no way to check (e.g. non-S3 URIs on EMR)
+
+        if not self.fs.exists(path):
+            raise IOError(
+                'Input path %s does not exist!' % (path,))
 
     def _add_input_files_for_upload(self):
         """If there is an upload manager, add input files to it."""

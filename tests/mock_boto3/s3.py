@@ -30,12 +30,13 @@ class MockS3Client(object):
     """Mock out boto3 S3 client
 
     :param mock_s3_fs: Maps bucket name to a dictionary with the keys *keys*
-                       and *location*. *keys* maps key name to tuples of
-                       ``(data, time_modified)``. *data* is bytes, and
-                        *time_modified* is a UTC
-                        :py:class:`~datetime.datetime`. *location* is an
-                        optional location constraint for the bucket
-                        (a region name).
+                       and *location*. *keys* maps key name to dicts with
+                       the keys *body* and *time_modified*. *body* is bytes,
+                       and *time_modified* is a UTC
+                       :py:class:`~datetime.datetime`. *location* is an
+                       optional location constraint for the bucket
+                       (a region name). *storage_class* is an optional
+                       non-Standard storage class (e.g. ``'GLACIER'``).
     """
     def __init__(self,
                  mock_s3_fs,
@@ -90,11 +91,13 @@ class MockS3Client(object):
         return dict(Buckets=buckets)
 
 
-def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
+def add_mock_s3_data(mock_s3_fs, data,
+                     age=None, location=None, storage_class=None):
     """Update *mock_s3_fs* with a map from bucket name to key name to data.
 
     :param age: a timedelta
     :param location string: the bucket's location constraint (a region name)
+    :param storage_class string: storage class for all data added
     """
     age = age or timedelta(0)
     time_modified = _boto3_now() - age
@@ -107,7 +110,13 @@ def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
         for key_name, key_data in key_name_to_bytes.items():
             if not isinstance(key_data, bytes):
                 raise TypeError('mock s3 data must be bytes')
-            bucket['keys'][key_name] = (key_data, time_modified)
+
+            mock_key = dict(
+                body=key_data, time_modified=time_modified)
+            if storage_class:
+                mock_key['storage_class'] = storage_class
+
+            bucket['keys'][key_name] = mock_key
 
         if location is not None:
             bucket['location'] = location
@@ -223,22 +232,33 @@ class MockS3Object(object):
         return {}
 
     def get(self):
-        key_data, mtime = self._get_key_data_and_mtime()
+        mock_keys = self._mock_bucket_keys('GetBucket')
+
+        if self.key not in mock_keys:
+            raise _no_such_key_error(self.key, 'GetObject')
+
+        mock_key = mock_keys[self.key]
 
         # fill in known attributes
         m = hashlib.md5()
-        m.update(key_data)
+        m.update(mock_key['body'])
 
         self.e_tag = '"%s"' % m.hexdigest()
-        self.last_modified = mtime
-        self.size = len(key_data)
+        self.last_modified = mock_key['time_modified']
+        self.size = len(mock_key['body'])
+        self.storage_class = mock_key.get('storage_class')
 
-        return dict(
-            Body=MockStreamingBody(key_data),
+        result = dict(
+            Body=MockStreamingBody(mock_key['body']),
             ContentLength=self.size,
             ETag=self.e_tag,
             LastModified=self.last_modified,
         )
+
+        if self.storage_class is not None:
+            result['StorageClass'] = self.storage_class
+
+        return result
 
     def put(self, Body):
         if not isinstance(Body, bytes):
@@ -254,7 +274,8 @@ class MockS3Object(object):
         if not isinstance(data, bytes):
             raise TypeError('Body or Body.read() must be bytes')
 
-        mock_keys[self.key] = (data, _boto3_now())
+        mock_keys[self.key] = dict(
+            body=data, time_modified=_boto3_now())
 
     def upload_file(self, path, Config=None):
         if self.bucket_name not in self.meta.client.mock_s3_fs:
@@ -266,7 +287,8 @@ class MockS3Object(object):
 
         mock_keys = self._mock_bucket_keys('PutObject')
         with open(path, 'rb') as f:
-            mock_keys[self.key] = (f.read(), _boto3_now())
+            mock_keys[self.key] = dict(
+                body=f.read(), time_modified=_boto3_now())
 
     def __getattr__(self, key):
         if key in ('e_tag', 'last_modified', 'size'):
@@ -289,15 +311,6 @@ class MockS3Object(object):
     def _check_bucket_exists(self, operation_name):
         if self.bucket_name not in self.meta.client.mock_s3_fs:
             raise _no_such_bucket_error(self.bucket_name, operation_name)
-
-    def _get_key_data_and_mtime(self):
-        """Return (key_data, time_modified)."""
-        mock_keys = self._mock_bucket_keys('GetBucket')
-
-        if self.key not in mock_keys:
-            raise _no_such_key_error(self.key, 'GetObject')
-
-        return mock_keys[self.key]
 
 
 class MockStreamingBody(object):

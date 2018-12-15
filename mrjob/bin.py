@@ -69,7 +69,7 @@ class MRJobBinRunner(MRJobRunner):
         # we'll create the setup wrapper scripts later
         self._setup_wrapper_script_path = None
         self._manifest_setup_script_path = None
-        self._spark_setup_wrapper_path = None
+        self._spark_python_wrapper_path = None
 
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmd() for details
@@ -441,10 +441,12 @@ class MRJobBinRunner(MRJobRunner):
                     'manifest setup wrapper script')
 
         if (self._uses_spark_setup_script() and not
-                self._spark_setup_wrapper_path):
+                self._spark_python_wrapper_path):
 
-            self._spark_setup_wrapper_path = self._write_setup_script(
-                self._setup, 'spark-setup.sh', 'Spark setup wrapper script')
+            self._spark_python_wrapper_path = self._write_setup_script(
+                self._setup,
+                'python-wrapper.sh', 'Spark Python wrapper script',
+                wrap_python=True)
 
     def _uses_spark_setup_script(self):
         if not self._has_pyspark_steps():
@@ -471,9 +473,11 @@ class MRJobBinRunner(MRJobRunner):
 
         return result
 
-    def _write_setup_script(self, setup, filename, desc, manifest=False):
+    def _write_setup_script(self, setup, filename, desc,
+                            manifest=False, wrap_python=False):
         """Write a setup script and return its path."""
-        contents = self._setup_wrapper_script_content(setup, manifest=manifest)
+        contents = self._setup_wrapper_script_content(
+            setup, manifest=manifest, wrap_python=wrap_python)
 
         path = os.path.join(self._get_local_tmp_dir(), filename)
         self._write_script(contents, path, desc)
@@ -524,7 +528,8 @@ class MRJobBinRunner(MRJobRunner):
 
         return self._mrjob_zip_path
 
-    def _setup_wrapper_script_content(self, setup, manifest=False):
+    def _setup_wrapper_script_content(
+            self, setup, manifest=False, wrap_python=False):
         """Return a (Bourne) shell script that runs the setup commands and then
         executes whatever is passed to it (this will be our mapper/reducer),
         as a list of strings (one for each line, including newlines).
@@ -534,6 +539,15 @@ class MRJobBinRunner(MRJobRunner):
         :command:`make` on a shared source code archive, for example).
         """
         lines = []
+
+        # TODO: this is very similar to _start_of_sh_script() in cloud.py
+
+        if wrap_python:
+            # start with shebang
+            sh_bin = self._sh_bin()
+            if not sh_bin[0].startswith('/'):
+                sh_bin = ['/usr/bin/env'] + sh_bin
+            lines.append('#!' + cmd_line(sh_bin))
 
         # hook for 'set -e', etc.
         pre_commands = self._sh_pre_commands()
@@ -545,11 +559,17 @@ class MRJobBinRunner(MRJobRunner):
         if setup:
             lines.extend(self._setup_cmd_content(setup))
 
-        # we're always going to execute this script as an argument to
-        # sh, so there's no need to add a shebang (e.g. #!/bin/sh)
-        if manifest:
+        # handle arguments to the script
+        if wrap_python:
+            # pretend to be python ($@ is arguments to the python binary)
+            python_bin = self._task_python_bin()
+            lines.append('%s "$@"' % cmd_line(python_bin))
+        elif manifest:
+            # arguments ($@) are a command
+            # eventually runs: "$@" $INPUT_PATH $INPUT_URI
             lines.extend(self._manifest_download_content())
         else:
+            # arguments ($@) are a command, just run it
             lines.append('"$@"')
 
         return lines
@@ -842,7 +862,7 @@ class MRJobBinRunner(MRJobRunner):
 
     def _spark_upload_args(self):
         # TODO: will need a solution for Spark installations without --archives
-        if self._spark_setup_wrapper_path:
+        if self._spark_python_wrapper_path:
             return self._upload_args_helper('--files', None,
                                             '--archives', None)
         else:
@@ -881,14 +901,16 @@ class MRJobBinRunner(MRJobRunner):
         if step['type'] in ('spark', 'spark_script'):  # not spark_jar
             pyspark_python = cmd_line(self._python_bin())
 
-            if self._spark_setup_wrapper_path:
+            if self._spark_python_wrapper_path:
                 # use wrapper setup script as python_bin for executors only
-                executor_pyspark_python = cmd_line(
-                    self._sh_bin() +
-                    [self._working_dir_mgr.name(
-                        'file', self._spark_setup_wrapper_path)] +
-                    self._python_bin()
-                )
+                #executor_pyspark_python = cmd_line(
+                #    self._sh_bin() +
+                #    [self._working_dir_mgr.name(
+                #        'file', self._spark_python_wrapper_path)] +
+                #    self._python_bin()
+                #)
+                executor_pyspark_python = './%s' % self._working_dir_mgr.name(
+                    'file', self._spark_python_wrapper_path)
 
                 # use the wrapper script for executors only
                 cmdenv['PYSPARK_PYTHON'] = executor_pyspark_python

@@ -69,6 +69,7 @@ class MRJobBinRunner(MRJobRunner):
         # we'll create the setup wrapper scripts later
         self._setup_wrapper_script_path = None
         self._manifest_setup_script_path = None
+        self._spark_setup_script_path = None
 
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmd() for details
@@ -410,7 +411,6 @@ class MRJobBinRunner(MRJobRunner):
 
         return py_files
 
-    # TODO: rename to _setup_wrapper_scripts()
     def _create_setup_wrapper_scripts(self):
         """Create the setup wrapper script, and write it into our local temp
         directory (by default, to a file named setup-wrapper.sh).
@@ -426,28 +426,27 @@ class MRJobBinRunner(MRJobRunner):
         """
         setup = self._setup
 
-        setup = self._py_files_setup() + setup
+        if self._has_streaming_steps():
+            streaming_setup = self._py_files_setup() + setup
 
-        if setup and not self._setup_wrapper_script_path:
+            if streaming_setup and not self._setup_wrapper_script_path:
 
-            contents = self._setup_wrapper_script_content(setup)
-            path = os.path.join(self._get_local_tmp_dir(), 'setup-wrapper.sh')
+                self._setup_wrapper_script_path = self._write_setup_script(
+                    streaming_setup, 'setup-wrapper.sh',
+                    'setup wrapper script')
 
-            self._write_script(contents, path, 'setup wrapper script')
+            if (self._uses_input_manifest() and not
+                    self._manifest_setup_script_path):
 
-            self._setup_wrapper_script_path = path
-            self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
+                self._manifest_setup_script_path = self._write_setup_script(
+                    streaming_setup, 'manifest-setup.sh',
+                    'manifest setup script')
 
-        if (self._uses_input_manifest() and not
-                self._manifest_setup_script_path):
+        if (setup and self._has_pyspark_steps() and not
+                self._spark_setup_script_path):
 
-            contents = self._setup_wrapper_script_content(setup, manifest=True)
-            path = os.path.join(self._get_local_tmp_dir(), 'manifest-setup.sh')
-
-            self._write_script(contents, path, 'manifest setup script')
-
-            self._manifest_setup_script_path = path
-            self._working_dir_mgr.add('file', self._manifest_setup_script_path)
+            self._spark_setup_script_path = self._write_setup_script(
+                setup, 'spark-setup.sh', 'Spark setup script')
 
     def _py_files_setup(self):
         """A list of additional setup commands to emulate Spark's
@@ -460,6 +459,17 @@ class MRJobBinRunner(MRJobRunner):
             result.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 
         return result
+
+    def _write_setup_script(self, setup, filename, desc, manifest=False):
+        """Write a setup script and return its path."""
+        contents = self._setup_wrapper_script_content(setup, manifest=manifest)
+
+        path = os.path.join(self._get_local_tmp_dir(), filename)
+        self._write_script(contents, path, desc)
+
+        self._working_dir_mgr.add('file', path)
+
+        return path
 
     def _create_mrjob_zip(self):
         """Make a zip of the mrjob library, without .pyc or .pyo files,

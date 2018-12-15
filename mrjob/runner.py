@@ -845,6 +845,11 @@ class MRJobRunner(object):
         """Does the first step take an input manifest?"""
         return bool(self._get_step(0).get('input_manifest'))
 
+    def _has_streaming_steps(self):
+        """Are any of our steps Hadoop Streaming steps?"""
+        return any(step['type'] == 'streaming'
+                   for step in self._get_steps())
+
     def _has_spark_steps(self):
         """Are any of our steps Spark steps? (e.g. spark, spark_jar,
         spark_script)

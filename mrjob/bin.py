@@ -69,7 +69,7 @@ class MRJobBinRunner(MRJobRunner):
         # we'll create the setup wrapper scripts later
         self._setup_wrapper_script_path = None
         self._manifest_setup_script_path = None
-        self._spark_setup_script_path = None
+        self._spark_setup_wrapper_path = None
 
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmd() for details
@@ -424,29 +424,40 @@ class MRJobBinRunner(MRJobRunner):
         If *local* is true, use local line endings (e.g. Windows). Otherwise,
         use UNIX line endings (see #1071).
         """
-        setup = self._setup
-
         if self._has_streaming_steps():
-            streaming_setup = self._py_files_setup() + setup
+            streaming_setup = self._py_files_setup() + self._setup
 
             if streaming_setup and not self._setup_wrapper_script_path:
 
                 self._setup_wrapper_script_path = self._write_setup_script(
                     streaming_setup, 'setup-wrapper.sh',
-                    'setup wrapper script')
+                    'streaming setup wrapper script')
 
             if (self._uses_input_manifest() and not
                     self._manifest_setup_script_path):
 
                 self._manifest_setup_script_path = self._write_setup_script(
                     streaming_setup, 'manifest-setup.sh',
-                    'manifest setup script')
+                    'manifest setup wrapper script')
 
-        if (setup and self._has_pyspark_steps() and not
-                self._spark_setup_script_path):
+        if (self._uses_spark_setup_script() and not
+                self._spark_setup_wrapper_path):
 
-            self._spark_setup_script_path = self._write_setup_script(
-                setup, 'spark-setup.sh', 'Spark setup script')
+            self._spark_setup_wrapper_path = self._write_setup_script(
+                self._setup, 'spark-setup.sh', 'Spark setup wrapper script')
+
+    def _uses_spark_setup_script(self):
+        if not self._has_pyspark_steps():
+            return False
+
+        if not self._setup:
+            return False  # nothing to do
+
+        # setup scripts definitely don't work with local mode (see #1376)
+        if (self._spark_master() or '').startswith('local'):
+            return False
+
+        return True
 
     def _py_files_setup(self):
         """A list of additional setup commands to emulate Spark's
@@ -830,8 +841,13 @@ class MRJobBinRunner(MRJobRunner):
         return self._opts.get('spark_deploy_mode') or None
 
     def _spark_upload_args(self):
-        return self._upload_args_helper('--files', self._spark_files,
-                                        '--archives', self._spark_archives)
+        # TODO: will need a solution for Spark installations without --archives
+        if self._spark_setup_wrapper_path:
+            return self._upload_args_helper('--files', None,
+                                            '--archives', None)
+        else:
+            return self._upload_args_helper('--files', self._spark_files,
+                                            '--archives', self._spark_archives)
 
     def _spark_script_path(self, step_num):
         """The path of the spark script or har, used by
@@ -863,7 +879,24 @@ class MRJobBinRunner(MRJobRunner):
         cmdenv = {}
 
         if step['type'] in ('spark', 'spark_script'):  # not spark_jar
-            cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
+            pyspark_python = cmd_line(self._python_bin())
+
+            if self._spark_setup_wrapper_path:
+                # use wrapper setup script as python_bin for executors only
+                executor_pyspark_python = cmd_line(
+                    self._sh_bin() +
+                    [self._working_dir_mgr.name(
+                        'file', self._spark_setup_wrapper_path)] +
+                    self._python_bin()
+                )
+
+                # use the wrapper script for executors only
+                cmdenv['PYSPARK_PYTHON'] = executor_pyspark_python
+                cmdenv['PYSPARK_DRIVER_PYTHON'] = pyspark_python
+            else:
+                # if no wrapper script, use python_bin for driver and executors
+                cmdenv['PYSPARK_PYTHON'] = pyspark_python
+
         cmdenv.update(self._opts['cmdenv'])
         return cmdenv
 

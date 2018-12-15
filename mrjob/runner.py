@@ -244,6 +244,8 @@ class MRJobRunner(object):
 
         # track (name, path) of files and archives to upload to spark.
         # these are a subset of those in self._working_dir_mgr
+        #
+        # TODO: these might go away now that Spark does setup scripts too
         self._spark_files = []
         self._spark_archives = []
 

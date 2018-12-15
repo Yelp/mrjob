@@ -258,18 +258,12 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self.assertEqual(kwargs['check_input_paths'], False)
         self.assertEqual(kwargs['input_paths'], [os.devnull])
         self.assertEqual(kwargs['output_dir'], None)
-        self.assertEqual(kwargs['setup'], None)
-        self.assertEqual(kwargs['task_python_bin'], None)
 
     def test_no_switches_for_hard_coded_kwargs(self):
         self.assertRaises(MockSystemExit, spark_submit_main,
                           ['--check-input-paths', 'foo.py', 'arg1'])
         self.assertRaises(MockSystemExit, spark_submit_main,
                           ['--output-dir', 'out', 'foo.py', 'arg1'])
-        self.assertRaises(MockSystemExit, spark_submit_main,
-                          ['--setup', 'true', 'foo.py', 'arg1'])
-        self.assertRaises(MockSystemExit, spark_submit_main,
-                          ['--task-python-bin', 'pypy', 'foo.py', 'arg1'])
 
     def _assert_prints_basic_help(self, args, include_deprecated=False):
         self.assertRaises(MockSystemExit, spark_submit_main, args)

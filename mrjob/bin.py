@@ -426,11 +426,7 @@ class MRJobBinRunner(MRJobRunner):
         """
         setup = self._setup
 
-        # add py_files
-        for py_file in self._py_files():
-            path_dict = {'type': 'file', 'name': None, 'path': py_file}
-            self._working_dir_mgr.add(**path_dict)
-            setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
+        setup = self._py_files_setup() + setup
 
         if setup and not self._setup_wrapper_script_path:
 
@@ -452,6 +448,18 @@ class MRJobBinRunner(MRJobRunner):
 
             self._manifest_setup_script_path = path
             self._working_dir_mgr.add('file', self._manifest_setup_script_path)
+
+    def _py_files_setup(self):
+        """A list of additional setup commands to emulate Spark's
+        --py-files option on Hadoop Streaming."""
+        result = []
+
+        for py_file in self._py_files():
+            path_dict = {'type': 'file', 'name': None, 'path': py_file}
+            self._working_dir_mgr.add(**path_dict)
+            result.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
+
+        return result
 
     def _create_mrjob_zip(self):
         """Make a zip of the mrjob library, without .pyc or .pyo files,

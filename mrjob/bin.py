@@ -899,25 +899,24 @@ class MRJobBinRunner(MRJobRunner):
         cmdenv = {}
 
         if step['type'] in ('spark', 'spark_script'):  # not spark_jar
-            pyspark_python = cmd_line(self._python_bin())
+            driver_python = cmd_line(self._python_bin())
 
             if self._spark_python_wrapper_path:
-                # use wrapper setup script as python_bin for executors only
-                #executor_pyspark_python = cmd_line(
-                #    self._sh_bin() +
-                #    [self._working_dir_mgr.name(
-                #        'file', self._spark_python_wrapper_path)] +
-                #    self._python_bin()
-                #)
-                executor_pyspark_python = './%s' % self._working_dir_mgr.name(
+                executor_python = './%s' % self._working_dir_mgr.name(
                     'file', self._spark_python_wrapper_path)
-
-                # use the wrapper script for executors only
-                cmdenv['PYSPARK_PYTHON'] = executor_pyspark_python
-                cmdenv['PYSPARK_DRIVER_PYTHON'] = pyspark_python
             else:
-                # if no wrapper script, use python_bin for driver and executors
-                cmdenv['PYSPARK_PYTHON'] = pyspark_python
+                executor_python = cmd_line(self._task_python_bin())
+
+            if self._spark_deploy_mode() == 'cluster':
+                # treat driver like executors (they run in same environment)
+                cmdenv['PYSPARK_PYTHON'] = executor_python
+            elif driver_python == executor_python:
+                # no difference, just set $PYSPARK_PYTHON
+                cmdenv['PYSPARK_PYTHON'] = driver_python
+            else:
+                # set different pythons for driver and executor
+                cmdenv['PYSPARK_PYTHON'] = executor_python
+                cmdenv['PYSPARK_DRIVER_PYTHON'] = driver_python
 
         cmdenv.update(self._opts['cmdenv'])
         return cmdenv

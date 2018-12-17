@@ -179,7 +179,6 @@ _DEFAULT_RUNNER = 'hadoop'
 # argument group in _make_basic_help_parser(), below
 _SPARK_SUBMIT_ARG_GROUPS = [
     (None, [
-        'spark_deploy_mode',
         'main_class',
         'name',
         'libjars',
@@ -200,6 +199,7 @@ _SPARK_SUBMIT_ARG_GROUPS = [
     ]),
     ('Hadoop runner only', [
         'spark_master',
+        'spark_deploy_mode',
     ]),
     ('Cluster deploy mode only', [
         'driver_cores',

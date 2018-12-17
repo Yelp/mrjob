@@ -438,7 +438,8 @@ class MRJobBinRunner(MRJobRunner):
 
                 self._manifest_setup_script_path = self._write_setup_script(
                     streaming_setup, 'manifest-setup.sh',
-                    'manifest setup wrapper script')
+                    'manifest setup wrapper script',
+                    manifest=True)
 
         if (self._uses_spark_setup_script() and not
                 self._spark_python_wrapper_path):

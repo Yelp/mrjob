@@ -58,7 +58,7 @@ if [ -z "$GRACE_PERIOD_SECS" ]; then GRACE_PERIOD_SECS=600; fi
 LOG_PATH=$3
 if [ -z "$LOG_PATH" ]
 then
-    LOG_PATH=/var/log/bootstrap-actions/mrjob-idle-termination.log
+    LOG_PATH=/mnt/var/log/bootstrap-actions/mrjob-idle-termination.log
 fi
 
 # exit if this isn't the master node

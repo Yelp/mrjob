@@ -410,8 +410,16 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
     def _add_extra_cluster_params(self, params):
         """Return a dict with the *extra_cluster_params* opt patched into
         *params*, and ``None`` values removed."""
+        def recursive_dict_merge(base, new_dict):
+           """Merged new_dict into base recursively at each value"""
+           for key in new_dict:
+                if key in base and isinstance(base[key], dict) and isinstance(new_dict[key], dict):
+                   recursive_dict_merge(base[key], new_dict[key])
+                else:
+                   base[key] = new_dict[key]
+
         params = params.copy()
-        params.update(self._opts['extra_cluster_params'])
+        recursive_dict_merge(params, self._opts['extra_cluster_params'])
         params = {k: v for k, v in params.items() if v is not None}
 
         return params

@@ -329,7 +329,11 @@ class MRJobRunner(object):
 
         # check and store *steps*
         self._steps = None
-        if steps is not None:
+        if steps is None:
+            if not mr_job_script:
+                self._steps = []
+            # otherwise we'll load steps on-the-fly, see _load_steps()
+        else:
             self._check_steps(steps)
             self._steps = copy.deepcopy(steps)
 
@@ -811,6 +815,8 @@ class MRJobRunner(object):
         there are mappers and reducers for each step.
 
         Returns output as described in :ref:`steps-format`.
+
+        If this is called, you can assume self._script_path is set.
         """
         raise NotImplementedError
 

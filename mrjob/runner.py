@@ -823,12 +823,31 @@ class MRJobRunner(object):
         for step_num, step in enumerate(steps):
             if step['type'] not in STEP_TYPES:
                 raise ValueError(
-                    'unexpected step type %r in steps %r' % (
-                        step['type'], steps))
+                    'step %d has unexpected step type %r' % (
+                        step_num, step['type']))
 
             if step.get('input_manifest') and step_num != 0:
                 raise ValueError(
-                    'only first step may take an input manifest')
+                    'step %d may not take an input manifest (only'
+                    ' first step can' % step_num)
+
+            # some step types assume a MRJob script
+            if not self._script_path:
+                if step['type'] == 'spark':
+                    raise ValueError(
+                        "SparkStep (step %d) can't run without a MRJob script"
+                        " (try SparkScriptStep instead)" % step_num)
+
+                elif step['type'] == 'streaming':
+                    for mrc in ('mapper', 'combiner', 'reducer'):
+                        if not step.get(mrc):
+                            continue
+
+                        substep = step[mrc]
+                        if substep['type'] == 'script':
+                            raise ValueError(
+                                "%s (step %d) can't run without a MRJob"
+                                " script" % (mrc, step_num))
 
     def _get_step(self, step_num):
         """Get a single step (calls :py:meth:`_get_steps`)."""

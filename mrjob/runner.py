@@ -497,9 +497,6 @@ class MRJobRunner(object):
         :py:class:`~mrjob.inline.InlineMRJobRunner`, where we raise the
         actual exception that caused the step to fail).
         """
-        if not (self._script_path or self._steps):
-            raise AssertionError('No script to run!')
-
         if self._ran_job:
             raise AssertionError('Job already ran!')
 

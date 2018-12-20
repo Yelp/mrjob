@@ -82,8 +82,12 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
     def test_missing_input(self):
-        runner = InlineMRJobRunner(input_paths=['/some/bogus/file/path'])
-        self.assertRaises(Exception, runner._run)
+        mr_job = MRTwoStepJob(['-r', 'inline', '/some/bogus/file/path'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            assert isinstance(runner, InlineMRJobRunner)
+            self.assertRaises(IOError, runner.run)
 
 
 class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):

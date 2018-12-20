@@ -19,6 +19,7 @@ import os
 import os.path
 import tarfile
 import tempfile
+from io import BytesIO
 from time import sleep
 from unittest import skipIf
 
@@ -28,13 +29,19 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
+from mrjob.local import LocalMRJobRunner
 from mrjob.job import MRJob
 from mrjob.step import MRStep
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import to_lines
 
 from tests.mock_boto3 import MockBoto3TestCase
+from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
+from tests.mr_just_a_jar import MRJustAJar
+from tests.mr_null_spark import MRNullSpark
+from tests.mr_spark_jar import MRSparkJar
+from tests.mr_spark_script import MRSparkScript
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import patch
@@ -968,7 +975,7 @@ class MRCatsJob(MRJob):
         return [MRStep(mapper_cmd='cat')] * self.options.num_cats
 
 
-class PassStepsToRunnerTestCase(BasicTestCase):
+class PassStepsToRunnerTestCase(MockBoto3TestCase):
 
     def setUp(self):
         super(PassStepsToRunnerTestCase, self).setUp()
@@ -1018,3 +1025,64 @@ class PassStepsToRunnerTestCase(BasicTestCase):
             self.assertEqual(runner._steps, [])
 
             self.assertRaises(ValueError, runner.run)
+
+    def test_no_script_and_no_steps(self):
+        runner = InlineMRJobRunner()
+
+        self.assertEqual(runner._script_path, None)
+        self.assertEqual(runner._steps, [])
+
+        self.assertRaises(ValueError, runner.run)
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_classic_streaming_step_without_mr_job_script(self):
+        # classic MRJob mappers and reducers require a MRJob script
+        steps = MRWordCount()._steps_desc()
+
+        self.assertRaises(ValueError,
+                          LocalMRJobRunner,
+                          steps=steps, stdin=BytesIO(b'one\ntwo\n'))
+
+    def test_command_streaming_step_without_mr_job_script(self):
+        # you don't need a script to run commands
+        steps = MRCmdJob(['--mapper-cmd', 'cat'])._steps_desc()
+
+        runner = LocalMRJobRunner(steps=steps, stdin=BytesIO(b'dog\n'))
+
+        runner.run()
+        runner.cleanup()
+
+    def test_jar_step_without_mr_job_script(self):
+        jar_path = self.makefile('dora.jar')
+        steps = MRJustAJar(['--jar', jar_path])._steps_desc()
+
+        runner = EMRJobRunner(steps=steps, stdin=BytesIO(b'backpack'))
+
+        runner.run()
+        runner.cleanup()
+
+    def test_spark_step_without_mr_job_script(self):
+        steps = MRNullSpark()._steps_desc()
+
+        # need to be able to call the script's spark() method
+        self.assertRaises(ValueError,
+                          EMRJobRunner, steps=steps, stdin=BytesIO())
+
+    def test_spark_jar_step_without_mr_job_script(self):
+        spark_jar_path = self.makefile('fireflies.jar')
+        steps = MRSparkJar(['--jar', spark_jar_path])._steps_desc()
+
+        runner = EMRJobRunner(steps=steps, stdin=BytesIO())
+
+        runner.run()
+        runner.cleanup()
+
+    def test_spark_script_step_without_mr_job_script(self):
+        spark_script_path = self.makefile('a_spark_script.py')
+        steps = MRSparkScript(['--script', spark_script_path])._steps_desc()
+
+        runner = EMRJobRunner(steps=steps, stdin=BytesIO())
+
+        runner.run()
+        runner.cleanup()

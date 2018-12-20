@@ -99,9 +99,6 @@ class MRJobBinRunner(MRJobRunner):
         )
 
     def _load_steps(self):
-        if not self._script_path:
-            return []
-
         args = (self._executable(True) + ['--steps'] +
                 self._mr_job_extra_args(local=True))
         log.debug('> %s' % cmd_line(args))

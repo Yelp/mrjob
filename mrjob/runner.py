@@ -798,7 +798,7 @@ class MRJobRunner(object):
         """
         if self._steps is None:
             log.warning(
-                'querying jobs for steps is deprecated and '
+                'querying jobs for steps is deprecated and'
                 ' will go away in v0.7.0')
             steps = self._load_steps()
             self._check_steps(steps)

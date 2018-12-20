@@ -1638,7 +1638,7 @@ class MockEMRClient(object):
                     add_mock_s3_data(self.mock_s3_fs, {
                         bucket_name: {key_name + 'part-%05d' % i: part}})
             elif (cluster_id, step_num) in self.mock_emr_output:
-                raise AssertionError(
+                raise ValueError(
                     "can't use output for cluster ID %s, step %d "
                     "(it doesn't output to S3)" %
                     (cluster_id, step_num))

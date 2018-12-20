@@ -498,7 +498,7 @@ class MRJobRunner(object):
         actual exception that caused the step to fail).
         """
         if self._ran_job:
-            raise AssertionError('Job already ran!')
+            raise ValueError('Job already ran!')
 
         if self._num_steps() == 0:
             raise ValueError('Job has no steps!')
@@ -529,7 +529,7 @@ class MRJobRunner(object):
         """
         output_dir = self.get_output_dir()
         if output_dir is None:
-            raise AssertionError('Run the job before streaming output')
+            raise ValueError('Run the job before streaming output')
 
         if self._closed is True:
             log.warning(

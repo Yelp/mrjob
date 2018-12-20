@@ -1086,7 +1086,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _store_cluster_info(self):
         """Set self._image_version and self._hadoop_version."""
         if not self._cluster_id:
-            raise AssertionError('cluster has not yet been created')
+            raise ValueError('cluster has not yet been created')
 
         cluster = self._get_cluster(self._cluster_id)
         self._image_version = (

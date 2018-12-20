@@ -1018,3 +1018,13 @@ class PassStepsToRunnerTestCase(BasicTestCase):
             self.assertEqual(runner._steps, [])
 
             self.assertRaises(ValueError, runner.run)
+
+    def test_no_script_and_no_steps(self):
+        runner = InlineMRJobRunner()
+
+        self.assertEqual(runner._script_path, None)
+        self.assertEqual(runner._steps, [])
+
+        self.assertRaises(AssertionError, runner.run)
+
+        self.assertFalse(self.log.warning.called)

@@ -81,9 +81,7 @@ class MRJobRunner(object):
     # command lines to run substeps (including Spark) are handled by
     # mrjob.bin.MRJobBinRunner
 
-    #: alias for this runner; used for picking section of
-    #: :py:mod:`mrjob.conf` to load one of ``'local'``, ``'emr'``,
-    #: or ``'hadoop'``
+    #: alias for this runner, used on the command line with ``-r``
     alias = None
 
     # libjars is only here because the job can set it; might want to
@@ -106,6 +104,9 @@ class MRJobRunner(object):
         'upload_dirs',
         'upload_files'
     }
+
+    # re-define this as a set of step types supported by your runner
+    STEP_TYPES = None
 
     # if this is true, when bootstrap_mrjob is true, create a mrjob.zip
     # and patch it into the *py_files* option
@@ -820,11 +821,18 @@ class MRJobRunner(object):
     def _check_steps(self, steps):
         """Raise an exception if there's something wrong with the step
         definition."""
+        if not self._STEP_TYPES:
+            # use __class__.__name__ because only MRJobRunner would
+            # trigger this
+            raise NotImplementedError(
+                '%s cannot run steps!' % self.__class__.__name__)
+
         for step_num, step in enumerate(steps):
-            if step['type'] not in STEP_TYPES:
-                raise ValueError(
-                    'step %d has unexpected step type %r' % (
-                        step_num, step['type']))
+            if step['type'] not in self._STEP_TYPES:
+                raise NotImplementedError(
+                    'step %d has type %r, but %s runner only supports:'
+                    ' %s' % (step_num, step['type'], self.alias,
+                             ', '.join(sorted(self._STEP_TYPES))))
 
             if step.get('input_manifest') and step_num != 0:
                 raise ValueError(

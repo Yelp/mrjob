@@ -226,6 +226,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'task_instance_config',
     }
 
+    # no Spark support yet (see #1765)
+    _STEP_TYPES = {'jar', 'streaming'}
+
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.dataproc.DataprocJobRunner` takes the same
         arguments as

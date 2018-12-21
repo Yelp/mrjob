@@ -340,6 +340,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'visible_to_all_users',
     }
 
+    # supports everything (so far)
+    _STEP_TYPES = {
+        'jar', 'spark', 'spark_jar', 'spark_script', 'streaming'}
+
     # everything that controls instances number, type, or price
     _INSTANCE_OPT_NAMES = {
         name for name in OPT_NAMES

@@ -975,7 +975,7 @@ class MRCatsJob(MRJob):
         return [MRStep(mapper_cmd='cat')] * self.options.num_cats
 
 
-class PassStepsToRunnerTestCase(MockBoto3TestCase):
+class PassStepsToRunnerTestCase(BasicTestCase):
 
     def setUp(self):
         super(PassStepsToRunnerTestCase, self).setUp()
@@ -1035,6 +1035,9 @@ class PassStepsToRunnerTestCase(MockBoto3TestCase):
         self.assertRaises(ValueError, runner.run)
 
         self.assertFalse(self.log.warning.called)
+
+
+class TestStepsWithoutMRJobScript(MockBoto3TestCase):
 
     def test_classic_streaming_step_without_mr_job_script(self):
         # classic MRJob mappers and reducers require a MRJob script

@@ -414,7 +414,6 @@ class MRJobRunner(object):
         results = {}
 
         for k, v in sorted(opts.items()):
-
             # rewrite deprecated aliases
             if k in deprecated_aliases:
                 if v is None:  # don't care
@@ -433,7 +432,7 @@ class MRJobRunner(object):
 
             if k in self.OPT_NAMES:
                 results[k] = None if v is None else self._fix_opt(k, v, source)
-            else:
+            elif v:
                 log.warning('Unexpected option %s (from %s)' % (k, source))
 
         return results

@@ -26,6 +26,7 @@ from argparse import ArgumentTypeError
 
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
+from mrjob.options import _RUNNER_OPTS
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_job_args
 from mrjob.options import _add_runner_args
@@ -480,7 +481,8 @@ class MRJobLauncher(object):
         # magic to the runner
         return combine_dicts(
             self._non_option_kwargs(),
-            self._kwargs_from_switches(self._runner_opt_names()),
+            # don't screen out irrelevant opts (see #1898)
+            self._kwargs_from_switches(set(_RUNNER_OPTS)),
             self._job_kwargs(),
         )
 

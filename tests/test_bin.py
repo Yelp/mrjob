@@ -25,12 +25,14 @@ from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.hadoop import HadoopJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
 from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 
+from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_filter_job import MRFilterJob
 from tests.mr_no_mapper import MRNoMapper
@@ -59,14 +61,14 @@ else:
     PYTHON_BIN = 'python3'
 
 
-class ArgsForSparkStepTestCase(SandboxedTestCase):
+class ArgsForSparkStepTestCase(MockHadoopTestCase):
     # just test the structure of _args_for_spark_step()
 
     def setUp(self):
         super(ArgsForSparkStepTestCase, self).setUp()
 
         self.mock_get_spark_submit_bin = self.start(patch(
-            'mrjob.bin.MRJobBinRunner.get_spark_submit_bin',
+            'mrjob.hadoop.HadoopJobRunner.get_spark_submit_bin',
             return_value=['<spark-submit bin>']))
 
         self.mock_spark_submit_args = self.start(patch(
@@ -82,7 +84,8 @@ class ArgsForSparkStepTestCase(SandboxedTestCase):
             return_value=['<spark script args>']))
 
     def _test_step(self, step_num):
-        job = MRNullSpark(['-r', 'local'])
+        # use Hadoop because it supports spark steps and local runner doesn't
+        job = MRNullSpark(['-r', 'hadoop'])
         job.sandbox()
 
         with job.make_runner() as runner:

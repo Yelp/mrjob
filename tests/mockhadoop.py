@@ -50,6 +50,34 @@ from mrjob.hadoop import _HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
 from mrjob.util import shlex_split
 
+from tests.sandbox import SandboxedTestCase
+
+
+class MockHadoopTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(MockHadoopTestCase, self).setUp()
+        # setup fake hadoop home
+        hadoop_home = self.makedirs('mock_hadoop_home')
+        os.environ['HADOOP_HOME'] = hadoop_home
+        os.environ['MOCK_HADOOP_VERSION'] = "1.2.0"
+        os.environ['MOCK_HADOOP_TMP'] = self.makedirs('mock_hadoop_tmp')
+
+        # make fake hadoop binary
+        os.mkdir(os.path.join(hadoop_home, 'bin'))
+        self.hadoop_bin = os.path.join(hadoop_home, 'bin', 'hadoop')
+        create_mock_hadoop_script(self.hadoop_bin)
+
+        # make fake streaming jar
+        os.makedirs(os.path.join(hadoop_home, 'contrib', 'streaming'))
+        streaming_jar_path = os.path.join(
+            hadoop_home, 'contrib', 'streaming', 'hadoop-0.X.Y-streaming.jar')
+        open(streaming_jar_path, 'w').close()
+
+        # make sure the fake hadoop binaries can find mrjob
+        self.add_mrjob_to_pythonpath()
+
+
 # layout of $MOCK_HADOOP_TMP:
 #   cmd.log: single file containing one line per invocation of mock hadoop
 #     binary, with lines containing space-separated args passed

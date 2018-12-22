@@ -33,9 +33,9 @@ from mrjob.util import which
 
 from tests.mockhadoop import add_mock_hadoop_counters
 from tests.mockhadoop import add_mock_hadoop_output
-from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import get_mock_hadoop_cmd_args
 from tests.mockhadoop import get_mock_hdfs_root
+from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_jar_with_generic_args import MRJarWithGenericArgs
 from tests.mr_just_a_jar import MRJustAJar
@@ -60,31 +60,6 @@ try:
     pty
 except ImportError:
     pty = Mock()
-
-
-class MockHadoopTestCase(SandboxedTestCase):
-
-    def setUp(self):
-        super(MockHadoopTestCase, self).setUp()
-        # setup fake hadoop home
-        hadoop_home = self.makedirs('mock_hadoop_home')
-        os.environ['HADOOP_HOME'] = hadoop_home
-        os.environ['MOCK_HADOOP_VERSION'] = "1.2.0"
-        os.environ['MOCK_HADOOP_TMP'] = self.makedirs('mock_hadoop_tmp')
-
-        # make fake hadoop binary
-        os.mkdir(os.path.join(hadoop_home, 'bin'))
-        self.hadoop_bin = os.path.join(hadoop_home, 'bin', 'hadoop')
-        create_mock_hadoop_script(self.hadoop_bin)
-
-        # make fake streaming jar
-        os.makedirs(os.path.join(hadoop_home, 'contrib', 'streaming'))
-        streaming_jar_path = os.path.join(
-            hadoop_home, 'contrib', 'streaming', 'hadoop-0.X.Y-streaming.jar')
-        open(streaming_jar_path, 'w').close()
-
-        # make sure the fake hadoop binaries can find mrjob
-        self.add_mrjob_to_pythonpath()
 
 
 class TestFullyQualifyHDFSPath(BasicTestCase):

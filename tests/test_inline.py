@@ -241,7 +241,7 @@ class UnsupportedStepsTestCase(SandboxedTestCase):
 
         self.assertRaises(NotImplementedError, job.make_runner)
 
-    def test_no_spark_jobs(self):
+    def test_no_spark_steps(self):
         # just a sanity check; _STEP_TYPES is tested in a lot of ways
         job = MRNullSpark(['-r', 'inline'])
         job.sandbox()

@@ -56,6 +56,8 @@ from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_no_mapper import MRNoMapper
+from tests.mr_null_spark import MRNullSpark
+from tests.mr_spark_script import MRSparkScript
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
@@ -2354,3 +2356,21 @@ class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
             'https://www.googleapis.com/compute/v1/projects/%s'
             '/us-west1/subnetworks/test' % project_id)
         self.assertFalse(gce_config.network_uri)
+
+
+class UnsupportedStepsTestCase(MockGoogleTestCase):
+
+    def test_no_spark_steps(self):
+        # just a sanity check; _STEP_TYPES is tested in a lot of ways
+        job = MRNullSpark(['-r', 'dataproc'])
+        job.sandbox()
+
+        self.assertRaises(NotImplementedError, job.make_runner)
+
+    def test_no_jar_steps(self):
+        spark_script_path = self.makefile('chispa.py')
+
+        job = MRSparkScript(['-r', 'dataproc', '--script', spark_script_path])
+        job.sandbox()
+
+        self.assertRaises(NotImplementedError, job.make_runner)

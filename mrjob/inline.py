@@ -77,6 +77,20 @@ class InlineMRJobRunner(SimMRJobRunner):
         if self._opts['setup']:
             log.warning("inline runner can't run setup commands")
 
+    def _check_steps(self, steps):
+        """Don't try to run steps that include commands."""
+        super(InlineMRJobRunner, self)._check_steps(steps)
+
+        for step_num, step in enumerate(steps):
+            if step['type'] == 'streaming':
+                for mrc in ('mapper', 'combiner', 'reducer'):
+                    if step.get(mrc):
+                        if 'command' in step[mrc] or 'pre_filter' in step[mrc]:
+                            raise NotImplementedError(
+                                "step %d's %s runs a command, but inline"
+                                " runner does not support subprocesses (try"
+                                " -r local)" % (step_num, mrc))
+
     def _invoke_task_func(self, task_type, step_num, task_num):
         """Just run tasks in the same process."""
         manifest = (step_num == 0 and task_type == 'mapper' and

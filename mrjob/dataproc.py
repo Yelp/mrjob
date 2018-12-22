@@ -226,6 +226,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'task_instance_config',
     }
 
+    # no Spark support yet (see #1765)
+    _STEP_TYPES = {'jar', 'streaming'}
+
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.dataproc.DataprocJobRunner` takes the same
         arguments as
@@ -1086,7 +1089,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _store_cluster_info(self):
         """Set self._image_version and self._hadoop_version."""
         if not self._cluster_id:
-            raise AssertionError('cluster has not yet been created')
+            raise ValueError('cluster has not yet been created')
 
         cluster = self._get_cluster(self._cluster_id)
         self._image_version = (

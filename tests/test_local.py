@@ -48,6 +48,8 @@ from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_filter_job import MRFilterJob
 from tests.mr_group import MRGroup
 from tests.mr_job_where_are_you import MRJobWhereAreYou
+from tests.mr_just_a_jar import MRJustAJar
+from tests.mr_null_spark import MRNullSpark
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
@@ -1024,3 +1026,21 @@ class LocalInputManifestTestCase(InlineInputManifestTestCase):
             self.EXPECTED_OUTPUT)
 
         self.assertTrue(exists(touched_path))
+
+
+class UnsupportedStepsTestCase(SandboxedTestCase):
+
+    def test_no_spark_steps(self):
+        # just a sanity check; _STEP_TYPES is tested in a lot of ways
+        job = MRNullSpark(['-r', 'local'])
+        job.sandbox()
+
+        self.assertRaises(NotImplementedError, job.make_runner)
+
+    def test_no_jar_steps(self):
+        jar_path = self.makefile('dora.jar')
+
+        job = MRJustAJar(['-r', 'local', '--jar', jar_path])
+        job.sandbox()
+
+        self.assertRaises(NotImplementedError, job.make_runner)

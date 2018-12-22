@@ -82,9 +82,7 @@ class MRJobRunner(object):
     # command lines to run substeps (including Spark) are handled by
     # mrjob.bin.MRJobBinRunner
 
-    #: alias for this runner; used for picking section of
-    #: :py:mod:`mrjob.conf` to load one of ``'local'``, ``'emr'``,
-    #: or ``'hadoop'``
+    #: alias for this runner, used on the command line with ``-r``
     alias = None
 
     # libjars is only here because the job can set it; might want to
@@ -107,6 +105,9 @@ class MRJobRunner(object):
         'upload_dirs',
         'upload_files'
     }
+
+    # re-define this as a set of step types supported by your runner
+    _STEP_TYPES = None
 
     # if this is true, when bootstrap_mrjob is true, create a mrjob.zip
     # and patch it into the *py_files* option
@@ -332,7 +333,11 @@ class MRJobRunner(object):
 
         # check and store *steps*
         self._steps = None
-        if steps is not None:
+        if steps is None:
+            if not mr_job_script:
+                self._steps = []
+            # otherwise we'll load steps on-the-fly, see _load_steps()
+        else:
             self._check_steps(steps)
             self._steps = copy.deepcopy(steps)
 
@@ -496,11 +501,8 @@ class MRJobRunner(object):
         :py:class:`~mrjob.inline.InlineMRJobRunner`, where we raise the
         actual exception that caused the step to fail).
         """
-        if not (self._script_path or self._steps):
-            raise AssertionError('No script to run!')
-
         if self._ran_job:
-            raise AssertionError('Job already ran!')
+            raise ValueError('Job already ran!')
 
         if self._num_steps() == 0:
             raise ValueError('Job has no steps!')
@@ -531,7 +533,7 @@ class MRJobRunner(object):
         """
         output_dir = self.get_output_dir()
         if output_dir is None:
-            raise AssertionError('Run the job before streaming output')
+            raise ValueError('Run the job before streaming output')
 
         if self._closed is True:
             log.warning(
@@ -801,7 +803,7 @@ class MRJobRunner(object):
         """
         if self._steps is None:
             log.warning(
-                'querying jobs for steps is deprecated and '
+                'querying jobs for steps is deprecated and'
                 ' will go away in v0.7.0')
             steps = self._load_steps()
             self._check_steps(steps)
@@ -814,21 +816,51 @@ class MRJobRunner(object):
         there are mappers and reducers for each step.
 
         Returns output as described in :ref:`steps-format`.
+
+        If this is called, you can assume self._script_path is set.
         """
         raise NotImplementedError
 
     def _check_steps(self, steps):
-        """Raise an exception if there's something wrong with the step
-        definition."""
+        """Look at the step definition (*steps*). If it is not supported by
+        the runner, raise :py:class:`NotImplementedError`. If it is not
+        supported by mrjob, raise :py:class:`ValueError`.
+        """
+        if not self._STEP_TYPES:
+            # use __class__.__name__ because only MRJobRunner would
+            # trigger this
+            raise NotImplementedError(
+                '%s cannot run steps!' % self.__class__.__name__)
+
         for step_num, step in enumerate(steps):
-            if step['type'] not in STEP_TYPES:
-                raise ValueError(
-                    'unexpected step type %r in steps %r' % (
-                        step['type'], steps))
+            if step.get('type') not in self._STEP_TYPES:
+                raise NotImplementedError(
+                    'step %d has type %r, but %s runner only supports:'
+                    ' %s' % (step_num, step.get('type'), self.alias,
+                             ', '.join(sorted(self._STEP_TYPES))))
 
             if step.get('input_manifest') and step_num != 0:
                 raise ValueError(
-                    'only first step may take an input manifest')
+                    'step %d may not take an input manifest (only'
+                    ' first step can' % step_num)
+
+            # some step types assume a MRJob script
+            if not self._script_path:
+                if step['type'] == 'spark':
+                    raise ValueError(
+                        "SparkStep (step %d) can't run without a MRJob script"
+                        " (try SparkScriptStep instead)" % step_num)
+
+                elif step['type'] == 'streaming':
+                    for mrc in ('mapper', 'combiner', 'reducer'):
+                        if not step.get(mrc):
+                            continue
+
+                        substep = step[mrc]
+                        if substep['type'] == 'script':
+                            raise ValueError(
+                                "%s (step %d) can't run without a MRJob"
+                                " script" % (mrc, step_num))
 
     def _get_step(self, step_num):
         """Get a single step (calls :py:meth:`_get_steps`)."""

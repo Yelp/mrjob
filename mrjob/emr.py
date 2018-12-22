@@ -340,6 +340,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'visible_to_all_users',
     }
 
+    # supports everything (so far)
+    _STEP_TYPES = {
+        'jar', 'spark', 'spark_jar', 'spark_script', 'streaming'}
+
     # everything that controls instances number, type, or price
     _INSTANCE_OPT_NAMES = {
         name for name in OPT_NAMES
@@ -1367,7 +1371,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         elif _is_spark_step_type(step['type']):
             method = self._spark_step_hadoop_jar_step
         else:
-            raise AssertionError('Bad step type: %r' % (step['type'],))
+            raise ValueError('Bad step type: %r' % (step['type'],))
 
         hadoop_jar_step = method(step_num)
 
@@ -2341,7 +2345,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def make_persistent_cluster(self):
         if (self._cluster_id):
-            raise AssertionError(
+            raise ValueError(
                 'This runner is already associated with cluster ID %s' %
                 (self._cluster_id))
 
@@ -2771,7 +2775,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Describe our cluster, and cache image_version, hadoop_version,
         and master_public_dns"""
         if not self._cluster_id:
-            raise AssertionError('cluster has not yet been created')
+            raise ValueError('cluster has not yet been created')
 
         cache = self._cluster_to_cache[self._cluster_id]
 
@@ -2799,7 +2803,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """List master instance for our cluster, and cache
         master_private_ip."""
         if not self._cluster_id:
-            raise AssertionError('cluster has not yet been created')
+            raise ValueError('cluster has not yet been created')
 
         cache = self._cluster_to_cache[self._cluster_id]
 

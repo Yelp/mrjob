@@ -819,8 +819,10 @@ class MRJobRunner(object):
         raise NotImplementedError
 
     def _check_steps(self, steps):
-        """Raise an exception if there's something wrong with the step
-        definition."""
+        """Look at the step definition (*steps*). If it is not supported by
+        the runner, raise :py:class:`NotImplementedError`. If it is not
+        supported by mrjob, raise :py:class:`ValueError`.
+        """
         if not self._STEP_TYPES:
             # use __class__.__name__ because only MRJobRunner would
             # trigger this

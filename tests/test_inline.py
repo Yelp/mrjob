@@ -32,6 +32,9 @@ from mrjob.inline import InlineMRJobRunner
 from mrjob.job import MRJob
 
 from tests.examples.test_mr_phone_to_url import write_conversion_record
+from tests.mr_cmd_job import MRCmdJob
+from tests.mr_filter_job import MRFilterJob
+from tests.mr_null_spark import MRNullSpark
 from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -222,3 +225,25 @@ class WhileReadingFromTestCase(SandboxedTestCase):
 
     def test_input_manifest(self):
         self._test_reading_from(MRManifestNope, expect_input_path=True)
+
+
+class UnsupportedStepsTestCase(SandboxedTestCase):
+
+    def test_no_command_steps(self):
+        job = MRCmdJob(['-r', 'inline', '--mapper-cmd', 'cat'])
+        job.sandbox()
+
+        self.assertRaises(NotImplementedError, job.make_runner)
+
+    def test_no_pre_filters(self):
+        job = MRFilterJob(['-r', 'inline', '--mapper-filter', 'grep foo'])
+        job.sandbox()
+
+        self.assertRaises(NotImplementedError, job.make_runner)
+
+    def test_no_spark_jobs(self):
+        # just a sanity check; _STEP_TYPES is tested in a lot of ways
+        job = MRNullSpark(['-r', 'inline'])
+        job.sandbox()
+
+        self.assertRaises(NotImplementedError, job.make_runner)

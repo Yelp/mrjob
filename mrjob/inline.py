@@ -84,11 +84,12 @@ class InlineMRJobRunner(SimMRJobRunner):
         for step_num, step in enumerate(steps):
             if step['type'] == 'streaming':
                 for mrc in ('mapper', 'combiner', 'reducer'):
-                    if step.get(mrc) and step[mrc].get('type') == 'command':
-                        raise ValueError(
-                            "step %d's %s runs a command, but inline runner"
-                            " does not support subprocesses (try -r local)" % (
-                                step_num, mrc))
+                    if step.get(mrc):
+                        if 'command' in step[mrc] or 'pre_filter' in step[mrc]:
+                            raise NotImplementedError(
+                                "step %d's %s runs a command, but inline"
+                                " runner does not support subprocesses (try"
+                                " -r local)" % (step_num, mrc))
 
     def _invoke_task_func(self, task_type, step_num, task_num):
         """Just run tasks in the same process."""

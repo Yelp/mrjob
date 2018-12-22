@@ -67,6 +67,8 @@ class SimMRJobRunner(MRJobRunner):
         'num_cores'
     }
 
+    _STEP_TYPES = {'streaming'}
+
     def __init__(self, **kwargs):
         super(SimMRJobRunner, self).__init__(**kwargs)
 

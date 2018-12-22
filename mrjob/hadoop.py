@@ -130,6 +130,10 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         'spark_master',
     }
 
+    # supports everything (so far)
+    _STEP_TYPES = {
+        'jar', 'spark', 'spark_jar', 'spark_script', 'streaming'}
+
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
         as :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options

@@ -59,7 +59,19 @@ else:
     PYTHON_BIN = 'python3'
 
 
-class ArgsForSparkStepTestCase(SandboxedTestCase):
+class AllowSparkOnLocalRunnerTestCase(SandboxedTestCase):
+
+    # allow testing spark methods on local runner, even though
+    # it doesn't (currently) support them (see #1361)
+
+    def setUp(self):
+        super(AllowSparkOnLocalRunnerTestCase, self).setUp()
+
+        self.start(patch('mrjob.runner.MRJobRunner._check_steps'))
+
+
+
+class ArgsForSparkStepTestCase(AllowSparkOnLocalRunnerTestCase):
     # just test the structure of _args_for_spark_step()
 
     def setUp(self):
@@ -127,7 +139,7 @@ class BootstrapMRJobTestCase(BasicTestCase):
         self.assertEqual(runner._bootstrap_mrjob(), True)
 
 
-class GetSparkSubmitBinTestCase(SandboxedTestCase):
+class GetSparkSubmitBinTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def test_default(self):
         job = MRNullSpark(['-r', 'local'])
@@ -819,7 +831,7 @@ class SetupWrapperScriptContentTestCase(SandboxedTestCase):
             self.assertEqual(out[:2], ['set -e', 'set -v'])
 
 
-class PyFilesTestCase(SandboxedTestCase):
+class PyFilesTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def test_default(self):
         job = MRNullSpark(['-r', 'local'])
@@ -1003,7 +1015,7 @@ class SortValuesTestCase(SandboxedTestCase):
                 'org.apache.hadoop.mapred.lib.HashPartitioner')
 
 
-class SparkScriptPathTestCase(SandboxedTestCase):
+class SparkScriptPathTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def setUp(self):
         super(SparkScriptPathTestCase, self).setUp()
@@ -1059,7 +1071,7 @@ class SparkScriptPathTestCase(SandboxedTestCase):
                 runner._spark_script_path, 0)
 
 
-class SparkScriptArgsTestCase(SandboxedTestCase):
+class SparkScriptArgsTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def setUp(self):
         super(SparkScriptArgsTestCase, self).setUp()
@@ -1187,7 +1199,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 runner._spark_script_args, 0)
 
 
-class SparkSubmitArgsTestCase(SandboxedTestCase):
+class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def setUp(self):
         super(SparkSubmitArgsTestCase, self).setUp()

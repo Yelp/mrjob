@@ -1119,6 +1119,13 @@ class UnexpectedOptsWarningTestCase(SandboxedTestCase):
 
         self.log = self.start(patch('mrjob.runner.log'))
 
+    def test_no_warning_by_default(self):
+        job = MRTwoStepJob(['-r', 'local', '--no-conf'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(self.log.warning.called)
+
     def test_unexpected_opt_from_mrjob_conf(self):
         conf_path = self.makefile('mrjob.custom.conf')
 

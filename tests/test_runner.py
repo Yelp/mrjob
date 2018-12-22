@@ -547,7 +547,7 @@ class RemoteCreateDirArchiveTestCase(MockBoto3TestCase):
 
 class ConfigFilesTestCase(SandboxedTestCase):
 
-    MRJOB_CONF_CONTENTS = None  # don't patch load_opts_from_mrjob_confsq
+    MRJOB_CONF_CONTENTS = None  # don't patch load_opts_from_mrjob_confs
 
     def save_conf(self, name, conf):
         conf_path = os.path.join(self.tmp_dir, name)
@@ -1108,3 +1108,46 @@ class UnsupportedStepsTestCase(MockBoto3TestCase):
         steps = [dict(foo='bar')]
 
         self.assertRaises(NotImplementedError, EMRJobRunner, steps=steps)
+
+
+class UnexpectedOptsWarningTestCase(SandboxedTestCase):
+
+    MRJOB_CONF_CONTENTS = None  # don't patch load_opts_from_mrjob_confs
+
+    def setUp(self):
+        super(UnexpectedOptsWarningTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.runner.log'))
+
+    def test_unexpected_opt_from_mrjob_conf(self):
+        conf_path = self.makefile('mrjob.custom.conf')
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf(
+                dict(runners=dict(local=dict(land='useless_swamp'))), f)
+
+        job = MRTwoStepJob(['-r', 'local', '-c', conf_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(self.log.warning.called)
+            warnings = '\n'.join(
+                arg[0][0] for arg in self.log.warning.call_args_list)
+
+            self.assertIn('Unexpected option', warnings)
+            self.assertIn('land', warnings)
+            self.assertIn(conf_path, warnings)
+
+    def test_unexpected_opt_from_command_line(self):
+        # regression test for #1898. local runner doesn't support *zone*
+        job = MRTwoStepJob(['-r', 'local', '--no-conf', '--zone', 'DANGER'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(self.log.warning.called)
+            warnings = '\n'.join(
+                arg[0][0] for arg in self.log.warning.call_args_list)
+
+            self.assertIn('Unexpected option', warnings)
+            self.assertIn('zone', warnings)
+            self.assertIn('command line', warnings)

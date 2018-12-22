@@ -25,14 +25,12 @@ from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
 from mrjob.bin import MRJobBinRunner
-from mrjob.hadoop import HadoopJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
 from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 
-from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_filter_job import MRFilterJob
 from tests.mr_no_mapper import MRNoMapper
@@ -61,14 +59,26 @@ else:
     PYTHON_BIN = 'python3'
 
 
-class ArgsForSparkStepTestCase(MockHadoopTestCase):
+class AllowSparkOnLocalRunnerTestCase(SandboxedTestCase):
+
+    # allow testing spark methods on local runner, even though
+    # it doesn't (currently) support them (see #1361)
+
+    def setUp(self):
+        super(AllowSparkOnLocalRunnerTestCase, self).setUp()
+
+        self.start(patch('mrjob.runner.MRJobRunner._check_steps'))
+
+
+
+class ArgsForSparkStepTestCase(AllowSparkOnLocalRunnerTestCase):
     # just test the structure of _args_for_spark_step()
 
     def setUp(self):
         super(ArgsForSparkStepTestCase, self).setUp()
 
         self.mock_get_spark_submit_bin = self.start(patch(
-            'mrjob.hadoop.HadoopJobRunner.get_spark_submit_bin',
+            'mrjob.bin.MRJobBinRunner.get_spark_submit_bin',
             return_value=['<spark-submit bin>']))
 
         self.mock_spark_submit_args = self.start(patch(
@@ -84,8 +94,7 @@ class ArgsForSparkStepTestCase(MockHadoopTestCase):
             return_value=['<spark script args>']))
 
     def _test_step(self, step_num):
-        # use Hadoop because it supports spark steps and local runner doesn't
-        job = MRNullSpark(['-r', 'hadoop'])
+        job = MRNullSpark(['-r', 'local'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -130,7 +139,7 @@ class BootstrapMRJobTestCase(BasicTestCase):
         self.assertEqual(runner._bootstrap_mrjob(), True)
 
 
-class GetSparkSubmitBinTestCase(SandboxedTestCase):
+class GetSparkSubmitBinTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def test_default(self):
         job = MRNullSpark(['-r', 'local'])
@@ -822,7 +831,7 @@ class SetupWrapperScriptContentTestCase(SandboxedTestCase):
             self.assertEqual(out[:2], ['set -e', 'set -v'])
 
 
-class PyFilesTestCase(SandboxedTestCase):
+class PyFilesTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def test_default(self):
         job = MRNullSpark(['-r', 'local'])
@@ -1006,7 +1015,7 @@ class SortValuesTestCase(SandboxedTestCase):
                 'org.apache.hadoop.mapred.lib.HashPartitioner')
 
 
-class SparkScriptPathTestCase(SandboxedTestCase):
+class SparkScriptPathTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def setUp(self):
         super(SparkScriptPathTestCase, self).setUp()
@@ -1062,7 +1071,7 @@ class SparkScriptPathTestCase(SandboxedTestCase):
                 runner._spark_script_path, 0)
 
 
-class SparkScriptArgsTestCase(SandboxedTestCase):
+class SparkScriptArgsTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def setUp(self):
         super(SparkScriptArgsTestCase, self).setUp()
@@ -1190,7 +1199,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 runner._spark_script_args, 0)
 
 
-class SparkSubmitArgsTestCase(SandboxedTestCase):
+class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
 
     def setUp(self):
         super(SparkSubmitArgsTestCase, self).setUp()

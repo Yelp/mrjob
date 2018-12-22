@@ -29,6 +29,7 @@ from mrjob.conf import combine_envs
 from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.job import _im_func
+from mrjob.options import _RUNNER_OPTS
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
@@ -1355,7 +1356,7 @@ class RunnerKwargsTestCase(BasicTestCase):
         self.assertEqual(
             option_names,
             # libjars can be set by the job
-            (runner_class.OPT_NAMES -
+            (set(_RUNNER_OPTS) -
              self.CONF_ONLY_OPTIONS)
         )
 

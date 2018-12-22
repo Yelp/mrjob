@@ -106,7 +106,7 @@ class MRJobRunner(object):
     }
 
     # re-define this as a set of step types supported by your runner
-    STEP_TYPES = None
+    _STEP_TYPES = None
 
     # if this is true, when bootstrap_mrjob is true, create a mrjob.zip
     # and patch it into the *py_files* option
@@ -830,10 +830,10 @@ class MRJobRunner(object):
                 '%s cannot run steps!' % self.__class__.__name__)
 
         for step_num, step in enumerate(steps):
-            if step['type'] not in self._STEP_TYPES:
+            if step.get('type') not in self._STEP_TYPES:
                 raise NotImplementedError(
                     'step %d has type %r, but %s runner only supports:'
-                    ' %s' % (step_num, step['type'], self.alias,
+                    ' %s' % (step_num, step.get('type'), self.alias,
                              ', '.join(sorted(self._STEP_TYPES))))
 
             if step.get('input_manifest') and step_num != 0:

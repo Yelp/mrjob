@@ -31,6 +31,7 @@ from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.job import MRJob
+from mrjob.runner import MRJobRunner
 from mrjob.step import MRStep
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import to_lines
@@ -1089,3 +1090,21 @@ class TestStepsWithoutMRJobScript(MockBoto3TestCase):
 
         runner.run()
         runner.cleanup()
+
+
+class UnsupportedStepsTestCase(MockBoto3TestCase):
+
+    def test_base_classes_cant_have_steps(self):
+        steps = MRTwoStepJob()._steps_desc()
+
+        self.assertRaises(NotImplementedError, MRJobRunner, steps=steps)
+
+    def test_unknown_step_type(self):
+        steps = [dict(type='cameloop')]  # great name for your ML startup?
+
+        self.assertRaises(NotImplementedError, EMRJobRunner, steps=steps)
+
+    def test_malformed_step(self):
+        steps = [dict(foo='bar')]
+
+        self.assertRaises(NotImplementedError, EMRJobRunner, steps=steps)

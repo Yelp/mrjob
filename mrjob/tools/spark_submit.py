@@ -215,10 +215,11 @@ _SPARK_SUBMIT_ARG_GROUPS = [
         'executor_cores',
     ]),
     ('YARN-only', [
-        'queue_name',
-        'num_executors',
+        'setup',
         'upload_archives',
         'upload_dirs',
+        'queue_name',
+        'num_executors',
         'principal',
         'keytab',
     ]),
@@ -273,6 +274,12 @@ _SPARK_SUBMIT_ARG_HELP = dict(
     queue_name='The YARN queue to submit to (Default: "default").',
     repositories=('Comma-separated list of additional remote repositories to'
                   ' search for the maven coordinates given with --packages.'),
+    setup=('A command to run before each Spark executor in the'
+           ' shell ("touch foo"). In cluster mode, runs before the Spark'
+           ' driver as well. You may interpolate files'
+           ' available via URL or on your local filesystem using'
+           ' Hadoop Distributed Cache syntax (". setup.sh#"). To'
+           ' interpolate archives, use #/: "cd foo.tar.gz#/; make.'),
     spark_deploy_mode=('Whether to launch the driver program locally'
                        ' ("client") or on one of the worker machines inside'
                        ' the cluster ("cluster") (Default: client).'),
@@ -318,6 +325,7 @@ _SPARK_SUBMIT_SWITCHES = dict(
     py_files='--py-files',
     queue_name='--queue',
     repositories='--repositories',
+    setup='--setup',
     spark_deploy_mode='--deploy-mode',
     spark_master='--master',
     supervise='--supervise',

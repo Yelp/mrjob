@@ -453,8 +453,8 @@ class MRJobBinRunner(MRJobRunner):
         if not self._setup:
             return False  # nothing to do
 
-        # setup scripts definitely don't work with local mode (see #1376)
-        if (self._spark_master() or '').startswith('local'):
+        # for now, we only support setup scripts on YARN (see #1376)
+        if self._spark_master() != 'yarn':
             return False
 
         return True

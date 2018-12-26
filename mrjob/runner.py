@@ -243,10 +243,8 @@ class MRJobRunner(object):
         # set of dir_archives that have actually been created
         self._dir_archives_created = set()
 
-        # track (name, path) of files and archives to upload to spark.
-        # these are a subset of those in self._working_dir_mgr
-        #
-        # TODO: these might go away now that Spark does setup scripts too
+        # track (name, path) of files and archives to upload to spark
+        # if not using a setup script.
         self._spark_files = []
         self._spark_archives = []
 

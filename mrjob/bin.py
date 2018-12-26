@@ -859,16 +859,17 @@ class MRJobBinRunner(MRJobRunner):
         return self._opts.get('spark_deploy_mode') or None
 
     def _spark_upload_args(self):
-        # TODO: will need a solution for Spark installations without --archives
+        # if using a setup script, upload all files to working dir
         if self._spark_python_wrapper_path:
             return self._upload_args_helper('--files', None,
                                             '--archives', None)
         else:
+            # otherwise, just pass through --files and --archives
             return self._upload_args_helper('--files', self._spark_files,
                                             '--archives', self._spark_archives)
 
     def _spark_script_path(self, step_num):
-        """The path of the spark script or har, used by
+        """The path of the spark script or JAR, used by
         _args_for_spark_step()."""
         step = self._get_step(step_num)
 

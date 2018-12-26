@@ -24,6 +24,7 @@ import json
 import os
 import os.path
 import posixpath
+import signal
 import socket
 import sys
 import time
@@ -4706,7 +4707,10 @@ class SetUpSSHTunnelTestCase(MockBoto3TestCase):
         self.mock_Popen.return_value.returncode = None
         self.mock_Popen.return_value.pid = 99999
 
-        self.start(patch('os.kill'))  # don't clean up fake SSH proc
+        self.mock_kill = self.start(patch('os.kill'))
+
+        self.mock_signal = self.start(patch(
+            'mrjob.cloud.signal', spec=signal))
 
     def get_ssh_args(self, *args, **kwargs):
         job_args = [
@@ -4764,6 +4768,20 @@ class SetUpSSHTunnelTestCase(MockBoto3TestCase):
 
         self.assertNotIn('-g', ssh_args)
         self.assertNotIn('-4', ssh_args)
+
+        self.mock_kill.assert_called_once_with(
+            self.mock_Popen.return_value.pid,
+            self.mock_signal.SIGKILL)
+
+    def test_no_sigkill(self):
+        del self.mock_signal.SIGKILL
+
+        # launch and shut down mock runner
+        self.parse_ssh_args(self.get_ssh_args())
+
+        self.mock_kill.assert_called_once_with(
+            self.mock_Popen.return_value.pid,
+            self.mock_signal.SIGABRT)
 
     def test_2_x_ami(self):
         ssh_args = self.get_ssh_args('--image-version', '2.4.11')

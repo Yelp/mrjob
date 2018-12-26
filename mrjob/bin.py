@@ -75,6 +75,11 @@ class MRJobBinRunner(MRJobRunner):
         # interleaved; see mrjob.setup.parse_setup_cmd() for details
         self._setup = [parse_setup_cmd(cmd) for cmd in self._opts['setup']]
 
+        if self._setup and self._has_pyspark_steps() and not (
+                self._spark_setup_is_supported()):
+            log.warning("setup commands aren't supported on Spark master %r" %
+                        self._spark_master())
+
         for cmd in self._setup:
             for token in cmd:
                 if isinstance(token, dict):
@@ -453,11 +458,15 @@ class MRJobBinRunner(MRJobRunner):
         if not self._setup:
             return False  # nothing to do
 
-        # for now, we only support setup scripts on YARN (see #1376)
-        if self._spark_master() != 'yarn':
+        if not self._spark_setup_is_supported():
             return False
 
         return True
+
+    def _spark_setup_is_supported(self):
+        """Can we run setup scripts on Spark?"""
+        # for now, we only support setup scripts on YARN (see #1376)
+        return self._spark_master() == 'yarn'
 
     def _py_files_setup(self):
         """A list of additional setup commands to emulate Spark's

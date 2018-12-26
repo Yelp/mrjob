@@ -31,6 +31,7 @@ from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 
+from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_filter_job import MRFilterJob
 from tests.mr_no_mapper import MRNoMapper
@@ -1643,3 +1644,77 @@ class CreateMrjobZipTestCase(SandboxedTestCase):
         self.assertTrue(
             compileall.compile_dir(os.path.join(self.tmp_dir, 'mrjob'),
                                    quiet=1))
+
+
+class PySparkPythonTestCase(MockHadoopTestCase):
+
+    # using MockHadoopTestCase just so we don't inadvertently call
+    # subprocesses
+
+    def setUp(self):
+        super(PySparkPythonTestCase, self).setUp()
+
+        # catch warning about lack of setup script support on non-YARN Spark
+        self.log = self.start(patch('mrjob.bin.log'))
+
+    def _env_and_runner(self, *args):
+        job = MRNullSpark(['-r', 'hadoop'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._create_setup_wrapper_scripts()
+
+            return runner._spark_cmdenv(0), runner
+
+    def test_default(self):
+        env, runner = self._env_and_runner()
+
+        self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
+        self.assertEqual(env['PYSPARK_PYTHON'], PYTHON_BIN)
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_custom_python_bin(self):
+        env, runner = self._env_and_runner('--python-bin', 'mypy')
+
+        self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
+        self.assertEqual(env['PYSPARK_PYTHON'], 'mypy')
+
+    def test_task_python_bin(self):
+        # should be possible to set different Pythons for driver and executor
+        env, runner = self._env_and_runner('--task-python-bin', 'mypy')
+
+        self.assertEqual(env['PYSPARK_DRIVER_PYTHON'], PYTHON_BIN)
+        self.assertEqual(env['PYSPARK_PYTHON'], 'mypy')
+
+    def test_setup_wrapper_script(self):
+        env, runner = self._env_and_runner('--setup', 'true')
+
+        # sanity-check master and deploy mode
+        self.assertEqual(runner._spark_master(), 'yarn')
+        self.assertEqual(runner._spark_deploy_mode(), 'client')
+
+        self.assertIsNotNone(runner._spark_python_wrapper_path)
+        self.assertFalse(self.log.warning.called)
+
+        self.assertEqual(env['PYSPARK_DRIVER_PYTHON'], PYTHON_BIN)
+        self.assertEqual(env['PYSPARK_PYTHON'], './python-wrapper.sh')
+
+
+    def test_setup_wrapper_script_in_cluster_mode(self):
+        env, runner = self._env_and_runner(
+            '--setup', 'true', '--spark-deploy-mode', 'cluster')
+
+        # in cluster mode, treat driver same as executor
+        self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
+        self.assertEqual(env['PYSPARK_PYTHON'], './python-wrapper.sh')
+
+    def test_setup_wrapper_requires_yarn(self):
+        env, runner = self._env_and_runner(
+            '--setup', 'true', '--spark-master', 'local')
+
+        self.assertIsNone(runner._spark_python_wrapper_path)
+        self.assertTrue(self.log.warning.called)
+
+        self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
+        self.assertEqual(env['PYSPARK_PYTHON'], PYTHON_BIN)

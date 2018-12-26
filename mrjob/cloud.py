@@ -18,9 +18,9 @@ import os
 import pipes
 import socket
 import random
+import signal
 import time
 from os.path import basename
-from signal import SIGKILL
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -547,7 +547,11 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
             self._ssh_proc.stderr.close()
 
             try:
-                os.kill(self._ssh_proc.pid, SIGKILL)
+                if hasattr(signal, 'SIGKILL'):
+                    os.kill(self._ssh_proc.pid, signal.SIGKILL)
+                else:
+                    # Windows doesn't have SIGKILL, see #1892
+                    os.kill(self._ssh_proc.pid, signal.SIGABRT)
             except Exception as e:
                 log.exception(e)
 

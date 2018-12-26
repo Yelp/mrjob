@@ -1291,6 +1291,22 @@ class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='ourpy')))
 
+    def test_spark_cmdenv_method(self):
+        # test that _spark_submit_args() uses _spark_cmdenv(),
+        # so we can just test _spark_cmdenv() in other test cases
+        hard_coded_env = dict(FOO='bar')
+
+        self.start(patch('mrjob.local.LocalMRJobRunner._spark_cmdenv',
+                         return_value=hard_coded_env, create=True))
+
+        job = MRNullSpark(['-r', 'local'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                self._expected_conf_args(cmdenv=hard_coded_env))
+
     def test_jobconf(self):
         job = MRNullSpark(['-r', 'local',
                            '-D', 'spark.executor.memory=10g'])

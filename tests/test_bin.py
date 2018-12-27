@@ -1547,6 +1547,8 @@ class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
                 )
             )
 
+    # TODO: test upload args from setup script
+
     def _mock_upload_mgr(self):
         def mock_uri(path):
             return '<uri of %s>' % path
@@ -1761,6 +1763,25 @@ class SparkPythonSetupWrapperTestCase(MockHadoopTestCase):
         # should wrap python
         self.assertIn('%s "$@"' % PYTHON_BIN, content)
 
+    def test_file_interpolation(self):
+        makefile_path = self.makefile('Makefile')
+
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'make -f %s#' % makefile_path])
+
+        self.assertIn('make -f $__mrjob_PWD/Makefile', content)
+
+    def test_no_py_files_in_setup(self):
+        # no need to add py_files to setup because Spark has --py-files
+        py_file = self.makefile('alexandria.zip')
+
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg',
+                          '--py-files', py_file])
+
+        self.assertIn('echo blarg', content)
+        self.assertNotIn('alexandria', content)
+
     def test_spark_jar(self):
         jar_path = self.makefile('dora.jar')
 
@@ -1785,5 +1806,3 @@ class SparkPythonSetupWrapperTestCase(MockHadoopTestCase):
 
         self.assertIsNone(self._get_python_wrapper_content(
             MRJustAJar, ['--jar', jar_path, '--setup', 'true']))
-
-    # TODO: test interpolation of files, py_files, non-YARN masters

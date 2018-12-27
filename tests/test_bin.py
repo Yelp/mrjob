@@ -30,6 +30,7 @@ from mrjob.py2 import PY2
 from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
+from mrjob.util import cmd_line
 
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_cmd_job import MRCmdJob
@@ -59,6 +60,16 @@ if PY2:
     PYTHON_BIN = 'python'
 else:
     PYTHON_BIN = 'python3'
+
+
+def _mock_upload_mgr():
+    def mock_uri(path):
+        return '<uri of %s>' % path
+
+    m = Mock()
+    m.uri = Mock(side_effect=mock_uri)
+
+    return m
 
 
 class AllowSparkOnLocalRunnerTestCase(SandboxedTestCase):
@@ -1504,7 +1515,7 @@ class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._upload_mgr = self._mock_upload_mgr()
+            runner._upload_mgr = _mock_upload_mgr()
 
             self.assertEqual(
                 runner._spark_submit_args(0), (
@@ -1534,7 +1545,7 @@ class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._upload_mgr = self._mock_upload_mgr()
+            runner._upload_mgr = _mock_upload_mgr()
 
             self.assertEqual(
                 runner._spark_submit_args(0), (
@@ -1547,16 +1558,24 @@ class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
                 )
             )
 
-    # TODO: test upload args from setup script
+    def test_override_spark_upload_args(self):
+        # just confirm that _spark_submit_args() uses _spark_upload_args()
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_upload_args',
+                         return_value=['--files', 'foo,bar']))
 
-    def _mock_upload_mgr(self):
-        def mock_uri(path):
-            return '<uri of %s>' % path
+        job = MRNullSpark(['-r', 'local'])
+        job.sandbox()
 
-        m = Mock()
-        m.uri = Mock(side_effect=mock_uri)
-
-        return m
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')
+                    ) + [
+                        '--files', 'foo,bar',
+                    ]
+                )
+            )
 
     def test_py_files(self):
         job = MRNullSpark(['-r', 'local'])
@@ -1720,6 +1739,69 @@ class PySparkPythonTestCase(MockHadoopTestCase):
 
         self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
         self.assertEqual(env['PYSPARK_PYTHON'], PYTHON_BIN)
+
+
+class SparkUploadArgsTestCase(MockHadoopTestCase):
+
+    def setUp(self):
+        super(SparkUploadArgsTestCase, self).setUp()
+
+        # catch warning about lack of setup script support on non-YARN Spark
+        self.log = self.start(patch('mrjob.bin.log'))
+
+    def test_no_setup(self):
+        job = MRNullSpark(['-r', 'hadoop', '--file', 'foo'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = _mock_upload_mgr()
+            runner._create_setup_wrapper_scripts()
+
+            upload_args = cmd_line(runner._spark_upload_args())
+
+            self.assertIn('#foo', upload_args)
+
+    def test_setup_interpolation(self):
+        job = MRNullSpark(
+            ['-r', 'hadoop',
+             '--setup', 'make -f Makefile#',
+             '--file', 'foo',
+             ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = _mock_upload_mgr()
+            runner._create_setup_wrapper_scripts()
+
+            upload_args = cmd_line(runner._spark_upload_args())
+
+            self.assertIn('#Makefile', upload_args)
+            self.assertIn('#python-wrapper.sh', upload_args)
+            self.assertIn('#foo', upload_args)
+
+            self.assertFalse(self.log.warning.called)
+
+    def test_setup_disabled(self):
+        job = MRNullSpark(
+            ['-r', 'hadoop',
+             '--setup', 'make -f Makefile#',
+             '--file', 'foo',
+             '--spark-master', 'local',
+             ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = _mock_upload_mgr()
+            runner._create_setup_wrapper_scripts()
+
+            upload_args = cmd_line(runner._spark_upload_args())
+
+            self.assertIn('#foo', upload_args)
+
+            self.assertNotIn('#Makefile', upload_args)
+            self.assertNotIn('#python-wrapper.sh', upload_args)
+
+            self.assertTrue(self.log.warning.called)
 
 
 class SparkPythonSetupWrapperTestCase(MockHadoopTestCase):

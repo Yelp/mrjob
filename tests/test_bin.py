@@ -34,6 +34,7 @@ from mrjob.step import OUTPUT
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_filter_job import MRFilterJob
+from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_no_runner import MRNoRunner
 from tests.mr_null_spark import MRNullSpark
@@ -1700,7 +1701,6 @@ class PySparkPythonTestCase(MockHadoopTestCase):
         self.assertEqual(env['PYSPARK_DRIVER_PYTHON'], PYTHON_BIN)
         self.assertEqual(env['PYSPARK_PYTHON'], './python-wrapper.sh')
 
-
     def test_setup_wrapper_script_in_cluster_mode(self):
         env, runner = self._env_and_runner(
             '--setup', 'true', '--spark-deploy-mode', 'cluster')
@@ -1718,3 +1718,72 @@ class PySparkPythonTestCase(MockHadoopTestCase):
 
         self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
         self.assertEqual(env['PYSPARK_PYTHON'], PYTHON_BIN)
+
+
+class SparkPythonSetupWrapperTestCase(MockHadoopTestCase):
+
+    def setUp(self):
+        super(SparkPythonSetupWrapperTestCase, self).setUp()
+
+        # catch warning about lack of setup script support on non-YARN Spark
+        self.log = self.start(patch('mrjob.bin.log'))
+
+    def _get_python_wrapper_content(self, job_class, args):
+        job = job_class(['-r', 'hadoop'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._create_setup_wrapper_scripts()
+
+            if runner._spark_python_wrapper_path:
+                with open(runner._spark_python_wrapper_path) as f:
+                    return f.read()
+            else:
+                return None
+
+    def test_default(self):
+        self.assertIsNone(self._get_python_wrapper_content(
+            MRNullSpark, []))
+
+    def test_basic_setup(self):
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg'])
+        self.assertIsNotNone(content)
+
+        # should have shebang
+        first_line = content.split('\n')[0]
+        self.assertTrue(first_line.startswith('#!'))
+        self.assertIn('sh -ex', first_line)
+
+        # should contain command
+        self.assertIn('echo blarg', content)
+
+        # should wrap python
+        self.assertIn('%s "$@"' % PYTHON_BIN, content)
+
+    def test_spark_jar(self):
+        jar_path = self.makefile('dora.jar')
+
+        # no spark python wrapper because no python
+        self.assertIsNone(self._get_python_wrapper_content(
+            MRSparkJar, ['--jar', jar_path, '--setup', 'true']))
+
+    def test_spark_script(self):
+        script_path = self.makefile('ml.py')
+
+        self.assertIsNotNone(self._get_python_wrapper_content(
+            MRSparkScript, ['--script', script_path, '--setup', 'true']))
+
+    def test_streaming_job(self):
+        # no spark python wrapper because no spark
+        self.assertIsNone(self._get_python_wrapper_content(
+            MRTwoStepJob, ['--setup', 'true']))
+
+    def test_jar_job(self):
+        # no spark or python
+        jar_path = self.makefile('dora.jar')
+
+        self.assertIsNone(self._get_python_wrapper_content(
+            MRJustAJar, ['--jar', jar_path, '--setup', 'true']))
+
+    # TODO: test interpolation of files, py_files, non-YARN masters

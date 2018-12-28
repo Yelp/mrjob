@@ -19,6 +19,7 @@
 import json
 import logging
 import os
+import os.path
 import pipes
 import re
 import sys
@@ -103,6 +104,22 @@ class MRJobBinRunner(MRJobRunner):
                 sh_bin=['/bin/sh', '-ex'],
             )
         )
+
+    def _fix_opt(self, opt_key, opt_value, source):
+        """Check sh_bin"""
+        opt_value = super(MRJobBinRunner, self)._fix_opt(
+            opt_key, opt_value, source)
+
+        if opt_key == 'sh_bin':
+            if len(opt_value) == 0:
+                raise ValueError('sh_bin (from %s) may not be empty!' % source)
+
+            # make this a hard requirement in v0.7.0?
+            if len(opt_value) > 1 and not os.path.isabs(opt_value[0]):
+                log.warning('sh_bin (from %s) should use an absolute path'
+                            ' if you want it to take arguments')
+
+        return opt_value
 
     def _load_steps(self):
         args = (self._executable(True) + ['--steps'] +
@@ -552,9 +569,15 @@ class MRJobBinRunner(MRJobRunner):
         if wrap_python:
             # start with shebang
             sh_bin = self._sh_bin()
-            if not sh_bin[0].startswith('/'):
-                sh_bin = ['/usr/bin/env'] + sh_bin
-            lines.append('#!' + cmd_line(sh_bin))
+
+            if os.path.isabs(sh_bin[0]):
+                shebang_bin = sh_bin
+            else:
+                # Linux only allows one argument to shebangs
+                # (warning already issued by :py:meth:`_fix_opt`
+                shebang_bin = ['/usr/bin/env', sh_bin[0]]
+
+            lines.append('#!%s' % cmd_line(shebang_bin))
 
         # hook for 'set -e', etc.
         pre_commands = self._sh_pre_commands()

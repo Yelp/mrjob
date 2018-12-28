@@ -1888,3 +1888,34 @@ class SparkPythonSetupWrapperTestCase(MockHadoopTestCase):
 
         self.assertIsNone(self._get_python_wrapper_content(
             MRJustAJar, ['--jar', jar_path, '--setup', 'true']))
+
+
+class ShBinValidationTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(ShBinValidationTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.bin.log'))
+
+    def test_empty_sh_bin(self):
+        self.assertRaises(ValueError, MRJobBinRunner, sh_bin=[])
+
+    def test_absolute_sh_bin(self):
+        runner = MRJobBinRunner(sh_bin=['/bin/zsh'])
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_absolute_sh_bin_with_args(self):
+        runner = MRJobBinRunner(sh_bin=['/bin/zsh', '-v'])
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_relative_sh_bin(self):
+        runner = MRJobBinRunner(sh_bin=['zsh'])
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_relative_sh_bin_with_args(self):
+        runner = MRJobBinRunner(sh_bin=['zsh', '-v'])
+
+        self.assertTrue(self.log.warning.called)

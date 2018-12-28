@@ -380,7 +380,7 @@ Job execution context
     :switch: --sh-bin
     :type: :ref:`command <data-type-command>`
     :set: all
-    :default: :command:`sh -ex` (with exceptions below)
+    :default: :command:`/bin/sh -ex`
 
     Name/path of alternate shell binary to use for :mrjob-opt:`setup` and
     :mrjob-opt:`bootstrap`. Needs to be backwards compatible with
@@ -390,15 +390,17 @@ Job execution context
     one command into another (see e.g.
     :py:meth:`~mrjob.job.MRJob.mapper_pre_filter`).
 
-    On Dataproc and EMR, this defaults to :command:`/bin/sh -ex`.
-
     .. versionchanged:: 0.5.9
 
-       Starting with EMR AMI 5.2.0, :command:`sh -e` is broken, so we
+       Starting with EMR AMI 5.2.0, :command:`/bin/sh -e` is broken, so we
        emulate the :command:`-e` switch by using :command:`/bin/sh -x` as our
        shell, and prepending :command:`set -e` to any shell script generated
        by mrjob. :command:`set -e` is not prepended if you
        set *sh_bin* yourself; you could add it with :mrjob-opt:`setup`.
+
+    .. versionchanged:: 0.6.7
+
+       Used to be :command:`sh -ex` on local and Hadoop runners
 
 .. mrjob-opt::
     :config: steps_interpreter

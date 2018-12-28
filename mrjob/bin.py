@@ -100,7 +100,7 @@ class MRJobBinRunner(MRJobRunner):
             super(MRJobBinRunner, self)._default_opts(),
             dict(
                 read_logs=True,
-                sh_bin=['sh', '-ex'],
+                sh_bin=['/bin/sh', '-ex'],
             )
         )
 

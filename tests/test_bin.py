@@ -475,7 +475,7 @@ class RenderSubstepTestCase(SandboxedTestCase):
             # note that local mode uses sys.executable, not python/python3
             self.assertEqual(
                 runner._render_substep(0, 'mapper'),
-                'sh -ex setup-wrapper.sh %s mr_two_step_job.py'
+                '/bin/sh -ex setup-wrapper.sh %s mr_two_step_job.py'
                 ' --step-num=0 --mapper' % sys.executable
             )
 
@@ -526,7 +526,7 @@ class RenderSubstepTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._render_substep(0, mrc),
-                "sh -ex -c 'cat |"
+                "/bin/sh -ex -c 'cat |"
                 " %s mr_filter_job.py --step-num=0 --%s"
                 " --%s-filter cat'" %
                 (sys.executable, mrc, mrc))
@@ -567,7 +567,7 @@ class RenderSubstepTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._render_substep(0, 'mapper'),
-                "sh -ex -c 'set -v;"
+                "/bin/sh -ex -c 'set -v;"
                 " cat | %s mr_filter_job.py --step-num=0 --mapper"
                 " --mapper-filter cat'" % sys.executable)
 

@@ -355,7 +355,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 master_instance_type=_DEFAULT_INSTANCE_TYPE,
                 num_core_instances=_DATAPROC_MIN_WORKERS,
                 num_task_instances=0,
-                sh_bin=['/bin/sh', '-ex'],
             )
         )
 

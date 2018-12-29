@@ -1836,14 +1836,42 @@ class SparkPythonSetupWrapperTestCase(MockHadoopTestCase):
 
         # should have shebang
         first_line = content.split('\n')[0]
-        self.assertTrue(first_line.startswith('#!'))
-        self.assertIn('sh -ex', first_line)
+        self.assertEqual(first_line, ('#!/bin/sh -ex'))
+        self.assertFalse(self.log.warning.called)
 
         # should contain command
         self.assertIn('echo blarg', content)
 
         # should wrap python
         self.assertIn('%s "$@"' % PYTHON_BIN, content)
+
+    def test_env_shebang(self):
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg', '--sh-bin', 'zsh'])
+        self.assertIsNotNone(content)
+
+        first_line = content.split('\n')[0]
+        self.assertEqual(first_line, ('#!/usr/bin/env zsh'))
+        self.assertFalse(self.log.warning.called)
+
+    def test_cut_off_second_sh_bin_arg(self):
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg',
+                          '--sh-bin', '/bin/sh -v -ex'])
+        self.assertIsNotNone(content)
+
+        first_line = content.split('\n')[0]
+        self.assertEqual(first_line, ('#!/bin/sh -v'))
+        self.assertTrue(self.log.warning.called)
+
+    def test_no_args_for_env_shebang(self):
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg', '--sh-bin', 'bash -v'])
+        self.assertIsNotNone(content)
+
+        first_line = content.split('\n')[0]
+        self.assertEqual(first_line, ('#!/usr/bin/env bash'))
+        self.assertTrue(self.log.warning.called)
 
     def test_file_interpolation(self):
         makefile_path = self.makefile('Makefile')

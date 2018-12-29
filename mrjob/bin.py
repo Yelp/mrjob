@@ -28,6 +28,7 @@ from subprocess import PIPE
 
 import mrjob.step
 from mrjob.compat import translate_jobconf
+from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.py2 import PY2
@@ -111,14 +112,16 @@ class MRJobBinRunner(MRJobRunner):
             opt_key, opt_value, source)
 
         if opt_key == 'sh_bin':
-            if len(opt_value) == 0:
-                raise ValueError('sh_bin (from %s) may not be empty!' % source)
+            # opt_value is usually a string, combiner makes it a list of args
+            sh_bin = combine_cmds(opt_value)
 
-            # make this a hard requirement in v0.7.0?
-            if len(opt_value) > 1 and not os.path.isabs(opt_value[0]):
+            if len(sh_bin) == 0:
+                raise ValueError('sh_bin (from %s) may not be empty!' % source)
+            # make these hard requirements in v0.7.0?
+            elif len(sh_bin) > 1 and not os.path.isabs(sh_bin[0]):
                 log.warning('sh_bin (from %s) should use an absolute path'
                             ' if you want it to take arguments' % source)
-            elif len(opt_value) > 2:
+            elif len(sh_bin) > 2:
                 log.warning('sh_bin (from %s) should not take more than one'
                             ' argument' % source)
 

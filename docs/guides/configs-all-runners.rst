@@ -384,9 +384,12 @@ Job execution context
 
     Name/path of alternate shell binary to use for :mrjob-opt:`setup` and
     :mrjob-opt:`bootstrap`. Needs to be backwards compatible with
-    Bourne Shell (e.g. :command:`bash`, :command:`zsh`). If you want
-    to add arguments, use an absolute path (:command:`/bin/bash -x`, not
-    :command:`bash -x`).
+    Bourne Shell (e.g. :command:`bash`, :command:`zsh`).
+
+    If you want to add an argument, use an absolute path
+    (:command:`/bin/bash -x`, not :command:`bash -x`). Please do not pass
+    multiple args to your shell binary (this plays poorly with Linux
+    shebang syntax).
 
     This is also used to wrap mappers, reducers, etc. that require piping
     one command into another (see e.g.

@@ -117,7 +117,10 @@ class MRJobBinRunner(MRJobRunner):
             # make this a hard requirement in v0.7.0?
             if len(opt_value) > 1 and not os.path.isabs(opt_value[0]):
                 log.warning('sh_bin (from %s) should use an absolute path'
-                            ' if you want it to take arguments')
+                            ' if you want it to take arguments' % source)
+            elif len(opt_value) > 2:
+                log.warning('sh_bin (from %s) should not take more than one'
+                            ' argument' % source)
 
         return opt_value
 

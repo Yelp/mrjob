@@ -1905,17 +1905,22 @@ class ShBinValidationTestCase(SandboxedTestCase):
 
         self.assertFalse(self.log.warning.called)
 
-    def test_absolute_sh_bin_with_args(self):
+    def test_absolute_sh_bin_with_one_arg(self):
         runner = MRJobBinRunner(sh_bin=['/bin/zsh', '-v'])
 
         self.assertFalse(self.log.warning.called)
+
+    def test_absolute_sh_bin_with_two_args(self):
+        runner = MRJobBinRunner(sh_bin=['/bin/zsh', '-v', '-x'])
+
+        self.assertTrue(self.log.warning.called)
 
     def test_relative_sh_bin(self):
         runner = MRJobBinRunner(sh_bin=['zsh'])
 
         self.assertFalse(self.log.warning.called)
 
-    def test_relative_sh_bin_with_args(self):
+    def test_relative_sh_bin_with_one_arg(self):
         runner = MRJobBinRunner(sh_bin=['zsh', '-v'])
 
         self.assertTrue(self.log.warning.called)

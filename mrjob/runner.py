@@ -48,6 +48,7 @@ from mrjob.setup import parse_legacy_hash_path
 from mrjob.step import OUTPUT
 from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
+from mrjob.step import _is_pyspark_step_type
 from mrjob.util import to_lines
 
 
@@ -242,8 +243,8 @@ class MRJobRunner(object):
         # set of dir_archives that have actually been created
         self._dir_archives_created = set()
 
-        # track (name, path) of files and archives to upload to spark.
-        # these are a subset of those in self._working_dir_mgr
+        # track (name, path) of files and archives to upload to spark
+        # if not using a setup script.
         self._spark_files = []
         self._spark_archives = []
 
@@ -875,9 +876,27 @@ class MRJobRunner(object):
         """Does the first step take an input manifest?"""
         return bool(self._get_step(0).get('input_manifest'))
 
+    def _has_streaming_steps(self):
+        """Are any of our steps Hadoop Streaming steps?"""
+        return any(step['type'] == 'streaming'
+                   for step in self._get_steps())
+
     def _has_spark_steps(self):
-        """Are any of our steps Spark steps (either spark or spark_script)"""
+        """Are any of our steps Spark steps? (e.g. spark, spark_jar,
+        spark_script)
+
+        Generally used to determine if we need to install Spark on a cluster.
+        """
         return any(_is_spark_step_type(step['type'])
+                   for step in self._get_steps())
+
+    def _has_pyspark_steps(self):
+        """Do any of our steps involve running Python on Spark?
+        Includes spark and spark_script types, but not spark_jar.
+
+        Generally used to tell if we need a Spark setup script.
+        """
+        return any(_is_pyspark_step_type(step['type'])
                    for step in self._get_steps())
 
     def _args_for_task(self, step_num, mrc):

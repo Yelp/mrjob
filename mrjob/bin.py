@@ -19,6 +19,7 @@
 import json
 import logging
 import os
+import os.path
 import pipes
 import re
 import sys
@@ -27,6 +28,7 @@ from subprocess import PIPE
 
 import mrjob.step
 from mrjob.compat import translate_jobconf
+from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.py2 import PY2
@@ -69,10 +71,16 @@ class MRJobBinRunner(MRJobRunner):
         # we'll create the setup wrapper scripts later
         self._setup_wrapper_script_path = None
         self._manifest_setup_script_path = None
+        self._spark_python_wrapper_path = None
 
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmd() for details
         self._setup = [parse_setup_cmd(cmd) for cmd in self._opts['setup']]
+
+        if self._setup and self._has_pyspark_steps() and not (
+                self._spark_setup_is_supported()):
+            log.warning("setup commands aren't supported on Spark master %r" %
+                        self._spark_master())
 
         for cmd in self._setup:
             for token in cmd:
@@ -97,6 +105,27 @@ class MRJobBinRunner(MRJobRunner):
                 sh_bin=['/bin/sh', '-ex'],
             )
         )
+
+    def _fix_opt(self, opt_key, opt_value, source):
+        """Check sh_bin"""
+        opt_value = super(MRJobBinRunner, self)._fix_opt(
+            opt_key, opt_value, source)
+
+        if opt_key == 'sh_bin':
+            # opt_value is usually a string, combiner makes it a list of args
+            sh_bin = combine_cmds(opt_value)
+
+            if len(sh_bin) == 0:
+                raise ValueError('sh_bin (from %s) may not be empty!' % source)
+            # make these hard requirements in v0.7.0?
+            elif len(sh_bin) > 1 and not os.path.isabs(sh_bin[0]):
+                log.warning('sh_bin (from %s) should use an absolute path'
+                            ' if you want it to take arguments' % source)
+            elif len(sh_bin) > 2:
+                log.warning('sh_bin (from %s) should not take more than one'
+                            ' argument' % source)
+
+        return opt_value
 
     def _load_steps(self):
         args = (self._executable(True) + ['--steps'] +
@@ -407,7 +436,6 @@ class MRJobBinRunner(MRJobRunner):
 
         return py_files
 
-    # TODO: rename to _setup_wrapper_scripts()
     def _create_setup_wrapper_scripts(self):
         """Create the setup wrapper script, and write it into our local temp
         directory (by default, to a file named setup-wrapper.sh).
@@ -421,34 +449,72 @@ class MRJobBinRunner(MRJobRunner):
         If *local* is true, use local line endings (e.g. Windows). Otherwise,
         use UNIX line endings (see #1071).
         """
-        setup = self._setup
+        if self._has_streaming_steps():
+            streaming_setup = self._py_files_setup() + self._setup
 
-        # add py_files
+            if streaming_setup and not self._setup_wrapper_script_path:
+
+                self._setup_wrapper_script_path = self._write_setup_script(
+                    streaming_setup, 'setup-wrapper.sh',
+                    'streaming setup wrapper script')
+
+            if (self._uses_input_manifest() and not
+                    self._manifest_setup_script_path):
+
+                self._manifest_setup_script_path = self._write_setup_script(
+                    streaming_setup, 'manifest-setup.sh',
+                    'manifest setup wrapper script',
+                    manifest=True)
+
+        if (self._uses_spark_setup_script() and not
+                self._spark_python_wrapper_path):
+
+            self._spark_python_wrapper_path = self._write_setup_script(
+                self._setup,
+                'python-wrapper.sh', 'Spark Python wrapper script',
+                wrap_python=True)
+
+    def _uses_spark_setup_script(self):
+        if not self._has_pyspark_steps():
+            return False
+
+        if not self._setup:
+            return False  # nothing to do
+
+        if not self._spark_setup_is_supported():
+            return False
+
+        return True
+
+    def _spark_setup_is_supported(self):
+        """Can we run setup scripts on Spark?"""
+        # for now, we only support setup scripts on YARN (see #1376)
+        return self._spark_master() == 'yarn'
+
+    def _py_files_setup(self):
+        """A list of additional setup commands to emulate Spark's
+        --py-files option on Hadoop Streaming."""
+        result = []
+
         for py_file in self._py_files():
             path_dict = {'type': 'file', 'name': None, 'path': py_file}
             self._working_dir_mgr.add(**path_dict)
-            setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
+            result.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 
-        if setup and not self._setup_wrapper_script_path:
+        return result
 
-            contents = self._setup_wrapper_script_content(setup)
-            path = os.path.join(self._get_local_tmp_dir(), 'setup-wrapper.sh')
+    def _write_setup_script(self, setup, filename, desc,
+                            manifest=False, wrap_python=False):
+        """Write a setup script and return its path."""
+        contents = self._setup_wrapper_script_content(
+            setup, manifest=manifest, wrap_python=wrap_python)
 
-            self._write_script(contents, path, 'setup wrapper script')
+        path = os.path.join(self._get_local_tmp_dir(), filename)
+        self._write_script(contents, path, desc)
 
-            self._setup_wrapper_script_path = path
-            self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
+        self._working_dir_mgr.add('file', path)
 
-        if (self._uses_input_manifest() and not
-                self._manifest_setup_script_path):
-
-            contents = self._setup_wrapper_script_content(setup, manifest=True)
-            path = os.path.join(self._get_local_tmp_dir(), 'manifest-setup.sh')
-
-            self._write_script(contents, path, 'manifest setup script')
-
-            self._manifest_setup_script_path = path
-            self._working_dir_mgr.add('file', self._manifest_setup_script_path)
+        return path
 
     def _create_mrjob_zip(self):
         """Make a zip of the mrjob library, without .pyc or .pyo files,
@@ -492,7 +558,8 @@ class MRJobBinRunner(MRJobRunner):
 
         return self._mrjob_zip_path
 
-    def _setup_wrapper_script_content(self, setup, manifest=False):
+    def _setup_wrapper_script_content(
+            self, setup, manifest=False, wrap_python=False):
         """Return a (Bourne) shell script that runs the setup commands and then
         executes whatever is passed to it (this will be our mapper/reducer),
         as a list of strings (one for each line, including newlines).
@@ -502,6 +569,25 @@ class MRJobBinRunner(MRJobRunner):
         :command:`make` on a shared source code archive, for example).
         """
         lines = []
+
+        # TODO: this is very similar to _start_of_sh_script() in cloud.py
+
+        if wrap_python:
+            # start with shebang
+            sh_bin = self._sh_bin()
+
+            if os.path.isabs(sh_bin[0]):
+                shebang_bin = sh_bin
+            else:
+                shebang_bin = ['/usr/bin/env'] + list(sh_bin)
+
+            if len(shebang_bin) > 2:
+                # Linux limits shebang to one binary and one arg
+                shebang_bin = shebang_bin[:2]
+                log.warning('Limiting shebang to two arguments:'
+                            '#!%s' % cmd_line(shebang_bin))
+
+            lines.append('#!%s' % cmd_line(shebang_bin))
 
         # hook for 'set -e', etc.
         pre_commands = self._sh_pre_commands()
@@ -513,11 +599,17 @@ class MRJobBinRunner(MRJobRunner):
         if setup:
             lines.extend(self._setup_cmd_content(setup))
 
-        # we're always going to execute this script as an argument to
-        # sh, so there's no need to add a shebang (e.g. #!/bin/sh)
-        if manifest:
+        # handle arguments to the script
+        if wrap_python:
+            # pretend to be python ($@ is arguments to the python binary)
+            python_bin = self._task_python_bin()
+            lines.append('%s "$@"' % cmd_line(python_bin))
+        elif manifest:
+            # arguments ($@) are a command
+            # eventually runs: "$@" $INPUT_PATH $INPUT_URI
             lines.extend(self._manifest_download_content())
         else:
+            # arguments ($@) are a command, just run it
             lines.append('"$@"')
 
         return lines
@@ -809,11 +901,17 @@ class MRJobBinRunner(MRJobRunner):
         return self._opts.get('spark_deploy_mode') or None
 
     def _spark_upload_args(self):
-        return self._upload_args_helper('--files', self._spark_files,
-                                        '--archives', self._spark_archives)
+        # if using a setup script, upload all files to working dir
+        if self._spark_python_wrapper_path:
+            return self._upload_args_helper('--files', None,
+                                            '--archives', None)
+        else:
+            # otherwise, just pass through --files and --archives
+            return self._upload_args_helper('--files', self._spark_files,
+                                            '--archives', self._spark_archives)
 
     def _spark_script_path(self, step_num):
-        """The path of the spark script or har, used by
+        """The path of the spark script or JAR, used by
         _args_for_spark_step()."""
         step = self._get_step(step_num)
 
@@ -842,7 +940,25 @@ class MRJobBinRunner(MRJobRunner):
         cmdenv = {}
 
         if step['type'] in ('spark', 'spark_script'):  # not spark_jar
-            cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
+            driver_python = cmd_line(self._python_bin())
+
+            if self._spark_python_wrapper_path:
+                executor_python = './%s' % self._working_dir_mgr.name(
+                    'file', self._spark_python_wrapper_path)
+            else:
+                executor_python = cmd_line(self._task_python_bin())
+
+            if self._spark_deploy_mode() == 'cluster':
+                # treat driver like executors (they run in same environment)
+                cmdenv['PYSPARK_PYTHON'] = executor_python
+            elif driver_python == executor_python:
+                # no difference, just set $PYSPARK_PYTHON
+                cmdenv['PYSPARK_PYTHON'] = driver_python
+            else:
+                # set different pythons for driver and executor
+                cmdenv['PYSPARK_PYTHON'] = executor_python
+                cmdenv['PYSPARK_DRIVER_PYTHON'] = driver_python
+
         cmdenv.update(self._opts['cmdenv'])
         return cmdenv
 

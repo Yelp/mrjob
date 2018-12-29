@@ -30,9 +30,12 @@ from mrjob.py2 import PY2
 from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
+from mrjob.util import cmd_line
 
+from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_filter_job import MRFilterJob
+from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_no_runner import MRNoRunner
 from tests.mr_null_spark import MRNullSpark
@@ -57,6 +60,16 @@ if PY2:
     PYTHON_BIN = 'python'
 else:
     PYTHON_BIN = 'python3'
+
+
+def _mock_upload_mgr():
+    def mock_uri(path):
+        return '<uri of %s>' % path
+
+    m = Mock()
+    m.uri = Mock(side_effect=mock_uri)
+
+    return m
 
 
 class AllowSparkOnLocalRunnerTestCase(SandboxedTestCase):
@@ -1291,6 +1304,22 @@ class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='ourpy')))
 
+    def test_spark_cmdenv_method(self):
+        # test that _spark_submit_args() uses _spark_cmdenv(),
+        # so we can just test _spark_cmdenv() in other test cases
+        hard_coded_env = dict(FOO='bar')
+
+        self.start(patch('mrjob.local.LocalMRJobRunner._spark_cmdenv',
+                         return_value=hard_coded_env, create=True))
+
+        job = MRNullSpark(['-r', 'local'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                self._expected_conf_args(cmdenv=hard_coded_env))
+
     def test_jobconf(self):
         job = MRNullSpark(['-r', 'local',
                            '-D', 'spark.executor.memory=10g'])
@@ -1486,7 +1515,7 @@ class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._upload_mgr = self._mock_upload_mgr()
+            runner._upload_mgr = _mock_upload_mgr()
 
             self.assertEqual(
                 runner._spark_submit_args(0), (
@@ -1516,7 +1545,7 @@ class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._upload_mgr = self._mock_upload_mgr()
+            runner._upload_mgr = _mock_upload_mgr()
 
             self.assertEqual(
                 runner._spark_submit_args(0), (
@@ -1529,14 +1558,24 @@ class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
                 )
             )
 
-    def _mock_upload_mgr(self):
-        def mock_uri(path):
-            return '<uri of %s>' % path
+    def test_override_spark_upload_args(self):
+        # just confirm that _spark_submit_args() uses _spark_upload_args()
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_upload_args',
+                         return_value=['--files', 'foo,bar']))
 
-        m = Mock()
-        m.uri = Mock(side_effect=mock_uri)
+        job = MRNullSpark(['-r', 'local'])
+        job.sandbox()
 
-        return m
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')
+                    ) + [
+                        '--files', 'foo,bar',
+                    ]
+                )
+            )
 
     def test_py_files(self):
         job = MRNullSpark(['-r', 'local'])
@@ -1627,3 +1666,289 @@ class CreateMrjobZipTestCase(SandboxedTestCase):
         self.assertTrue(
             compileall.compile_dir(os.path.join(self.tmp_dir, 'mrjob'),
                                    quiet=1))
+
+
+class PySparkPythonTestCase(MockHadoopTestCase):
+
+    # using MockHadoopTestCase just so we don't inadvertently call
+    # subprocesses
+
+    def setUp(self):
+        super(PySparkPythonTestCase, self).setUp()
+
+        # catch warning about lack of setup script support on non-YARN Spark
+        self.log = self.start(patch('mrjob.bin.log'))
+
+    def _env_and_runner(self, *args):
+        job = MRNullSpark(['-r', 'hadoop'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._create_setup_wrapper_scripts()
+
+            return runner._spark_cmdenv(0), runner
+
+    def test_default(self):
+        env, runner = self._env_and_runner()
+
+        self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
+        self.assertEqual(env['PYSPARK_PYTHON'], PYTHON_BIN)
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_custom_python_bin(self):
+        env, runner = self._env_and_runner('--python-bin', 'mypy')
+
+        self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
+        self.assertEqual(env['PYSPARK_PYTHON'], 'mypy')
+
+    def test_task_python_bin(self):
+        # should be possible to set different Pythons for driver and executor
+        env, runner = self._env_and_runner('--task-python-bin', 'mypy')
+
+        self.assertEqual(env['PYSPARK_DRIVER_PYTHON'], PYTHON_BIN)
+        self.assertEqual(env['PYSPARK_PYTHON'], 'mypy')
+
+    def test_setup_wrapper_script(self):
+        env, runner = self._env_and_runner('--setup', 'true')
+
+        # sanity-check master and deploy mode
+        self.assertEqual(runner._spark_master(), 'yarn')
+        self.assertEqual(runner._spark_deploy_mode(), 'client')
+
+        self.assertIsNotNone(runner._spark_python_wrapper_path)
+        self.assertFalse(self.log.warning.called)
+
+        self.assertEqual(env['PYSPARK_DRIVER_PYTHON'], PYTHON_BIN)
+        self.assertEqual(env['PYSPARK_PYTHON'], './python-wrapper.sh')
+
+    def test_setup_wrapper_script_in_cluster_mode(self):
+        env, runner = self._env_and_runner(
+            '--setup', 'true', '--spark-deploy-mode', 'cluster')
+
+        # in cluster mode, treat driver same as executor
+        self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
+        self.assertEqual(env['PYSPARK_PYTHON'], './python-wrapper.sh')
+
+    def test_setup_wrapper_requires_yarn(self):
+        env, runner = self._env_and_runner(
+            '--setup', 'true', '--spark-master', 'local')
+
+        self.assertIsNone(runner._spark_python_wrapper_path)
+        self.assertTrue(self.log.warning.called)
+
+        self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
+        self.assertEqual(env['PYSPARK_PYTHON'], PYTHON_BIN)
+
+
+class SparkUploadArgsTestCase(MockHadoopTestCase):
+
+    def setUp(self):
+        super(SparkUploadArgsTestCase, self).setUp()
+
+        # catch warning about lack of setup script support on non-YARN Spark
+        self.log = self.start(patch('mrjob.bin.log'))
+
+    def test_no_setup(self):
+        job = MRNullSpark(['-r', 'hadoop', '--file', 'foo'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = _mock_upload_mgr()
+            runner._create_setup_wrapper_scripts()
+
+            upload_args = cmd_line(runner._spark_upload_args())
+
+            self.assertIn('#foo', upload_args)
+
+    def test_setup_interpolation(self):
+        job = MRNullSpark(
+            ['-r', 'hadoop',
+             '--setup', 'make -f Makefile#',
+             '--file', 'foo',
+             ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = _mock_upload_mgr()
+            runner._create_setup_wrapper_scripts()
+
+            upload_args = cmd_line(runner._spark_upload_args())
+
+            self.assertIn('#Makefile', upload_args)
+            self.assertIn('#python-wrapper.sh', upload_args)
+            self.assertIn('#foo', upload_args)
+
+            self.assertFalse(self.log.warning.called)
+
+    def test_setup_disabled(self):
+        job = MRNullSpark(
+            ['-r', 'hadoop',
+             '--setup', 'make -f Makefile#',
+             '--file', 'foo',
+             '--spark-master', 'local',
+             ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = _mock_upload_mgr()
+            runner._create_setup_wrapper_scripts()
+
+            upload_args = cmd_line(runner._spark_upload_args())
+
+            self.assertIn('#foo', upload_args)
+
+            self.assertNotIn('#Makefile', upload_args)
+            self.assertNotIn('#python-wrapper.sh', upload_args)
+
+            self.assertTrue(self.log.warning.called)
+
+
+class SparkPythonSetupWrapperTestCase(MockHadoopTestCase):
+
+    def setUp(self):
+        super(SparkPythonSetupWrapperTestCase, self).setUp()
+
+        # catch warning about lack of setup script support on non-YARN Spark
+        self.log = self.start(patch('mrjob.bin.log'))
+
+    def _get_python_wrapper_content(self, job_class, args):
+        job = job_class(['-r', 'hadoop'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._create_setup_wrapper_scripts()
+
+            if runner._spark_python_wrapper_path:
+                with open(runner._spark_python_wrapper_path) as f:
+                    return f.read()
+            else:
+                return None
+
+    def test_default(self):
+        self.assertIsNone(self._get_python_wrapper_content(
+            MRNullSpark, []))
+
+    def test_basic_setup(self):
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg'])
+        self.assertIsNotNone(content)
+
+        # should have shebang
+        first_line = content.split('\n')[0]
+        self.assertEqual(first_line, ('#!/bin/sh -ex'))
+        self.assertFalse(self.log.warning.called)
+
+        # should contain command
+        self.assertIn('echo blarg', content)
+
+        # should wrap python
+        self.assertIn('%s "$@"' % PYTHON_BIN, content)
+
+    def test_env_shebang(self):
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg', '--sh-bin', 'zsh'])
+        self.assertIsNotNone(content)
+
+        first_line = content.split('\n')[0]
+        self.assertEqual(first_line, ('#!/usr/bin/env zsh'))
+        self.assertFalse(self.log.warning.called)
+
+    def test_cut_off_second_sh_bin_arg(self):
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg',
+                          '--sh-bin', '/bin/sh -v -ex'])
+        self.assertIsNotNone(content)
+
+        first_line = content.split('\n')[0]
+        self.assertEqual(first_line, ('#!/bin/sh -v'))
+        self.assertTrue(self.log.warning.called)
+
+    def test_no_args_for_env_shebang(self):
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg', '--sh-bin', 'bash -v'])
+        self.assertIsNotNone(content)
+
+        first_line = content.split('\n')[0]
+        self.assertEqual(first_line, ('#!/usr/bin/env bash'))
+        self.assertTrue(self.log.warning.called)
+
+    def test_file_interpolation(self):
+        makefile_path = self.makefile('Makefile')
+
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'make -f %s#' % makefile_path])
+
+        self.assertIn('make -f $__mrjob_PWD/Makefile', content)
+
+    def test_no_py_files_in_setup(self):
+        # no need to add py_files to setup because Spark has --py-files
+        py_file = self.makefile('alexandria.zip')
+
+        content = self._get_python_wrapper_content(
+            MRNullSpark, ['--setup', 'echo blarg',
+                          '--py-files', py_file])
+
+        self.assertIn('echo blarg', content)
+        self.assertNotIn('alexandria', content)
+
+    def test_spark_jar(self):
+        jar_path = self.makefile('dora.jar')
+
+        # no spark python wrapper because no python
+        self.assertIsNone(self._get_python_wrapper_content(
+            MRSparkJar, ['--jar', jar_path, '--setup', 'true']))
+
+    def test_spark_script(self):
+        script_path = self.makefile('ml.py')
+
+        self.assertIsNotNone(self._get_python_wrapper_content(
+            MRSparkScript, ['--script', script_path, '--setup', 'true']))
+
+    def test_streaming_job(self):
+        # no spark python wrapper because no spark
+        self.assertIsNone(self._get_python_wrapper_content(
+            MRTwoStepJob, ['--setup', 'true']))
+
+    def test_jar_job(self):
+        # no spark or python
+        jar_path = self.makefile('dora.jar')
+
+        self.assertIsNone(self._get_python_wrapper_content(
+            MRJustAJar, ['--jar', jar_path, '--setup', 'true']))
+
+
+class ShBinValidationTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(ShBinValidationTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.bin.log'))
+
+    def test_empty_sh_bin(self):
+        self.assertRaises(ValueError, MRJobBinRunner, sh_bin=[])
+
+    def test_absolute_sh_bin(self):
+        runner = MRJobBinRunner(sh_bin=['/bin/zsh'])
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_absolute_sh_bin_with_one_arg(self):
+        runner = MRJobBinRunner(sh_bin=['/bin/zsh', '-v'])
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_absolute_sh_bin_with_two_args(self):
+        runner = MRJobBinRunner(sh_bin=['/bin/zsh', '-v', '-x'])
+
+        self.assertTrue(self.log.warning.called)
+
+    def test_relative_sh_bin(self):
+        runner = MRJobBinRunner(sh_bin=['zsh'])
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_relative_sh_bin_with_one_arg(self):
+        runner = MRJobBinRunner(sh_bin=['zsh', '-v'])
+
+        self.assertTrue(self.log.warning.called)

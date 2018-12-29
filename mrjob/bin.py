@@ -573,9 +573,13 @@ class MRJobBinRunner(MRJobRunner):
             if os.path.isabs(sh_bin[0]):
                 shebang_bin = sh_bin
             else:
-                # Linux only allows one argument to shebangs
-                # (warning already issued by :py:meth:`_fix_opt`
-                shebang_bin = ['/usr/bin/env', sh_bin[0]]
+                shebang_bin = ['/usr/bin/env'] + list(sh_bin)
+
+            if len(shebang_bin) > 2:
+                # Linux limits shebang to one binary and one arg
+                shebang_bin = shebang_bin[:2]
+                log.warning('Limiting shebang to two arguments:'
+                            '#!%s' % cmd_line(shebang_bin))
 
             lines.append('#!%s' % cmd_line(shebang_bin))
 

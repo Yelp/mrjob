@@ -229,11 +229,6 @@ _EMR_STATUS_RUNNING = ('RUNNING', 'WAITING')
 _EMR_STATUS_TERMINATING = ('TERMINATING', 'TERMINATED',
                            'TERMINATED_WITH_ERRORS')
 
-# Approximate maximum time in seconds to wait while a new cluster is starting
-# and bootstrapping. This is approximate since we only wait to the closest
-# multiple of the option `check_cluster_every` rounded down.
-_NEW_CLUSTER_WAIT_TIME = 1200  # 20 minutes
-
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):

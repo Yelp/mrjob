@@ -1350,6 +1350,10 @@ def _runner_class(alias):
         from mrjob.emr import EMRJobRunner
         return EMRJobRunner
 
+    elif alias == 'yarnemr':
+        from mrjob.yarnemr import YarnEMRJobRunner
+        return YarnEMRJobRunner
+
     elif alias == 'hadoop':
         from mrjob.hadoop import HadoopJobRunner
         return HadoopJobRunner

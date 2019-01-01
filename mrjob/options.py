@@ -93,6 +93,7 @@ _RUNNER_ALIASES = {
     'inline',
     'local',
     'spark',
+    'yarnemr'
 }
 
 
@@ -692,6 +693,26 @@ _RUNNER_OPTS = dict(
                       ' by mrjob. Takes the form <param>=<value>, where value'
                       ' is JSON or a string. Use <param>=null to unset a'
                       ' parameter'),
+            )),
+        ],
+    ),
+    expected_cores=dict(
+        switches=[
+            (['--expected-cores'], dict(
+                help=('This specifies the expected number of cores needed for'
+                      ' the job to run. This is required by jobs scheduled via'
+                      ' YARN in order to perform cluster scheduling.'),
+                type=int,
+            )),
+        ],
+    ),
+    expected_memory=dict(
+        switches=[
+            (['--expected-memory'], dict(
+                help=('This specifies the expected memory needed (in mb) for'
+                      ' the job to run. This is required by jobs scheduled via'
+                      ' YARN in order to perform cluster scheduling.'),
+                type=int,
             )),
         ],
     ),

@@ -37,7 +37,7 @@ class InlineMRJobRunner(SimMRJobRunner):
     This is the default way to run jobs (we assume you'll spend some time
     debugging your job before you're ready to run it on EMR or Hadoop).
 
-    Unlike other runners, ``InlineMRJobRunner``\ 's ``run()`` method
+    Unlike other runners, ``InlineMRJobRunner``\\'s ``run()`` method
     raises the actual exception that caused a step to fail (rather than
     :py:class:`~mrjob.step.StepFailedException`).
 

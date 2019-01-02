@@ -80,14 +80,14 @@ _FALLBACK_HADOOP_YARN_LOG_DIRS = [
 ]
 
 # start of Counters printed by Hadoop
-_HADOOP_COUNTERS_START_RE = re.compile(b'^Counters: (?P<amount>\d+)\s*$')
+_HADOOP_COUNTERS_START_RE = re.compile(br'^Counters: (?P<amount>\d+)\s*$')
 
 # header for a group of counters
-_HADOOP_COUNTER_GROUP_RE = re.compile(b'^(?P<indent>\s+)(?P<group>.*)$')
+_HADOOP_COUNTER_GROUP_RE = re.compile(br'^(?P<indent>\s+)(?P<group>.*)$')
 
 # line for a counter
 _HADOOP_COUNTER_RE = re.compile(
-    b'^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
+    br'^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
 
 # the one thing Hadoop streaming prints to stderr not in log format
 _HADOOP_NON_LOG_LINE_RE = re.compile(r'^Streaming Command Failed!')

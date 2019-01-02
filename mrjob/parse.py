@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 ### URI PARSING ###
 
 def is_uri(uri):
-    """Return True if *uri* is a URI and contains ``://``
+    r"""Return True if *uri* is a URI and contains ``://``
     (we only care about URIs that can describe files)
 
     .. versionchanged:: 0.5.7

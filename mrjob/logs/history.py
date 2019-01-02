@@ -334,7 +334,7 @@ def _parse_pre_yarn_history_log(lines):
 
 
 def _parse_pre_yarn_history_records(lines):
-    """Yield records from the given sequence of lines. For example,
+    r"""Yield records from the given sequence of lines. For example,
     a line like this:
 
     Task TASKID="task_201512311928_0001_m_000003" \

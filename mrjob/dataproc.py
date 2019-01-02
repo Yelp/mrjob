@@ -116,7 +116,7 @@ _CONTAINER_EXIT_RE = re.compile(
     r'Exit code from container (?P<container_id>\w+)'
     r' is ?: (?P<returncode>\d+)')
 
-_TRACEBACK_EXCEPTION_RE = re.compile('\w+: .*$')
+_TRACEBACK_EXCEPTION_RE = re.compile(r'\w+: .*$')
 
 _STDERR_LOG4J_WARNING = re.compile(
     r'.*(No appenders could be found for logger'
@@ -170,7 +170,7 @@ def _wait_for(msg, sleep_secs):
 
 
 def _cleanse_gcp_job_id(job_id):
-    return re.sub('[^a-zA-Z0-9_\-]', '-', job_id)
+    return re.sub(r'[^a-zA-Z0-9_\-]', '-', job_id)
 
 
 def _check_and_fix_fs_dir(gcs_uri):

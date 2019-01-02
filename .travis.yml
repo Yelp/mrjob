@@ -5,13 +5,17 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
-  - "3.7"
   - "3.8-dev"
   - "nightly"
 matrix:
   allow_failures:
     - python: "3.8-dev"
     - python: "nightly"
+  include:
+    - python: '3.7'
+      dist: xenial
+    - python: '3.8-dev'
+      dist: xenial
   fast_finish: true
 install:
   - "pip install ."

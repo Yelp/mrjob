@@ -24,8 +24,8 @@ that all non-byte strings be unicode. But that doesn't really make sense for
 Python 2, where str (bytes) and unicode can be used interchangeably.
 
 So really our string datatypes fall into two categories, bytes, and
-"strings", which means either ``unicode``\s or ASCII ``str``\s in
-Python 2, and ``str``\s (i.e. unicode) in Python 3.
+"strings", which means either ``unicode``\\s or ASCII ``str``\\s in
+Python 2, and ``str``\\s (i.e. unicode) in Python 3.
 
 These things should always be bytes:
 

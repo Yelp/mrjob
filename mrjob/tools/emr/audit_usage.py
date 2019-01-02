@@ -129,7 +129,7 @@ def _runner_kwargs(options):
 
 
 def _clusters_to_stats(clusters, now=None):
-    """Aggregate statistics for several clusters into a dictionary.
+    r"""Aggregate statistics for several clusters into a dictionary.
 
     :param clusters: a sequence of dicts with the keys ``bootstrap_actions``,
                      ``cluster``, ``steps``.
@@ -354,7 +354,7 @@ def _cluster_to_basic_summary(cluster, now=None):
 
 
 def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
-    """Break billing/usage information for a cluster down by job.
+    r"""Break billing/usage information for a cluster down by job.
 
     :param cluster: a :py:mod:`boto3` cluster data structure
     :param basic_summary: a basic summary of the cluster, returned by

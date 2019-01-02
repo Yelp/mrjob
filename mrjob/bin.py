@@ -711,7 +711,7 @@ class MRJobBinRunner(MRJobRunner):
             lines.append('    *.%s)' % ext)
             lines.append('      %s $INPUT_PATH' % cmd)
             lines.append("      INPUT_PATH="
-                         "$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
+                         r"$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
             lines.append('      ;;')
         lines.append('  esac')
         lines.append('} 1>&2')

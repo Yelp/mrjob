@@ -27,7 +27,7 @@ class RetryWrapperTestCase(BasicTestCase):
         a = RetryWrapper(
             a1,
             retry_if=lambda x: True,
-            backoff=0.0001,
+            initial_backoff=0.0001,
             max_tries=2
         )
 
@@ -40,7 +40,7 @@ class RetryWrapperTestCase(BasicTestCase):
         a = RetryWrapper(
             a1,
             retry_if=lambda x: True,
-            backoff=0.0001,
+            initial_backoff=0.0001,
             max_tries=2
         )
 
@@ -53,7 +53,7 @@ class RetryWrapperTestCase(BasicTestCase):
         a = RetryWrapper(
             a1,
             retry_if=lambda x: True,
-            backoff=0.0001,
+            initial_backoff=0.0001,
             max_tries=2
         )
         with self.assertRaises(IOError):
@@ -66,7 +66,7 @@ class RetryWrapperTestCase(BasicTestCase):
         a = RetryWrapper(
             a1,
             retry_if=lambda x: True,
-            backoff=0.0001,
+            initial_backoff=0.0001,
             max_tries=0
         )
         a.f()

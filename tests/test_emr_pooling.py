@@ -766,7 +766,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             EbsConfiguration=ebs_config,
             InstanceRole=role,
             InstanceCount=1,
-            InstanceType='m1.medium',
+            InstanceType='m4.large',
         )
 
     def test_can_join_cluster_with_same_ebs_config(self):
@@ -1050,7 +1050,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         _, cluster_id = self.make_pooled_cluster(
             core_instance_bid_price='0.25',
             task_instance_bid_price='25.00',
-            task_instance_type='c1.xlarge',
+            task_instance_type='c3.2xlarge',
             num_core_instances=2,
             num_task_instances=3)
 

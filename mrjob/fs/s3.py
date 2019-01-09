@@ -383,9 +383,12 @@ class S3Filesystem(Filesystem):
         """
         client = self.make_s3_client()
 
-        conf = {}
-        if region and region != _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
-            conf['LocationConstraint'] = region
+        params = dict(Bucket=bucket_name)
 
-        client.create_bucket(Bucket=bucket_name,
-                             CreateBucketConfiguration=conf)
+        # CreateBucketConfiguration can't be empty, so don't set it
+        # unless there's a location constraint (see #1927)
+        if region != _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
+            params['CreateBucketConfiguration'] = dict(
+                LocationConstraint=region)
+
+        client.create_bucket(**params)

@@ -66,6 +66,24 @@ class MockS3Client(object):
             raise _no_such_bucket_error(bucket_name, operation_name)
 
     def create_bucket(self, Bucket, CreateBucketConfiguration=None):
+        # empty CreateBucketConfiguration causes an error; see #1927
+        if not (CreateBucketConfiguration or
+                CreateBucketConfiguration is None):
+            raise ClientError(
+                dict(
+                    Error=dict(
+                        Code='MalformedXML',
+                        Message=('The XML you provided was not well-formed'
+                                 ' or did not validate against our published'
+                                 ' schema'),
+                    ),
+                    ResponseMetadata=dict(
+                        HTTPStatusCode=400,
+                    ),
+                ),
+                'CreateBucket',
+            )
+
         # boto3 doesn't seem to mind if you try to create a bucket that exists
         if Bucket not in self.mock_s3_fs:
             location = (CreateBucketConfiguration or {}).get(

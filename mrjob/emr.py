@@ -192,22 +192,19 @@ _MIN_SPARK_PY3_AMI_VERSION = '4.0.0'
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
 
-# cheapest instance type that can run Spark
-_CHEAPEST_SPARK_INSTANCE_TYPE = 'm1.large'
+# a relatively cheap instance type that's available on (almost) all regions
+# and is big enough to support Spark. See #1932.
+_DEFAULT_INSTANCE_TYPE = 'm4.large'
 
 # minimum amount of memory to run spark jobs
 #
-# (it's possible that we could get by with slightly less memory, but
-# m1.medium definitely doesn't work)
-_MIN_SPARK_INSTANCE_MEMORY = (
-    EC2_INSTANCE_TYPE_TO_MEMORY[_CHEAPEST_SPARK_INSTANCE_TYPE])
+# it's possible that we could get by with slightly less memory, but
+# m1.medium (3.75) definitely doesn't work.
+_MIN_SPARK_INSTANCE_MEMORY = 7.5
 
-# cheapest instance type that can run resource manager and non-Spark tasks
-# on 3.x AMI and above
-_CHEAPEST_INSTANCE_TYPE = 'm1.medium'
-
-# cheapest instance type that can run on 2.x AMIs
-_CHEAPEST_2_X_INSTANCE_TYPE = 'm1.small'
+# cheapest instance type that can run everything (resource manager, Hadoop
+# tasks, Spark tasks) and is available on almost all regions. See #1932.
+_CHEAPEST_INSTANCE_TYPE = 'm4.large'
 
 # these are the only kinds of instance roles that exist
 _INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
@@ -1063,21 +1060,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     # instance types
 
-    def _cheapest_manager_instance_type(self):
+    def _cheap_manager_instance_type(self):
         """What's the cheapest instance type we can get away with
         for the master node (when it's not also running jobs)?"""
-        if self._image_version_gte('3'):
-            return _CHEAPEST_INSTANCE_TYPE
-        else:
-            return _CHEAPEST_2_X_INSTANCE_TYPE
+        return _CHEAPEST_INSTANCE_TYPE
 
     def _cheapest_worker_instance_type(self):
         """What's the cheapest instance type we can get away with
         running tasks on?"""
-        if self._uses_spark():
-            return _CHEAPEST_SPARK_INSTANCE_TYPE
-        else:
-            return self._cheapest_manager_instance_type()
+        return _CHEAPEST_INSTANCE_TYPE
 
     def _instance_type(self, role):
         """What instance type should we use for the given role?

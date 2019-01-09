@@ -1060,7 +1060,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     # instance types
 
-    def _cheap_manager_instance_type(self):
+    def _cheapest_manager_instance_type(self):
         """What's the cheapest instance type we can get away with
         for the master node (when it's not also running jobs)?"""
         return _CHEAPEST_INSTANCE_TYPE

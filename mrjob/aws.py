@@ -96,16 +96,6 @@ EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
     'r4.8xlarge': 99,
     'r4.large': 7,
     'r4.xlarge': 13.6,
-    't1.micro': 1,
-    # t2 units are "burstable", and receive a certain number of "credits"
-    # (CPU-minutes) per hour. MapReduce usage is pretty much continuous, so
-    # just rating them by how much they can use in one hour.
-    't2.large': 0.6,
-    't2.medium': 0.4,
-    't2.micro': 0.1,
-    't2.nano': 0.05,
-    't2.small': 0.2,
-    'x1.32xlarge': 349,
 }
 
 # map from instance type to GB of memory
@@ -174,13 +164,6 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     'r4.8xlarge': 244,
     'r4.large': 15.25,
     'r4.xlarge': 30.5,
-    't1.micro': 0.615,
-    't2.large': 8,
-    't2.medium': 4,
-    't2.micro': 1,
-    't2.nano': 0.5,
-    't2.small': 2,
-    'x1.32xlarge': 1952,
 }
 
 

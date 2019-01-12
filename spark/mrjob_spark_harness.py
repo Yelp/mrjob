@@ -53,14 +53,16 @@ def main(cmd_line_args=None):
 
         if step_desc.get('mapper'):
             # creating a separate job instance to ensure that initialization
-            # happens correctly (e.g. mapper_job.is_task() should be true)
+            # happens correctly (e.g. mapper_job.is_task() should be True).
+            # probably doesn't actually matter that we pass --step-num
             mapper_job = job('--mapper', '--step-num=%d' % step_num)
             m_read, m_write = mapper_job.pick_protocols(step_num, 'mapper')
 
+            # run the mapper
             rdd = rdd.map(m_read)
             rdd = rdd.mapPartitions(
-                lambda pairs: mapper_job.map_pairs(pairs, step_num=step_num))
-            rdd = rdd.map(m_write)
+                lambda pairs: mapper_job.map_pairs(pairs, step_num))
+            rdd = rdd.map(lambda k_v: m_write(*k_v))
 
         if step_desc.get('reducer'):
             reducer_job = job('--reducer', '--step-num=%d' % step_num)
@@ -68,13 +70,13 @@ def main(cmd_line_args=None):
 
             # simulate shuffle in Hadoop Streaming
             rdd = rdd.groupBy(lambda line: line.split(b'\t')[0])
-            rdd = rdd.flatMap(
-                lambda k_lines: (r_read(line) for line in k_lines[1]),
-                preservesPartitioning=True)
+            rdd = rdd.flatMap(lambda key_and_lines: key_and_lines[1])
+
             # run the reducer
+            rdd = rdd.map(r_read)
             rdd = rdd.mapPartitions(
-                lambda pairs: reducer_job.map_pairs(pairs, step_num=step_num))
-            rdd = rdd.map(r_write)
+                lambda pairs: reducer_job.reduce_pairs(pairs, step_num))
+            rdd = rdd.map(lambda k_v: r_write(*k_v))
 
     # write the results
     rdd.saveAsTextFile(args.output_path)

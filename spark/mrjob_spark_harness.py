@@ -57,10 +57,10 @@ def main(cmd_line_args=None):
             mapper_job = job('--mapper', '--step-num=%d' % step_num)
             m_read, m_write = mapper_job.pick_protocols(step_num, 'mapper')
 
-            rdd = rdd.map(m_read)
+            rdd = rdd.map(lambda line: m_read(line.rstrip(b'\r\n')))
             rdd = rdd.mapPartitions(
                 lambda pairs: mapper_job.map_pairs(pairs, step_num=step_num))
-            rdd = rdd.map(m_write)
+            rdd = rdd.map(lambda k_v: m_write(*k_v) + b'\n')
 
         if step_desc.get('reducer'):
             reducer_job = job('--reducer', '--step-num=%d' % step_num)
@@ -69,12 +69,13 @@ def main(cmd_line_args=None):
             # simulate shuffle in Hadoop Streaming
             rdd = rdd.groupBy(lambda line: line.split(b'\t')[0])
             rdd = rdd.flatMap(
-                lambda k_lines: (r_read(line) for line in k_lines[1]),
+                lambda key_and_lines: (r_read(line.rstrip(b'\r\n'))
+                                       for line in key_and_lines[1]),
                 preservesPartitioning=True)
             # run the reducer
             rdd = rdd.mapPartitions(
                 lambda pairs: reducer_job.map_pairs(pairs, step_num=step_num))
-            rdd = rdd.map(r_write)
+            rdd = rdd.map(lambda k_v: r_write(*k_v) + b'\n')
 
     # write the results
     rdd.saveAsTextFile(args.output_path)

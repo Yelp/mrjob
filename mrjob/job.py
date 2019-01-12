@@ -522,6 +522,22 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
+        # pick input and output protocol
+        read_lines, write_line = self._wrap_protocols(step_num, 'mapper')
+
+        for k, v in self.map_pairs(read_lines(), step_num=step_num):
+            write_line(k, v)
+
+    def map_pairs(self, pairs, step_num=0):
+        """Runs :py:meth:`mapper_init`,
+        :py:meth:`mapper`/:py:meth:`mapper_raw`, and :py:meth:`mapper_final`
+        for one mapper step.
+
+        Takes in a sequence of (key, value) pairs as input, and yields
+        (key, value) pairs as output.
+
+        :py:meth:`run_mapper` is responsible for reading/decoding input
+        and writing/encoding output."""
         step = self._get_step(step_num, MRStep)
 
         mapper = step['mapper']
@@ -529,29 +545,24 @@ class MRJob(MRJobLauncher):
         mapper_init = step['mapper_init']
         mapper_final = step['mapper_final']
 
-        # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'mapper')
-
         if mapper_init:
-            for out_key, out_value in mapper_init() or ():
-                write_line(out_key, out_value)
+            for k, v in mapper_init() or ():
+                yield k, v
 
         if mapper_raw:
-            # pass input path and uri to mapper_raw()
             if len(self.options.args) != 2:
                 raise ValueError('Wrong number of args')
             input_path, input_uri = self.options.args
-            for out_key, out_value in mapper_raw(input_path, input_uri) or ():
-                write_line(out_key, out_value)
+            for k, v in mapper_raw(input_path, input_uri) or ():
+                yield k, v
         else:
-            # run the mapper on each line
-            for key, value in read_lines():
-                for out_key, out_value in mapper(key, value) or ():
-                    write_line(out_key, out_value)
+            for key, value in pairs:
+                for k, v in mapper(key, value) or ():
+                    yield k, v
 
         if mapper_final:
-            for out_key, out_value in mapper_final() or ():
-                write_line(out_key, out_value)
+            for k, v in mapper_final() or ():
+                yield k, v
 
     def run_reducer(self, step_num=0):
         """Run the reducer for the given step.

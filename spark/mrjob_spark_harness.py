@@ -52,11 +52,14 @@ def main(cmd_line_args=None):
         _check_step(step_desc, step_num)
 
         if step_desc.get('mapper'):
+            # creating a separate job instance to ensure that initialization
+            # happens correctly (e.g. mapper_job.is_task() should be true)
             mapper_job = job('--mapper', '--step-num=%d' % step_num)
             m_read, m_write = mapper_job.pick_protocols(step_num, 'mapper')
 
             rdd = rdd.map(m_read)
-            rdd = rdd.mapPartitions(mapper_job.map_pairs)
+            rdd = rdd.mapPartitions(
+                lambda pairs: mapper_job.map_pairs(pairs, step_num=step_num))
             rdd = rdd.map(m_write)
 
         if step_desc.get('reducer'):
@@ -64,12 +67,13 @@ def main(cmd_line_args=None):
             r_read, r_write = reducer_job.pick_protocols(step_num, 'reducer')
 
             # simulate shuffle in Hadoop Streaming
-            # TODO: could simulate SORT_VALUES here too
             rdd = rdd.groupBy(lambda line: line.split(b'\t')[0])
             rdd = rdd.flatMap(
                 lambda k_lines: (r_read(line) for line in k_lines[1]),
                 preservesPartitioning=True)
-            rdd = rdd.mapPartitions(reducer_job.reduce_pairs)
+            # run the reducer
+            rdd = rdd.mapPartitions(
+                lambda pairs: reducer_job.map_pairs(pairs, step_num=step_num))
             rdd = rdd.map(r_write)
 
     # write the results

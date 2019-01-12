@@ -875,9 +875,9 @@ class StepNumTestCase(BasicTestCase):
         mr_job = MRJob()
         mr_job.spark = MagicMock()
 
-        self.assertRaises(TypeError, mr_job.run_mapper)
-        self.assertRaises(TypeError, mr_job.run_combiner)
-        self.assertRaises(TypeError, mr_job.run_reducer)
+        self.assertRaises((TypeError, ValueError), mr_job.run_mapper)
+        self.assertRaises((TypeError, ValueError), mr_job.run_combiner)
+        self.assertRaises((TypeError, ValueError), mr_job.run_reducer)
 
 
 class FileOptionsTestCase(SandboxedTestCase):

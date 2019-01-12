@@ -522,36 +522,11 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        step = self._get_step(step_num, MRStep)
-
-        mapper = step['mapper']
-        mapper_raw = step['mapper_raw']
-        mapper_init = step['mapper_init']
-        mapper_final = step['mapper_final']
-
         # pick input and output protocol
         read_lines, write_line = self._wrap_protocols(step_num, 'mapper')
 
-        if mapper_init:
-            for out_key, out_value in mapper_init() or ():
-                write_line(out_key, out_value)
-
-        if mapper_raw:
-            # pass input path and uri to mapper_raw()
-            if len(self.options.args) != 2:
-                raise ValueError('Wrong number of args')
-            input_path, input_uri = self.options.args
-            for out_key, out_value in mapper_raw(input_path, input_uri) or ():
-                write_line(out_key, out_value)
-        else:
-            # run the mapper on each line
-            for key, value in read_lines():
-                for out_key, out_value in mapper(key, value) or ():
-                    write_line(out_key, out_value)
-
-        if mapper_final:
-            for out_key, out_value in mapper_final() or ():
-                write_line(out_key, out_value)
+        for k, v in self.map_pairs(read_lines(), step_num=step_num):
+            write_line(k, v)
 
     def run_reducer(self, step_num=0):
         """Run the reducer for the given step.
@@ -559,14 +534,61 @@ class MRJob(MRJobLauncher):
         :type step_num: int
         :param step_num: which step to run (0-indexed)
 
-        If we encounter a line that can't be decoded by our input protocol,
-        or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If
-        --strict-protocols is set, then an exception is raised
-
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
+        # pick input and output protocol
+        read_lines, write_line = self._wrap_protocols(step_num, 'reducer')
+
+        for k, v in self.reduce_pairs(read_lines(), step_num=step_num):
+            write_line(k, v)
+
+    def map_pairs(self, pairs, step_num=0):
+        """Runs :py:meth:`mapper_init`,
+        :py:meth:`mapper`/:py:meth:`mapper_raw`, and :py:meth:`mapper_final`
+        for one map task in one step.
+
+        Takes in a sequence of (key, value) pairs as input, and yields
+        (key, value) pairs as output.
+
+        :py:meth:`run_mapper` is responsible for reading/decoding input
+        and writing/encoding output."""
+        step = self._get_step(step_num, MRStep)
+
+        mapper = step['mapper']
+        mapper_raw = step['mapper_raw']
+        mapper_init = step['mapper_init']
+        mapper_final = step['mapper_final']
+
+        if mapper_init:
+            for k, v in mapper_init() or ():
+                yield k, v
+
+        if mapper_raw:
+            if len(self.options.args) != 2:
+                raise ValueError('Wrong number of args')
+            input_path, input_uri = self.options.args
+            for k, v in mapper_raw(input_path, input_uri) or ():
+                yield k, v
+        else:
+            for key, value in pairs:
+                for k, v in mapper(key, value) or ():
+                    yield k, v
+
+        if mapper_final:
+            for k, v in mapper_final() or ():
+                yield k, v
+
+    def reduce_pairs(self, pairs, step_num=0):
+        """Runs :py:meth:`reducer_init`,
+        :py:meth:`reducer`, and :py:meth:`reducer_final`
+        for one reduce task in one step.
+
+        Takes in a sequence of (key, value) pairs as input, and yields
+        (key, value) pairs as output.
+
+        :py:meth:`run_reducer` is responsible for reading/decoding input
+        and writing/encoding output."""
         step = self._get_step(step_num, MRStep)
 
         reducer = step['reducer']
@@ -575,26 +597,22 @@ class MRJob(MRJobLauncher):
         if reducer is None:
             raise ValueError('No reducer in step %d' % step_num)
 
-        # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'reducer')
-
         if reducer_init:
-            for out_key, out_value in reducer_init() or ():
-                write_line(out_key, out_value)
+            for k, v in reducer_init() or ():
+                yield k, v
 
         # group all values of the same key together, and pass to the reducer
         #
         # be careful to use generators for everything, to allow for
         # very large groupings of values
-        for key, kv_pairs in itertools.groupby(read_lines(),
-                                               key=lambda k_v: k_v[0]):
-            values = (v for k, v in kv_pairs)
-            for out_key, out_value in reducer(key, values) or ():
-                write_line(out_key, out_value)
+        for key, pairs_for_key in itertools.groupby(pairs, lambda k_v: k_v[0]):
+            values = (value for _, value in pairs_for_key)
+            for k, v in reducer(key, values) or ():
+                yield k, v
 
         if reducer_final:
-            for out_key, out_value in reducer_final() or ():
-                write_line(out_key, out_value)
+            for k, v in reducer_final() or ():
+                yield k, v
 
     def run_combiner(self, step_num=0):
         """Run the combiner for the given step.
@@ -716,9 +734,7 @@ class MRJob(MRJobLauncher):
 
     def _wrap_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing
-        for the given step, and wrap them so that bad input and output
-        trigger a counter rather than an exception unless --strict-protocols
-        is set.
+        for the given step.
 
         Returns a tuple of ``(read_lines, write_line)``
 

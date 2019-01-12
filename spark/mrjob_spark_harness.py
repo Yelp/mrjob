@@ -35,7 +35,7 @@ def main(cmd_line_args=None):
     job_args = []
 
     def job(*args):
-        j = job_class(job_args + list(*args))
+        j = job_class(job_args + list(args))
         j.sandbox()  # so Spark doesn't try to serialize stdin
         return j
 
@@ -47,7 +47,7 @@ def main(cmd_line_args=None):
     steps = job().steps()
 
     # process steps
-    for step_num, step in steps:
+    for step_num, step in enumerate(steps):
         step_desc = step.description()
         _check_step(step_desc, step_num)
 
@@ -110,25 +110,6 @@ def _check_step(step_desc, step_num):
                     step_num, mrc))
 
 
-
-
-def _check_mapper(mapper_desc, step_num):
-    """Check that the given mapper description doesn't run commands"""
-    if mapper_desc.get('type') != 'script':
-        raise NotImplementedError(
-            "step %d's mapper has unexpected type: %r" % (
-                step_num, mapper_desc.get('type')))
-
-    if mapper_desc.get('pre_filter'):
-        raise NotImplementedError(
-            "step %d's mapper has pre-filter, which is unsupported" % (
-                step_num))
-
-
-
-
-
-
 def _make_arg_parser():
     parser = ArgumentParser()
 
@@ -147,12 +128,6 @@ def _make_arg_parser():
         help=('An empty directory to write output to. Can be a path or URI.'))
 
     return parser
-
-
-
-
-
-
 
 
 if __name__ == '__main__':

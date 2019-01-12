@@ -48,7 +48,7 @@ def main(cmd_line_args=None):
 
     # process steps
     for step_num, step in enumerate(steps):
-        step_desc = step.description()
+        step_desc = step.description(step_num)
         _check_step(step_desc, step_num)
 
         if step_desc.get('mapper'):

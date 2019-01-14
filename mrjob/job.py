@@ -571,8 +571,8 @@ class MRJob(MRJobLauncher):
         Takes in a sequence of (key, value) pairs as input, and yields
         (key, value) pairs as output.
 
-        :py:meth:`run_mapper` is responsible for reading/decoding input
-        and writing/encoding output."""
+        :py:meth:`run_mapper` essentially wraps this method with code to handle
+        reading/decoding input and writing/encoding output."""
         step = self._get_step(step_num, MRStep)
 
         mapper = step['mapper']
@@ -607,8 +607,8 @@ class MRJob(MRJobLauncher):
         Takes in a sequence of (key, value) pairs as input, and yields
         (key, value) pairs as output.
 
-        :py:meth:`run_combiner` is responsible for reading/decoding input
-        and writing/encoding output."""
+        :py:meth:`run_combiner` essentially wraps this method with code to
+        handle reading/decoding input and writing/encoding output."""
         for k, v in self._combine_or_reduce_pairs(pairs, 'combiner', step_num):
             yield k, v
 
@@ -620,8 +620,8 @@ class MRJob(MRJobLauncher):
         Takes in a sequence of (key, value) pairs as input, and yields
         (key, value) pairs as output.
 
-        :py:meth:`run_reducer` is responsible for reading/decoding input
-        and writing/encoding output."""
+        :py:meth:`run_reducer` essentially wraps this method with code to
+        handle reading/decoding input and writing/encoding output."""
         for k, v in self._combine_or_reduce_pairs(pairs, 'reducer', step_num):
             yield k, v
 

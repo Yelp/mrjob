@@ -22,4 +22,3 @@ Guides
     guides/emr.rst
     guides/py2-vs-py3.rst
     guides/contributing.rst
-    guides/runner-job-interactions.rst

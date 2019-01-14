@@ -195,10 +195,8 @@ class MRJobRunner(object):
                       get passed through to the runner. If for some reason
                       your lines are missing newlines, we'll add them;
                       this makes it easier to write automated tests.
-        :param steps: a list of descriptions of steps to run (see
-                      :py:meth:`mrjob.steps.MRStep.description`,
-                      :py:meth:`mrjob.steps.JarStep.description`, etc.
-                      for format).
+        :param steps: a list of descriptions of steps to run (see :doc:`step`
+                      for description formats)
         :type step_output_dir: str
         :param step_output_dir: An empty/non-existent directory where Hadoop
                                 should put output from all steps other than

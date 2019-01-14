@@ -528,6 +528,26 @@ class MRJob(MRJobLauncher):
         for k, v in self.map_pairs(read_lines(), step_num=step_num):
             write_line(k, v)
 
+    def run_combiner(self, step_num=0):
+        """Run the combiner for the given step.
+
+        :type step_num: int
+        :param step_num: which step to run (0-indexed)
+
+        If we encounter a line that can't be decoded by our input protocol,
+        or a tuple that can't be encoded by our output protocol, we'll
+        increment a counter rather than raising an exception. If
+        --strict-protocols is set, then an exception is raised
+
+        Called from :py:meth:`run`. You'd probably only want to call this
+        directly from automated tests.
+        """
+        # pick input and output protocol
+        read_lines, write_line = self._wrap_protocols(step_num, 'combiner')
+
+        for k, v in self.combine_pairs(read_lines(), step_num=step_num):
+            write_line(k, v)
+
     def run_reducer(self, step_num=0):
         """Run the reducer for the given step.
 
@@ -579,6 +599,19 @@ class MRJob(MRJobLauncher):
             for k, v in mapper_final() or ():
                 yield k, v
 
+    def combine_pairs(self, pairs, step_num=0):
+        """Runs :py:meth:`combiner_init`,
+        :py:meth:`combiner`, and :py:meth:`combiner_final`
+        for one reduce task in one step.
+
+        Takes in a sequence of (key, value) pairs as input, and yields
+        (key, value) pairs as output.
+
+        :py:meth:`run_combiner` is responsible for reading/decoding input
+        and writing/encoding output."""
+        for k, v in self._combine_or_reduce_pairs(pairs, 'combiner', step_num):
+            yield k, v
+
     def reduce_pairs(self, pairs, step_num=0):
         """Runs :py:meth:`reducer_init`,
         :py:meth:`reducer`, and :py:meth:`reducer_final`
@@ -589,16 +622,21 @@ class MRJob(MRJobLauncher):
 
         :py:meth:`run_reducer` is responsible for reading/decoding input
         and writing/encoding output."""
+        for k, v in self._combine_or_reduce_pairs(pairs, 'reducer', step_num):
+            yield k, v
+
+    def _combine_or_reduce_pairs(self, pairs, mrc, step_num=0):
+        """Helper for :py:meth:`combine_pairs` and :py:meth:`reduce_pairs`."""
         step = self._get_step(step_num, MRStep)
 
-        reducer = step['reducer']
-        reducer_init = step['reducer_init']
-        reducer_final = step['reducer_final']
-        if reducer is None:
-            raise ValueError('No reducer in step %d' % step_num)
+        task = step[mrc]
+        task_init = step[mrc + '_init']
+        task_final = step[mrc + '_final']
+        if task is None:
+            raise ValueError('No %s in step %d' % (mrc, step_num))
 
-        if reducer_init:
-            for k, v in reducer_init() or ():
+        if task_init:
+            for k, v in task_init() or ():
                 yield k, v
 
         # group all values of the same key together, and pass to the reducer
@@ -607,55 +645,12 @@ class MRJob(MRJobLauncher):
         # very large groupings of values
         for key, pairs_for_key in itertools.groupby(pairs, lambda k_v: k_v[0]):
             values = (value for _, value in pairs_for_key)
-            for k, v in reducer(key, values) or ():
+            for k, v in task(key, values) or ():
                 yield k, v
 
-        if reducer_final:
-            for k, v in reducer_final() or ():
+        if task_final:
+            for k, v in task_final() or ():
                 yield k, v
-
-    def run_combiner(self, step_num=0):
-        """Run the combiner for the given step.
-
-        :type step_num: int
-        :param step_num: which step to run (0-indexed)
-
-        If we encounter a line that can't be decoded by our input protocol,
-        or a tuple that can't be encoded by our output protocol, we'll
-        increment a counter rather than raising an exception. If
-        --strict-protocols is set, then an exception is raised
-
-        Called from :py:meth:`run`. You'd probably only want to call this
-        directly from automated tests.
-        """
-        step = self._get_step(step_num, MRStep)
-
-        combiner = step['combiner']
-        combiner_init = step['combiner_init']
-        combiner_final = step['combiner_final']
-        if combiner is None:
-            raise ValueError('No combiner in step %d' % step_num)
-
-        # pick input and output protocol
-        read_lines, write_line = self._wrap_protocols(step_num, 'combiner')
-
-        if combiner_init:
-            for out_key, out_value in combiner_init() or ():
-                write_line(out_key, out_value)
-
-        # group all values of the same key together, and pass to the combiner
-        #
-        # be careful to use generators for everything, to allow for
-        # very large groupings of values
-        for key, kv_pairs in itertools.groupby(read_lines(),
-                                               key=lambda k_v1: k_v1[0]):
-            values = (v for k, v in kv_pairs)
-            for out_key, out_value in combiner(key, values) or ():
-                write_line(out_key, out_value)
-
-        if combiner_final:
-            for out_key, out_value in combiner_final() or ():
-                write_line(out_key, out_value)
 
     def run_spark(self, step_num):
         """Run the Spark code for the given step.

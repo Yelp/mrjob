@@ -1334,7 +1334,7 @@ up debugging for many users. Use `local` if you need to simulate more features
 of Hadoop.
 
 The EMR tools can now be accessed more easily via the `mrjob` command. Learn
-more :doc:`here <guides/cmd>`.
+more :doc:`here <cmd>`.
 
 Job steps are much richer now:
 

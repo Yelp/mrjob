@@ -24,9 +24,9 @@ Options::
 
   --additional-emr-info ADDITIONAL_EMR_INFO
                         A JSON string for selecting additional features on EMR
-  --application APPLICATIONS
-                        Additional applications to run on 4.x AMIs (e.g.
-                        Ganglia, Mahout, Spark)
+  --applications APPLICATIONS, --application APPLICATIONS
+                        Additional applications to run on 4.x and 5.x AMIs,
+                        separated by commas (e.g. "Ganglia,Spark")
   --bootstrap BOOTSTRAP
                         A shell command to set up libraries etc. before any
                         steps (e.g. "sudo apt-get -qy install python3"). You
@@ -78,12 +78,22 @@ Options::
                         this for task instances).
   --core-instance-type CORE_INSTANCE_TYPE
                         Type of GCE/EC2 core instance(s) to launch
+  --ebs-root-volume-gb EBS_ROOT_VOLUME_GB
+                        Size of root EBS volume, in GiB. Must be an
+                        integer.Set to 0 to use the default
+  --ec2-endpoint EC2_ENDPOINT
+                        Force mrjob to connect to EC2 on this endpoint (e.g.
+                        ec2.us-west-1.amazonaws.com). Default is to infer this
+                        from region.
   --ec2-key-pair EC2_KEY_PAIR
                         Name of the SSH key pair you set up for EMR
+  --emr-action-on-failure EMR_ACTION_ON_FAILURE
+                        Action to take when a step fails (e.g.
+                        TERMINATE_CLUSTER, CANCEL_AND_WAIT, CONTINUE)
   --emr-api-param EMR_API_PARAMS
-                        deprecated. Use --extra-cluster-param instead
+                        Does nothing. Use --extra-cluster-param instead
   --no-emr-api-param EMR_API_PARAMS
-                        deprecated. Use --extra-cluster-param instead
+                        Does nothing. Use --extra-cluster-param instead
   --emr-configuration EMR_CONFIGURATIONS
                         Configuration to use on 4.x AMIs as a JSON-encoded
                         dict; see http://docs.aws.amazon.com/ElasticMapReduce/
@@ -114,8 +124,9 @@ Options::
   --iam-service-role IAM_SERVICE_ROLE
                         IAM service role to use for the EMR cluster -- see
                         "Configure IAM Roles for Amazon EMR" in AWS docs
+  --image-id IMAGE_ID   ID of custom AWS machine image (AMI) to use
   --image-version IMAGE_VERSION
-                        EMR/Dataproc machine image to launch clusters with
+                        version of EMR/Dataproc machine image to run
   --instance-fleets INSTANCE_FLEETS
                         detailed JSON list of instance fleets, including EBS
                         configuration. See docs for --instance-fleets at

@@ -499,8 +499,8 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cloud_part_size_mb=dict(
-        deprecated_aliases=['cloud_upload_part_size'],
         cloud_role='launch',
+        deprecated_aliases=['cloud_upload_part_size'],
         switches=[
             (['--cloud-part-size-mb'], dict(
                 deprecated_aliases=['--cloud-upload-part-size'],
@@ -519,6 +519,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cluster_properties=dict(
+        cloud_role='launch',
         combiner=combine_dicts,
         switches=[
             (['--cluster-property'], dict(
@@ -613,6 +614,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     emr_action_on_failure=dict(
+        cloud_role='launch',
         switches=[
             (['--emr-action-on-failure'], dict(
                 help=('Action to take when a step fails'
@@ -1020,6 +1022,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     project_id=dict(
+        cloud_role='connect',
         deprecated_aliases=['gcp_project'],
         switches=[
             (['--project-id'], dict(

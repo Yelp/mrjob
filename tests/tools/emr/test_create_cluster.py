@@ -43,7 +43,6 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'cloud_log_dir': None,
                 'cloud_part_size_mb': None,
                 'cloud_tmp_dir': None,
-                'cluster_id': None,
                 'conf_paths': None,
                 'core_instance_bid_price': None,
                 'core_instance_type': None,

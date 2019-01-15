@@ -69,8 +69,6 @@ Options::
                         Deprecated alias for --cloud-part-size-mb
   --cloud-tmp-dir CLOUD_TMP_DIR
                         URI on remote FS to use as our temp directory.
-  --cluster-id CLUSTER_ID
-                        ID of an existing cluster to run our job on
   -c CONF_PATHS, --conf-path CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available

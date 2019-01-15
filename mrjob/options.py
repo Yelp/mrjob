@@ -513,7 +513,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cluster_id=dict(
-        cloud_role='launch',
         switches=[
             (['--cluster-id'], dict(
                 help='ID of an existing cluster to run our job on',

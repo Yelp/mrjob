@@ -57,13 +57,13 @@ _SPARK_JAR_STEP_KWARGS = ['args', 'jar', 'main_class', 'spark_args']
 _SPARK_SCRIPT_STEP_KWARGS = ['args', 'script', 'spark_args']
 
 
-#: If passed as an argument to :py:class:`JarStep` or
-#: py:class:`SparkScriptStep`, it'll be replaced with the step's input path(s)
-#: (if there are multiple paths, they'll be joined with commas)
+#: If passed as an argument to :py:class:`JarStep`, :py:class:`SparkJarStep`,
+#: or :py:class:`SparkScriptStep`, it'll be replaced with the step's input
+#: path(s). If there are multiple paths, they'll be joined with commas.
 INPUT = '<input>'
 
-#: If this is passed as an argument to :py:class:`JarStep` or
-#: py:class:`SparkScriptStep`, it'll be replaced
+#: If this is passed as an argument to :py:class:`JarStep`,
+#: :py:class:`SparkJarStep`, or :py:class:`SparkScriptStep`, it'll be replaced
 #: with the step's output path
 OUTPUT = '<output>'
 
@@ -420,6 +420,10 @@ class JarStep(_Step):
             'args': ['argh', 'argh']  # optional
             'jobconf': { ... }  # optional
         }
+
+    To give your jar access to input files, an empty output directory,
+    configuration properties, and libjars managed by mrjob, you may include
+    :py:data:`INPUT`, :py:data:`OUTPUT`, and :py:data:`GENERIC_ARGS` in *args*.
     """
     _STEP_TYPE = 'jar'
 
@@ -487,6 +491,10 @@ class SparkJarStep(_Step):
             'jobconf': { ... },  # optional
             'spark_args': ['--executor-memory', '2G'],  # optional
         }
+
+    To give your Spark JAR access to input files and an empty output directory
+    managed by mrjob, you may include :py:data:`INPUT` and :py:data:`OUTPUT`
+    in *args*.
     """
     _STEP_TYPE = 'spark_jar'
 
@@ -523,6 +531,10 @@ class SparkScriptStep(_Step):
             'jobconf': { ... },  # optional
             'spark_args': ['--executor-memory', '2G'],  # optional
         }
+
+    To give your Spark script access to input files and an empty output
+    directory managed by mrjob, you may include :py:data:`INPUT` and
+    :py:data:`OUTPUT` in *args*.
     """
     _STEP_TYPE = 'spark_script'
 

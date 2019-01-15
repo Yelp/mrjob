@@ -18,6 +18,8 @@ runners. For example, you can submit your spark job to EMR just by adding
 This also adds a few mrjob features that are not standard with
 :command:`spark-submit`, such as ``--cmdenv``, ``--dirs``, and ``--setup``.
 
+.. versionadded:: 0.6.7
+
 Usage::
 
     mrjob spark-submit [-r <runner>] [options] <python file | app jar>

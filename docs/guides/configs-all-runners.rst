@@ -371,7 +371,8 @@ Job execution context
     (e.g. ``cd src-tree/#/subdir``).
 
     This works for Spark as well when running on YARN. The setup script
-    is only run prior to the driver in cluster mode.
+    is run before every executor, but only run before the driver in
+    cluster mode.
 
     .. versionadded:: 0.5.8 support for directories (above)
 

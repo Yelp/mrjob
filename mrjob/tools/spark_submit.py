@@ -137,7 +137,6 @@ from argparse import ArgumentParser
 from argparse import SUPPRESS
 from logging import getLogger
 
-from mrjob.conf import combine_lists
 from mrjob.job import MRJob
 from mrjob.options import _RUNNER_OPTS
 from mrjob.options import _add_basic_args

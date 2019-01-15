@@ -26,6 +26,7 @@ from argparse import ArgumentTypeError
 
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
+from mrjob.local import LocalMRJobRunner
 from mrjob.options import _RUNNER_OPTS
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_job_args

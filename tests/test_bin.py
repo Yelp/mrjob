@@ -1929,26 +1929,26 @@ class ShBinValidationTestCase(SandboxedTestCase):
         self.assertRaises(ValueError, MRJobBinRunner, sh_bin=[])
 
     def test_absolute_sh_bin(self):
-        runner = MRJobBinRunner(sh_bin=['/bin/zsh'])
+        MRJobBinRunner(sh_bin=['/bin/zsh'])
 
         self.assertFalse(self.log.warning.called)
 
     def test_absolute_sh_bin_with_one_arg(self):
-        runner = MRJobBinRunner(sh_bin=['/bin/zsh', '-v'])
+        MRJobBinRunner(sh_bin=['/bin/zsh', '-v'])
 
         self.assertFalse(self.log.warning.called)
 
     def test_absolute_sh_bin_with_two_args(self):
-        runner = MRJobBinRunner(sh_bin=['/bin/zsh', '-v', '-x'])
+        MRJobBinRunner(sh_bin=['/bin/zsh', '-v', '-x'])
 
         self.assertTrue(self.log.warning.called)
 
     def test_relative_sh_bin(self):
-        runner = MRJobBinRunner(sh_bin=['zsh'])
+        MRJobBinRunner(sh_bin=['zsh'])
 
         self.assertFalse(self.log.warning.called)
 
     def test_relative_sh_bin_with_one_arg(self):
-        runner = MRJobBinRunner(sh_bin=['zsh', '-v'])
+        MRJobBinRunner(sh_bin=['zsh', '-v'])
 
         self.assertTrue(self.log.warning.called)

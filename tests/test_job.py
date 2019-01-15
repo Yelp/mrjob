@@ -1348,7 +1348,6 @@ class RunnerKwargsTestCase(BasicTestCase):
     def _test_runner_kwargs(self, runner_alias):
         launcher = MRJob(args=['/path/to/script', '-r', runner_alias])
 
-        runner_class = launcher._runner_class()
         kwargs = launcher._runner_kwargs()
 
         option_names = set(kwargs) - self.NON_OPTION_KWARGS - {'mrjob_cls'}

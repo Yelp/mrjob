@@ -1123,7 +1123,7 @@ class UnexpectedOptsWarningTestCase(SandboxedTestCase):
         job = MRTwoStepJob(['-r', 'local', '--no-conf'])
         job.sandbox()
 
-        with job.make_runner() as runner:
+        with job.make_runner():
             self.assertFalse(self.log.warning.called)
 
     def test_unexpected_opt_from_mrjob_conf(self):
@@ -1136,7 +1136,7 @@ class UnexpectedOptsWarningTestCase(SandboxedTestCase):
         job = MRTwoStepJob(['-r', 'local', '-c', conf_path])
         job.sandbox()
 
-        with job.make_runner() as runner:
+        with job.make_runner():
             self.assertTrue(self.log.warning.called)
             warnings = '\n'.join(
                 arg[0][0] for arg in self.log.warning.call_args_list)
@@ -1150,7 +1150,7 @@ class UnexpectedOptsWarningTestCase(SandboxedTestCase):
         job = MRTwoStepJob(['-r', 'local', '--no-conf', '--zone', 'DANGER'])
         job.sandbox()
 
-        with job.make_runner() as runner:
+        with job.make_runner():
             self.assertTrue(self.log.warning.called)
             warnings = '\n'.join(
                 arg[0][0] for arg in self.log.warning.call_args_list)

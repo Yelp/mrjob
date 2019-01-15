@@ -25,7 +25,6 @@ from argparse import Action
 from argparse import ArgumentParser
 from argparse import SUPPRESS
 from logging import getLogger
-from os import devnull
 
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -1483,8 +1482,6 @@ def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True,
 
         deprecated_aliases = kwargs.pop('deprecated_aliases', None)
         deprecated = kwargs.pop('deprecated', False)
-
-        suppress = any(sw in suppress_switches for sw in args)
 
         # add this switch
         if (include_deprecated or not deprecated) and not suppressed(args):

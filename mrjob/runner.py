@@ -46,7 +46,6 @@ from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.step import OUTPUT
-from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.step import _is_pyspark_step_type
 from mrjob.util import to_lines
@@ -864,11 +863,6 @@ class MRJobRunner(object):
     def _num_steps(self):
         """Get the number of steps (calls :py:meth:`get_steps`)."""
         return len(self._get_steps())
-
-    def _has_streaming_steps(self):
-        """Are any of our steps Hadoop streaming steps?"""
-        return any(step['type'] == 'streaming'
-                   for step in self._get_steps())
 
     def _uses_input_manifest(self):
         """Does the first step take an input manifest?"""

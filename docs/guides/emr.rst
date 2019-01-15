@@ -10,4 +10,3 @@ Elastic MapReduce
     emr-bootstrap-cookbook.rst
     emr-troubleshooting.rst
     emr-advanced.rst
-    cmd.rst

@@ -1,20 +1,13 @@
-.. _mrjob-cmd:
+mrjob.cmd: The ``mrjob`` command-line utility
+=============================================
 
-The ``mrjob`` command
-=====================
-
-The :command:`mrjob` command has two purposes:
-
-1. To provide easy access to EMR tools
-2. To eventually let you run Hadoop Streaming jobs written in languages other
-   than Python
+The :command:`mrjob` command provides a number of sub-commands that help you
+run and monitor jobs.
 
 The :command:`mrjob` command comes with Python-version-specific aliases (e.g.
 :command:`mrjob-3`, :command:`mrjob-3.4`), in case you choose to install
-``mrjob`` for multiple versions of Python.
-
-EMR tools
----------
+``mrjob`` for multiple versions of Python. You may also run it as
+:command:`python -m mrjob.cmd <subcommand>`.
 
 .. _audit-emr-usage:
 
@@ -48,6 +41,14 @@ report-long-jobs
 
     .. automodule:: mrjob.tools.emr.report_long_jobs
 
+run
+^^^
+
+    ``mrjob run (path to script or executable) [options]``
+
+    Run a job. While you can use this command to invoke your jobs, you
+    can just as easily call ``python my_job.py [options]``.
+
 s3-tmpwatch
 ^^^^^^^^^^^
 
@@ -71,14 +72,3 @@ terminate-idle-clusters
 ^^^^^^^^^^^^^^^^^^^^^^^
 
     .. automodule:: mrjob.tools.emr.terminate_idle_clusters
-
-
-Running jobs
-------------
-
-    ``mrjob run (path to script or executable) [options]``
-
-    Run a job. Takes same options as invoking a Python job. See
-    :doc:`configs-all-runners`, :doc:`configs-hadoopy-runners`, :doc:`dataproc-opts`, and
-    :doc:`emr-opts`. While you can use this command to invoke your jobs, you
-    can just as easily call ``python my_job.py [options]``.

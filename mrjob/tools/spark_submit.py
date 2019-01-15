@@ -15,8 +15,8 @@
 runners. For example, you can submit your spark job to EMR just by adding
 ``-r emr``.
 
-This also adds a couple of mrjob features that are not standard with
-:command:`spark-submit`: ``--cmdenv`` and ``--dirs``.
+This also adds a few mrjob features that are not standard with
+:command:`spark-submit`, such as ``--cmdenv``, ``--dirs``, and ``--setup``.
 
 Usage::
 
@@ -27,10 +27,6 @@ Options::
 
   -r {emr,hadoop}, --runner {emr,hadoop}
                         Where to run the job (default: "hadoop")
-  --deploy-mode SPARK_DEPLOY_MODE
-                        Whether to launch the driver program locally
-                        ("client") or on one of the worker machines inside the
-                        cluster ("cluster") (Default: client).
   --class MAIN_CLASS    Your application's main class (for Java / Scala apps).
   --name NAME           The name of your application.
   --jars LIBJARS        Comma-separated list of jars to include on the
@@ -89,6 +85,10 @@ Options::
                         spark://host:port, mesos://host:port,
                         yarn,k8s://https://host:port, or local (Default:
                         yarn).
+  --deploy-mode SPARK_DEPLOY_MODE
+                        Whether to launch the driver program locally
+                        ("client") or on one of the worker machines inside the
+                        cluster ("cluster") (Default: client).
   --driver-cores DRIVER_CORES
                         Number of cores used by the driver (Default: 1).
   --supervise           If given, restarts the driver on failure.
@@ -103,6 +103,12 @@ Options::
                         Number of executors to launch (Default: 2). If dynamic
                         allocation is enabled, the initial number of executors
                         will be at least NUM.
+  --setup SETUP         A command to run before each Spark executor in the
+                        shell ("touch foo"). In cluster mode, runs before the
+                        Spark driver as well. You may interpolate files
+                        available via URL or on your local filesystem using
+                        Hadoop Distributed Cache syntax (". setup.sh#"). To
+                        interpolate archives, use #/: "cd foo.tar.gz#/; make.
   --archives UPLOAD_ARCHIVES
                         Comma-separated list of archives to be extracted into
                         the working directory of each executor.

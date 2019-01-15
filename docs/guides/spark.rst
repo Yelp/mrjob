@@ -15,6 +15,7 @@ the following features familiar to users of mrjob:
 * support for :mrjob-opt:`libjars`
 * passthrough and file options (see :ref:`writing-cl-opts`)
 * automatically upload input and other support files to HDFS or S3 (see :mrjob-opt:`upload_files`, :mrjob-opt:`upload_archives`, and :mrjob-opt:`py_files`)
+* automatically run :command:`make` and other command before running Spark tasks (see :mrjob-opt:`setup`).
 * automatically set up Spark on EMR (see :mrjob-opt:`bootstrap_spark`)
 * automatically making the mrjob library available to your job
   (see :mrjob-opt:`bootstrap_mrjob`)
@@ -23,12 +24,27 @@ the following features familiar to users of mrjob:
 
    mrjob does not yet support Spark on Google Cloud Dataproc.
 
-Writing your first Spark job
-----------------------------
+mrjob spark-submit
+------------------
 
-The simplest way to integrate mrjob with Spark is to add a
+.. versionadded: 0.6.7
+
+If you already have a Spark script written, the easiest way to access mrjob's
+features is to run your job with :command:`mrjob spark-submit`, just like you
+would normally run it with :command:`spark-submit`. This can, for instance,
+make running a Spark job on EMR as easy as running it locally, or allow
+you to access features (e.g. :mrjob-opt:`setup`) not natively supported by
+Spark.
+
+For more details, see :ref:`mrjob spark-submit <spark-submit>`.
+
+Writing your first Spark MRJob
+------------------------------
+
+Another way to integrate mrjob with Spark is to add a
 :py:meth:`~mrjob.job.MRJob.spark` method to your :py:class:`~mrjob.job.MRJob`
-class, and put your Spark code inside it.
+class, and put your Spark code inside it. This will allow you to access
+features only availble to MRJobs (e.g. :py:attr:`~mrjob.job.MRJob.FILES`).
 
 Here's how you'd implement a word frequency count job in Spark::
 

@@ -14,6 +14,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Representations of job steps, to use in your :py:class:`~mrjob.job.MRJob`'s
+:py:meth:`~mrjob.job.MRJob.steps` method.
+
+Because :py:class:`the runner <mrjob.runner.MRJobRunner>` just needs to know
+how to invoke your MRJob script, not how it works insternally, each step
+instance's ``description()`` method produces a simplified, JSON-able
+description of the step, to pass to the runner.
+"""
 import logging
 
 from mrjob.py2 import string_types
@@ -49,13 +57,13 @@ _SPARK_JAR_STEP_KWARGS = ['args', 'jar', 'main_class', 'spark_args']
 _SPARK_SCRIPT_STEP_KWARGS = ['args', 'script', 'spark_args']
 
 
-#: If passed as an argument to :py:class:`JarStep` or
-#: py:class:`SparkScriptStep`, it'll be replaced with the step's input path(s)
-#: (if there are multiple paths, they'll be joined with commas)
+#: If passed as an argument to :py:class:`JarStep`, :py:class:`SparkJarStep`,
+#: or :py:class:`SparkScriptStep`, it'll be replaced with the step's input
+#: path(s). If there are multiple paths, they'll be joined with commas.
 INPUT = '<input>'
 
-#: If this is passed as an argument to :py:class:`JarStep` or
-#: py:class:`SparkScriptStep`, it'll be replaced
+#: If this is passed as an argument to :py:class:`JarStep`,
+#: :py:class:`SparkJarStep`, or :py:class:`SparkScriptStep`, it'll be replaced
 #: with the step's output path
 OUTPUT = '<output>'
 
@@ -141,6 +149,34 @@ class MRStep(object):
 
     Also accepts `jobconf`, a dictionary with custom jobconf arguments to pass
     to hadoop.
+
+    A MRStep's description looks like::
+
+        {
+            'type': 'streaming',
+            'mapper': { ... },
+            'combiner': { ... },
+            'reducer': { ... },
+            'jobconf': { ... },  # dict of Hadoop configuration properties
+        }
+
+    At least one of ``mapper``, ``combiner`` and ``reducer`` need be included.
+    ``jobconf`` is completely optional.
+
+    ``mapper``, ``combiner``, and ``reducer`` are either handled by
+    the script containing your job definition, in which case they look like::
+
+        {
+            'type': 'script',
+            'pre_filter': 'grep -v bad', # optional cmd to filter input
+        }
+
+    or they simply run a command, which looks like::
+
+        {
+            'type': 'command',
+            'command': 'cut -f 1-2', # command to run, as a string
+        }
     """
     def __init__(self, **kwargs):
         # limit which keyword args can be specified
@@ -236,42 +272,6 @@ class MRStep(object):
         return self._render_substep('reducer_cmd', 'reducer_pre_filter')
 
     def description(self, step_num=0):
-        """Returns a dictionary representation of this step:
-
-        .. code-block:: js
-
-            {
-                'type': 'streaming',
-                'mapper': { ... },
-                'combiner': { ... },
-                'reducer': { ... },
-                'jobconf': dictionary of Hadoop configuration properties
-            }
-
-        ``jobconf`` is optional, and only one of ``mapper``, ``combiner``,
-        and ``reducer`` need be included.
-
-        ``mapper``, ``combiner``, and ``reducer`` are either handled by
-        the script containing your job definition:
-
-        .. code-block:: js
-
-           {
-               'type': 'script',
-               'pre_filter': (optional) cmd to pass input through, as a string
-           }
-
-        or they simply run a command:
-
-        .. code-block:: js
-
-            {
-                'type': 'command',
-                'command': command to run, as a string
-            }
-
-        See :ref:`steps-format` for examples.
-        """
         desc = {'type': 'streaming'}
         # Use a mapper if:
         #   - the user writes one
@@ -410,6 +410,20 @@ class JarStep(_Step):
     *jar* can also be passed as a positional argument
 
     See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
+
+    Sample description of a JarStep::
+
+        {
+            'type': 'jar',
+            'jar': 'binks.jar.jar',
+            'main_class': 'MyMainMan',  # optional
+            'args': ['argh', 'argh']  # optional
+            'jobconf': { ... }  # optional
+        }
+
+    To give your jar access to input files, an empty output directory,
+    configuration properties, and libjars managed by mrjob, you may include
+    :py:data:`INPUT`, :py:data:`OUTPUT`, and :py:data:`GENERIC_ARGS` in *args*.
     """
     _STEP_TYPE = 'jar'
 
@@ -429,6 +443,14 @@ class SparkStep(_Step):
     :param jobconf: (optional) A dictionary of Hadoop properties
     :param spark_args: (optional) an array of arguments to pass to spark-submit
                        (e.g. ``['--executor-memory', '2G']``).
+
+    Sample description of a SparkStep::
+
+        {
+            'type': 'spark',
+            'jobconf': { ... },  # optional
+            'spark_args': ['--executor-memory', '2G'],  # optional
+        }
     """
     _STEP_TYPE = 'spark'
 
@@ -458,6 +480,21 @@ class SparkJarStep(_Step):
                        (e.g. ``['--executor-memory', '2G']``).
 
     *jar* and *main_class* can also be passed as positional arguments
+
+    Sample description of a SparkJarStep::
+
+        {
+            'type': 'spark_jar',
+            'jar': 'binks.jar.jar',
+            'main_class': 'MyMainMan',  # optional
+            'args': ['argh', 'argh'],  # optional
+            'jobconf': { ... },  # optional
+            'spark_args': ['--executor-memory', '2G'],  # optional
+        }
+
+    To give your Spark JAR access to input files and an empty output directory
+    managed by mrjob, you may include :py:data:`INPUT` and :py:data:`OUTPUT`
+    in *args*.
     """
     _STEP_TYPE = 'spark_jar'
 
@@ -484,6 +521,20 @@ class SparkScriptStep(_Step):
                        (e.g. ``['--executor-memory', '2G']``).
 
     *script* can also be passed as a positional argument
+
+    Sample description of a ScriptStep::
+
+       {
+            'type': 'spark_script',
+            'script': 'my_spark_script.py',
+            'args': ['script_arg1', 'script_arg2'],
+            'jobconf': { ... },  # optional
+            'spark_args': ['--executor-memory', '2G'],  # optional
+        }
+
+    To give your Spark script access to input files and an empty output
+    directory managed by mrjob, you may include :py:data:`INPUT` and
+    :py:data:`OUTPUT` in *args*.
     """
     _STEP_TYPE = 'spark_script'
 

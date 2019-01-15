@@ -6,6 +6,7 @@ Reference
 
     utils-ami.rst
     utils-cat.rst
+    cmd.rst
     utils-compat.rst
     configs.rst
     runners-dataproc.rst

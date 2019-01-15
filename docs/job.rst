@@ -3,7 +3,6 @@ mrjob.job - defining your job
 
 .. py:module:: mrjob.job
 
-
 .. currentmodule:: mrjob.job
 
 .. autoclass:: MRJob
@@ -107,8 +106,11 @@ Running specific parts of jobs
 ------------------------------
 .. automethod:: MRJob.run_job
 .. automethod:: MRJob.run_mapper
+.. automethod:: MRJob.map_pairs
 .. automethod:: MRJob.run_reducer
+.. automethod:: MRJob.reduce_pairs
 .. automethod:: MRJob.run_combiner
+.. automethod:: MRJob.combine_pairs
 .. automethod:: MRJob.show_steps
 
 .. _hadoop-config:

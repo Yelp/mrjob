@@ -153,46 +153,34 @@ in different ways. You'll only ever use one of these; the rest are for mrjob
 and Hadoop Streaming to use.
 
 When you run with no arguments or with ``--runner``, you invoke mrjob's
-machinery for running your job or submitting it to the cluster. We'll call it
-*Process 1* to disambiguate it later. Your mappers and reducers are not called
-in this process at all [#inl]_.
+machinery for running your job or submitting it to the cluster. Your mappers
+and reducers are not called in this process at all [#inl]_.
 
-::
+This process creates a runner (see :py:class:`~mrjob.runner.MRJobRunner`),
+which then sends the job to Hadoop [#inl2]_.
 
-    $ python my_job.py -r hadoop input.txt  # run process 1
-
-Within Process 1, mrjob will need to determine what the :term:`steps <step>` of
-your project are. It does so by launching another subprocess of your job, this
-time with the ``--steps`` argument, which we'll call Process 2::
-
-    $ python my_job.py --steps              # run process 2
-    [{"mapper": {"type": "script"},
-      "reducer": {"type": "script"},
-      "combiner": {"type": "script"},
-      "type": "streaming"}]
-
-mrjob now has all the information it needs to send the job to Hadoop [#inl2]_.
-It does so. (At this time, please wave your hands in the air to represent
-magic.)
-
-mrjob has told Hadoop something like this:
+It tells Hadoop something like this:
 
 * Run a step with Hadoop Streaming.
 * The command for the mapper is ``python my_job.py --step-num=0 --mapper``.
 * The command for the combiner is ``python my_job.py --step-num=0 --combiner``.
 * The command for the reducer is ``python my_job.py --step-num=0 --reducer``.
 
-When Hadoop distributes tasks among the task nodes, Hadoop Streaming will use
-the appropriate command to process the data it is given. (We did not assign
-numbers to the above commands because there might be anywhere from 1 to 10,000
-processes running on Hadoop.)
+If you have a multi-step job, ``--step-num`` helps your script know which step
+is being run.
 
-You should now have a pretty good idea of the different environments in which
-your job is run.
+When Hadoop distributes tasks among the task nodes, Hadoop Streaming will use
+the appropriate command to process the data it is given.
+
+.. note:: Prior to v0.6.7, your job would *also* run itself locally with the
+          ``--steps`` switch, to get a JSON representation of the job's step.
+          Jobs now pass that representation directly to the runner
+          when they instantiate it. See :doc:`../step` for more
+          information.
 
 .. rubric:: Footnotes
 
 .. [#inl] Unless you're using the ``inline`` runner, which is a special case
     for debugging.
 
-.. [#inl2] Or run the job locally.
+.. [#inl2] Or when using the ``local`` runner, a simulation of Hadoop.

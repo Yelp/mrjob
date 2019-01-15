@@ -471,9 +471,9 @@ class MRJobLauncher(object):
             return LocalMRJobRunner
 
         elif self.options.runner == 'inline':
-             raise ValueError(
-                 "inline is not supported in the multi-lingual"
-                 " launcher.")
+            raise ValueError(
+                "inline is not supported in the multi-lingual"
+                " launcher.")
 
         return _runner_class(self.options.runner)
 

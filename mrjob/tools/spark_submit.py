@@ -397,6 +397,7 @@ def main(cl_args=None):
     finally:
         runner.cleanup()
 
+
 def _get_runner_opt_kwargs(options, runner_class):
     """Extract the options for the given runner class from *options*."""
     return {opt_name: getattr(options, opt_name)
@@ -575,8 +576,6 @@ def _make_basic_help_parser(include_deprecated=False):
                 _add_deprecated_arg(help_parser)
 
     return help_parser
-
-
 
 
 if __name__ == '__main__':

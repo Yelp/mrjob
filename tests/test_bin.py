@@ -83,7 +83,6 @@ class AllowSparkOnLocalRunnerTestCase(SandboxedTestCase):
         self.start(patch('mrjob.runner.MRJobRunner._check_steps'))
 
 
-
 class ArgsForSparkStepTestCase(AllowSparkOnLocalRunnerTestCase):
     # just test the structure of _args_for_spark_step()
 

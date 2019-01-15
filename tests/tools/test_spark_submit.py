@@ -69,7 +69,6 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         def _mock_print_message(self_, message, file=None):
             self.printout += message
 
-
         self.start(patch('argparse.ArgumentParser._print_message',
                          _mock_print_message))
 
@@ -315,8 +314,8 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self._assert_prints_basic_help(['-h'])
 
     def test_help_arg_with_deprecated(self):
-         self._assert_prints_basic_help(['-h', '--deprecated'],
-                                        include_deprecated=True)
+        self._assert_prints_basic_help(['-h', '--deprecated'],
+                                       include_deprecated=True)
 
     def test_help_arg_with_runner(self):
         self._assert_prints_runner_help(

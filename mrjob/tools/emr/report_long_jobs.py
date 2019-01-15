@@ -1,7 +1,7 @@
 # Copyright 2012 Yelp
 # Copyright 2013 David Marin and Steve Johnson
 # Copyright 2014 Brett Gibson
-# Copyright 2015-2017 Yelp
+# Copyright 2015-2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

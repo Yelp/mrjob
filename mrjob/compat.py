@@ -2,6 +2,7 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013-2014 Yelp and Contributors
 # Copyright 2015-2016 Yelp
+# Copyright 2018 Ben Dalling
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

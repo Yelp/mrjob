@@ -37,7 +37,6 @@ v0.6.7, 2019-01-15 -- mrjob spark-submit
  * raise ValueError, not AssertionError (#1877)
  * added experimental harness to submit basic MRJobs on Spark (#1941)
 
-
 v0.6.6, 2018-11-05 -- nicer options and switches
  * configs:
    * boolean jobconf values in mrjob.conf now work correctly (#323)

@@ -4,6 +4,98 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.7:
+
+0.6.7
+-----
+
+:mrjob-opt:`setup` commands now work on Spark (at least on YARN).
+
+Added the :ref:`mrjob spark-submit <spark-submit>` subcommand, which works
+as a drop-in replacement for :command:`spark-submit` but with mrjob runners
+(e.g EMR) and mrjob features (e.g. :mrjob-opt:`setup`, :mrjob-opt:`cmdenv`).
+
+Fixed a bug that was causing idle timeout scripts to silently fail
+on 2.x EMR AMIs.
+
+Fixed a bug that broke :py:meth:`~mrjob.fs.s3.S3Filesystem.create_bucket`
+on ``us-east-1``, preventing new mrjob installations from launching on EMR
+in that region.
+
+Fixed an :py:class:`ImportError` from attempting to import
+:py:data:`os.SIGKILL` on Windows.
+
+The default instance type on EMR is now ``m4.large``.
+
+EMR's cluster pooling now knows the CPU and memory capacity of ``c5`` and
+``m5`` instances, allowing it to join "better" clusters.
+
+Added the plural form of several switches (separate multiple values with
+commas):
+
+ * ``--applications``
+ * ``--archives``
+ * ``--dirs``
+ * ``--files``
+ * ``--libjars``
+ * ``--py-files``
+
+Except for ``--application``, the singular version of these switches
+(``--archive``, ``--dir``, ``--file``, ``--libjar``, ``--py-file``) is
+deprecated for consistency with Hadoop and Spark
+
+:mrjob-opt:`sh_bin` is now fully qualified by default (``/bin/sh -ex``,
+not ``sh -ex``). :mrjob-opt:`sh_bin` may no longer be empty, and a warning
+is issued if it has more than one argument, to properly support shell script
+shebangs (e.g. ``#!/bin/sh -ex``) on Linux.
+
+Runners no longer call :py:class:`~mrjob.job.MRJob`\s with ``--steps``;
+instead the job passes its step description to the runner on instantiation.
+``--steps`` and :mrjob-opt:`steps_python_bin` are now deprecated.
+
+The Hadoop and EMR runner can now set ``SPARK_PYTHON`` and
+``SPARK_DRIVER_PYTHON`` to different values if need be (e.g. to
+match :mrjob-opt:`task_python_bin`, or to support :mrjob-opt:`setup`
+scripts in client mode).
+
+The inline runner no longer attempts to run command substeps.
+
+The inline and local runner no longer silently pretend to run
+non-streaming steps.
+
+The Hadoop runner no longer has the :mrjob-opt:`bootstrap_spark` option,
+which did nothing.
+
+:mrjob-opt:`interpreter` and :mrjob-opt:`steps_interpreter` are deprecated,
+in anticipation in removing support for writing MRJobs in other
+programming languages.
+
+Runners now issue a warning if they receive options that belong to other
+runners (e.g. passing :mrjob-opt:`image_version` to the Hadoop runner).
+
+:command:`mrjob create-cluster` now supports ``--emr-action-on-failure``.
+
+Updated deprecate escape sequences in mrjob code that would break
+on Python 3.8.
+
+``--help`` message for mrjob subcommands now correctly includes the
+subcommand in ``usage``.
+
+mrjob no longer raises :py:class:`AssertionError`, instead raising
+:py:class:`ValueError`.
+
+Added an experimental harness script (in ``mrjob/spark``) to run basic
+MRJobs on Spark, potentially without Hadoop:
+
+.. code-block:: sh
+
+   spark-submit mrjob_spark_harness.py module.of.YourMRJob input_path output_dir
+
+Added :py:meth:`~mrjob.job.MRJob.map_pairs`,
+:py:meth:`~mrjob.job.MRJob.reduce_pairs`,
+and :py:meth:`~mrjob.job.MRJob.combine_pairs` methods to
+:py:class:`~mrjob.job.MRJob`, to enable the Spark harness script.
+
 .. _v0.6.6:
 
 0.6.6

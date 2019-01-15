@@ -1,3 +1,42 @@
+v0.6.7, 2019-01-15 -- mrjob spark-submit
+ * tools:
+   * added mrjob spark-submit subcommand (#1382)
+   * add subcommand to usage in --help for subscommands (#1885)
+ * jobs:
+   * added *_pairs() methods to MRJob (#1947)
+   * pass steps description to runner constructor (#1845)
+     * --steps is deprecated
+ * all runners:
+   * sh_bin defaults to /bin/sh -ex, not just sh -ex (#1924)
+     * sh_bin may not be empty and should not take more than one argument
+   * warn about command-line switches for wrong runner (#1898)
+   * added plural command-line switches (#1882):
+     * added --applications, --archives, --dirs, --files, --libjars, --py-files
+     * deprecated --archive, --dir, --file, --libjar, --py-file
+   * interpreter and steps_interpreter opts are deprecated (#1850)
+   * steps_python_bin is deprecated (#1851)
+   * can set separate SPARK_PYTHON and SPARK_DRIVER_PYTHON if need be
+ * inline runner:
+   * no longer attempts to run command substeps (#1878)
+ * inline and local runner:
+   * no longer attempts to run non-streaming steps (#1915)
+ * Dataproc and EMR runners:
+   * fixed SIGKILL import error on Windows (#1892)
+ * Hadoop and EMR runners:
+   * setup opt works with Spark scripts on YARN (#1376)
+ * Hadoop runner:
+   * removed useless bootstrap_spark opt (#1382)
+ * EMR runner:
+   * fail fast if input files are archived in Glacier (#1887)
+   * default instance type is m4.large (#1932)
+   * pooling knows about c5 and m5 instance types (#1930, #1936)
+   * create_bucket() was broken in us-east-1, fixed (#1927)
+   * idle timeout silently failed on 2.x AMIs, fixed (#1909)
+ * updated deprecated escape sequences that would break in Python 3.8 (#1920)
+ * raise ValueError, not AssertionError (#1877)
+ * added experimental harness to submit basic MRJobs on Spark (#1941)
+
+
 v0.6.6, 2018-11-05 -- nicer options and switches
  * configs:
    * boolean jobconf values in mrjob.conf now work correctly (#323)

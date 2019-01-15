@@ -128,8 +128,6 @@ Options::
 
 This also supports the same runner-specific switches as
 :py:class:`~mrjob.job.MRJob`\\s (e.g. ``--hadoop-bin``, ``--region``).
-
-.. versionadded:: 0.6.7
 """
 from __future__ import print_function
 

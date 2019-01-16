@@ -1,4 +1,4 @@
-v0.6.7, 2019-01-15 -- mrjob spark-submit
+v0.6.7, 2019-01-16 -- mrjob spark-submit
  * tools:
    * added mrjob spark-submit subcommand (#1382)
    * add subcommand to usage in --help for subcommands (#1885)

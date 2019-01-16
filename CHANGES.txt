@@ -1,11 +1,11 @@
 v0.6.7, 2019-01-15 -- mrjob spark-submit
  * tools:
    * added mrjob spark-submit subcommand (#1382)
-   * add subcommand to usage in --help for subscommands (#1885)
+   * add subcommand to usage in --help for subcommands (#1885)
    * added --emr-action-on-failure switch to mrjob create-cluster (#1959)
  * jobs:
    * added *_pairs() methods to MRJob (#1947)
-   * pass steps description to runner constructor (#1845)
+   * jobs pass steps description to runner constructor (#1845)
      * --steps is deprecated
  * all runners:
    * sh_bin defaults to /bin/sh -ex, not just sh -ex (#1924)

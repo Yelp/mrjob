@@ -18,6 +18,7 @@
 them together. Useful for testing, not terrible for running medium-sized
 jobs on all CPUs."""
 import logging
+import math
 import os
 import platform
 from functools import partial
@@ -28,12 +29,16 @@ from subprocess import check_call
 from mrjob.bin import MRJobBinRunner
 from mrjob.logs.errors import _format_error
 from mrjob.logs.task import _parse_task_stderr
+from mrjob.py2 import string_types
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import _sort_lines_in_memory
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 
 log = logging.getLogger(__name__)
+
+
+_DEFAULT_EXECUTOR_MEMORY = '1g'
 
 
 class _TaskFailedException(StepFailedException):
@@ -183,6 +188,36 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             # only sort on the reducer key (see #660)
             return ['sort', '-t', '\t', '-k', '1,1', '-s']
 
+    # Spark steps
+
+    # TODO: _spark_master() should probably take step_num, to allow for
+    # step-specific jobconf
+    def _spark_master(self):
+        """Use the local-cluster master, which simulates a Spark cluster."""
+        # figure out the required parameters to local-cluster
+        num_executors = self._num_cores()
+
+        # for now assigning one core per executor, so we don't have to worry
+        # about a number of cores that's not evenly divisible
+        cores_per_executor = 1
+
+        executor_mem_bytes = _to_num_bytes(
+            self._opts['jobconf'].get('spark.executor.memory') or
+            _DEFAULT_EXECUTOR_MEMORY)
+        executor_mem_mb = math.ceil(executor_mem_bytes / 1024.0 / 1024.0)
+
+        return 'local-cluster[%d,%d,%d]' % (
+            num_executors, cores_per_executor, executor_mem_mb)
+
+
+def _to_num_bytes(java_mem_str):
+    if isinstance(java_mem_str, string_types):
+        for i, magnitude in enumerate(('k', 'm', 'g', 't'), start=1):
+            if java_mem_str.lower().endswith(magnitude):
+                return int(java_mem_str[:-1]) * 1024 ** i
+
+    return int(java_mem_str)
+
 
 # pickle utilities, to protect multiprocessing from itself
 
@@ -215,6 +250,9 @@ def _pickle_safe(func):
         raise  # we know these are pickleable
     except Exception as ex:
         raise Exception(repr(ex))  # we know this is pickleable
+
+
+        # other utilities
 
 
 def _sort_lines_with_sort_bin(input_paths, output_path, sort_bin,

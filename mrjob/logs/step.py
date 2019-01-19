@@ -204,6 +204,21 @@ def _interpret_emr_step_stderr(fs, matches):
     return {}
 
 
+def _yield_lines_from_pty_or_pipe(stderr):
+    """Yield lines from a PTY or pipe, converting to unicode and gracefully
+    handling errno.EIO"""
+    try:
+        for line in stderr:
+            yield to_unicode(line)
+    except IOError as e:
+        # this is just the PTY's way of saying goodbye
+        if e.errno == errno.EIO:
+            return
+        else:
+            raise
+
+# TODO: could factor out _yield_lines_from_pty_or_pipe() and just have
+# this method take a sequence of lines
 def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     """Parse stderr from the ``hadoop jar`` command. Works like
     :py:func:`_parse_step_syslog` (same return format)  with a few extra
@@ -217,23 +232,13 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     - Optionally calls *record_callback* for each log4j record (see
       :py:func:`~mrjob.logs.log4j._parse_hadoop_log4j_records`).
     """
-    def yield_lines():
-        try:
-            for line in stderr:
-                yield to_unicode(line)
-        except IOError as e:
-            # this is just the PTY's way of saying goodbye
-            if e.errno == errno.EIO:
-                return
-            else:
-                raise
-
     def pre_filter(line):
         return bool(_HADOOP_STREAMING_NON_LOG4J_LINE_RE.match(line))
 
     def yield_records():
-        for record in _parse_hadoop_log4j_records(yield_lines(),
-                                                  pre_filter=pre_filter):
+        for record in _parse_hadoop_log4j_records(
+                _yield_lines_from_pty_or_pipe(stderr),
+                pre_filter=pre_filter):
             if record_callback:
                 record_callback(record)
             yield record

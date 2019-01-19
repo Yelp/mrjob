@@ -36,6 +36,10 @@ except ImportError:
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.logs.errors import _format_error
+from mrjob.logs.log4j import _parse_hadoop_log4j_records
+from mrjob.logs.step import _log_line_from_driver
+from mrjob.logs.step import _log_log4j_record
+from mrjob.logs.step import _yield_lines_from_pty_or_pipe
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.py2 import string_types
 from mrjob.py2 import to_unicode
@@ -152,12 +156,13 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE, env=env)
 
             for line in step_proc.stderr:
-                # TODO: could parse log4j records, we know how to do that
-                _log_line(line)
+                for record in _parse_hadoop_log4j_records(
+                        _yield_lines_from_pty_or_pipe(step_proc.stderr)):
+                    _log_log4j_record(record)
 
             # there shouldn't be much output on STDOUT
             for line in step_proc.stdout:
-                _log_line(line)
+                _log_line_from_driver(line)
 
             step_proc.stdout.close()
             step_proc.stderr.close()
@@ -171,8 +176,9 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
                 log.debug('Invoking spark-submit via PTY')
 
                 with os.fdopen(master_fd, 'rb') as master:
-                    for line in master:
-                        _log_line(line)
+                    for record in _parse_hadoop_log4j_records(
+                            _yield_lines_from_pty_or_pipe(master)):
+                        _log_log4j_record(record)
                     _, returncode = os.waitpid(pid, 0)
 
         if returncode:

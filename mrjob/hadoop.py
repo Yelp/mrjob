@@ -39,6 +39,8 @@ from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
+from mrjob.logs.step import _log_line_from_driver
+from mrjob.logs.step import _log_log4j_record
 from mrjob.logs.wrap import _logs_exist
 from mrjob.parse import is_uri
 from mrjob.py2 import to_unicode
@@ -439,7 +441,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
                 # there shouldn't be much output to STDOUT
                 for line in step_proc.stdout:
-                    _log_line_from_hadoop(to_unicode(line).strip('\r\n'))
+                    _log_line_from_driver(to_unicode(line).strip('\r\n'))
 
                 step_proc.stdout.close()
                 step_proc.stderr.close()
@@ -635,16 +637,7 @@ def _hadoop_prefix_from_bin(hadoop_bin):
     return hadoop_home
 
 
-def _log_line_from_hadoop(line, level=None):
-    """Log ``'  <line>'``. *line* should be a string.
-
-    Optionally specify a logging level (default is logging.INFO).
-    """
-    log.log(level or logging.INFO, '  %s' % line)
-
-
 def _log_record_from_hadoop(record):
     """Log log4j record parsed from hadoop stderr."""
     if not _is_counter_log4j_record(record):  # counters are printed separately
-        level = getattr(logging, record.get('level') or '', None)
-        _log_line_from_hadoop(record['message'], level=level)
+        _log_log4j_record(record)

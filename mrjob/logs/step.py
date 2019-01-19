@@ -18,6 +18,7 @@ Hadoop streaming command (we call them this because EMR puts them
 in the steps/ subdir of the logs on S3)."""
 import errno
 import re
+import logging
 from logging import getLogger
 
 from mrjob.py2 import to_unicode
@@ -400,3 +401,17 @@ def _parse_indented_counters(lines):
             log.warning('unexpected counter line: %s' % line)
 
     return counters
+
+
+def _log_line_from_driver(line, level=None):
+    """Log ``'  <line>'``. *line* should be a string.
+
+    Optionally specify a logging level (default is logging.INFO).
+    """
+    log.log(level or logging.INFO, '  %s' % line)
+
+
+def _log_log4j_record(record):
+    """Log a log4j message at the appropriate logging level"""
+    level = getattr(logging, record.get('level') or '', None)
+    _log_line_from_driver(record['message'], level=level)

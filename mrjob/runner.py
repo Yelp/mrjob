@@ -1102,7 +1102,7 @@ class MRJobRunner(object):
         except the first step, this list will have a single item (a
         directory)."""
         if step_num == 0:
-            return [self._upload_mgr.uri(path)
+            return [self._upload_mgr.uri(path) if self._upload_mgr else path
                     for path in self._get_input_paths()]
         else:
             return [self._intermediate_output_uri(step_num - 1)]

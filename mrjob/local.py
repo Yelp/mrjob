@@ -25,14 +25,24 @@ from functools import partial
 from multiprocessing import Pool
 from subprocess import CalledProcessError
 from subprocess import check_call
+from subprocess import Popen
+from subprocess import PIPE
+
+try:
+    import pty
+    pty  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    pty = None
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.logs.errors import _format_error
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.py2 import string_types
+from mrjob.py2 import to_unicode
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import _sort_lines_in_memory
 from mrjob.step import StepFailedException
+from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 
 log = logging.getLogger(__name__)
@@ -74,6 +84,9 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
         'sort_bin',
     }
 
+    _STEP_TYPES = (
+        SimMRJobRunner._STEP_TYPES | {'spark', 'spark_jar', 'spark_script'})
+
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
         under ``runners/local``.
@@ -101,6 +114,72 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             _invoke_task_in_subprocess,
             task_type, step_num, task_num,
             args, num_steps)
+
+    def _run_step(self, step, step_num):
+        if _is_spark_step_type(step['type']):
+            self._run_step_on_spark(step, step_num)
+        else:
+            super(LocalMRJobRunner, self)._run_step(step, step_num)
+
+    # TODO: this is similar to _run_job_in_hadoop() (hadoop.py), and is
+    # probably useful to other runners with minor modifications
+    def _run_step_on_spark(self, step, step_num):
+        if self._opts['upload_archives']:
+            log.warning('Spark master %r will probably ignore archives' %
+                        self._spark_master())
+
+        step_args = self._args_for_spark_step(step_num)
+
+        env = dict(os.environ)
+        env.update(self._spark_cmdenv(step_num))
+
+        log.debug('> %s' % cmd_line(step_args))
+        log.debug('  with environment: %r' % sorted(env.items()))
+
+        def _log_line(line):
+            log.info('  %s' % to_unicode(line).strip('\r\n'))
+
+        # try to use a PTY if it's available
+        try:
+            pid, master_fd = pty.fork()
+        except (AttributeError, OSError):
+            # no PTYs, just use Popen
+
+            # user won't get much feedback for a while, so tell them
+            # spark-submit is running
+            log.debug('No PTY available, using Popen() to invoke spark-submit')
+
+            step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE, env=env)
+
+            for line in step_proc.stderr:
+                # TODO: could parse log4j records, we know how to do that
+                _log_line(line)
+
+            # there shouldn't be much output on STDOUT
+            for line in step_proc.stdout:
+                _log_line(line)
+
+            step_proc.stdout.close()
+            step_proc.stderr.close()
+
+            returncode = step_proc.wait()
+        else:
+            # we have PTYs
+            if pid == 0:  # we are the child process
+                os.execvpe(step_args[0], step_args, env)
+            else:
+                log.debug('Invoking spark-submit via PTY')
+
+                with os.fdopen(master_fd, 'rb') as master:
+                    for line in master:
+                        _log_line(line)
+                    _, returncode = os.waitpid(pid, 0)
+
+        if returncode:
+            reason = str(CalledProcessError(returncode, step_args))
+            raise StepFailedException(
+                reason=reason, step_num=step_num,
+                num_steps=self._num_steps())
 
     def _run_multiple(self, funcs, num_processes=None):
         """Use multiprocessing to run in parallel."""

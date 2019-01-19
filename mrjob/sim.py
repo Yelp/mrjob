@@ -139,28 +139,34 @@ class SimMRJobRunner(MRJobRunner):
 
             self._counters.append({})
 
-            try:
-                self._create_dist_cache_dir(step_num)
-                self.fs.mkdir(self._output_dir_for_step(step_num))
+            self._run_step(step, step_num)
 
-                map_splits = self._split_mapper_input(
-                    self._input_paths_for_step(step_num), step_num)
+    def _run_step(self, step, step_num):
+        """Run an individual step. You can assume that setup wrapper scripts
+        are created and self._counters has a dictionary for that step already.
+        """
+        try:
+            self._create_dist_cache_dir(step_num)
+            self.fs.mkdir(self._output_dir_for_step(step_num))
 
-                self._run_mappers_and_combiners(step_num, map_splits)
+            map_splits = self._split_mapper_input(
+                self._input_paths_for_step(step_num), step_num)
 
-                if 'reducer' in step:
-                    self._sort_reducer_input(step_num, len(map_splits))
-                    num_reducer_tasks = self._split_reducer_input(step_num)
+            self._run_mappers_and_combiners(step_num, map_splits)
 
-                    self._run_reducers(step_num, num_reducer_tasks)
+            if 'reducer' in step:
+                self._sort_reducer_input(step_num, len(map_splits))
+                num_reducer_tasks = self._split_reducer_input(step_num)
 
-                self._log_counters(step_num)
+                self._run_reducers(step_num, num_reducer_tasks)
 
-            except Exception as ex:
-                self._log_counters(step_num)
-                self._log_cause_of_error(ex)
+            self._log_counters(step_num)
 
-                raise
+        except Exception as ex:
+            self._log_counters(step_num)
+            self._log_cause_of_error(ex)
+
+            raise
 
     def _run_task_func(self, task_type, step_num, task_num, map_split=None):
         """Returns a no-args function that runs one mapper, reducer, or

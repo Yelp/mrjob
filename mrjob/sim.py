@@ -129,6 +129,9 @@ class SimMRJobRunner(MRJobRunner):
         pass
 
     def _run(self):
+        if not self._output_dir:
+            self._output_dir = join(self._get_local_tmp_dir(), 'output')
+
         if hasattr(self, '_create_setup_wrapper_scripts'):  # inline doesn't
             self._create_setup_wrapper_scripts()
 
@@ -572,8 +575,6 @@ class SimMRJobRunner(MRJobRunner):
 
     def _output_dir_for_step(self, step_num):
         if step_num == self._num_steps() - 1:
-            if not self._output_dir:
-                self._output_dir = join(self._get_local_tmp_dir(), 'output')
             return self._output_dir
         else:
             return self._intermediate_output_uri(step_num, local=True)

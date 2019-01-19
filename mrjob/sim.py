@@ -370,13 +370,16 @@ class SimMRJobRunner(MRJobRunner):
             return {tk: v for k, v in j.items()
                     for tk in translate_jobconf_for_all_versions(k)}
 
+    def _num_cores(self):
+        return self._opts['num_cores'] or cpu_count()
+
     def _num_mappers(self, step_num):
         # TODO: look up mapred.job.maps (convert to int) in _jobconf_for_step()
-        return self._opts['num_cores'] or cpu_count()
+        return self._num_cores()
 
     def _num_reducers(self, step_num):
         # TODO: look up mapred.job.reduces in _jobconf_for_step()
-        return self._opts['num_cores'] or cpu_count()
+        return self._num_cores()
 
     def _split_mapper_input(self, input_paths, step_num):
         """Take one or more input paths (which may be compressed) and split

@@ -1030,13 +1030,6 @@ class LocalInputManifestTestCase(InlineInputManifestTestCase):
 
 class UnsupportedStepsTestCase(SandboxedTestCase):
 
-    def test_no_spark_steps(self):
-        # just a sanity check; _STEP_TYPES is tested in a lot of ways
-        job = MRNullSpark(['-r', 'local'])
-        job.sandbox()
-
-        self.assertRaises(NotImplementedError, job.make_runner)
-
     def test_no_jar_steps(self):
         jar_path = self.makefile('dora.jar')
 

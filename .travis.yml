@@ -21,7 +21,7 @@ install:
 addons:
   apt:
     packages:
-      - oracle-java8-installer
+      - oracle-java8-set-default
 # command to run tests
 script: python -m unittest discover -v
 sudo: false

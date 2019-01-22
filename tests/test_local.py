@@ -66,19 +66,6 @@ from tests.test_sim import SimRunnerNoMapperTestCase
 from tests.test_sim import SortValuesTestCase
 
 
-def _bash_wrap(cmd_str):
-    """Escape single quotes in a shell command string and wrap it with ``bash
-    -c '<string>'``.
-
-    This low-tech replacement works because we control the surrounding string
-    and single quotes are the only character in a single-quote string that
-    needs escaping.
-
-    .. deprecated:: 0.5.8
-    """
-    return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
-
-
 class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
@@ -641,7 +628,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
         with gzip.open(x_gz_path, 'wb') as x_gz:
             x_gz.write(b'x\nx\nx\nx\nx\nx\n')
 
-        reducer_cmd = _bash_wrap('wc -l | tr -Cd "[:digit:]"')
+        reducer_cmd = '/bin/sh -c \'wc -l | tr -Cd "[:digit:]"\''
         job = MRCmdJob([
             '--runner', 'local',
             '--mapper-cmd', 'cat -e',

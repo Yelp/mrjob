@@ -1,11 +1,12 @@
 language: python
 python:
   - "2.7"
-  - "pypy"
   - "3.4"
   - "3.5"
   - "3.6"
   - "3.7"
+  - "pypy2.7-6.0"
+  - "pypy3.5-6.0"
 dist: xenial
 before_install:
   - sudo -E apt-add-repository -y "ppa:webupd8team/java"

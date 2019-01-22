@@ -1037,3 +1037,48 @@ class UnsupportedStepsTestCase(SandboxedTestCase):
         job.sandbox()
 
         self.assertRaises(NotImplementedError, job.make_runner)
+
+
+class SparkMasterTestCase(SandboxedTestCase):
+
+    def test_default_spark_master(self):
+        runner = LocalMRJobRunner()
+
+        self.assertEqual(runner._spark_master(),
+                         'local-cluster[%d,1,1024]' % cpu_count())
+
+    def test_num_cores(self):
+        runner = LocalMRJobRunner(num_cores=3)
+
+        self.assertEqual(runner._spark_master(),
+                         'local-cluster[3,1,1024]')
+
+    def _test_spark_executor_memory(self, conf_value, megs):
+        runner = LocalMRJobRunner(
+            jobconf={'spark.executor.memory': conf_value})
+
+        self.assertEqual(runner._spark_master(),
+                         'local-cluster[%d,1,%d]' % (
+                             cpu_count(), megs))
+
+    def test_spark_exector_memory_2g(self):
+        self._test_spark_executor_memory('2g', 2048)
+
+    def test_spark_exector_memory_512m(self):
+        self._test_spark_executor_memory('512m', 512)
+
+    def test_spark_exector_memory_512M(self):
+        # test case-insensitivity
+        self._test_spark_executor_memory('512M', 512)
+
+    def test_spark_exector_memory_1t(self):
+        self._test_spark_executor_memory('1t', 1024 * 1024)
+
+    def test_spark_exector_memory_1_billion(self):
+        # should round up
+        self._test_spark_executor_memory('1000000000', 954)
+
+    def test_spark_exector_memory_640000k(self):
+        self._test_spark_executor_memory('640000k', 625)
+
+    # TODO: does Spark allow floats?

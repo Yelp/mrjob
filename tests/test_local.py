@@ -39,6 +39,7 @@ from mrjob.cat import decompress
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
+from mrjob.examples.mr_sparkaboom import MRSparKaboom
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.local import _sort_lines_in_memory
@@ -1099,6 +1100,13 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
 
         self.assertEqual(counts, dict(
             blue=1, fish=4, one=1, red=1, two=1))
+
+    def test_spark_job_failure(self):
+        job = MRSparKaboom(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(b'line\n'))
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
 
     def test_spark_script_mrjob(self):
         text = b'one fish\ntwo fish\nred fish\nblue fish\n'

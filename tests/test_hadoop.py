@@ -52,7 +52,6 @@ from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.test_bin import PYTHON_BIN
-from tests.test_local import _bash_wrap
 
 # pty isn't available on Windows
 try:
@@ -896,7 +895,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 'type': 'streaming',
                 'mapper': {
                     'type': 'script',
-                    'pre_filter': _bash_wrap("grep 'anything'"),
+                    'pre_filter': "bash -c 'grep '\\''anything'\\'''",
                 },
             },
         ]

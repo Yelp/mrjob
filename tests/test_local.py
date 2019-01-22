@@ -29,14 +29,23 @@ from unittest import skipIf
 
 from warcio.warcwriter import WARCWriter
 
+try:
+    import pyspark
+except ImportError:
+    pyspark = None
+
 import mrjob
 from mrjob.cat import decompress
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
+from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
+from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
+from mrjob.examples.mr_sparkaboom import MRSparKaboom
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.local import _sort_lines_in_memory
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
+from mrjob.util import safeeval
 from mrjob.util import to_lines
 
 import tests.sr_wc
@@ -64,19 +73,6 @@ from tests.test_sim import LocalFSTestCase
 from tests.test_sim import SimRunnerJobConfTestCase
 from tests.test_sim import SimRunnerNoMapperTestCase
 from tests.test_sim import SortValuesTestCase
-
-
-def _bash_wrap(cmd_str):
-    """Escape single quotes in a shell command string and wrap it with ``bash
-    -c '<string>'``.
-
-    This low-tech replacement works because we control the surrounding string
-    and single quotes are the only character in a single-quote string that
-    needs escaping.
-
-    .. deprecated:: 0.5.8
-    """
-    return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
 
 
 class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
@@ -641,7 +637,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
         with gzip.open(x_gz_path, 'wb') as x_gz:
             x_gz.write(b'x\nx\nx\nx\nx\nx\n')
 
-        reducer_cmd = _bash_wrap('wc -l | tr -Cd "[:digit:]"')
+        reducer_cmd = '/bin/sh -c \'wc -l | tr -Cd "[:digit:]"\''
         job = MRCmdJob([
             '--runner', 'local',
             '--mapper-cmd', 'cat -e',
@@ -1030,13 +1026,6 @@ class LocalInputManifestTestCase(InlineInputManifestTestCase):
 
 class UnsupportedStepsTestCase(SandboxedTestCase):
 
-    def test_no_spark_steps(self):
-        # just a sanity check; _STEP_TYPES is tested in a lot of ways
-        job = MRNullSpark(['-r', 'local'])
-        job.sandbox()
-
-        self.assertRaises(NotImplementedError, job.make_runner)
-
     def test_no_jar_steps(self):
         jar_path = self.makefile('dora.jar')
 
@@ -1044,3 +1033,97 @@ class UnsupportedStepsTestCase(SandboxedTestCase):
         job.sandbox()
 
         self.assertRaises(NotImplementedError, job.make_runner)
+
+
+class SparkMasterTestCase(SandboxedTestCase):
+
+    def test_default_spark_master(self):
+        runner = LocalMRJobRunner()
+
+        self.assertEqual(runner._spark_master(),
+                         'local-cluster[%d,1,1024]' % cpu_count())
+
+    def test_num_cores(self):
+        runner = LocalMRJobRunner(num_cores=3)
+
+        self.assertEqual(runner._spark_master(),
+                         'local-cluster[3,1,1024]')
+
+    def _test_spark_executor_memory(self, conf_value, megs):
+        runner = LocalMRJobRunner(
+            jobconf={'spark.executor.memory': conf_value})
+
+        self.assertEqual(runner._spark_master(),
+                         'local-cluster[%d,1,%d]' % (
+                             cpu_count(), megs))
+
+    def test_spark_exector_memory_2g(self):
+        self._test_spark_executor_memory('2g', 2048)
+
+    def test_spark_exector_memory_512m(self):
+        self._test_spark_executor_memory('512m', 512)
+
+    def test_spark_exector_memory_512M(self):
+        # test case-insensitivity
+        self._test_spark_executor_memory('512M', 512)
+
+    def test_spark_exector_memory_1t(self):
+        self._test_spark_executor_memory('1t', 1024 * 1024)
+
+    def test_spark_exector_memory_1_billion(self):
+        # should round up
+        self._test_spark_executor_memory('1000000000', 954)
+
+    def test_spark_exector_memory_640000k(self):
+        self._test_spark_executor_memory('640000k', 625)
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class LocalRunnerSparkTestCase(SandboxedTestCase):
+    # these tests are a bit slow because they actually
+    # run on Spark.
+
+    def test_spark_mrjob(self):
+        text = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = MRSparkWordcount(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(text))
+
+        counts = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                k, v = safeeval(line)
+                counts[k] = v
+
+        self.assertEqual(counts, dict(
+            blue=1, fish=4, one=1, red=1, two=1))
+
+    def test_spark_job_failure(self):
+        job = MRSparKaboom(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(b'line\n'))
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_spark_script_mrjob(self):
+        text = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = MRSparkScriptWordcount(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(text))
+
+        counts = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                k, v = safeeval(line)
+                counts[k] = v
+
+        self.assertEqual(counts, dict(
+            blue=1, fish=4, one=1, red=1, two=1))
+
+    # TODO: add a Spark JAR to the repo, so we can test it

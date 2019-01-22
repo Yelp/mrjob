@@ -7,18 +7,16 @@ python:
   - "3.6"
   - "3.7"
 dist: xenial
+before_install:
+  - sudo -E apt-add-repository -y "ppa:webupd8team/java"
+  - sudo apt-get update
+  - echo "oracle-java8-installer shared/accepted-oracle-license-v1-1 select true" | sudo debconf-set-selections
+  - sudo apt-get-install oracle-java8-installer
+  - sudo apt-get-install oracle-java8-set-default
 install:
   - "pip install ."
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
   - "pip install pyspark || true"
-addons:
-  apt:
-    sources:
-      - sourceline: ppa:webupd8team/java
-    packages:
-      - oracle-java8-installer
-      - oracle-java8-set-default
-# command to run tests
 script: python -m unittest discover -v
 sudo: false

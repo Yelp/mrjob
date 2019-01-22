@@ -18,6 +18,10 @@ install:
   - "pip install ."
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
+addons:
+  apt:
+    packages:
+      - oracle-java8-installer
 # command to run tests
 script: python -m unittest discover -v
 sudo: false

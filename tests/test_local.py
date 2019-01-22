@@ -32,11 +32,14 @@ from warcio.warcwriter import WARCWriter
 import mrjob
 from mrjob.cat import decompress
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
+from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
+from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.local import _sort_lines_in_memory
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
+from mrjob.util import safeeval
 from mrjob.util import to_lines
 
 import tests.sr_wc
@@ -1067,3 +1070,46 @@ class SparkMasterTestCase(SandboxedTestCase):
 
     def test_spark_exector_memory_640000k(self):
         self._test_spark_executor_memory('640000k', 625)
+
+
+class LocalRunnerSparkTestCase(SandboxedTestCase):
+    # these tests are a bit slow because they actually
+    # run on Spark.
+
+    def test_spark_mrjob(self):
+        text = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = MRSparkWordcount(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(text))
+
+        counts = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                k, v = safeeval(line)
+                counts[k] = v
+
+        self.assertEqual(counts, dict(
+            blue=1, fish=4, one=1, red=1, two=1))
+
+    def test_spark_script_mrjob(self):
+        text = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = MRSparkScriptWordcount(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(text))
+
+        counts = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                k, v = safeeval(line)
+                counts[k] = v
+
+        self.assertEqual(counts, dict(
+            blue=1, fish=4, one=1, red=1, two=1))
+
+    # TODO: add a Spark JAR to the repo, so we can test it

@@ -29,6 +29,11 @@ from unittest import skipIf
 
 from warcio.warcwriter import WARCWriter
 
+try:
+    import pyspark
+except ImportError:
+    pyspark = None
+
 import mrjob
 from mrjob.cat import decompress
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
@@ -1072,6 +1077,7 @@ class SparkMasterTestCase(SandboxedTestCase):
         self._test_spark_executor_memory('640000k', 625)
 
 
+@skipIf(pyspark is None, 'no pyspark module')
 class LocalRunnerSparkTestCase(SandboxedTestCase):
     # these tests are a bit slow because they actually
     # run on Spark.

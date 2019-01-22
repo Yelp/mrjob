@@ -5,24 +5,17 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
-matrix:
-  include:
-    - python: '3.7'
-      dist: xenial
-  allow_failures:
-    - python: '3.8-dev'
-      dist: xenial
-    - python: "nightly"
-  fast_finish: true
+  - "3.7"
+dist: xenial
 install:
   - "pip install ."
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
-  - "pip install pyspark"
+  - "pip install pyspark || true"
 addons:
   apt:
     packages:
-      - oracle-java8-set-default
+      - oracle-java8-installer
 # command to run tests
 script: python -m unittest discover -v
 sudo: false

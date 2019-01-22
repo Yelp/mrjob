@@ -1080,5 +1080,3 @@ class SparkMasterTestCase(SandboxedTestCase):
 
     def test_spark_exector_memory_640000k(self):
         self._test_spark_executor_memory('640000k', 625)
-
-    # TODO: does Spark allow floats?

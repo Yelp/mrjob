@@ -18,6 +18,7 @@ install:
   - "pip install ."
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
+  - "pip install pyspark"
 addons:
   apt:
     packages:

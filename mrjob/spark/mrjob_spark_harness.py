@@ -83,6 +83,8 @@ def _run_step(step, step_num, rdd, make_job):
 
         # run the reducer
         rdd = rdd.map(r_read)
+        if reducer_job.SORT_VALUES:
+            rdd = rdd.sortBy(lambda pairs: pairs)
         rdd = rdd.mapPartitions(
             lambda pairs: reducer_job.reduce_pairs(pairs, step_num))
         rdd = rdd.map(lambda k_v: r_write(*k_v))

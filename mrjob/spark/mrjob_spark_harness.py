@@ -14,6 +14,7 @@
 """A Spark script that can run a MRJob without Hadoop."""
 import sys
 from argparse import ArgumentParser
+from argparse import REMAINDER
 from importlib import import_module
 
 
@@ -29,8 +30,7 @@ def main(cmd_line_args=None):
     job_module = import_module(job_module_name)
     job_class = getattr(job_module, job_class_name)
 
-    # eventually will want to set this for passthrough args, etc.
-    job_args = []
+    job_args = args.passthru_args
 
     def make_job(*args):
         j = job_class(job_args + list(args))
@@ -144,6 +144,11 @@ def _make_arg_parser():
         dest='compression_codec',
         help=('Java class path of a codec to use to compress output.'))
 
+    parser.add_argument(
+        'passthru_args',
+        nargs=REMAINDER,
+        help=('the arguments pass to the MRJob')
+    )
     return parser
 
 

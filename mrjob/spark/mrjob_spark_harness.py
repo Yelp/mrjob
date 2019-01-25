@@ -80,6 +80,8 @@ def _run_step(step, step_num, rdd, make_job):
         # simulate shuffle in Hadoop Streaming
         rdd = rdd.groupBy(lambda line: line.split(b'\t')[0])
         rdd = rdd.flatMap(lambda key_and_lines: key_and_lines[1])
+        if reducer_job.SORT_VALUES:
+            rdd = rdd.sortBy(lambda line: line)
 
         # run the reducer
         rdd = rdd.map(r_read)

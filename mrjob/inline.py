@@ -20,8 +20,10 @@ process. Useful for debugging."""
 import logging
 import os
 import sys
+from os.path import abspath
 
 from mrjob.job import MRJob
+from mrjob.runner import _fix_env
 from mrjob.sim import SimMRJobRunner
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
@@ -136,6 +138,38 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         return invoke_task
 
+    def _run_step_on_spark(self, step, step_num):
+        """Set up a fake working directory and environment, and call the Spark
+        method."""
+        # this is kind of a Spark-specific mash-up of _run_streaming_step()
+        # (in sim.py) and _invoke_task_func(), above
+
+        # don't create the output dir for the step; that's Spark's job
+
+        # breaking the Spark step down into tasks is pyspark's job, so
+        # we just have a single dummy task
+
+        self.fs.mkdir(self._task_dir('spark', step_num, task_num=0))
+        # could potentially parse this for cause of error
+        stderr_path = self._task_stderr_path('spark', step_num, task_num=0)
+        stdout_path = self._task_output_path('spark', step_num, task_num=0)
+
+        self._create_dist_cache_dir(step_num)
+        wd = self._setup_working_dir('spark', step_num, task_num=0)
+
+        # use abspath() on input URIs before changing working dir
+        task_args = self._spark_script_args(step_num)
+
+        with save_current_environment(), save_cwd(), save_sys_path():
+            os.environ.update(_fix_env(self._opts['cmdenv']))
+            os.chdir(wd)
+            sys.path = [os.getcwd()] + sys.path
+
+            task = self._mrjob_cls(task_args)
+            task.sandbox(stdout=stdout_path, stderr=stderr_path)
+
+            task.execute()
+
     def _log_cause_of_error(self, ex):
         """Just tell what file we were reading from (since they'll see
         the stacktrace from the actual exception)"""
@@ -147,3 +181,22 @@ class InlineMRJobRunner(SimMRJobRunner):
         """Get step descriptions without calling a subprocess."""
         job_args = ['--steps'] + self._mr_job_extra_args(local=True)
         return self._mrjob_cls(args=job_args)._steps_desc()
+
+    def _spark_script_args(self, step_num):
+        # TODO: this is a simpler version of _spark_script_args() in bin.py.
+        # Some of this code should be pushed up into runner.py
+        step = self._get_step(step_num)
+
+        if step['type'] != 'spark':
+            raise TypeError('Bad step type: %r' % step['type'])
+
+        return (
+            [
+                '--step-num=%d' % step_num,
+                '--spark',
+            ] + self._mr_job_extra_args() + [
+                ','.join(abspath(path)
+                         for path in self._step_input_uris(step_num)),
+                self._step_output_uri(step_num),
+            ]
+        )

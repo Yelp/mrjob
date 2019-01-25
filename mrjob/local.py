@@ -46,7 +46,6 @@ from mrjob.py2 import to_unicode
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import _sort_lines_in_memory
 from mrjob.step import StepFailedException
-from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 
 log = logging.getLogger(__name__)

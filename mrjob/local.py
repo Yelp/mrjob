@@ -89,7 +89,7 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
     }
 
     _STEP_TYPES = (
-        SimMRJobRunner._STEP_TYPES | {'spark', 'spark_jar', 'spark_script'})
+        SimMRJobRunner._STEP_TYPES | {'spark_jar', 'spark_script'})
 
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
@@ -118,12 +118,6 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             _invoke_task_in_subprocess,
             task_type, step_num, task_num,
             args, num_steps)
-
-    def _run_step(self, step, step_num):
-        if _is_spark_step_type(step['type']):
-            self._run_step_on_spark(step, step_num)
-        else:
-            super(LocalMRJobRunner, self)._run_step(step, step_num)
 
     # TODO: this is similar to _run_job_in_hadoop() (hadoop.py), and is
     # probably useful to other runners with minor modifications

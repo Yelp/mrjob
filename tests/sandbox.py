@@ -181,7 +181,7 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
 
 
 @skipIf(pyspark is None, 'no pyspark module')
-class SingleSparkContextTestCase(TestCase):
+class SingleSparkContextTestCase(BasicTestCase):
     """Only create a single SparkContext, to speed things up and prevent
     errors from attempting to instantiate multiple contexts."""
 
@@ -202,6 +202,13 @@ class SingleSparkContextTestCase(TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.spark_context.stop()
+
+
+    def setUp(self):
+        super(SingleSparkContextTestCase, self).setUp()
+
+        self.start(patch('pyspark.SparkContext',
+                         return_value=self.spark_context))
 
 
 def mrjob_pythonpath():

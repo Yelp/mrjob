@@ -17,6 +17,7 @@ from os.path import join
 
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.local import LocalMRJobRunner
+from mrjob.protocol import TextProtocol
 from mrjob.spark import mrjob_spark_harness
 from mrjob.spark.mr_spark_harness import MRSparkHarness
 from mrjob.step import INPUT
@@ -26,6 +27,30 @@ from mrjob.util import to_lines
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
+
+
+
+def _rev(s):
+    return ''.join(reversed(s))
+
+
+class ReversedTextProtocol(TextProtocol):
+    """Like TextProtocol, but stores text backwards."""
+
+    def read(self, line):
+        key, value = super(ReversedTextProtocol, self).read(line)
+
+        return _rev(key), _rev(value)
+
+    def write(self, key, value):
+        return super(ReversedTextProtocol, self).write(
+            _rev(key), _rev(value))
+
+
+class MRSortAndGroupReversedText(MRSortAndGroup):
+
+    INTERNAL_PROTOCOL = ReversedTextProtocol
+
 
 
 class SparkHarnessOutputComparisonTestCase(
@@ -112,3 +137,18 @@ class SparkHarnessOutputComparisonTestCase(
             b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n')
 
         self._assert_output_matches(MRSortAndGroup, input_bytes=input_bytes)
+
+    def test_sort_values_sorts_encoded_values(self):
+        input_bytes = (
+            b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n')
+
+        job = self._harness_job(MRSortAndGroupReversedText,
+                                input_bytes=input_bytes)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(a=['artichoke', 'alligator', 'actuary'],
+                     b=['bowling', 'balloon', 'baby']))

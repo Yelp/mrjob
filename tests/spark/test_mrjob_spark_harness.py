@@ -158,3 +158,7 @@ class SparkHarnessOutputComparisonTestCase(
                 dict(job.parse_output(runner.cat_output())),
                 dict(a=['artichoke', 'alligator', 'actuary'],
                      b=['bowling', 'balloon', 'baby']))
+
+
+
+# TODO: add back a test of the bare Harness script in local mode (slow)

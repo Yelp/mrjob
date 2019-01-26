@@ -51,7 +51,7 @@ def main(cmd_line_args=None):
 
     # write the results
     rdd.saveAsTextFile(
-        args.output_path, compressionCodecClass=args.compression_codec_class)
+        args.output_path, compressionCodecClass=args.compression_codec)
 
 
 def _run_step(step, step_num, rdd, make_job):
@@ -136,7 +136,8 @@ def _make_arg_parser():
         help=('An empty directory to write output to. Can be a path or URI.'))
 
     parser.add_argument(
-        '--compression-codec-class',
+        '--compression-codec',
+        dest='compression_codec',
         help=('Java class path of a codec to use to compress output.'))
 
     return parser

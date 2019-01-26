@@ -24,10 +24,22 @@ class MRSparkHarness(MRJob):
 
         self.add_passthru_arg(
             '--job-class', dest='job_class', type=str,
-            help='dot-separated module and class name of MRJob')
+            help='dot-separated module and class name of MRJob',
+            default='mrjob.job.MRJob')
+
+        self.add_passthru_arg(
+            '--compression-codec',
+            dest='compression_codec',
+            help=('Java class path of a codec to use to compress output.'))
 
     def spark(self, input_path, output_path):
-        harness_main([self.options.job_class, input_path, output_path])
+        args = [self.options.job_class, input_path, output_path]
+
+        if self.options.compression_codec:
+            args.append('--compression-codec')
+            args.append(self.options.compression_codec)
+
+        harness_main(args)
 
 
 if __name__ == '__main__':

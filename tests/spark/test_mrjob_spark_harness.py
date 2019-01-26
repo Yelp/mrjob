@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test the Spark Harness."""
 from io import BytesIO
+from os.path import join
 
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.local import LocalMRJobRunner
@@ -36,24 +37,44 @@ class SparkHarnessOutputComparisonTestCase(
 
         return path
 
-    def _assert_output_matches(
-            self, job_class, input_bytes=b'', input_paths=()):
+    def _reference_job(self, job_class, input_bytes=b'', input_paths=(),
+                       runner_alias='inline'):
 
-        job_args = ['-r', 'inline'] + list(input_paths)
+        job_args = ['-r', runner_alias] + list(input_paths)
 
         reference_job = job_class(job_args)
         reference_job.sandbox(stdin=BytesIO(input_bytes))
+
+        return reference_job
+
+    def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
+                     runner_alias='inline', compression_codec=None):
+        job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
+
+        harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
+        if compression_codec:
+            harness_job_args.append('--compression-codec')
+            harness_job_args.append(compression_codec)
+        harness_job_args.extend(input_paths)
+
+        harness_job = MRSparkHarness(harness_job_args)
+        harness_job.sandbox(stdin=BytesIO(input_bytes))
+
+        return harness_job
+
+    def _assert_output_matches(
+            self, job_class, input_bytes=b'', input_paths=()):
+
+        reference_job = self._reference_job(job_class, input_bytes=input_bytes,
+                                            input_paths=input_paths)
 
         with reference_job.make_runner() as runner:
             runner.run()
 
             reference_output = sorted(to_lines(runner.cat_output()))
 
-        job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
-
-        harness_job_args = job_args + ['--job-class', job_class_path]
-        harness_job = MRSparkHarness(harness_job_args)
-        harness_job.sandbox(stdin=BytesIO(input_bytes))
+        harness_job = self._harness_job(job_class, input_bytes=input_bytes,
+                                        input_paths=input_paths)
 
         with harness_job.make_runner() as runner:
             runner.run()
@@ -67,21 +88,20 @@ class SparkHarnessOutputComparisonTestCase(
 
         self._assert_output_matches(MRWordFreqCount, input_bytes=input_bytes)
 
+    def test_compression(self):
+        compression_codec = 'org.apache.hadoop.io.compress.GzipCodec'
 
+        input_bytes = b'fa la la la la\nla la la la\n'
 
+        job = self._harness_job(
+            MRWordFreqCount, input_bytes=input_bytes,
+            compression_codec=compression_codec)
 
+        with job.make_runner() as runner:
+            runner.run()
 
-        # this code tests the harness script directly, but takes about 30s
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 'part*.gz')))
 
-        #harness_job_step = dict(
-        #    type='spark_script',
-        #    script=self._spark_harness_path(),
-        #    args=[job_class_path, INPUT, OUTPUT],
-        #)
-
-        #harness_kwargs = dict(
-        #    stdin=BytesIO(input_bytes),
-        #    steps=[harness_job_step],
-        #)
-
-        #with LocalMRJobRunner(**harness_kwargs) as runner:
+            self.assertEqual(dict(job.parse_output(runner.cat_output())),
+                             dict(fa=1, la=8))

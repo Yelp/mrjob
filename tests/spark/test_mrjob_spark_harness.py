@@ -23,6 +23,7 @@ from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.util import to_lines
 
+from tests.mr_sort_and_group import MRSortAndGroup
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
 
@@ -83,7 +84,7 @@ class SparkHarnessOutputComparisonTestCase(
 
         self.assertEqual(harness_output, reference_output)
 
-    def test_mr_word_freq_count(self):
+    def test_basic_job(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
 
         self._assert_output_matches(MRWordFreqCount, input_bytes=input_bytes)
@@ -105,3 +106,9 @@ class SparkHarnessOutputComparisonTestCase(
 
             self.assertEqual(dict(job.parse_output(runner.cat_output())),
                              dict(fa=1, la=8))
+
+    def test_sort_values(self):
+        input_bytes = (
+            b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n')
+
+        self._assert_output_matches(MRSortAndGroup, input_bytes=input_bytes)

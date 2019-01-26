@@ -17,14 +17,17 @@ from io import BytesIO
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.local import LocalMRJobRunner
 from mrjob.spark import mrjob_spark_harness
+from mrjob.spark.mr_spark_harness import MRSparkHarness
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.util import to_lines
 
 from tests.sandbox import SandboxedTestCase
+from tests.sandbox import SingleSparkContextTestCase
 
 
-class SparkHarnessOutputComparisonTestCase(SandboxedTestCase):
+class SparkHarnessOutputComparisonTestCase(
+        SandboxedTestCase, SingleSparkContextTestCase):
 
     def _spark_harness_path(self):
         path = mrjob_spark_harness.__file__
@@ -34,11 +37,11 @@ class SparkHarnessOutputComparisonTestCase(SandboxedTestCase):
         return path
 
     def _assert_output_matches(
-            self, job_class,
-            runner_alias='local', input_bytes=b'', input_paths=()):
+            self, job_class, input_bytes=b'', input_paths=()):
 
-        ref_job_args = ['-r', runner_alias] + list(input_paths)
-        reference_job = job_class(ref_job_args)
+        job_args = ['-r', 'inline'] + list(input_paths)
+
+        reference_job = job_class(job_args)
         reference_job.sandbox(stdin=BytesIO(input_bytes))
 
         with reference_job.make_runner() as runner:
@@ -48,18 +51,11 @@ class SparkHarnessOutputComparisonTestCase(SandboxedTestCase):
 
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
-        harness_job_step = dict(
-            type='spark_script',
-            script=self._spark_harness_path(),
-            args=[job_class_path, INPUT, OUTPUT],
-        )
+        harness_job_args = job_args + ['--job-class', job_class_path]
+        harness_job = MRSparkHarness(harness_job_args)
+        harness_job.sandbox(stdin=BytesIO(input_bytes))
 
-        harness_kwargs = dict(
-            stdin=BytesIO(input_bytes),
-            steps=[harness_job_step],
-        )
-
-        with LocalMRJobRunner(**harness_kwargs) as runner:
+        with harness_job.make_runner() as runner:
             runner.run()
 
             harness_output = sorted(to_lines(runner.cat_output()))
@@ -70,3 +66,22 @@ class SparkHarnessOutputComparisonTestCase(SandboxedTestCase):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
 
         self._assert_output_matches(MRWordFreqCount, input_bytes=input_bytes)
+
+
+
+
+
+        # this code tests the harness script directly, but takes about 30s
+
+        #harness_job_step = dict(
+        #    type='spark_script',
+        #    script=self._spark_harness_path(),
+        #    args=[job_class_path, INPUT, OUTPUT],
+        #)
+
+        #harness_kwargs = dict(
+        #    stdin=BytesIO(input_bytes),
+        #    steps=[harness_job_step],
+        #)
+
+        #with LocalMRJobRunner(**harness_kwargs) as runner:

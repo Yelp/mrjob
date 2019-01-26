@@ -38,6 +38,7 @@ from mrjob.logs.counters import _format_counters
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
 from mrjob.runner import _fix_env
+from mrjob.step import _is_spark_step_type
 from mrjob.util import unarchive
 
 log = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class SimMRJobRunner(MRJobRunner):
         'num_cores'
     }
 
-    _STEP_TYPES = {'streaming'}
+    _STEP_TYPES = {'spark', 'streaming'}
 
     def __init__(self, **kwargs):
         super(SimMRJobRunner, self).__init__(**kwargs)
@@ -128,6 +129,14 @@ class SimMRJobRunner(MRJobRunner):
         """Log why the job failed."""
         pass
 
+    def _run_step_on_spark(self, step, step_num):
+        """Run a Step on Spark. Override this in your subclass. You can
+        assume that setup wrapper scripts are created (if relevant)
+        and that self._counters has a dictionary for that step already"""
+        raise NotImplementedError
+
+    # other implementation
+
     def _run(self):
         if not self._output_dir:
             self._output_dir = join(self._get_local_tmp_dir(), 'output')
@@ -148,6 +157,13 @@ class SimMRJobRunner(MRJobRunner):
         """Run an individual step. You can assume that setup wrapper scripts
         are created and self._counters has a dictionary for that step already.
         """
+        if _is_spark_step_type(step['type']):
+            self._run_step_on_spark(step, step_num)
+        else:
+            self._run_streaming_step(step, step_num)
+
+    def _run_streaming_step(self, step, step_num):
+        """Run a Hadoop streaming step on simulated Hadoop."""
         try:
             self._create_dist_cache_dir(step_num)
             self.fs.mkdir(self._output_dir_for_step(step_num))

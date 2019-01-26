@@ -25,6 +25,7 @@ from mrjob.step import OUTPUT
 from mrjob.util import to_lines
 
 from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_two_step_job import MRTwoStepJob
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
 
@@ -113,6 +114,11 @@ class SparkHarnessOutputComparisonTestCase(
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
 
         self._assert_output_matches(MRWordFreqCount, input_bytes=input_bytes)
+
+    def test_two_step_job(self):
+        input_bytes = b'foo\nbar\n'
+
+        self._assert_output_matches(MRTwoStepJob, input_bytes=input_bytes)
 
     def test_compression(self):
         compression_codec = 'org.apache.hadoop.io.compress.GzipCodec'

@@ -38,6 +38,7 @@ from mrjob.logs.counters import _format_counters
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
 from mrjob.runner import _fix_env
+from mrjob.step import _is_spark_step_type
 from mrjob.util import unarchive
 
 log = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class SimMRJobRunner(MRJobRunner):
         'num_cores'
     }
 
-    _STEP_TYPES = {'streaming'}
+    _STEP_TYPES = {'spark', 'streaming'}
 
     def __init__(self, **kwargs):
         super(SimMRJobRunner, self).__init__(**kwargs)
@@ -128,7 +129,18 @@ class SimMRJobRunner(MRJobRunner):
         """Log why the job failed."""
         pass
 
+    def _run_step_on_spark(self, step, step_num):
+        """Run a Step on Spark. Override this in your subclass. You can
+        assume that setup wrapper scripts are created (if relevant)
+        and that self._counters has a dictionary for that step already"""
+        raise NotImplementedError
+
+    # other implementation
+
     def _run(self):
+        if not self._output_dir:
+            self._output_dir = join(self._get_local_tmp_dir(), 'output')
+
         if hasattr(self, '_create_setup_wrapper_scripts'):  # inline doesn't
             self._create_setup_wrapper_scripts()
 
@@ -139,28 +151,41 @@ class SimMRJobRunner(MRJobRunner):
 
             self._counters.append({})
 
-            try:
-                self._create_dist_cache_dir(step_num)
-                self.fs.mkdir(self._output_dir_for_step(step_num))
+            self._run_step(step, step_num)
 
-                map_splits = self._split_mapper_input(
-                    self._input_paths_for_step(step_num), step_num)
+    def _run_step(self, step, step_num):
+        """Run an individual step. You can assume that setup wrapper scripts
+        are created and self._counters has a dictionary for that step already.
+        """
+        if _is_spark_step_type(step['type']):
+            self._run_step_on_spark(step, step_num)
+        else:
+            self._run_streaming_step(step, step_num)
 
-                self._run_mappers_and_combiners(step_num, map_splits)
+    def _run_streaming_step(self, step, step_num):
+        """Run a Hadoop streaming step on simulated Hadoop."""
+        try:
+            self._create_dist_cache_dir(step_num)
+            self.fs.mkdir(self._output_dir_for_step(step_num))
 
-                if 'reducer' in step:
-                    self._sort_reducer_input(step_num, len(map_splits))
-                    num_reducer_tasks = self._split_reducer_input(step_num)
+            map_splits = self._split_mapper_input(
+                self._input_paths_for_step(step_num), step_num)
 
-                    self._run_reducers(step_num, num_reducer_tasks)
+            self._run_mappers_and_combiners(step_num, map_splits)
 
-                self._log_counters(step_num)
+            if 'reducer' in step:
+                self._sort_reducer_input(step_num, len(map_splits))
+                num_reducer_tasks = self._split_reducer_input(step_num)
 
-            except Exception as ex:
-                self._log_counters(step_num)
-                self._log_cause_of_error(ex)
+                self._run_reducers(step_num, num_reducer_tasks)
 
-                raise
+            self._log_counters(step_num)
+
+        except Exception as ex:
+            self._log_counters(step_num)
+            self._log_cause_of_error(ex)
+
+            raise
 
     def _run_task_func(self, task_type, step_num, task_num, map_split=None):
         """Returns a no-args function that runs one mapper, reducer, or
@@ -370,13 +395,16 @@ class SimMRJobRunner(MRJobRunner):
             return {tk: v for k, v in j.items()
                     for tk in translate_jobconf_for_all_versions(k)}
 
+    def _num_cores(self):
+        return self._opts['num_cores'] or cpu_count()
+
     def _num_mappers(self, step_num):
         # TODO: look up mapred.job.maps (convert to int) in _jobconf_for_step()
-        return self._opts['num_cores'] or cpu_count()
+        return self._num_cores()
 
     def _num_reducers(self, step_num):
         # TODO: look up mapred.job.reduces in _jobconf_for_step()
-        return self._opts['num_cores'] or cpu_count()
+        return self._num_cores()
 
     def _split_mapper_input(self, input_paths, step_num):
         """Take one or more input paths (which may be compressed) and split
@@ -563,8 +591,6 @@ class SimMRJobRunner(MRJobRunner):
 
     def _output_dir_for_step(self, step_num):
         if step_num == self._num_steps() - 1:
-            if not self._output_dir:
-                self._output_dir = join(self._get_local_tmp_dir(), 'output')
             return self._output_dir
         else:
             return self._intermediate_output_uri(step_num, local=True)

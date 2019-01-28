@@ -551,7 +551,9 @@ class MRJobRunner(object):
         def ls_output():
             for filename in self.fs.ls(output_dir):
                 subpath = filename[len(output_dir):]
-                if not (any(name.startswith('_')
+                # Hadoop ignores files and dirs inside the output dir
+                # whose names start with '_' or '.'. See #1337.
+                if not (any(name[0] in '_.'
                             for name in split_path(subpath))):
                     yield filename
 
@@ -1102,7 +1104,7 @@ class MRJobRunner(object):
         except the first step, this list will have a single item (a
         directory)."""
         if step_num == 0:
-            return [self._upload_mgr.uri(path)
+            return [self._upload_mgr.uri(path) if self._upload_mgr else path
                     for path in self._get_input_paths()]
         else:
             return [self._intermediate_output_uri(step_num - 1)]

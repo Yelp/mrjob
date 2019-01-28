@@ -84,7 +84,6 @@ from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_inline import InlineInputManifestTestCase
-from tests.test_local import _bash_wrap
 
 # used to match command lines
 if PY2:
@@ -2318,7 +2317,7 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
             [dict(type='streaming',
                   mapper=dict(
                       type='script',
-                      pre_filter=_bash_wrap("grep 'anything'")))])
+                      pre_filter="bash -c 'grep '\\''anything'\\'''"))])
 
         step = runner._build_step(0)
 

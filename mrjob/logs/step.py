@@ -18,6 +18,7 @@ Hadoop streaming command (we call them this because EMR puts them
 in the steps/ subdir of the logs on S3)."""
 import errno
 import re
+import logging
 from logging import getLogger
 
 from mrjob.py2 import to_unicode
@@ -204,6 +205,21 @@ def _interpret_emr_step_stderr(fs, matches):
     return {}
 
 
+def _yield_lines_from_pty_or_pipe(stderr):
+    """Yield lines from a PTY or pipe, converting to unicode and gracefully
+    handling errno.EIO"""
+    try:
+        for line in stderr:
+            yield to_unicode(line)
+    except IOError as e:
+        # this is just the PTY's way of saying goodbye
+        if e.errno == errno.EIO:
+            return
+        else:
+            raise
+
+# TODO: could factor out _yield_lines_from_pty_or_pipe() and just have
+# this method take a sequence of lines
 def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     """Parse stderr from the ``hadoop jar`` command. Works like
     :py:func:`_parse_step_syslog` (same return format)  with a few extra
@@ -217,23 +233,13 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     - Optionally calls *record_callback* for each log4j record (see
       :py:func:`~mrjob.logs.log4j._parse_hadoop_log4j_records`).
     """
-    def yield_lines():
-        try:
-            for line in stderr:
-                yield to_unicode(line)
-        except IOError as e:
-            # this is just the PTY's way of saying goodbye
-            if e.errno == errno.EIO:
-                return
-            else:
-                raise
-
     def pre_filter(line):
         return bool(_HADOOP_STREAMING_NON_LOG4J_LINE_RE.match(line))
 
     def yield_records():
-        for record in _parse_hadoop_log4j_records(yield_lines(),
-                                                  pre_filter=pre_filter):
+        for record in _parse_hadoop_log4j_records(
+                _yield_lines_from_pty_or_pipe(stderr),
+                pre_filter=pre_filter):
             if record_callback:
                 record_callback(record)
             yield record
@@ -395,3 +401,17 @@ def _parse_indented_counters(lines):
             log.warning('unexpected counter line: %s' % line)
 
     return counters
+
+
+def _log_line_from_driver(line, level=None):
+    """Log ``'  <line>'``. *line* should be a string.
+
+    Optionally specify a logging level (default is logging.INFO).
+    """
+    log.log(level or logging.INFO, '  %s' % line)
+
+
+def _log_log4j_record(record):
+    """Log a log4j message at the appropriate logging level"""
+    level = getattr(logging, record.get('level') or '', None)
+    _log_line_from_driver(record['message'], level=level)

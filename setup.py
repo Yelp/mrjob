@@ -35,7 +35,12 @@ try:
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
-        'tests_require': ['simplejson', 'ujson', 'warcio'],
+        'tests_require': [
+            'pyspark',
+            'simplejson',
+            'ujson',
+            'warcio',
+        ],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 

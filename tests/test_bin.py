@@ -72,18 +72,26 @@ def _mock_upload_mgr():
     return m
 
 
-class AllowSparkOnLocalRunnerTestCase(SandboxedTestCase):
-
-    # allow testing spark methods on local runner, even though
-    # it doesn't (currently) support them (see #1361)
-
+class GenericLocalRunnerTestCase(SandboxedTestCase):
+    """Disable the local runner's custom
+    :py:meth:`~mrjob.local.LocalMRJobRunner._spark_master`
+    method, so we can use it to test the basic functionality
+    of :py:class:`~mrjob.bin.MRJobBinRunner`.
+    """
     def setUp(self):
-        super(AllowSparkOnLocalRunnerTestCase, self).setUp()
+        super(GenericLocalRunnerTestCase, self).setUp()
 
-        self.start(patch('mrjob.runner.MRJobRunner._check_steps'))
+        # couldn't figure out how to delete a method with mock
+
+        _spark_master_method = LocalMRJobRunner._spark_master
+        def restore_spark_master_method():
+            LocalMRJobRunner._spark_master = _spark_master_method
+        self.addCleanup(restore_spark_master_method)
+
+        delattr(LocalMRJobRunner, '_spark_master')
 
 
-class ArgsForSparkStepTestCase(AllowSparkOnLocalRunnerTestCase):
+class ArgsForSparkStepTestCase(GenericLocalRunnerTestCase):
     # just test the structure of _args_for_spark_step()
 
     def setUp(self):
@@ -151,7 +159,7 @@ class BootstrapMRJobTestCase(BasicTestCase):
         self.assertEqual(runner._bootstrap_mrjob(), True)
 
 
-class GetSparkSubmitBinTestCase(AllowSparkOnLocalRunnerTestCase):
+class GetSparkSubmitBinTestCase(GenericLocalRunnerTestCase):
 
     def test_default(self):
         job = MRNullSpark(['-r', 'local'])
@@ -843,7 +851,7 @@ class SetupWrapperScriptContentTestCase(SandboxedTestCase):
             self.assertEqual(out[:2], ['set -e', 'set -v'])
 
 
-class PyFilesTestCase(AllowSparkOnLocalRunnerTestCase):
+class PyFilesTestCase(GenericLocalRunnerTestCase):
 
     def test_default(self):
         job = MRNullSpark(['-r', 'local'])
@@ -1027,7 +1035,7 @@ class SortValuesTestCase(SandboxedTestCase):
                 'org.apache.hadoop.mapred.lib.HashPartitioner')
 
 
-class SparkScriptPathTestCase(AllowSparkOnLocalRunnerTestCase):
+class SparkScriptPathTestCase(GenericLocalRunnerTestCase):
 
     def setUp(self):
         super(SparkScriptPathTestCase, self).setUp()
@@ -1083,7 +1091,7 @@ class SparkScriptPathTestCase(AllowSparkOnLocalRunnerTestCase):
                 runner._spark_script_path, 0)
 
 
-class SparkScriptArgsTestCase(AllowSparkOnLocalRunnerTestCase):
+class SparkScriptArgsTestCase(GenericLocalRunnerTestCase):
 
     def setUp(self):
         super(SparkScriptArgsTestCase, self).setUp()
@@ -1211,7 +1219,7 @@ class SparkScriptArgsTestCase(AllowSparkOnLocalRunnerTestCase):
                 runner._spark_script_args, 0)
 
 
-class SparkSubmitArgsTestCase(AllowSparkOnLocalRunnerTestCase):
+class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
     def setUp(self):
         super(SparkSubmitArgsTestCase, self).setUp()

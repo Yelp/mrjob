@@ -57,6 +57,7 @@ class MuxFilesystem(Filesystem):
         if hasattr(self, name):
             raise ValueError('name %r is already taken' % name)
 
+        self._fs_names.append(name)
         setattr(self, name, fs)
 
         if disable_if:

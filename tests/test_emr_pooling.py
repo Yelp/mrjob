@@ -2275,7 +2275,7 @@ class S3LockTestCase(MockBoto3TestCase):
         runner = EMRJobRunner(conf_paths=[])
 
         def _while_you_were_sleeping(*args, **kwargs):
-            key = runner.fs._get_s3_key(self.LOCK_URI)
+            key = runner.fs.s3._get_s3_key(self.LOCK_URI)
             key.put(b'job_two')
 
         self.sleep.side_effect = _while_you_were_sleeping

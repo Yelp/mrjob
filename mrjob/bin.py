@@ -891,7 +891,8 @@ class MRJobBinRunner(MRJobRunner):
         args.extend(self._opts['spark_args'])
 
         # step spark_args
-        args.extend(step['spark_args'])
+        if step.get('spark_args'):
+            args.extend(step['spark_args'])
 
         return args
 

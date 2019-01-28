@@ -16,8 +16,6 @@ import sys
 from argparse import ArgumentParser
 from importlib import import_module
 
-from pyspark import SparkContext
-
 
 def main(cmd_line_args=None):
     if cmd_line_args is None:
@@ -40,6 +38,7 @@ def main(cmd_line_args=None):
         return j
 
     # load initial data
+    from pyspark import SparkContext
     sc = SparkContext()
     rdd = sc.textFile(args.input_path, use_unicode=False)
 
@@ -52,7 +51,7 @@ def main(cmd_line_args=None):
 
     # write the results
     rdd.saveAsTextFile(
-        args.output_path, compressionCodecClass=args.compression_codec_class)
+        args.output_path, compressionCodecClass=args.compression_codec)
 
 
 def _run_step(step, step_num, rdd, make_job):
@@ -79,9 +78,11 @@ def _run_step(step, step_num, rdd, make_job):
 
         # simulate shuffle in Hadoop Streaming
         rdd = rdd.groupBy(lambda line: line.split(b'\t')[0])
-        rdd = rdd.flatMap(lambda key_and_lines: key_and_lines[1])
-        if reducer_job.SORT_VALUES:
-            rdd = rdd.sortBy(lambda line: line)
+
+        if reducer_job.sort_values():
+            rdd = rdd.flatMap(lambda key_and_lines: sorted(key_and_lines[1]))
+        else:
+            rdd = rdd.flatMap(lambda key_and_lines: key_and_lines[1])
 
         # run the reducer
         rdd = rdd.map(r_read)
@@ -139,7 +140,8 @@ def _make_arg_parser():
         help=('An empty directory to write output to. Can be a path or URI.'))
 
     parser.add_argument(
-        '--compression-codec-class',
+        '--compression-codec',
+        dest='compression_codec',
         help=('Java class path of a codec to use to compress output.'))
 
     return parser

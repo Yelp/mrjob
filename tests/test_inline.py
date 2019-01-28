@@ -265,12 +265,6 @@ class UnsupportedStepsTestCase(SandboxedTestCase):
 @skipIf(pyspark is None, 'no pyspark module')
 class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
 
-    def setUp(self):
-        super(InlineRunnerSparkTestCase, self).setUp()
-
-        self.start(patch('pyspark.SparkContext',
-                         return_value=self.spark_context))
-
     def test_spark_mrjob(self):
         text = b'one fish\ntwo fish\nred fish\nblue fish\n'
 

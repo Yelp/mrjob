@@ -31,8 +31,6 @@ class MuxFilesystem(Filesystem):
     (e.g. ``fs.s3.create_bucket(...)``).
 
     """
-    name = 'mux'
-
     def __init__(self):
         # names of sub-filesystems, in the order to call them. (The filesystems
         # themselves are stored in the attribute with that name.)
@@ -44,22 +42,18 @@ class MuxFilesystem(Filesystem):
         # set of names of filesystems that have been disabled
         self._disabled = set()
 
-    def add_fs(self, fs, name=None, disable_if=None):
+    def add_fs(self, name, fs, disable_if=None):
         """Add a filesystem.
 
         :param fs: a :py:class:~mrjob.fs.base.Filesystem to forward calls to.
         :param name string: Name of this filesystem. It will be directly
                             accessible through that the attribute with that
-                            name. If not set, uses ``fs.name``.
+                            name. Recommended usage is the same name as
+                            the module that contains the fs class.
         :param disable_if: A function called with a single argument, an
                            exception raised by ``fs``. If it returns true,
                            futher calls will not be forwarded to ``fs``.
         """
-        # name the filesystem
-        name = name or fs.name
-        if not name:
-            raise ValueError('%r has no name, specify one directly' % fs)
-
         if hasattr(self, name):
             raise ValueError('name %r is already taken' % name)
 

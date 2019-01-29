@@ -15,10 +15,25 @@
 from __future__ import print_function
 
 import os
+from glob import glob
+from os.path import join
+from os.path import exists
+from unittest import skipIf
+
+try:
+    import pyspark
+except ImportError:
+    pyspark = None
+
+try:
+    from mrjob.examples import spark_wordcount_script
+except ImportError:
+    spark_wordcount_script = None
 
 from mrjob.runner import _runner_class
 from mrjob.step import StepFailedException
 from mrjob.tools.spark_submit import main as spark_submit_main
+from mrjob.util import safeeval
 
 from tests.mock_boto3.case import MockBoto3TestCase
 from tests.py2 import MagicMock
@@ -366,3 +381,44 @@ class SparkSubmitToEMRTestCase(MockBoto3TestCase):
         self.assertEqual(step_args[0], 'spark-submit')
         self.assertEqual(step_args[-1], 'arg1')
         self.assertTrue(step_args[-2].endswith('/foo.py'))
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class SparkSubmitLocallyTestCase(SandboxedTestCase):
+    # this test is a bit slow (~30s) as it actually runs on Spark
+    # in local-cluster mode
+
+    def setUp(self):
+        super(SparkSubmitLocallyTestCase, self).setUp()
+
+        # don't set up logging
+        self.set_up_logging = self.start(
+            patch('mrjob.job.MRJob.set_up_logging'))
+
+    def test_end_to_end(self):
+        script_path = spark_wordcount_script.__file__
+        if script_path.endswith('.pyc'):
+            script_path = script_path[:-1]
+
+        input_path = self.makefile(
+            'input', b'one fish\ntwo fish\nred fish\nblue fish\n')
+
+        # don't create this path, let Spark do it
+        output_path = join(self.tmp_dir, 'output')
+        self.assertFalse(exists(output_path))
+
+        spark_submit_main(
+            ['-r', 'local', script_path, input_path, output_path])
+
+        self.assertTrue(exists(output_path))
+
+        word_counts = {}
+
+        for path in glob(join(output_path, 'part-*')):
+            with open(path) as f:
+                for line in f:
+                    word, count = safeeval(line)
+                    word_counts[word] = count
+
+        self.assertEqual(word_counts,
+                         dict(blue=1, fish=4, one=1, red=1, two=1))

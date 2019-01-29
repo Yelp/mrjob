@@ -598,9 +598,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _set_cloud_tmp_dir(self):
         """Helper for _fix_s3_tmp_and_log_uri_opts"""
-        client = self.fs.make_s3_client()
+        client = self.fs.s3.make_s3_client()
 
-        for bucket_name in self.fs.get_all_bucket_names():
+        for bucket_name in self.fs.s3.get_all_bucket_names():
             if not bucket_name.startswith('mrjob-'):
                 continue
 
@@ -634,8 +634,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._s3_tmp_bucket_to_create:
             log.debug('creating S3 bucket %r to use as temp space' %
                       self._s3_tmp_bucket_to_create)
-            self.fs.create_bucket(self._s3_tmp_bucket_to_create,
-                                  self._opts['region'])
+            self.fs.s3.create_bucket(self._s3_tmp_bucket_to_create,
+                                     self._opts['region'])
             self._s3_tmp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
@@ -672,30 +672,28 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         local filesystem.
         """
         if self._fs is None:
-            self._s3_fs = S3Filesystem(
+            self._fs = CompositeFilesystem()
+
+            if self._opts['ec2_key_pair_file']:
+                self._fs.add_fs('ssh', SSHFilesystem(
+                    ssh_bin=self._opts['ssh_bin'],
+                    ec2_key_pair_file=self._opts['ec2_key_pair_file']))
+
+
+            self._fs.add_fs('s3', S3Filesystem(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 aws_session_token=self._opts['aws_session_token'],
                 s3_endpoint=self._opts['s3_endpoint'],
-                s3_region=self._opts['region'])
+                s3_region=self._opts['region']))
 
             if self._opts['ec2_key_pair_file']:
-                self._ssh_fs = SSHFilesystem(
-                    ssh_bin=self._opts['ssh_bin'],
-                    ec2_key_pair_file=self._opts['ec2_key_pair_file'])
+                # add hadoop fs after S3 because it tries to handle all URIs
 
                 # we'll set hadoop_bin later, once the cluster is set up
-                self._hadoop_fs = HadoopFilesystem(hadoop_bin=[])
+                self._fs.add_fs('hadoop', HadoopFilesystem(hadoop_bin=[]))
 
-                # put _hadoop_fs last because it tries to handle all URIs
-                self._fs = CompositeFilesystem(
-                    self._ssh_fs, self._s3_fs, self._hadoop_fs,
-                    LocalFilesystem())
-            else:
-                self._ssh_fs = None
-                self._hadoop_fs = None
-                self._fs = CompositeFilesystem(
-                    self._s3_fs, LocalFilesystem())
+            self._fs.add_fs('local', LocalFilesystem())
 
         return self._fs
 
@@ -736,8 +734,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._kill_ssh_tunnel()
 
         # don't try to connect to HDFS on the old cluster
-        if self._hadoop_fs:
-            self._hadoop_fs.set_hadoop_bin([])
+        if hasattr(self.fs, 'hadoop'):
+            self.fs.hadoop.set_hadoop_bin([])
 
         self._launch_emr_job()
 
@@ -751,7 +749,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         exists = False
 
-        for uri, obj in self._s3_fs._ls(path):
+        for uri, obj in self.fs.s3._ls(path):
             exists = True
 
             # we currently just look for 'ongoing-request="false"'
@@ -864,7 +862,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _upload_contents(self, s3_uri, path):
         """Uploads the file at the given path to S3, possibly using
         multipart upload."""
-        s3_key = self.fs._get_s3_key(s3_uri)
+        s3_key = self.fs.s3._get_s3_key(s3_uri)
 
         # use _HUGE_PART_THRESHOLD to disable multipart uploading
         # (could use put() directly, but that would be another code path)
@@ -883,8 +881,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         return int((self._opts['cloud_part_size_mb'] or 0) * 1024 * 1024)
 
     def _set_up_ssh_tunnel_and_hdfs(self):
-        if self._hadoop_fs:
-            self._hadoop_fs.set_hadoop_bin(self._ssh_hadoop_bin())
+        if hasattr(self.fs, 'hadoop'):
+            self.fs.hadoop.set_hadoop_bin(self._ssh_hadoop_bin())
         self._set_up_ssh_tunnel()
 
     def _ssh_tunnel_config(self):
@@ -1527,8 +1525,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._emr_job_start = time.time()
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
-        if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
-            self._ssh_fs.use_sudo_over_ssh()
+        if hasattr(self.fs, 'ssh') and version_gte(
+                self.get_image_version(), '4.3.0'):
+            self.fs.ssh.use_sudo_over_ssh()
 
     def get_job_steps(self):
         """Fetch the steps submitted by this runner from the EMR API.
@@ -1778,7 +1777,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             tunnel_config['name']))
 
         try:
-            stdout, _ = self.fs._ssh_run(host, ['curl', remote_url])
+            stdout, _ = self.fs.ssh._ssh_run(host, ['curl', remote_url])
             return stdout
         except Exception as e:
             log.debug('    failed: %s' % str(e))
@@ -2619,7 +2618,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if cluster_info_list:
                 cluster_id, num_steps = cluster_info_list[-1]
                 status = _attempt_to_acquire_lock(
-                    self.fs, self._lock_uri(cluster_id, num_steps),
+                    self.fs.s3, self._lock_uri(cluster_id, num_steps),
                     self._opts['cloud_fs_sync_secs'], self._job_key)
                 if status:
                     log.debug('Acquired lock on cluster %s', cluster_id)

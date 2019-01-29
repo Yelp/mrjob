@@ -320,10 +320,10 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
             list(runner.cat_output())
 
-        bucket = runner.fs.get_bucket(tmp_bucket)
+        bucket = runner.fs.s3.get_bucket(tmp_bucket)
         self.assertEqual(len(list(bucket.objects.all())), tmp_len)
 
-        bucket = runner.fs.get_bucket(log_bucket)
+        bucket = runner.fs.s3.get_bucket(log_bucket)
         self.assertEqual(len(list(bucket.objects.all())), log_len)
 
     def test_cleanup_all(self):
@@ -2947,7 +2947,7 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
 
         runner._upload_contents(self.TEST_S3_URI, data_path)
 
-        s3_key = runner.fs._get_s3_key(self.TEST_S3_URI)
+        s3_key = runner.fs.s3._get_s3_key(self.TEST_S3_URI)
         self.assertEqual(s3_key.get()['Body'].read(), data)
 
         self.assertTrue(self.upload_file.called)
@@ -3008,7 +3008,7 @@ class AWSSessionTokenTestCase(MockBoto3TestCase):
         self.assertEqual(iam_kwargs['aws_session_token'], session_token)
 
         self.mock_client.reset_mock()
-        runner.fs.make_s3_client()
+        runner.fs.s3.make_s3_client()
 
         self.assertTrue(self.mock_client.called)
         s3_client_args, s3_client_kwargs = self.mock_client.call_args
@@ -3016,7 +3016,7 @@ class AWSSessionTokenTestCase(MockBoto3TestCase):
         self.assertIn('aws_session_token', s3_client_kwargs)
         self.assertEqual(s3_client_kwargs['aws_session_token'], session_token)
 
-        runner.fs.make_s3_resource()
+        runner.fs.s3.make_s3_resource()
         self.assertTrue(self.mock_client.called)
         s3_resource_args, s3_resource_kwargs = self.mock_client.call_args
         self.assertEqual(s3_resource_args, ('s3',))
@@ -4645,12 +4645,12 @@ class UseSudoOverSshTestCase(MockBoto3TestCase):
              '--image-version', '4.3.0']).sandbox()
 
         with job.make_runner() as runner:
-            self.assertIsNotNone(runner._ssh_fs)
-            self.assertFalse(runner._ssh_fs._sudo)
+            self.assertTrue(hasattr(runner.fs, 'ssh'))
+            self.assertFalse(runner.fs.ssh._sudo)
 
             self.launch(runner)
 
-            self.assertTrue(runner._ssh_fs._sudo)
+            self.assertTrue(runner.fs.ssh._sudo)
 
     def test_ami_4_2_0_with_ssh_fs(self):
 
@@ -4659,12 +4659,12 @@ class UseSudoOverSshTestCase(MockBoto3TestCase):
              '--image-version', '4.2.0']).sandbox()
 
         with job.make_runner() as runner:
-            self.assertIsNotNone(runner._ssh_fs)
-            self.assertFalse(runner._ssh_fs._sudo)
+            self.assertTrue(hasattr(runner.fs, 'ssh'))
+            self.assertFalse(runner.fs.ssh._sudo)
 
             self.launch(runner)
 
-            self.assertFalse(runner._ssh_fs._sudo)
+            self.assertFalse(runner.fs.ssh._sudo)
 
     def test_ami_4_3_0_without_ssh_fs(self):
         # just make sure we don't cause an error trying to set up sudo
@@ -4673,11 +4673,11 @@ class UseSudoOverSshTestCase(MockBoto3TestCase):
             ['-r', 'emr', '--image-version', '4.3.0']).sandbox()
 
         with job.make_runner() as runner:
-            self.assertIsNone(runner._ssh_fs)
+            self.assertFalse(hasattr(runner.fs, 'ssh'))
 
             self.launch(runner)
 
-            self.assertIsNone(runner._ssh_fs)
+            self.assertFalse(hasattr(runner.fs, 'ssh'))
 
 
 class MasterPrivateIPTestCase(MockBoto3TestCase):

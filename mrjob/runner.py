@@ -480,9 +480,10 @@ class MRJobRunner(object):
         filesystem.
         """
         if self._fs is None:
-            # wrap LocalFilesystem in CompositeFilesystem to get IOError
+            # wrap LocalFilesystem in LocalFilesystem to get IOError
             # on URIs (see #1185)
-            self._fs = CompositeFilesystem(LocalFilesystem())
+            self._fs = CompositeFilesystem()
+            self._fs.add_fs('local', LocalFilesystem())
         return self._fs
 
     ### Running the job and parsing output ###

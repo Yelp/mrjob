@@ -14,7 +14,6 @@
 """A Spark script that can run a MRJob without Hadoop."""
 import sys
 from argparse import ArgumentParser
-from argparse import REMAINDER
 from importlib import import_module
 
 from mrjob.util import shlex_split

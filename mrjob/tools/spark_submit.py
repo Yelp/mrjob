@@ -27,7 +27,7 @@ Usage::
 
 Options::
 
-  -r {emr,hadoop}, --runner {emr,hadoop}
+  -r {emr,hadoop,local}, --runner {emr,hadoop,local}
                         Where to run the job (default: "hadoop")
   --class MAIN_CLASS    Your application's main class (for Java / Scala apps).
   --name NAME           The name of your application.
@@ -168,7 +168,7 @@ _DEPRECATED_OPT_HELP = (
 # display in default help message
 
 # the only runners that support spark scripts/jars
-_SPARK_RUNNERS = ('emr', 'hadoop')
+_SPARK_RUNNERS = ('emr', 'hadoop', 'local')
 
 # the default spark runner to use
 _DEFAULT_RUNNER = 'hadoop'

@@ -1080,8 +1080,8 @@ class SparkMasterTestCase(SandboxedTestCase):
 
 @skipIf(pyspark is None, 'no pyspark module')
 class LocalRunnerSparkTestCase(SandboxedTestCase):
-    # these tests are a bit slow because they actually
-    # run on Spark.
+    # these tests are slow (~30s) because they run on
+    # actual Spark, in local-cluster mode
 
     def test_spark_mrjob(self):
         text = b'one fish\ntwo fish\nred fish\nblue fish\n'

@@ -809,6 +809,7 @@ class MRJobBinRunner(MRJobRunner):
     def _spark_script_args(self, step_num):
         """A list of args to the spark script/jar, used by
         _args_for_spark_step()."""
+        # TODO: this can also return args to the MRJob, which is confusing
         step = self._get_step(step_num)
 
         if step['type'] == 'spark':
@@ -890,7 +891,8 @@ class MRJobBinRunner(MRJobRunner):
         args.extend(self._opts['spark_args'])
 
         # step spark_args
-        args.extend(step['spark_args'])
+        if step.get('spark_args'):
+            args.extend(step['spark_args'])
 
         return args
 

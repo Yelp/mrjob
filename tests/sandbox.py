@@ -1,7 +1,7 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 David Marin
-# Copyright 2015-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2015-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,12 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from shutil import rmtree
 from unittest import TestCase
+from unittest import skipIf
+
+try:
+    import pyspark
+except ImportError:
+    pyspark = None
 
 import mrjob
 from mrjob import runner
@@ -172,6 +178,37 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
         """
         os.environ['PYTHONPATH'] = (
             mrjob_pythonpath() + ':' + os.environ.get('PYTHONPATH', ''))
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class SingleSparkContextTestCase(BasicTestCase):
+    """Only create a single SparkContext, to speed things up and prevent
+    errors from attempting to instantiate multiple contexts."""
+
+    @classmethod
+    def setUpClass(cls):
+        super(SingleSparkContextTestCase, cls).setUpClass()
+
+        from pyspark import SparkContext
+        cls.spark_context = SparkContext()
+
+        try:
+            cls.spark_context.setLogLevel('FATAL')
+        except:
+            # tearDownClass() won't be called if there's an exception
+            cls.spark_context.stop()
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.spark_context.stop()
+
+
+    def setUp(self):
+        super(SingleSparkContextTestCase, self).setUp()
+
+        self.start(patch('pyspark.SparkContext',
+                         return_value=self.spark_context))
 
 
 def mrjob_pythonpath():

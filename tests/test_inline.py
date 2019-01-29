@@ -21,26 +21,39 @@
 import gzip
 import os
 import os.path
+import sys
 from os.path import exists
 from os.path import join
 from io import BytesIO
+from unittest import TestCase
+from unittest import skipIf
 
 from warcio.warcwriter import WARCWriter
 
+try:
+    import pyspark
+except ImportError:
+    pyspark = None
+
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
+from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
+from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
+from mrjob.examples.mr_sparkaboom import MRSparKaboom
 from mrjob.inline import InlineMRJobRunner
 from mrjob.job import MRJob
+from mrjob.util import safeeval
+from mrjob.util import to_lines
 
 from tests.examples.test_mr_phone_to_url import write_conversion_record
+from tests.job import run_job
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_filter_job import MRFilterJob
-from tests.mr_null_spark import MRNullSpark
 from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import patch
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
-from tests.job import run_job
-from tests.py2 import patch
+from tests.sandbox import SingleSparkContextTestCase
 from tests.test_sim import MRIncrementerJob
 
 
@@ -241,9 +254,40 @@ class UnsupportedStepsTestCase(SandboxedTestCase):
 
         self.assertRaises(NotImplementedError, job.make_runner)
 
-    def test_no_spark_steps(self):
+    def test_no_spark_script_steps(self):
         # just a sanity check; _STEP_TYPES is tested in a lot of ways
-        job = MRNullSpark(['-r', 'inline'])
+        job = MRSparkScriptWordcount(['-r', 'inline'])
         job.sandbox()
 
         self.assertRaises(NotImplementedError, job.make_runner)
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
+
+    def test_spark_mrjob(self):
+        text = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = MRSparkWordcount(['-r', 'inline'])
+        job.sandbox(stdin=BytesIO(text))
+
+        counts = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                k, v = safeeval(line)
+                counts[k] = v
+
+        self.assertEqual(counts, dict(
+            blue=1, fish=4, one=1, red=1, two=1))
+
+    def test_spark_job_failure(self):
+        job = MRSparKaboom(['-r', 'inline'])
+        job.sandbox(stdin=BytesIO(b'line\n'))
+
+        from py4j.protocol import Py4JJavaError
+
+        with job.make_runner() as runner:
+            self.assertRaises(Py4JJavaError, runner.run)

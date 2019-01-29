@@ -20,7 +20,6 @@ log = logging.getLogger(__name__)
 
 # TODO:
 #
-# add back (deprecated) __getattr__ to pass through to sub-fs extensions
 # unit-test MuxFilesystem
 # make CompositeFilesystem a deprecated wrapper for MuxFilesystem
 
@@ -47,6 +46,28 @@ class MuxFilesystem(Filesystem):
 
         # set of names of filesystems that have been disabled
         self._disabled = set()
+
+    def __getattr__(self, name):
+        # don't confuse pickling (e.g. __getstate__())
+        if name.startswith('__'):
+            raise AttributeError(name)
+
+        # go through non-disabled filesystems and pick the first
+        # attribute with a matching name
+        for fs_name in self._fs_names:
+            if fs_name in self._disabled:
+                continue
+
+            fs = getattr(self, fs_name)
+            if hasattr(fs, name):
+                log.warning(
+                    'passing %s through to the top-level filesystem is'
+                    ' deprecated and going away in v0.7.0. Try'
+                    ' fs.%s.%s(...) instead' % (name, fs_name, name))
+                return getattr(fs, name)
+
+        raise AttributeError(name)
+
 
     def add_fs(self, name, fs, disable_if=None):
         """Add a filesystem.

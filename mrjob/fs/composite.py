@@ -68,7 +68,6 @@ class CompositeFilesystem(Filesystem):
 
         raise AttributeError(name)
 
-
     def add_fs(self, name, fs, disable_if=None):
         """Add a filesystem.
 
@@ -81,11 +80,11 @@ class CompositeFilesystem(Filesystem):
                            exception raised by ``fs``. If it returns true,
                            futher calls will not be forwarded to ``fs``.
         """
-        if hasattr(self, name):
+        if name in self._fs_names:
             raise ValueError('name %r is already taken' % name)
 
-        self._fs_names.append(name)
         setattr(self, name, fs)
+        self._fs_names.append(name)
 
         if disable_if:
             self._disable_if[name] = disable_if

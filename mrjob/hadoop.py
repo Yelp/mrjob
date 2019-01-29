@@ -31,9 +31,9 @@ except ImportError:
 from mrjob.bin import MRJobBinRunner
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_dicts
+from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
-from mrjob.fs.mux import MuxFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
@@ -195,7 +195,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         filesystem.
         """
         if self._fs is None:
-            self._fs = MuxFilesystem()
+            self._fs = CompositeFilesystem()
 
             self._fs.add_fs('hadoop',
                             HadoopFilesystem(self._opts['hadoop_bin']))

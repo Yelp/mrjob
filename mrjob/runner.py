@@ -34,8 +34,8 @@ from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_jobconfs
 from mrjob.conf import combine_opts
 from mrjob.conf import load_opts_from_mrjob_confs
+from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
-from mrjob.fs.mux import MuxFilesystem
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.options import CLEANUP_CHOICES
@@ -482,7 +482,7 @@ class MRJobRunner(object):
         if self._fs is None:
             # wrap LocalFilesystem in LocalFilesystem to get IOError
             # on URIs (see #1185)
-            self._fs = MuxFilesystem()
+            self._fs = CompositeFilesystem()
             self._fs.add_fs('local', LocalFilesystem())
         return self._fs
 

@@ -53,9 +53,9 @@ from mrjob.cloud import HadoopInTheCloudJobRunner
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
+from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
-from mrjob.fs.mux import MuxFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _client_error_status
 from mrjob.fs.s3 import _endpoint_url
@@ -672,7 +672,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         local filesystem.
         """
         if self._fs is None:
-            self._fs = MuxFilesystem()
+            self._fs = CompositeFilesystem()
 
             if self._opts['ec2_key_pair_file']:
                 self._fs.add_fs('ssh', SSHFilesystem(

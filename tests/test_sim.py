@@ -377,8 +377,8 @@ class FSDoesntHandleURIsTestCase(SandboxedTestCase):
         self.assertTrue(runner.fs.exists(foo_path))
         self.assertFalse(runner.fs.exists(bar_path))
 
-        # should raise IOError, not return False
+        # URI should raise IOError, not return False
         self.assertRaises(IOError,
                           runner.fs.exists, 's3://walrus/fish')
-        # and it's because we wrapped the local fs in MuxFilesystem
+        # and it's because we wrapped the local fs in CompositeFilesystem
         self.assertFalse(runner.fs.local.exists('s3://walrus/fish'))

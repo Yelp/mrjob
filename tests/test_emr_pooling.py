@@ -2060,8 +2060,8 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertTrue(runner._hadoop_fs)
-            self.assertEqual(runner._hadoop_fs._hadoop_bin, [])
+            self.assertTrue(hasattr(runner.fs, 'hadoop'))
+            self.assertEqual(runner.fs.hadoop._hadoop_bin, [])
 
             runner.run()
 
@@ -2075,9 +2075,9 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.assertEqual(ssh_tunnel_cluster_ids,
                              [cluster_id, runner.get_cluster_id()])
 
-            self.assertNotEqual(runner._hadoop_fs._hadoop_bin, [])
+            self.assertNotEqual(runner.fs.hadoop._hadoop_bin, [])
             self.assertIn('hadoop@%s-master' % runner.get_cluster_id(),
-                          runner._hadoop_fs._hadoop_bin)
+                          runner.fs.hadoop._hadoop_bin)
 
     def test_join_pooled_cluster_after_self_termination(self):
         # cluster 1 should be preferable

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from mrjob.fs.base import Filesystem
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
@@ -27,15 +28,15 @@ class CompositeFilesystemTestCase(BasicTestCase):
 
         self.log = self.start(patch('mrjob.fs.composite.log'))
 
-        self.hadoop_fs = Mock()
-        self.hadoop_fs.get_hadoop_version
+        self.hadoop_fs = Mock(spec=Filesystem)
+        self.hadoop_fs.get_hadoop_version = Mock()
         self.hadoop_fs.can_handle_path.side_effect = is_uri
 
-        self.local_fs = Mock()
+        self.local_fs = Mock(spec=Filesystem)
         self.local_fs.can_handle_path.side_effect = lambda p: not is_uri(p)
 
-        self.s3_fs = Mock()
-        self.s3_fs.create_bucket
+        self.s3_fs = Mock(spec=Filesystem)
+        self.s3_fs.create_bucket = Mock()
         self.s3_fs.can_handle_path.side_effect = is_s3_uri
 
     def test_empty_fs(self):
@@ -66,3 +67,40 @@ class CompositeFilesystemTestCase(BasicTestCase):
         self.s3_fs.ls.side_effect = IOError
 
         self.assertRaises(IOError, fs.ls, 's3://walrus/fish')
+
+    def test_forward_fs_extensions(self):
+        fs = CompositeFilesystem()
+
+        fs.add_fs('s3', self.s3_fs)
+        fs.add_fs('hadoop', self.hadoop_fs)
+
+        self.assertEqual(fs.create_bucket, self.s3_fs.create_bucket)
+        self.assertEqual(fs.get_hadoop_version,
+                         self.hadoop_fs.get_hadoop_version)
+
+        self.assertRaises(AttributeError, lambda: fs.client)
+
+    def test_disable_fs(self):
+        class NoCredentialsError(Exception):
+            pass
+
+        fs = CompositeFilesystem()
+
+        # tentatively use S3 filesystem, if set up
+        fs.add_fs('s3', self.s3_fs,
+                  disable_if=lambda ex: isinstance(ex, NoCredentialsError))
+        fs.add_fs('hadoop', self.hadoop_fs)
+
+        self.s3_fs.ls.side_effect = NoCredentialsError
+
+        # calling ls() on S3 fs disables it, so we move on to hadoop fs
+        self.assertEqual(fs.ls('s3://walrus/'),
+                         self.hadoop_fs.ls.return_value)
+        self.assertTrue(self.s3_fs.ls.called)
+
+        self.assertIn('s3', fs._disabled)
+
+        # now that s3 fs is disabled, we won't even try to call it
+        self.assertEqual(fs.cat('s3://walrus/fish'),
+                         self.hadoop_fs.cat.return_value)
+        self.assertFalse(self.s3_fs.cat.called)

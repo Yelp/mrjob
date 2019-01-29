@@ -363,3 +363,22 @@ class DistributedCachePermissionsTestCase(SandboxedTestCase):
         self.assertTrue(data_perms & stat.S_IXUSR)
         self.assertFalse(data_perms & stat.S_IXGRP)
         self.assertFalse(data_perms & stat.S_IXOTH)
+
+
+class FSDoesntHandleURIsTestCase(SandboxedTestCase):
+    # regression test for #1185
+
+    def test_no_uris(self):
+        runner = InlineMRJobRunner()
+
+        # sanity check
+        foo_path = self.makefile('foo')
+        bar_path = os.path.join(self.tmp_dir, 'bar')
+        self.assertTrue(runner.fs.exists(foo_path))
+        self.assertFalse(runner.fs.exists(bar_path))
+
+        # should raise IOError, not return False
+        self.assertRaises(IOError,
+                          runner.fs.exists, 's3://walrus/fish')
+        # and it's because we wrapped the local fs in MuxFilesystem
+        self.assertFalse(runner.fs.local.exists('s3://walrus/fish'))

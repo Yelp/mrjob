@@ -36,7 +36,7 @@ class MuxFilesystem(Filesystem):
     (e.g. ``fs.s3.create_bucket(...)``).
 
     """
-    def __init__(self):
+    def __init__(self, *filesystems):
         # names of sub-filesystems, in the order to call them. (The filesystems
         # themselves are stored in the attribute with that name.)
         self._fs_names = []
@@ -46,6 +46,14 @@ class MuxFilesystem(Filesystem):
 
         # set of names of filesystems that have been disabled
         self._disabled = set()
+
+        if filesystems:
+            log.warning('passing filesystems to the constructor is deprecated'
+                        ' and going away in v0.7.0. Use add_fs() instead')
+            for fs in filesystems:
+                # convention is to name filesystems after their module
+                fs_name = fs.__module__.split('.')[-1]
+                self.add_fs(fs, fs_name)
 
     def __getattr__(self, name):
         # don't confuse pickling (e.g. __getstate__())
@@ -61,7 +69,7 @@ class MuxFilesystem(Filesystem):
             fs = getattr(self, fs_name)
             if hasattr(fs, name):
                 log.warning(
-                    'passing %s through to the top-level filesystem is'
+                    'passing %s() through to the top-level filesystem is'
                     ' deprecated and going away in v0.7.0. Try'
                     ' fs.%s.%s(...) instead' % (name, fs_name, name))
                 return getattr(fs, name)

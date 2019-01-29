@@ -18,6 +18,12 @@ from mrjob.fs.base import Filesystem
 
 log = logging.getLogger(__name__)
 
+# TODO:
+#
+# add back (deprecated) __getattr__ to pass through to sub-fs extensions
+# unit-test MuxFilesystem
+# make CompositeFilesystem a deprecated wrapper for MuxFilesystem
+
 
 class MuxFilesystem(Filesystem):
     """Use one of several filesystems depending on the path/URI.

@@ -34,6 +34,7 @@ from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
+from mrjob.fs.mux import MuxFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
@@ -195,18 +196,21 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         filesystem.
         """
         if self._fs is None:
-            self._fs = CompositeFilesystem(
-                HadoopFilesystem(self._opts['hadoop_bin']),
-                LocalFilesystem())
+            self._fs = MuxFilesystem()
+
+            self._fs.add_fs('hadoop',
+                            HadoopFilesystem(self._opts['hadoop_bin']))
+            self._fs.add_fs('local', LocalFilesystem())
+
         return self._fs
 
     def get_hadoop_version(self):
         """Invoke the hadoop executable to determine its version"""
-        return self.fs.get_hadoop_version()
+        return self.fs.hadoop.get_hadoop_version()
 
     def get_hadoop_bin(self):
         """Find the hadoop binary. A list: binary followed by arguments."""
-        return self.fs.get_hadoop_bin()
+        return self.fs.hadoop.get_hadoop_bin()
 
     def get_hadoop_streaming_jar(self):
         """Find the path of the hadoop streaming jar, or None if not found."""
@@ -391,7 +395,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
     def _upload_to_hdfs(self, path, target):
         log.debug('  %s -> %s' % (path, target))
-        self.fs._put(path, target)
+        self.fs.hadoop._put(path, target)
 
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""

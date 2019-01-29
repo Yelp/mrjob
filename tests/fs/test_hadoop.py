@@ -228,14 +228,14 @@ class FindHadoopBinTestCase(SandboxedTestCase):
     def test_fallback(self):
         self.assertFalse(self.which.called)
 
-        self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop'])
+        self.assertEqual(self.fs.hadoop.get_hadoop_bin(), ['hadoop'])
 
         self.which.assert_called_once_with('hadoop', path=None)
 
     def test_predefined_hadoop_bin(self):
         self.fs = HadoopFilesystem(hadoop_bin=['hadoop', '-v'])
 
-        self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop', '-v'])
+        self.assertEqual(self.fs.hadoop.get_hadoop_bin(), ['hadoop', '-v'])
 
         self.assertFalse(self.which.called)
 
@@ -246,7 +246,7 @@ class FindHadoopBinTestCase(SandboxedTestCase):
         # okay to add after HadoopFilesystem() created; it hasn't looked yet
         hadoop_bin = self._add_hadoop_bin_for_envvar(envvar, *dirnames)
 
-        self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_bin])
+        self.assertEqual(self.fs.hadoop.get_hadoop_bin(), [hadoop_bin])
 
     def test_hadoop_prefix(self):
         self._test_environment_variable('HADOOP_PREFIX', 'bin')
@@ -273,8 +273,8 @@ class FindHadoopBinTestCase(SandboxedTestCase):
 
         os.environ['PATH'] = ':'.join([hadoop_path1, hadoop_path2])
 
-        self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_path1_bin])
-        self.assertNotEqual(self.fs.get_hadoop_bin(), [hadoop_path2_bin])
+        self.assertEqual(self.fs.hadoop.get_hadoop_bin(), [hadoop_path1_bin])
+        self.assertNotEqual(self.fs.hadoop.get_hadoop_bin(), [hadoop_path2_bin])
 
     def test_hadoop_mapred_home(self):
         self._test_environment_variable('HADOOP_MAPRED_HOME', 'bin')
@@ -285,7 +285,7 @@ class FindHadoopBinTestCase(SandboxedTestCase):
     def test_other_environment_variable(self):
         self._add_hadoop_bin_for_envvar('HADOOP_YARN_MRJOB_DIR', 'bin')
 
-        self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop'])
+        self.assertEqual(self.fs.hadoop.get_hadoop_bin(), ['hadoop'])
 
     # precedence tests
 

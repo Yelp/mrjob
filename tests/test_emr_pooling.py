@@ -2227,7 +2227,9 @@ class S3LockTestCase(MockBoto3TestCase):
 
         self.assertEqual(
             True,
-            _attempt_to_acquire_lock(runner.fs, self.LOCK_URI, 5.0, 'job_one'))
+            _attempt_to_acquire_lock(
+                runner.fs.s3, self.LOCK_URI, 5.0, 'job_one')
+        )
 
         self.sleep.assert_called_with(5.0)
 
@@ -2235,7 +2237,9 @@ class S3LockTestCase(MockBoto3TestCase):
 
         self.assertEqual(
             False,
-            _attempt_to_acquire_lock(runner.fs, self.LOCK_URI, 5.0, 'job_two'))
+            _attempt_to_acquire_lock(
+                runner.fs.s3, self.LOCK_URI, 5.0, 'job_two')
+        )
 
         self.assertFalse(self.sleep.called)
 
@@ -2248,7 +2252,7 @@ class S3LockTestCase(MockBoto3TestCase):
         }}, age=timedelta(minutes=30))
 
         did_lock = _attempt_to_acquire_lock(
-            runner.fs, 's3://locks/expired_lock', 5.0, 'job_one',
+            runner.fs.s3, 's3://locks/expired_lock', 5.0, 'job_one',
             mins_to_expiration=5)
         self.assertEqual(True, did_lock)
 
@@ -2263,10 +2267,10 @@ class S3LockTestCase(MockBoto3TestCase):
 
         self.assertRaises(
             StopIteration, _attempt_to_acquire_lock,
-            runner.fs, self.LOCK_URI, 5.0, 'job_one')
+            runner.fs.s3, self.LOCK_URI, 5.0, 'job_one')
 
         did_lock = _attempt_to_acquire_lock(
-            runner.fs, self.LOCK_URI, 5.0, 'job_two')
+            runner.fs.s3, self.LOCK_URI, 5.0, 'job_two')
         self.assertFalse(did_lock)
 
     def test_read_race_condition(self):
@@ -2281,7 +2285,7 @@ class S3LockTestCase(MockBoto3TestCase):
         self.sleep.side_effect = _while_you_were_sleeping
 
         did_lock = _attempt_to_acquire_lock(
-            runner.fs, self.LOCK_URI, 5.0, 'job_one')
+            runner.fs.s3, self.LOCK_URI, 5.0, 'job_one')
         self.assertFalse(did_lock)
 
         self.sleep.assert_called_with(5.0)

@@ -35,11 +35,11 @@ import mrjob
 from mrjob.cloud import HadoopInTheCloudJobRunner
 from mrjob.compat import map_version
 from mrjob.conf import combine_dicts
-from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.local import LocalFilesystem
+from mrjob.fs.mux import MuxFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
@@ -402,16 +402,17 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """:py:class:`~mrjob.fs.base.Filesystem` object for SSH, S3, GCS, and
         the local filesystem.
         """
-        if self._fs is not None:
-            return self._fs
+        if self._fs is None:
+            self._fs = MuxFilesystem()
 
-        self._gcs_fs = GCSFilesystem(
-            credentials=self._credentials,
-            local_tmp_dir=self._get_local_tmp_dir(),
-            project_id=self._project_id,
-        )
+            self._fs.add_fs('gcs', GCSFilesystem(
+                credentials=self._credentials,
+                local_tmp_dir=self._get_local_tmp_dir(),
+                project_id=self._project_id,
+            ))
 
-        self._fs = CompositeFilesystem(self._gcs_fs, LocalFilesystem())
+            self._fs.add_fs('local', LocalFilesystem())
+
         return self._fs
 
     def _fs_chunk_size(self):
@@ -435,8 +436,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # determine region for bucket
         region = self._region()
 
-        for tmp_bucket_name in self.fs.get_all_bucket_names(prefix='mrjob-'):
-            tmp_bucket = self.fs.get_bucket(tmp_bucket_name)
+        for tmp_bucket_name in self.fs.gcs.get_all_bucket_names(
+                prefix='mrjob-'):
+            tmp_bucket = self.fs.gcs.get_bucket(tmp_bucket_name)
 
             # NOTE - GCP ambiguous Behavior - Bucket location is being
             # returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs
@@ -531,7 +533,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for path, gcs_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, gcs_uri))
 
-            self.fs.put(path, gcs_uri, chunk_size=self._fs_chunk_size())
+            self.fs.gcs.put(path, gcs_uri, chunk_size=self._fs_chunk_size())
 
         self._wait_for_fs_sync()
 
@@ -543,7 +545,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         # Return early if our bucket already exists
         try:
-            self.fs.get_bucket(bucket_name)
+            self.fs.gcs.get_bucket(bucket_name)
             return
         except google.api_core.exceptions.NotFound:
             pass
@@ -556,7 +558,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # NOTE - By default, we create a bucket in the same GCE region as our
         # job (tmp buckets ONLY)
         # https://cloud.google.com/storage/docs/bucket-locations
-        self.fs.create_bucket(
+        self.fs.gcs.create_bucket(
             bucket_name, location=location,
             object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS)
 
@@ -876,7 +878,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 state['pos'] = 0
                 state['log_uri'] = log_uri
 
-            log_blob = self.fs._get_blob(log_uri)
+            log_blob = self.fs.gcs._get_blob(log_uri)
 
             try:
                 new_data = log_blob.download_as_string(start=state['pos'])

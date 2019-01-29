@@ -31,7 +31,6 @@ except ImportError:
 from mrjob.bin import MRJobBinRunner
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_dicts
-from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.mux import MuxFilesystem

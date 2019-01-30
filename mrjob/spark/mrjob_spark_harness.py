@@ -96,11 +96,16 @@ def _run_step(step, step_num, rdd, make_job):
     step_desc = step.description(step_num)
     _check_step(step_desc, step_num)
 
-    if step_desc.get('mapper'):
-        # creating a separate job instance to ensure that initialization
-        # happens correctly (e.g. mapper_job.is_task() should be True).
-        # probably doesn't actually matter that we pass --step-num
-        mapper_job = make_job('--mapper', '--step-num=%d' % step_num)
+    # creating a separate job instances to ensure that initialization
+    # happens correctly (e.g. mapper_job.is_task() should be True).
+    # probably doesn't actually matter that we pass --step-num
+    mapper_job, reducer_job, combiner_job = (
+        make_job('--%s' % mrc, '--step-num=%d' % step_num)
+        if step_desc.get(mrc) else None
+        for mrc in ('mapper', 'reducer', 'combiner')
+    )
+
+    if mapper_job is not None:
         m_read, m_write = mapper_job.pick_protocols(step_num, 'mapper')
 
         # run the mapper
@@ -109,17 +114,52 @@ def _run_step(step, step_num, rdd, make_job):
             lambda pairs: mapper_job.map_pairs(pairs, step_num))
         rdd = rdd.map(lambda k_v: m_write(*k_v))
 
-    if step_desc.get('reducer'):
-        reducer_job = make_job('--reducer', '--step-num=%d' % step_num)
-        r_read, r_write = reducer_job.pick_protocols(step_num, 'reducer')
+    if combiner_job is not None:
+        c_read, c_write = combiner_job.pick_protocols(step_num, 'combiner')
 
+        # run the combiner
+        rdd = rdd.map(c_read)
+
+        # Most combiners should return a single value per key to shrink the
+        # mapper output. If the combiner does not seem to be doing this, fall
+        # back to recreating the mapper output since Hadoop combiners are
+        # optional anyway and we do not want to run the same values through the
+        # combiner multiple times.
+        def combiner_helper(pairs1, pairs2):
+            if len(pairs1) == len(pairs2) == 1:
+                return list(
+                    combiner_job.combine_pairs(pairs1 + pairs2, step_num),
+                )
+            else:
+                pairs1.extend(pairs2)
+                return pairs1
+
+        # combine_pairs takes a list of key-value pairs; restructuring the
+        # data so that we can provide that
+        rdd = rdd.map(lambda k_v: (k_v[0], k_v))
+
+        # a shuffle is unneccesary in this case since combineByKey returns an
+        # RDD grouped by key.
+        rdd = rdd.combineByKey(
+            createCombiner=lambda k_v: [k_v],
+            mergeValue=lambda k_v_list, k_v: combiner_helper(k_v_list, [k_v]),
+            mergeCombiners=combiner_helper,
+        )
+        rdd = rdd.mapValues(
+            lambda pairs: [c_write(*pair) for pair in pairs])
+        rdd = _flatten_and_maybe_sort_keys(
+            rdd,
+            should_sort=(
+                reducer_job.sort_values() if reducer_job is not None else False
+            ))
+    elif reducer_job is not None and combiner_job is None:
         # simulate shuffle in Hadoop Streaming
         rdd = rdd.groupBy(lambda line: line.split(b'\t')[0])
+        rdd = _flatten_and_maybe_sort_keys(
+            rdd, should_sort=reducer_job.sort_values())
 
-        if reducer_job.sort_values():
-            rdd = rdd.flatMap(lambda key_and_lines: sorted(key_and_lines[1]))
-        else:
-            rdd = rdd.flatMap(lambda key_and_lines: key_and_lines[1])
+    if reducer_job is not None:
+        r_read, r_write = reducer_job.pick_protocols(step_num, 'reducer')
 
         # run the reducer
         rdd = rdd.map(r_read)
@@ -128,6 +168,13 @@ def _run_step(step, step_num, rdd, make_job):
         rdd = rdd.map(lambda k_v: r_write(*k_v))
 
     return rdd
+
+
+def _flatten_and_maybe_sort_keys(rdd, should_sort):
+    if should_sort:
+        return rdd.flatMap(lambda key_and_lines: sorted(key_and_lines[1]))
+    else:
+        return rdd.flatMap(lambda key_and_lines: key_and_lines[1])
 
 
 def _check_step(step_desc, step_num):

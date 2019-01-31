@@ -54,9 +54,9 @@ class SparkMRJobRunner(MRJobBinRunner):
     }
 
     # everything except Hadoop JARs
-    # streaming jobs are run using mrjob_spark_harness.py (in this directory)
+    # streaming jobs will be run using mrjob_spark_harness.py (see #1972)
     _STEP_TYPES = {
-        'spark', 'spark_jar', 'spark_script', 'streaming',
+        'spark', 'spark_jar', 'spark_script', # 'streaming',
     }
 
     def __init__(self, **kwargs):

@@ -14,6 +14,15 @@
 """A runner that can run jobs on Spark, with or without Hadoop."""
 from mrjob.bin import MRJobBinRunner
 
+from mrjob.fs.composite import CompositeFilesystem
+from mrjob.fs.gcs import GCSFilesystem
+from mrjob.fs.gcs import google as google_libs_installed
+from mrjob.fs.hadoop import HadoopFilesystem
+from mrjob.fs.local import LocalFilesystem
+from mrjob.fs.s3 import S3Filesystem
+from mrjob.fs.s3 import boto3 as boto3_installed
+from mrjob.fs.s3 import _is_permanent_boto3_error
+
 
 class SparkJobRunner(MRJobBinRunner):
     """Runs a :py:class:`~mrjob.job.MRJob` on your Spark cluster (with or
@@ -29,10 +38,10 @@ class SparkJobRunner(MRJobBinRunner):
         'cloud_fs_sync_secs',
         'cloud_part_size_mb',
         'cloud_tmp_dir',
+        'google_project_id',  # used by GCS filesystem
         'hadoop_bin',
-        'project_id',  # used by GCS filesystem
-        'region',  # used by S3 filesystem
         's3_endpoint',
+        's3_region',  # only used along with s3_endpoint
         'spark_deploy_mode',
         'spark_master',
     }
@@ -42,3 +51,30 @@ class SparkJobRunner(MRJobBinRunner):
     _STEP_TYPES = {
         'spark', 'spark_jar', 'spark_script', 'streaming',
     }
+
+    def fs(self):
+        # Spark supports basically every filesystem there is
+
+        if not self._fs:
+            self._fs = CompositeFilesystem()
+
+            if boto3_installed:
+                self._fs.add_fs('s3', S3Filesystem(
+                    aws_access_key_id=self._opts['aws_access_key_id'],
+                    aws_secret_access_key=self._opts['aws_secret_access_key'],
+                    aws_session_token=self._opts['aws_session_token'],
+                    s3_endpoint=self._opts['s3_endpoint'],
+                    s3_region=self._opts['s3_region'],
+                ), disable_if=_is_permanent_boto3_error)
+
+            # TODO: break out credentials managing code
+            if google_libs_installed and False:
+                self._fs.add_fs('gcs', GCSFilesystem(  # fill in
+                    ))
+
+            self._fs.add_fs('hadoop', HadoopFilesystem(
+                self._opts['hadoop_bin']))
+
+            self._fs.add_fs('local', LocalFilesystem())
+
+        return self._fs

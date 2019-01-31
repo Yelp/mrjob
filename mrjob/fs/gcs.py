@@ -26,6 +26,7 @@ from mrjob.runner import GLOB_RE
 
 try:
     import google.api_core.exceptions
+    import google.auth.exceptions
     import google.cloud.storage.client
 except ImportError:
     google = None
@@ -285,3 +286,7 @@ def parse_gcs_uri(uri):
         raise ValueError('Invalid GCS URI: %s' % uri)
 
     return components.netloc, components.path[1:]
+
+
+def _is_permanent_google_error(self, ex):
+    return isinstance(ex, google.auth.exceptions.DefaultCredentialsError)

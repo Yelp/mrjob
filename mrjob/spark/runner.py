@@ -65,8 +65,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         self._spark_tmp_dir = self._pick_spark_tmp_dir()
 
         # where local files are uploaded into Spark
-        spark_files_dir = posixpath.join(self._spark_tmp_dir, 'files', '')
-        self._upload_mgr = UploadDirManager(spark_files_dir)
+        if is_uri(self._spark_tmp_dir):
+            spark_files_dir = posixpath.join(self._spark_tmp_dir, 'files', '')
+            self._upload_mgr = UploadDirManager(spark_files_dir)
 
         # where to put job output (if not set explicitly)
         if not self._output_dir:

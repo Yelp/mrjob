@@ -23,9 +23,10 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import boto3 as boto3_installed
 from mrjob.fs.s3 import _is_permanent_boto3_error
+from mrjob.hadoop import fully_qualify_hdfs_path
 
 
-class SparkJobRunner(MRJobBinRunner):
+class SparkMRJobRunner(MRJobBinRunner):
     """Runs a :py:class:`~mrjob.job.MRJob` on your Spark cluster (with or
     without Hadoop). Invoked when you run your job with ``-r spark``.
     """
@@ -53,6 +54,14 @@ class SparkJobRunner(MRJobBinRunner):
         'spark', 'spark_jar', 'spark_script', 'streaming',
     }
 
+    def _default_opts(self):
+        return combine_dicts(
+            super(SparkMRJobRunner, self)._default_opts(),
+            dict(
+                cloud_tmp_dir=fully_qualify_hdfs_path('tmp/mrjob'),
+            )
+        )
+
     def fs(self):
         # Spark supports basically every filesystem there is
 
@@ -68,7 +77,7 @@ class SparkJobRunner(MRJobBinRunner):
                     s3_region=self._opts['s3_region'],
                 ), disable_if=_is_permanent_boto3_error)
 
-            if google_libs_installed and False:
+            if google_libs_installed:
                 self._fs.add_fs('gcs', GCSFilesystem(
                     project_id=self._opts['google_project_id']
                 ), disable_if=_is_permanent_google_error)

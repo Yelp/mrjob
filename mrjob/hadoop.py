@@ -170,9 +170,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         self._hadoop_streaming_jar = self._opts['hadoop_streaming_jar']
         self._searched_for_hadoop_streaming_jar = False
 
-        # Keep track of where the spark-submit binary is
-        self._spark_submit_bin = self._opts['spark_submit_bin']
-
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task' ('step' will always
         # be filled because it comes from the hadoop jar command output,
@@ -315,11 +312,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
         for path in _FALLBACK_HADOOP_LOG_DIRS:
             yield path
-
-    def get_spark_submit_bin(self):
-        if not self._spark_submit_bin:
-            self._spark_submit_bin = self._find_spark_submit_bin()
-        return self._spark_submit_bin
 
     def _run(self):
         self._find_binaries_and_jars()

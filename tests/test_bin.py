@@ -1962,6 +1962,39 @@ class ShBinValidationTestCase(SandboxedTestCase):
         self.assertTrue(self.log.warning.called)
 
 
+class GetSparkSubmitBinTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(GetSparkSubmitBinTestCase, self).setUp()
+
+        self.find_spark_submit_bin = self.start(patch(
+            'mrjob.bin.MRJobBinRunner._find_spark_submit_bin'))
+
+    def test_do_nothing_on_init(self):
+        runner = MRJobBinRunner()
+        self.assertFalse(self.find_spark_submit_bin.called)
+
+    def test_find_spark_submit(self):
+        runner = MRJobBinRunner()
+        self.assertEqual(runner.get_spark_submit_bin(),
+                         self.find_spark_submit_bin.return_value)
+
+    def test_only_find_spark_submit_bin_once(self):
+        runner = MRJobBinRunner()
+        runner.get_spark_submit_bin()
+        runner.get_spark_submit_bin()
+
+        self.assertEqual(self.find_spark_submit_bin.call_count, 1)
+
+    def test_option_short_circuits_find(self):
+        runner = MRJobBinRunner(
+            spark_submit_bin=['/path/to/spark-submit'])
+
+        self.assertEqual(runner.get_spark_submit_bin(),
+                         ['/path/to/spark-submit'])
+        self.assertFalse(self.find_spark_submit_bin.called)
+
+
 class FindSparkSubmitBinTestCase(SandboxedTestCase):
 
     def setUp(self):

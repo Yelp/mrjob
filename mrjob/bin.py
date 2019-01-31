@@ -99,6 +99,10 @@ class MRJobBinRunner(MRJobRunner):
         if any('#' in path for path in self._opts['py_files']):
             raise ValueError("py_files cannot contain '#'")
 
+        # Keep track of where the spark-submit binary is
+        self._spark_submit_bin = self._opts['spark_submit_bin']
+
+
     def _default_opts(self):
         return combine_dicts(
             super(MRJobBinRunner, self)._default_opts(),
@@ -842,9 +846,20 @@ class MRJobBinRunner(MRJobRunner):
         """
         return self._opts['spark_submit_bin'] or ['spark-submit']
 
+    def get_spark_submit_bin(self):
+        """Return the location of the ``spark-submit`` binary, searching for it
+        if necessary."""
+        if not self._spark_submit_bin:
+            self._spark_submit_bin = self._find_spark_submit_bin()
+        return self._spark_submit_bin
+
     def _find_spark_submit_bin(self):
         """Attempt to find the spark binary. Returns a list of arguments.
-        Defaults to ``['spark-submit']``"""
+        Defaults to ``['spark-submit']``.
+
+        Re-define this in your subclass if you already know where
+        to find spark-submit (e.g. on cloud services).
+        """
         for path in unique(self._spark_submit_bin_dirs()):
             log.info('Looking for spark-submit binary in %s...' % (
                 path or '$PATH'))

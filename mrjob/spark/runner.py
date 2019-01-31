@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """A runner that can run jobs on Spark, with or without Hadoop."""
-from mrjob.bin import MRJobBinRunner
+import os.path
+import posixpath
+from tempfile import gettempdir
 
+from mrjob.bin import MRJobBinRunner
+from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import google as google_libs_installed
@@ -24,6 +28,7 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import boto3 as boto3_installed
 from mrjob.fs.s3 import _is_permanent_boto3_error
 from mrjob.hadoop import fully_qualify_hdfs_path
+from mrjob.setup import UploadDirManager
 
 
 class SparkMRJobRunner(MRJobBinRunner):
@@ -39,13 +44,13 @@ class SparkMRJobRunner(MRJobBinRunner):
         'aws_session_token',
         'cloud_fs_sync_secs',
         'cloud_part_size_mb',
-        'cloud_tmp_dir',
         'google_project_id',  # used by GCS filesystem
         'hadoop_bin',
         's3_endpoint',
         's3_region',  # only used along with s3_endpoint
         'spark_deploy_mode',
         'spark_master',
+        'spark_tmp_dir',  # where to put temp files in Spark
     }
 
     # everything except Hadoop JARs
@@ -53,6 +58,38 @@ class SparkMRJobRunner(MRJobBinRunner):
     _STEP_TYPES = {
         'spark', 'spark_jar', 'spark_script', 'streaming',
     }
+
+    def __init__(self, **kwargs):
+        self(SparkMRJobRunner, self).__init__(**kwargs)
+
+        self._spark_tmp_dir = self._pick_spark_tmp_dir()
+
+        # where local files are uploaded into Spark
+        spark_files_dir = posixpath.join(self._spark_tmp_dir, 'files', '')
+        self._upload_mgr = UploadDirManager(spark_files_dir)
+
+        # where to put job output (if not set explicitly)
+        if not self._output_dir:
+            self._output_dir = posixpath.join(self._spark_tmp_dir, 'output')
+
+        # keep track of where the spark-submit binary is
+        self._spark_submit_bin = self._opts['spark_submit_bin']
+
+    def _pick_spark_tmp_dir(self):
+        master = self._spark_master()
+
+        if master is None or master.startswith('local'):
+            # need a local temp dir
+            # add "-spark" so we don't collide with default local temp dir
+            return os.path.join(
+                gettempdir(), self._job_key + '-spark')
+        else:
+            # use HDFS (same default as HadoopJobRunner)
+            return posixpath.join(
+                fully_qualify_hdfs_path('tmp/mrjob', self._job_key))
+
+    def _default_step_output_dir(self):
+        return posixpath.join(self._spark_tmp_dir, 'step-output')
 
     def _default_opts(self):
         return combine_dicts(

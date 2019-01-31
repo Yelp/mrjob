@@ -17,6 +17,7 @@ from mrjob.bin import MRJobBinRunner
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import google as google_libs_installed
+from mrjob.fs.gcs import _is_permanent_google_error
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
@@ -67,10 +68,10 @@ class SparkJobRunner(MRJobBinRunner):
                     s3_region=self._opts['s3_region'],
                 ), disable_if=_is_permanent_boto3_error)
 
-            # TODO: break out credentials managing code
             if google_libs_installed and False:
-                self._fs.add_fs('gcs', GCSFilesystem(  # fill in
-                    ))
+                self._fs.add_fs('gcs', GCSFilesystem(
+                    project_id=self._opts['google_project_id']
+                ), disable_if=_is_permanent_google_error)
 
             self._fs.add_fs('hadoop', HadoopFilesystem(
                 self._opts['hadoop_bin']))

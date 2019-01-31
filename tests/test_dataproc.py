@@ -286,7 +286,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
         # with statement finishes, cleanup runs
 
         self.assertEqual(
-            len(list(fs.client.bucket(tmp_bucket).list_blobs())),
+            len(list(fs.gcs.client.bucket(tmp_bucket).list_blobs())),
             tmp_len)
 
     def test_cleanup_all(self):
@@ -659,7 +659,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         self.assertNotIn(bucket_name, existing_buckets)
         self.assertEqual(path, 'tmp/')
 
-        current_bucket = runner.fs.get_bucket(bucket_name)
+        current_bucket = runner.fs.gcs.get_bucket(bucket_name)
 
         self.assertEqual(current_bucket.location, location.upper())
 

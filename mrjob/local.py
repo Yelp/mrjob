@@ -25,8 +25,6 @@ from functools import partial
 from multiprocessing import Pool
 from subprocess import CalledProcessError
 from subprocess import check_call
-from subprocess import Popen
-from subprocess import PIPE
 
 try:
     import pty
@@ -36,13 +34,9 @@ except ImportError:
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.logs.errors import _format_error
-from mrjob.logs.log4j import _parse_hadoop_log4j_records
-from mrjob.logs.step import _log_line_from_driver
 from mrjob.logs.step import _log_log4j_record
-from mrjob.logs.step import _yield_lines_from_pty_or_pipe
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.py2 import string_types
-from mrjob.py2 import to_unicode
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import _sort_lines_in_memory
 from mrjob.step import StepFailedException
@@ -125,57 +119,16 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             log.warning('Spark master %r will probably ignore archives' %
                         self._spark_master())
 
-        step_args = self._args_for_spark_step(step_num)
+        spark_submit_args = self._args_for_spark_step(step_num)
 
         env = dict(os.environ)
         env.update(self._spark_cmdenv(step_num))
 
-        log.debug('> %s' % cmd_line(step_args))
-        log.debug('  with environment: %r' % sorted(env.items()))
-
-        def _log_line(line):
-            log.info('  %s' % to_unicode(line).strip('\r\n'))
-
-        # try to use a PTY if it's available
-        try:
-            pid, master_fd = pty.fork()
-        except (AttributeError, OSError):
-            # no PTYs, just use Popen
-
-            # user won't get much feedback for a while, so tell them
-            # spark-submit is running
-            log.debug('No PTY available, using Popen() to invoke spark-submit')
-
-            step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE, env=env)
-
-            for line in step_proc.stderr:
-                for record in _parse_hadoop_log4j_records(
-                        _yield_lines_from_pty_or_pipe(step_proc.stderr)):
-                    _log_log4j_record(record)
-
-            # there shouldn't be much output on STDOUT
-            for line in step_proc.stdout:
-                _log_line_from_driver(line)
-
-            step_proc.stdout.close()
-            step_proc.stderr.close()
-
-            returncode = step_proc.wait()
-        else:
-            # we have PTYs
-            if pid == 0:  # we are the child process
-                os.execvpe(step_args[0], step_args, env)
-            else:
-                log.debug('Invoking spark-submit via PTY')
-
-                with os.fdopen(master_fd, 'rb') as master:
-                    for record in _parse_hadoop_log4j_records(
-                            _yield_lines_from_pty_or_pipe(master)):
-                        _log_log4j_record(record)
-                    _, returncode = os.waitpid(pid, 0)
+        returncode = self._run_spark_submit(spark_submit_args, env,
+                                            record_callback=_log_log4j_record)
 
         if returncode:
-            reason = str(CalledProcessError(returncode, step_args))
+            reason = str(CalledProcessError(returncode, spark_submit_args))
             raise StepFailedException(
                 reason=reason, step_num=step_num,
                 num_steps=self._num_steps())

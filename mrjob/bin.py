@@ -26,11 +26,19 @@ import sys
 from subprocess import Popen
 from subprocess import PIPE
 
+try:
+    import pty
+    pty  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    pty = None
+
 import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
+from mrjob.logs.log4j import _parse_hadoop_log4j_records
+from mrjob.logs.step import _yield_lines_from_pty_or_pipe
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
@@ -839,12 +847,64 @@ class MRJobBinRunner(MRJobRunner):
 
         return self._interpolate_step_args(args, step_num)
 
-    def get_spark_submit_bin(self):
-        """The spark-submit command, as a list of args. Re-define
-        this in your subclass for runner-specific behavior, possibly using
-        :py:meth:`_find_spark_submit_bin`.
+    def _run_spark_submit(self, spark_submit_args, env, record_callback):
+        """Run the spark submit binary in a subprocess, using a PTY if possible
+
+        :param spark_submit_args: spark-submit binary and arguments, as as list
+        :param env: environment variables, as a dict
+        :param record_callback: a function that takes a single log4j record
+                                as its argument (see
+                                :py:func:`~mrjob.logs.log4j\
+                                ._parse_hadoop_log4j_records)
+
+        :return: the subprocess's return code
         """
-        return self._opts['spark_submit_bin'] or ['spark-submit']
+        log.debug('> %s' % cmd_line(spark_submit_args))
+        log.debug('  with environment: %r' % sorted(env.items()))
+
+        returncode = 0  # should always be set, but just in case
+
+        # try to use a PTY if it's available
+        try:
+            pid, master_fd = pty.fork()
+        except (AttributeError, OSError):
+            # no PTYs, just use Popen
+
+            # user won't get much feedback for a while, so tell them
+            # spark-submit is running
+            log.debug('No PTY available, using Popen() to invoke spark-submit')
+
+            step_proc = Popen(
+                spark_submit_args, stdout=PIPE, stderr=PIPE, env=env)
+
+            for line in step_proc.stderr:
+                for record in _parse_hadoop_log4j_records(
+                        _yield_lines_from_pty_or_pipe(step_proc.stderr)):
+                    record_callback(record)
+
+            # there shouldn't be much output on STDOUT
+            for record in _parse_hadoop_log4j_records(step_proc.stdout):
+                record_callback(record)
+
+            step_proc.stdout.close()
+            step_proc.stderr.close()
+
+            returncode = step_proc.wait()
+        else:
+            # we have PTYs
+            if pid == 0:  # we are the child process
+                os.execvpe(spark_submit_args[0], spark_submit_args, env)
+                # now this process is no longer Python
+            else:
+                log.debug('Invoking spark-submit via PTY')
+
+                with os.fdopen(master_fd, 'rb') as master:
+                    for record in _parse_hadoop_log4j_records(
+                            _yield_lines_from_pty_or_pipe(master)):
+                        record_callback(record)
+                    _, returncode = os.waitpid(pid, 0)
+
+        return returncode
 
     def get_spark_submit_bin(self):
         """Return the location of the ``spark-submit`` binary, searching for it

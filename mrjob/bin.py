@@ -38,6 +38,8 @@ from mrjob.setup import parse_setup_cmd
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
+from mrjob.util import unique
+from mrjob.util import which
 from mrjob.util import zip_dir
 
 log = logging.getLogger(__name__)
@@ -835,9 +837,39 @@ class MRJobBinRunner(MRJobRunner):
 
     def get_spark_submit_bin(self):
         """The spark-submit command, as a list of args. Re-define
-        this in your subclass for runner-specific behavior.
+        this in your subclass for runner-specific behavior, possibly using
+        :py:meth:`_find_spark_submit_bin`.
         """
         return self._opts['spark_submit_bin'] or ['spark-submit']
+
+    def _find_spark_submit_bin(self):
+        """Attempt to find the spark binary. Returns a list of arguments.
+        Defaults to ``['spark-submit']``"""
+        for path in unique(self._spark_submit_bin_dirs()):
+            log.info('Looking for spark-submit binary in %s...' % (
+                path or '$PATH'))
+
+            spark_submit_bin = which('spark-submit', path=path)
+
+            if spark_submit_bin:
+                log.info('Found spark-submit binary: %s' % spark_submit_bin)
+                return [spark_submit_bin]
+        else:
+            log.info("Falling back to 'spark-submit'")
+            return ['spark-submit']
+
+    def _spark_submit_bin_dirs(self):
+        # $SPARK_HOME
+        spark_home = os.environ.get('SPARK_HOME')
+        if spark_home:
+            yield os.path.join(spark_home, 'bin')
+
+        yield None  # use $PATH
+
+        # some other places recommended by install docs (see #1366)
+        yield '/usr/lib/spark/bin'
+        yield '/usr/local/spark/bin'
+        yield '/usr/local/lib/spark/bin'
 
     def _spark_submit_args(self, step_num):
         """Build a list of extra args to the spark-submit binary for

@@ -31,6 +31,7 @@ from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.util import cmd_line
+from mrjob.util import which
 
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_cmd_job import MRCmdJob
@@ -1959,3 +1960,63 @@ class ShBinValidationTestCase(SandboxedTestCase):
         MRJobBinRunner(sh_bin=['zsh', '-v'])
 
         self.assertTrue(self.log.warning.called)
+
+
+class FindSparkSubmitBinTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(FindSparkSubmitBinTestCase, self).setUp()
+
+        # track calls to which()
+        self.which = self.start(patch('mrjob.bin.which', wraps=which))
+
+        # keep which() from searching in /bin, etc.
+        os.environ['PATH'] = self.tmp_dir
+
+        self.runner = MRJobBinRunner()
+
+    def test_fallback_and_hard_coded_dirs(self):
+        # don't get caught by real spark install
+        self.which.return_value = None
+
+        os.environ['SPARK_HOME'] = '/spark/home'
+
+        self.assertEqual(self.runner._find_spark_submit_bin(),
+                         ['spark-submit'])
+
+        which_paths = [
+            kwargs.get('path') for args, kwargs in self.which.call_args_list]
+
+        self.assertEqual(which_paths, [
+            '/spark/home/bin',
+            None,
+            '/usr/lib/spark/bin',
+            '/usr/local/spark/bin',
+            '/usr/local/lib/spark/bin',
+        ])
+
+    def test_find_in_spark_home(self):
+        spark_submit_bin = self.makefile(
+            os.path.join(self.tmp_dir, 'spark', 'bin', 'spark-submit'),
+            executable=True)
+
+        os.environ['SPARK_HOME'] = os.path.join(self.tmp_dir, 'spark')
+
+        self.assertEqual(self.runner._find_spark_submit_bin(),
+                         [spark_submit_bin])
+
+        self.assertEqual(self.which.call_count, 1)
+
+    def test_find_in_path(self):
+        spark_submit_bin = self.makefile(
+            os.path.join(self.tmp_dir, 'bin', 'spark-submit'),
+            executable=True)
+
+        os.environ['PATH'] = os.path.join(self.tmp_dir, 'bin')
+
+        # don't get caught by real $SPARK_HOME
+        if 'SPARK_HOME' in os.environ:
+            del os.environ['SPARK_HOME']
+
+        self.assertEqual(self.runner._find_spark_submit_bin(),
+                         [spark_submit_bin])

@@ -56,8 +56,6 @@ class MRSortAndGroupReversedText(MRSortAndGroup):
 
 class MRPassThruArgTest(MRJob):
 
-    INTERNAL_PROTOCOL = ReversedTextProtocol
-
     def configure_args(self):
         super(MRPassThruArgTest, self).configure_args()
         self.add_passthru_arg('--chars', action='store_true')
@@ -198,7 +196,7 @@ class SparkHarnessOutputComparisonTestCase(
             b'that is the question'])
 
         job = self._harness_job(
-            MRSortAndGroupReversedText, input_bytes=input_bytes,
+            MRPassThruArgTest, input_bytes=input_bytes,
             extra_args=['--lines', '--ignore', 'to'])
 
 # TODO: add back a test of the bare Harness script in local mode (slow)

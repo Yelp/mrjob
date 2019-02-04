@@ -24,20 +24,23 @@ log = logging.getLogger(__name__)
 
 class Filesystem(object):
     """Some simple filesystem operations that are common across the local
-    filesystem, S3, HDFS, and remote machines via SSH. Different runners
-    provide functionality for different filesystems via their
-    :py:attr:`~mrjob.runner.MRJobRunner.fs` attribute. The ``hadoop`` and
-    ``emr`` runners provide support for multiple protocols using
-    :py:class:`~mrjob.job.composite.CompositeFilesystem`.
+    filesystem, S3, GCS, HDFS, and remote machines via SSH.
 
-    Protocol support:
+    Different runners provide functionality for different filesystems via their
+    :py:attr:`~mrjob.runner.MRJobRunner.fs` attribute. Generally a runner will
+    wrap one or more filesystems with
+    :py:class:`mrjob.fs.composite.CompositeFilesystem`.
 
-    * :py:class:`mrjob.fs.hadoop.HadoopFilesystem`: ``hdfs://``, others
-    * :py:class:`mrjob.fs.local.LocalFilesystem`: ``/``
-    * :py:class:`mrjob.fs.s3.S3Filesystem`: ``s3://bucket/path``,
-      ``s3n://bucket/path``
-    * :py:class:`mrjob.fs.ssh.SSHFilesystem`: ``ssh://hostname/path``
+    Schemes supported:
+
+    * :py:class:`mrjob.fs.gcs.GCSFilesystem`: ``gs://``
+    * :py:class:`mrjob.fs.hadoop.HadoopFilesystem`: ``hdfs://`` and other URIs
+    * :py:class:`mrjob.fs.local.LocalFilesystem`: ``/`` (non-URIs)
+    * :py:class:`mrjob.fs.s3.S3Filesystem`: ``s3://``, ``s3a://``, ``s3n://``,
+    * :py:class:`mrjob.fs.ssh.SSHFilesystem`: ``ssh://``
     """
+    # Note: currently, we're not very consistent about the names of arguments
+    # to these methods in subclasses, which we'll fix in v0.7.0 (see #1979).
 
     def can_handle_path(self, path):
         """Can we handle this path at all?"""

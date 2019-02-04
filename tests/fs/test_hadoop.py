@@ -151,8 +151,8 @@ class HadoopFSTestCase(MockSubprocessTestCase):
 
     def test_mkdir(self):
         self.fs.mkdir('hdfs:///d/ave')
-        local_path = os.path.join(get_mock_hdfs_root(self.env), 'd', 'ave')
-        self.assertEqual(os.path.isdir(local_path), True)
+        path = os.path.join(get_mock_hdfs_root(self.env), 'd', 'ave')
+        self.assertEqual(os.path.isdir(path), True)
 
     def test_exists_no(self):
         path = 'hdfs:///f'
@@ -164,16 +164,16 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.assertEqual(self.fs.exists(path), True)
 
     def test_rm(self):
-        local_path = self.make_mock_file('f')
-        self.assertEqual(os.path.exists(local_path), True)
+        path = self.make_mock_file('f')
+        self.assertEqual(os.path.exists(path), True)
         self.fs.rm('hdfs:///f')
-        self.assertEqual(os.path.exists(local_path), False)
+        self.assertEqual(os.path.exists(path), False)
 
     def test_rm_recursive(self):
-        local_path = self.make_mock_file('foo/bar')
-        self.assertEqual(os.path.exists(local_path), True)
+        path = self.make_mock_file('foo/bar')
+        self.assertEqual(os.path.exists(path), True)
         self.fs.rm('hdfs:///foo')  # remove containing directory
-        self.assertEqual(os.path.exists(local_path), False)
+        self.assertEqual(os.path.exists(path), False)
 
     def test_rm_nonexistent(self):
         self.fs.rm('hdfs:///baz')

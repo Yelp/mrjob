@@ -111,6 +111,14 @@ class Filesystem(object):
         """
         raise NotImplementedError
 
+    def put(self, src, dest):
+        """Upload a file on the local filesystem to *dest* (which should not
+        be a directory).
+
+        Corresponds roughly to ``hadoop fs -put src dest``.
+        """
+        raise NotImplementedError
+
     def rm(self, path_glob):
         """Recursively delete the given file/directory, if it exists
 

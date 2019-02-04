@@ -149,11 +149,6 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def test_du_non_existent(self):
         self.assertEqual(self.fs.du('hdfs:///does-not-exist'), 0)
 
-    def test_mkdir(self):
-        self.fs.mkdir('hdfs:///d/ave')
-        path = os.path.join(get_mock_hdfs_root(self.env), 'd', 'ave')
-        self.assertEqual(os.path.isdir(path), True)
-
     def test_exists_no(self):
         path = 'hdfs:///f'
         self.assertEqual(self.fs.exists(path), False)
@@ -162,6 +157,11 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.make_mock_file('f')
         path = 'hdfs:///f'
         self.assertEqual(self.fs.exists(path), True)
+
+    def test_mkdir(self):
+        self.fs.mkdir('hdfs:///d/ave')
+        path = os.path.join(get_mock_hdfs_root(self.env), 'd', 'ave')
+        self.assertEqual(os.path.isdir(path), True)
 
     def test_rm(self):
         path = self.make_mock_file('f')

@@ -313,12 +313,12 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not check path %s" % path_glob)
 
-    def _put(self, local_path, target):
-        # used by HadoopMRJobRunner._upload_to_hdfs()
+    def put(self, src, path):
+        # don't inadvertently support cp syntax
+        if path.endswith('/'):
+            raise ValueError('put() destination may not be a directory')
 
-        # not exposing this method because it's not part of the general FS
-        # interface. Probably want to add cp() at some point
-        self.invoke_hadoop(['fs', '-put', local_path, target])
+        self.invoke_hadoop(['fs', '-put', src, path])
 
     def rm(self, path_glob):
         if not is_uri(path_glob):

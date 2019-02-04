@@ -111,11 +111,12 @@ class Filesystem(object):
         """
         raise NotImplementedError
 
-    def put(self, src, dest):
-        """Upload a file on the local filesystem to *dest* (which should not
-        be a directory).
+    def put(self, src, path):
+        """Upload a file on the local filesystem (*src*) to *path*.
+        *path* should be the path of the new file, not a directory containing
+        it.
 
-        Corresponds roughly to ``hadoop fs -put src dest``.
+        Corresponds roughly to ``hadoop fs -put src path``.
         """
         raise NotImplementedError
 

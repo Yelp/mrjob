@@ -394,7 +394,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
     def _upload_to_hdfs(self, path, target):
         log.debug('  %s -> %s' % (path, target))
-        self.fs.hadoop._put(path, target)
+        self.fs.hadoop.put(path, target)
 
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""

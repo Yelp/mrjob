@@ -68,6 +68,27 @@ class CompositeFilesystemTestCase(BasicTestCase):
 
         self.assertRaises(IOError, fs.ls, 's3://walrus/fish')
 
+    def test_forward_join(self):
+        # join() is a special case since it takes multiple arguments
+        fs = CompositeFilesystem()
+
+        fs.add_fs('s3', self.s3_fs)
+
+        self.assertEqual(fs.join('s3://walrus/fish', 'salmon'),
+                         self.s3_fs.join.return_value)
+        self.s3_fs.join.assert_called_once_with(
+            's3://walrus/fish', 'salmon')
+
+    def test_forward_put(self):
+        # put() is a special case since the path that matters comes second
+        fs = CompositeFilesystem()
+
+        fs.add_fs('s3', self.s3_fs)
+
+        fs.put('/path/to/file', 's3://walrus/file')
+        self.s3_fs.put.assert_called_once_with(
+            '/path/to/file', 's3://walrus/file')
+
     def test_forward_fs_extensions(self):
         fs = CompositeFilesystem()
 

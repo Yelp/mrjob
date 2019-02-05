@@ -101,20 +101,21 @@ class CompositeFilesystem(Filesystem):
 
         return False
 
-    def _do_action(self, action, path, *args, **kwargs):
-        """Call method named **action** on the first (non-disabled) filesystem
-        that says it can handle *path*. If it raises an exception, either
-        disable the filesystem and continue, or re-raise the exception."""
+    def _handle(self, name, path_to_handle, *args, **kwargs):
+        """Call method named *name* on the first (non-disabled) filesystem
+        that says it can handle every path in *paths_to_handle*. If it raises
+        an exception, either disable the filesystem and continue, or
+        re-raise the exception."""
         for fs_name in self._fs_names:
             if fs_name in self._disabled:
                 continue
 
             fs = getattr(self, fs_name)
-            if not fs.can_handle_path(path):
+            if not fs.can_handle_path(path_to_handle):
                 continue
 
             try:
-                return getattr(fs, action)(path, *args, **kwargs)
+                return getattr(fs, name)(*args, **kwargs)
             except Exception as ex:
                 if (fs_name in self._disable_if and
                         self._disable_if[fs_name](ex)):
@@ -124,37 +125,44 @@ class CompositeFilesystem(Filesystem):
                 else:
                     raise
 
-        raise IOError("Can't handle path: %s" % path)
+        raise IOError("Can't handle path: %s" % path_to_handle)
+
+    def _do(self, name, path):
+        """Handle the common case, where a method operates on a single path."""
+        return self._handle(name, path, path)
 
     # explicitly implement Filesystem interface. this will come in handy
 
     def cat(self, path_glob):
-        return self._do_action('cat', path_glob)
+        return self._do('cat', path_glob)
 
     def _cat_file(self, path):
         # mrjob/runner.py accesses this directly for efficiency
-        return self._do_action('_cat_file', path)
+        return self._do('_cat_file', path)
 
     def du(self, path_glob):
-        return self._do_action('du', path_glob)
+        return self._do('du', path_glob)
 
     def ls(self, path_glob):
-        return self._do_action('ls', path_glob)
+        return self._do('ls', path_glob)
 
     def exists(self, path_glob):
-        return self._do_action('exists', path_glob)
+        return self._do('exists', path_glob)
 
     def mkdir(self, path):
-        return self._do_action('mkdir', path)
+        return self._do('mkdir', path)
 
     def join(self, path, *paths):
-        return self._do_action('join', path, *paths)
+        return self._handle('join', path, path, *paths)
+
+    def put(self, src, path):
+        return self._handle('put', path, src, path)
 
     def rm(self, path_glob):
-        return self._do_action('rm', path_glob)
+        return self._do('rm', path_glob)
 
     def touchz(self, path):
-        return self._do_action('touchz', path)
+        return self._do('touchz', path)
 
     def md5sum(self, path_glob):
-        return self._do_action('md5sum', path_glob)
+        return self._do('md5sum', path_glob)

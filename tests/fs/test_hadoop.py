@@ -193,7 +193,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.fs.rm('hdfs:///baz')
 
     def test_touchz(self):
-        # mockhadoop doesn't implement this.
+        # mockhadoop doesn't implement this (see #1981)
         pass
 
 

@@ -113,14 +113,6 @@ class SparkMRJobRunner(MRJobBinRunner):
     def _default_step_output_dir(self):
         return posixpath.join(self._spark_tmp_dir, 'step-output')
 
-    def _default_opts(self):
-        return combine_dicts(
-            super(SparkMRJobRunner, self)._default_opts(),
-            dict(
-                cloud_tmp_dir=fully_qualify_hdfs_path('tmp/mrjob'),
-            )
-        )
-
     @property
     def fs(self):
         # Spark supports basically every filesystem there is

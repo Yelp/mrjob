@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """A runner that can run jobs on Spark, with or without Hadoop."""
+import logging
 import os.path
 import posixpath
+from subprocess import CalledProcessError
 from tempfile import gettempdir
 
 from mrjob.bin import MRJobBinRunner
@@ -28,7 +30,12 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import boto3 as boto3_installed
 from mrjob.fs.s3 import _is_permanent_boto3_error
 from mrjob.hadoop import fully_qualify_hdfs_path
+from mrjob.logs.step import _log_log4j_record
+from mrjob.parse import is_uri
 from mrjob.setup import UploadDirManager
+from mrjob.step import StepFailedException
+
+log = logging.getLogger(__name__)
 
 
 class SparkMRJobRunner(MRJobBinRunner):
@@ -76,10 +83,23 @@ class SparkMRJobRunner(MRJobBinRunner):
         # keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
 
-    def _pick_spark_tmp_dir(self):
-        master = self._spark_master()
+    def _run(self):
+        self.get_spark_submit_bin()  # find spark-submit up front
+        self._create_setup_wrapper_scripts()
+        self._add_job_files_for_upload()
+        self._upload_local_files()
+        self._run_steps_on_spark()
 
-        if master is None or master.startswith('local'):
+    def _add_job_files_for_upload(self):
+        """Add files needed for running the job (setup and input)
+        to self._upload_mgr."""
+        for path in self._working_dir_mgr.paths():
+            self._upload_mgr.add(path)
+
+        # no need to upload py_files, spark-submit handles this
+
+    def _pick_spark_tmp_dir(self):
+        if self._spark_master_is_local():
             # need a local temp dir
             # add "-spark" so we don't collide with default local temp dir
             return os.path.join(
@@ -126,3 +146,36 @@ class SparkMRJobRunner(MRJobBinRunner):
             self._fs.add_fs('local', LocalFilesystem())
 
         return self._fs
+
+    def _upload_local_files(self):
+        # in local mode, nothing to upload
+        if not self._upload_mgr:
+            return
+
+        log.info('Copying local files to %s' % self._upload_mgr.prefix)
+        for src_path, uri in self._upload_mgr.path_to_uri().items():
+            log.debug('  %s -> %s' % (src_path, uri))
+            self.fs.put(src_path, uri)
+
+    def _run_steps_on_spark(self):
+        for step_num, step in enumerate(self._get_steps()):
+            self._run_step_on_spark(step, step_num)
+
+    def _run_step_on_spark(self, step, step_num):
+        if self._opts['upload_archives'] and self._spark_master() != 'yarn':
+            log.warning('Spark master %r will probably ignore archives' %
+                        self._spark_master())
+
+        spark_submit_args = self._args_for_spark_step(step_num)
+
+        env = dict(os.environ)
+        env.update(self._spark_cmdenv(step_num))
+
+        returncode = self._run_spark_submit(spark_submit_args, env,
+                                            record_callback=_log_log4j_record)
+
+        if returncode:
+            reason = str(CalledProcessError(returncode, spark_submit_args))
+            raise StepFailedException(
+                reason=reason, step_num=step_num,
+                num_steps=self._num_steps())

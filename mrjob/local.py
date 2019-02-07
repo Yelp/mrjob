@@ -112,8 +112,6 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             task_type, step_num, task_num,
             args, num_steps)
 
-    # TODO: this is similar to _run_job_in_hadoop() (hadoop.py), and is
-    # probably useful to other runners with minor modifications
     def _run_step_on_spark(self, step, step_num):
         if self._opts['upload_archives']:
             log.warning('Spark master %r will probably ignore archives' %

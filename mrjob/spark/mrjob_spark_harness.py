@@ -30,7 +30,7 @@ def main(cmd_line_args=None):
     job_module = import_module(job_module_name)
     job_class = getattr(job_module, job_class_name)
 
-    job_args = shlex_split(args.passthru_args)
+    job_args = shlex_split(args.job_args)
 
     def make_job(*args):
         j = job_class(job_args + list(args))
@@ -145,7 +145,8 @@ def _make_arg_parser():
         help=('Java class path of a codec to use to compress output.'))
 
     parser.add_argument(
-        '--passthru-args',
+        '--job-args',
+        dest='job_args',
         default='',
         help=('The arguments pass to the MRJob. Please quote all passthru args'
               ' so that they are in the same string')

@@ -67,8 +67,6 @@ class MRPassThruArgTest(MRJob):
         if self.options.chars:
             for c in value:
                 yield c, 1
-        elif self.options.lines:
-            yield 'line_count', 1
         else:
             for w in value.split(' '):
                 yield w, 1
@@ -107,7 +105,7 @@ class SparkHarnessOutputComparisonTestCase(
             harness_job_args.append('--compression-codec')
             harness_job_args.append(compression_codec)
         if extra_args:
-            harness_job_args.extend(['--passthru-args', ' '.join(extra_args)])
+            harness_job_args.extend(['--job-args', ' '.join(extra_args)])
         harness_job_args.extend(input_paths)
 
         harness_job = MRSparkHarness(harness_job_args)
@@ -195,8 +193,10 @@ class SparkHarnessOutputComparisonTestCase(
             b'not to be',
             b'that is the question'])
 
-        job = self._harness_job(
-            MRPassThruArgTest, input_bytes=input_bytes,
-            extra_args=['--lines', '--ignore', 'to'])
+        self._assert_output_matches(
+            MRPassThruArgTest,
+            input_bytes=input_bytes,
+            extra_args=['--chars', '--ignore', 'to'])
+
 
 # TODO: add back a test of the bare Harness script in local mode (slow)

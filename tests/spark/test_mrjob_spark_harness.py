@@ -16,6 +16,7 @@ from io import BytesIO
 from os.path import join
 
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
+from mrjob.job import MRJob
 from mrjob.local import LocalMRJobRunner
 from mrjob.protocol import TextProtocol
 from mrjob.spark import mrjob_spark_harness
@@ -53,6 +54,26 @@ class MRSortAndGroupReversedText(MRSortAndGroup):
     INTERNAL_PROTOCOL = ReversedTextProtocol
 
 
+class MRPassThruArgTest(MRJob):
+
+    def configure_args(self):
+        super(MRPassThruArgTest, self).configure_args()
+        self.add_passthru_arg('--chars', action='store_true')
+        self.add_passthru_arg('--ignore')
+
+    def mapper(self, _, value):
+        if self.options.ignore:
+            value = value.replace(self.options.ignore, '')
+        if self.options.chars:
+            for c in value:
+                yield c, 1
+        else:
+            for w in value.split(' '):
+                yield w, 1
+
+    def reducer(self, key, values):
+        yield key, sum(values)
+
 
 class SparkHarnessOutputComparisonTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
@@ -65,23 +86,26 @@ class SparkHarnessOutputComparisonTestCase(
         return path
 
     def _reference_job(self, job_class, input_bytes=b'', input_paths=(),
-                       runner_alias='inline'):
+                       runner_alias='inline', extra_args=[]):
 
         job_args = ['-r', runner_alias] + list(input_paths)
 
-        reference_job = job_class(job_args)
+        reference_job = job_class(job_args + extra_args)
         reference_job.sandbox(stdin=BytesIO(input_bytes))
 
         return reference_job
 
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
-                     runner_alias='inline', compression_codec=None):
+                     runner_alias='inline', compression_codec=None,
+                     extra_args=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
         if compression_codec:
             harness_job_args.append('--compression-codec')
             harness_job_args.append(compression_codec)
+        if extra_args:
+            harness_job_args.extend(['--job-args', ' '.join(extra_args)])
         harness_job_args.extend(input_paths)
 
         harness_job = MRSparkHarness(harness_job_args)
@@ -90,18 +114,22 @@ class SparkHarnessOutputComparisonTestCase(
         return harness_job
 
     def _assert_output_matches(
-            self, job_class, input_bytes=b'', input_paths=()):
+            self, job_class, input_bytes=b'', input_paths=(), extra_args=[]):
 
-        reference_job = self._reference_job(job_class, input_bytes=input_bytes,
-                                            input_paths=input_paths)
+        reference_job = self._reference_job(
+            job_class, input_bytes=input_bytes,
+            input_paths=input_paths,
+            extra_args=extra_args)
 
         with reference_job.make_runner() as runner:
             runner.run()
 
             reference_output = sorted(to_lines(runner.cat_output()))
 
-        harness_job = self._harness_job(job_class, input_bytes=input_bytes,
-                                        input_paths=input_paths)
+        harness_job = self._harness_job(
+            job_class, input_bytes=input_bytes,
+            input_paths=input_paths,
+            extra_args=extra_args)
 
         with harness_job.make_runner() as runner:
             runner.run()
@@ -159,6 +187,16 @@ class SparkHarnessOutputComparisonTestCase(
                 dict(a=['artichoke', 'alligator', 'actuary'],
                      b=['bowling', 'balloon', 'baby']))
 
+    def test_passthru_args(self):
+        input_bytes = b'\n'.join([
+            b'to be or',
+            b'not to be',
+            b'that is the question'])
+
+        self._assert_output_matches(
+            MRPassThruArgTest,
+            input_bytes=input_bytes,
+            extra_args=['--chars', '--ignore', 'to'])
 
 
 # TODO: add back a test of the bare Harness script in local mode (slow)

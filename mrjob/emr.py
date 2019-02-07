@@ -862,19 +862,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _upload_contents(self, s3_uri, path):
         """Uploads the file at the given path to S3, possibly using
         multipart upload."""
-        s3_key = self.fs.s3._get_s3_key(s3_uri)
-
         # use _HUGE_PART_THRESHOLD to disable multipart uploading
         # (could use put() directly, but that would be another code path)
-        part_size = self._get_upload_part_size() or _HUGE_PART_THRESHOLD
+        part_size_mb = self._get_upload_part_size() or _HUGE_PART_THRESHOLD
 
-        s3_key.upload_file(
-            path,
-            Config=boto3.s3.transfer.TransferConfig(
-                multipart_chunksize=part_size,
-                multipart_threshold=part_size,
-            ),
-        )
+        self.fs.put(path, s3_uri, part_size_mb)
 
     def _get_upload_part_size(self):
         # part size is in MB, as the minimum is 5 MB

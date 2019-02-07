@@ -16,6 +16,7 @@ import sys
 from argparse import ArgumentParser
 from importlib import import_module
 
+from mrjob.util import shlex_split
 
 def main(cmd_line_args=None):
     if cmd_line_args is None:
@@ -29,8 +30,7 @@ def main(cmd_line_args=None):
     job_module = import_module(job_module_name)
     job_class = getattr(job_module, job_class_name)
 
-    # eventually will want to set this for passthrough args, etc.
-    job_args = []
+    job_args = shlex_split(args.job_args)
 
     def make_job(*args):
         j = job_class(job_args + list(args))
@@ -144,6 +144,13 @@ def _make_arg_parser():
         dest='compression_codec',
         help=('Java class path of a codec to use to compress output.'))
 
+    parser.add_argument(
+        '--job-args',
+        dest='job_args',
+        default='',
+        help=('The arguments pass to the MRJob. Please quote all passthru args'
+              ' so that they are in the same string')
+    )
     return parser
 
 

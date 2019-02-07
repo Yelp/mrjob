@@ -118,6 +118,13 @@ class LocalFSTestCase(SandboxedTestCase):
         path = self.makefile('f', 'contents')
         self.assertEqual(self.fs.exists(path), True)
 
+    def test_put(self):
+        src = self.makefile('f', 'contents')
+        dest = join(self.tmp_dir, 'g')
+
+        self.fs.put(src, dest)
+        self.assertEqual(b''.join(self.fs.cat(dest)), b'contents')
+
     def test_rm_file(self):
         path = self.makefile('f', 'contents')
         self.assertEqual(self.fs.exists(path), True)

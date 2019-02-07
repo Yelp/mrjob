@@ -192,13 +192,24 @@ class GCSFilesystem(Filesystem):
 
         self._blob(dest_uri).upload_from_string(b'')
 
-    def put(self, src_path, dest_uri, chunk_size=None):
-        """Uploads a local file to a specific destination."""
+    def put(self, src_path, dest_uri, part_size_mb=None, chunk_size=None):
+        """Uploads a local file to a specific destination.
+
+        *chunk_size* is a deprecated alias for *part_size_mb* and will
+        be removed in v0.7.0.
+        """
+        # support old name for *part_size_mb*
+        if chunk_size:
+            log.warning('chunk_size is a deprecated alias for part_size_mb'
+                        ' and will be removed in v0.7.0')
+        if part_size_mb is None:
+            part_size_mb = chunk_size
+
         old_blob = self._get_blob(dest_uri)
         if old_blob:
             raise IOError('File already exists: %s' % dest_uri)
 
-        self._blob(dest_uri, chunk_size=chunk_size).upload_from_filename(
+        self._blob(dest_uri, chunk_size=part_size_mb).upload_from_filename(
             src_path)
 
     def get_all_bucket_names(self, prefix=None):

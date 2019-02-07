@@ -28,6 +28,7 @@ except ImportError:
 
 try:
     import boto3
+    import boto3.s3.transfer
     boto3  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     boto3 = None
@@ -231,12 +232,6 @@ class S3Filesystem(Filesystem):
 
         return decompress(body, filename)
 
-    def mkdir(self, dest):
-        """Make a directory. This does nothing on S3 because there are
-        no directories.
-        """
-        pass
-
     def exists(self, path_glob):
         """Does the given path exist?
 
@@ -245,6 +240,24 @@ class S3Filesystem(Filesystem):
         """
         # just fall back on _ls(); it's smart
         return any(self._ls(path_glob))
+
+    def mkdir(self, dest):
+        """Make a directory. This does nothing on S3 because there are
+        no directories.
+        """
+        pass
+
+    def put(self, src, path, part_size_mb=None):
+        """Uploads a local file to a specific destination."""
+        s3_key = self._get_s3_key(path)
+
+        s3_key.upload_file(
+            src,
+            Config=boto3.s3.transfer.TransferConfig(
+                multipart_chunksize=part_size_mb,
+                multipart_threshold=part_size_mb,
+            ),
+        )
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""

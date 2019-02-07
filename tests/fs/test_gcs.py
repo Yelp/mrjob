@@ -21,6 +21,7 @@ from mrjob.fs.gcs import _CAT_CHUNK_SIZE
 
 from tests.compress import gzip_compress
 from tests.mock_google import MockGoogleTestCase
+from tests.py2 import patch
 
 
 class CatTestCase(MockGoogleTestCase):
@@ -185,6 +186,36 @@ class GCSFSTestCase(MockGoogleTestCase):
         })
 
         self.assertRaises(IOError, self.fs.md5sum, 'gs://walrus/data/bar')
+
+    def test_put(self):
+        local_path = self.makefile('foo', contents=b'bar')
+        dest = 'gs://bar-files/foo'
+        self.storage_client().bucket('bar-files').create()
+
+        self.fs.put(local_path, dest)
+        self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
+
+    def test_put_part_size_mb(self):
+        local_path = self.makefile('foo', contents=b'bar')
+        dest = 'gs://bar-files/foo'
+        self.storage_client().bucket('bar-files').create()
+
+        with patch.object(GCSFilesystem, '_blob') as blob_meth:
+            self.fs.put(local_path, dest, part_size_mb=99999)
+            blob_meth.assert_called_once_with(dest, chunk_size=99999)
+
+    def test_put_chunk_size(self):
+        local_path = self.makefile('foo', contents=b'bar')
+        dest = 'gs://bar-files/foo'
+        self.storage_client().bucket('bar-files').create()
+
+        with patch.object(GCSFilesystem, '_blob') as blob_meth:
+            with patch('mrjob.fs.gcs.log') as log:
+
+                self.fs.put(local_path, dest, chunk_size=99999)
+                blob_meth.assert_called_once_with(dest, chunk_size=99999)
+
+                self.assertTrue(log.warning.called)
 
     def test_rm(self):
         self.put_gcs_multi({

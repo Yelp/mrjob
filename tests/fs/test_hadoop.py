@@ -149,11 +149,6 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def test_du_non_existent(self):
         self.assertEqual(self.fs.du('hdfs:///does-not-exist'), 0)
 
-    def test_mkdir(self):
-        self.fs.mkdir('hdfs:///d/ave')
-        local_path = os.path.join(get_mock_hdfs_root(self.env), 'd', 'ave')
-        self.assertEqual(os.path.isdir(local_path), True)
-
     def test_exists_no(self):
         path = 'hdfs:///f'
         self.assertEqual(self.fs.exists(path), False)
@@ -163,23 +158,42 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         path = 'hdfs:///f'
         self.assertEqual(self.fs.exists(path), True)
 
+    def test_mkdir(self):
+        self.fs.mkdir('hdfs:///d/ave')
+        path_in_mock_hdfs = os.path.join(
+            get_mock_hdfs_root(self.env), 'd', 'ave')
+        self.assertEqual(os.path.isdir(path_in_mock_hdfs), True)
+
+    def test_put(self):
+        local_path = self.makefile('foo', contents=b'bar')
+        dest = 'hdfs:///bar'
+
+        self.fs.put(local_path, dest)
+        self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
+
+    def test_no_put_to_dir(self):
+        local_path = self.makefile('foo', contents=b'bar')
+        dest = 'hdfs:///bar'
+
+        self.assertRaises(ValueError, self.fs.put, local_path, 'hdfs:///')
+
     def test_rm(self):
-        local_path = self.make_mock_file('f')
-        self.assertEqual(os.path.exists(local_path), True)
+        path_in_mock_hdfs = self.make_mock_file('f')
+        self.assertEqual(os.path.exists(path_in_mock_hdfs), True)
         self.fs.rm('hdfs:///f')
-        self.assertEqual(os.path.exists(local_path), False)
+        self.assertEqual(os.path.exists(path_in_mock_hdfs), False)
 
     def test_rm_recursive(self):
-        local_path = self.make_mock_file('foo/bar')
-        self.assertEqual(os.path.exists(local_path), True)
+        path_in_mock_hdfs = self.make_mock_file('foo/bar')
+        self.assertEqual(os.path.exists(path_in_mock_hdfs), True)
         self.fs.rm('hdfs:///foo')  # remove containing directory
-        self.assertEqual(os.path.exists(local_path), False)
+        self.assertEqual(os.path.exists(path_in_mock_hdfs), False)
 
     def test_rm_nonexistent(self):
         self.fs.rm('hdfs:///baz')
 
     def test_touchz(self):
-        # mockhadoop doesn't implement this.
+        # mockhadoop doesn't implement this (see #1981)
         pass
 
 

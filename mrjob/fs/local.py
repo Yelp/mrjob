@@ -49,12 +49,16 @@ class LocalFilesystem(Filesystem):
             for chunk in decompress(f, filename):
                 yield chunk
 
+    def exists(self, path_glob):
+        return bool(glob.glob(path_glob))
+
     def mkdir(self, path):
         if not os.path.isdir(path):
             os.makedirs(path)
 
-    def exists(self, path_glob):
-        return bool(glob.glob(path_glob))
+    def put(self, src, path, part_size_mb=None):
+        """Copy a file from *src* to *path*"""
+        shutil.copyfile(src, path)
 
     def rm(self, path_glob):
         for path in glob.glob(path_glob):

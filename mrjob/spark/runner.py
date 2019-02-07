@@ -67,7 +67,7 @@ class SparkMRJobRunner(MRJobBinRunner):
     }
 
     def __init__(self, **kwargs):
-        self(SparkMRJobRunner, self).__init__(**kwargs)
+        super(SparkMRJobRunner, self).__init__(**kwargs)
 
         self._spark_tmp_dir = self._pick_spark_tmp_dir()
 

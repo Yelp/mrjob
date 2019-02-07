@@ -1569,7 +1569,7 @@ def _add_job_args(parser, include_deprecated=True):
     parser.add_argument(
         '-r', '--runner', dest='runner', default=None,
         choices=sorted(_RUNNER_ALIASES),
-        help=('Where to run the job; one of: ' % ', '.join(
+        help=('Where to run the job; one of: %s' % ', '.join(
             sorted(_RUNNER_ALIASES))))
 
     parser.add_argument(

@@ -313,11 +313,12 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not check path %s" % path_glob)
 
-    def put(self, src, path):
+    def put(self, src, path, part_size_mb=None):
         # don't inadvertently support cp syntax
         if path.endswith('/'):
             raise ValueError('put() destination may not be a directory')
 
+        # ignore part_size_mb, not supported by `hadoop fs`
         self.invoke_hadoop(['fs', '-put', src, path])
 
     def rm(self, path_glob):

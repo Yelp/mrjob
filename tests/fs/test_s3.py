@@ -26,6 +26,7 @@ from mrjob.fs.s3 import _AWS_MAX_TRIES
 
 from tests.compress import gzip_compress
 from tests.mock_boto3 import MockBoto3TestCase
+from tests.mock_boto3.s3 import MockS3Object
 from tests.py2 import patch
 
 
@@ -157,6 +158,33 @@ class S3FSTestCase(MockBoto3TestCase):
             'walrus': {'data/foo': b'abcd'}})
         self.assertEqual(self.fs.exists('s3://walrus/data/foo'), True)
         self.assertEqual(self.fs.exists('s3://walrus/data/bar'), False)
+
+    def test_put(self):
+        self.add_mock_s3_data({'bar-files': {}})
+
+        local_path = self.makefile('foo', contents=b'bar')
+        dest = 's3://bar-files/foo'
+
+        self.fs.put(local_path, dest)
+        self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
+
+    def test_put_part_size_mb(self):
+        self.add_mock_s3_data({'bar-files': {}})
+
+        local_path = self.makefile('foo', contents=b'bar')
+        dest = 's3://bar-files/foo'
+
+        with patch.object(MockS3Object, 'upload_file') as upload_file:
+            with patch('boto3.s3.transfer.TransferConfig') as TransferConfig:
+                self.fs.put(local_path, dest, part_size_mb=99999)
+
+                upload_file.assert_called_once_with(
+                    local_path, Config=TransferConfig.return_value)
+
+                TransferConfig.assert_called_once_with(
+                    multipart_chunksize=99999,
+                    multipart_threshold=99999,
+                )
 
     def test_rm(self):
         self.add_mock_s3_data({

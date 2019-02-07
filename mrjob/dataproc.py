@@ -533,7 +533,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for path, gcs_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, gcs_uri))
 
-            self.fs.gcs.put(path, gcs_uri, chunk_size=self._fs_chunk_size())
+            self.fs.put(path, gcs_uri, part_size_mb=self._fs_chunk_size())
 
         self._wait_for_fs_sync()
 

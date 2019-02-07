@@ -1301,5 +1301,9 @@ def _runner_class(alias):
         from mrjob.local import LocalMRJobRunner
         return LocalMRJobRunner
 
+    elif alias == 'spark':
+        from mrjob.spark.runner import SparkMRJobRunner
+        return SparkMRJobRunner
+
     else:
         raise ValueError('bad runner alias: %s' % alias)

@@ -93,8 +93,9 @@ class SparkMRJobRunner(MRJobBinRunner):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._working_dir_mgr.paths():
-            self._upload_mgr.add(path)
+        if self._upload_mgr:
+            for path in self._working_dir_mgr.paths():
+                self._upload_mgr.add(path)
 
         # no need to upload py_files, spark-submit handles this
 
@@ -120,6 +121,7 @@ class SparkMRJobRunner(MRJobBinRunner):
             )
         )
 
+    @property
     def fs(self):
         # Spark supports basically every filesystem there is
 

@@ -32,6 +32,13 @@ try:
 except ImportError:
     pty = None
 
+
+try:
+    import pyspark
+    pyspark  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    pyspark = None
+
 import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.conf import combine_cmds
@@ -940,6 +947,10 @@ class MRJobBinRunner(MRJobRunner):
             yield os.path.join(spark_home, 'bin')
 
         yield None  # use $PATH
+
+        # look for pyspark installation (see #1984)
+        if pyspark:
+            yield os.path.join(os.path.dirname(pyspark.__file__), 'bin')
 
         # some other places recommended by install docs (see #1366)
         yield '/usr/lib/spark/bin'

@@ -141,10 +141,14 @@ xrange  # quiet, pyflakes
 # in most cases you should use ``mrjob.parse.urlparse()``
 if PY2:
     from urlparse import ParseResult
+    from urllib import pathname2url
+    from urlparse import urljoin
     from urllib2 import urlopen
     from urlparse import urlparse
 else:
     from urllib.parse import ParseResult
+    from urllib.request import pathname2url
+    from urllib.parse import urljoin
     from urllib.request import urlopen
     from urllib.parse import urlparse
 ParseResult

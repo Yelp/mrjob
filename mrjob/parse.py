@@ -1,8 +1,8 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 Steve Johnson and David Marin
 # Copyright 2014 Yelp and Contributors
-# Copyright 2015-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2015-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,9 +20,12 @@ import logging
 import re
 from functools import wraps
 from io import BytesIO
+from os.path import abspath
 
 from mrjob.py2 import ParseResult
+from mrjob.py2 import pathname2url
 from mrjob.py2 import to_unicode
+from mrjob.py2 import urljoin
 from mrjob.py2 import urlparse as urlparse_buggy
 
 log = logging.getLogger(__name__)
@@ -66,6 +69,15 @@ def parse_s3_uri(uri):
         raise ValueError('Invalid S3 URI: %s' % uri)
 
     return components.netloc, components.path[1:]
+
+
+def to_uri(path_or_uri):
+    """If *path_or_uri* is not a URI already, convert it to a ``file:///`
+    URI."""
+    if is_uri(path_or_uri):
+        return path_or_uri
+    else:
+        return urljoin('file:', pathname2url(abspath(path_or_uri)))
 
 
 @wraps(urlparse_buggy)

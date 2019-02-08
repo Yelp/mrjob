@@ -100,7 +100,14 @@ class SparkMRJobRunner(MRJobBinRunner):
         # no need to upload py_files, spark-submit handles this
 
     def _pick_spark_tmp_dir(self):
-        if self._spark_master_is_local():
+        if self._opts['spark_tmp_dir']:
+            if is_uri(self._opts['spark_tmp_dir']):
+                return posixpath.join(
+                    self._opts['spark_tmp_dir'], self._job_key)
+            else:
+                return os.path.join(
+                    self._opts['spark_tmp_dir'], self._job_key)
+        elif self._spark_master_is_local():
             # need a local temp dir
             # add "-spark" so we don't collide with default local temp dir
             return os.path.join(
@@ -108,7 +115,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         else:
             # use HDFS (same default as HadoopJobRunner)
             return posixpath.join(
-                fully_qualify_hdfs_path('tmp/mrjob', self._job_key))
+                fully_qualify_hdfs_path('tmp/mrjob'), self._job_key)
 
     def _default_step_output_dir(self):
         return posixpath.join(self._spark_tmp_dir, 'step-output')

@@ -31,6 +31,7 @@ from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.job import MRJob
+from mrjob.parse import to_uri
 from mrjob.runner import MRJobRunner
 from mrjob.step import MRStep
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
@@ -380,6 +381,48 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
 
             output_uri_2 = runner._step_output_uri(2)
             self.assertEqual(output_uri_2, 'hdfs:///tmp/output')
+
+    def test_local_output_dir_and_step_output_dir(self):
+        input1_path = self.makefile('input1')
+        input2_path = self.makefile('input2')
+
+        output_dir = self.makedirs('output')
+        step_output_dir = self.makedirs('step_output')
+
+        # this has three steps, which lets us test step numbering
+        job = MRCountingJob([
+            '-r', 'local',
+            '--output-dir', output_dir,
+            '--step-output-dir', step_output_dir,
+            input1_path, input2_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._num_steps(), 3)
+
+            input_uris_0 = runner._step_input_uris(0)
+            self.assertEqual([os.path.basename(uri) for uri in input_uris_0],
+                             ['input1', 'input2'])
+            self.assertEqual([uri[:8] for uri in input_uris_0],
+                             ['file:///', 'file:///'])
+
+            output_uri_0 = runner._step_output_uri(0)
+            self.assertEqual(output_uri_0,
+                             to_uri(os.path.join(step_output_dir, '0000')))
+
+            input_uris_1 = runner._step_input_uris(1)
+            self.assertEqual(input_uris_1, [output_uri_0])
+
+            output_uri_1 = runner._step_output_uri(1)
+            self.assertEqual(output_uri_1,
+                             to_uri(os.path.join(step_output_dir, '0001')))
+
+            input_uris_2 = runner._step_input_uris(2)
+            self.assertEqual(input_uris_2, [output_uri_1])
+
+            output_uri_2 = runner._step_output_uri(2)
+            self.assertEqual(output_uri_2, to_uri(output_dir))
+
 
 
 class DirArchivePathTestCase(SandboxedTestCase):

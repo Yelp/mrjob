@@ -20,7 +20,6 @@ process. Useful for debugging."""
 import logging
 import os
 import sys
-from os.path import abspath
 
 from mrjob.job import MRJob
 from mrjob.runner import _fix_env
@@ -195,8 +194,7 @@ class InlineMRJobRunner(SimMRJobRunner):
                 '--step-num=%d' % step_num,
                 '--spark',
             ] + self._mr_job_extra_args() + [
-                ','.join(abspath(path)
-                         for path in self._step_input_uris(step_num)),
+                ','.join(self._step_input_uris(step_num)),
                 self._step_output_uri(step_num),
             ]
         )

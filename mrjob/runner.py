@@ -40,6 +40,7 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.options import CLEANUP_CHOICES
 from mrjob.parse import is_uri
+from mrjob.parse import to_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
@@ -1083,8 +1084,8 @@ class MRJobRunner(object):
             for path in self._get_input_paths():
                 self._upload_mgr.add(path)
 
-    def _intermediate_output_uri(self, step_num, local=False):
-        """A URI for intermediate output for the given step number."""
+    def _intermediate_output_dir(self, step_num, local=False):
+        """A directory for intermediate output for the given step number."""
         join = os.path.join if local else posixpath.join
 
         return join(
@@ -1105,19 +1106,20 @@ class MRJobRunner(object):
         except the first step, this list will have a single item (a
         directory)."""
         if step_num == 0:
-            return [self._upload_mgr.uri(path) if self._upload_mgr else path
+            return [self._upload_mgr.uri(path) if self._upload_mgr
+                    else to_uri(path)
                     for path in self._get_input_paths()]
         else:
-            return [self._intermediate_output_uri(step_num - 1)]
+            return [to_uri(self._intermediate_output_dir(step_num - 1))]
 
     def _step_output_uri(self, step_num):
         """URI to use as output for the given step. This is either an
         intermediate dir (see :py:meth:`intermediate_output_uri`) or
         ``self._output_dir`` for the final step."""
         if step_num == len(self._get_steps()) - 1:
-            return self._output_dir
+            return to_uri(self._output_dir)
         else:
-            return self._intermediate_output_uri(step_num)
+            return to_uri(self._intermediate_output_dir(step_num))
 
     def _jobconf_for_step(self, step_num):
         """Get the jobconf dictionary, optionally including step-specific

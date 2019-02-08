@@ -5,6 +5,7 @@
 # Copyright 2015-2016 Yelp
 # Copyright 2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +19,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from io import BytesIO
+from os import chdir
+from os.path import realpath
+from posixpath import join
+from tempfile import gettempdir
 
 from mrjob.parse import _parse_port_range_list
 from mrjob.parse import _parse_progress_from_job_tracker
@@ -26,7 +31,10 @@ from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_s3_uri
+from mrjob.parse import to_uri
 from mrjob.parse import urlparse
+from mrjob.py2 import pathname2url
+from mrjob.util import save_cwd
 
 from tests.sandbox import BasicTestCase
 
@@ -153,6 +161,22 @@ class URITestCase(BasicTestCase):
                          ('s3', 'bucket', '', '', '', ''))
         self.assertEqual(urlparse('s3://bucket/'),
                          ('s3', 'bucket', '/', '', '', ''))
+
+    def test_to_uri(self):
+        self.assertEqual(to_uri('/path/to/file'), 'file:///path/to/file')
+        self.assertEqual(to_uri('s3://a/uri'), 's3://a/uri')
+
+    def test_relative_path_to_uri(self):
+        tmp_dir = realpath(gettempdir())
+
+        with save_cwd():
+            chdir(tmp_dir)
+
+            foo_uri = to_uri('foo.db')
+
+            self.assertEqual(foo_uri[:8], 'file:///')
+            self.assertEqual(foo_uri,
+                             'file://' + join(pathname2url(tmp_dir), 'foo.db'))
 
 
 class JobTrackerProgressTestCase(BasicTestCase):

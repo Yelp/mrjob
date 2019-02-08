@@ -593,7 +593,7 @@ class SimMRJobRunner(MRJobRunner):
         if step_num == self._num_steps() - 1:
             return self._output_dir
         else:
-            return self._intermediate_output_uri(step_num, local=True)
+            return self._intermediate_output_dir(step_num, local=True)
 
     def _default_step_output_dir(self):
         return join(self._get_local_tmp_dir(), 'step-output')

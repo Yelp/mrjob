@@ -1119,7 +1119,7 @@ class MRJobRunner(object):
         if step_num == len(self._get_steps()) - 1:
             return to_uri(self._output_dir)
         else:
-            return to_uri(self._intermediate_output_uri(step_num))
+            return to_uri(self._intermediate_output_dir(step_num))
 
     def _jobconf_for_step(self, step_num):
         """Get the jobconf dictionary, optionally including step-specific

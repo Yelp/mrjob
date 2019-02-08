@@ -1084,13 +1084,13 @@ class MRJobRunner(object):
             for path in self._get_input_paths():
                 self._upload_mgr.add(path)
 
-    def _intermediate_output_uri(self, step_num, local=False):
-        """A URI for intermediate output for the given step number."""
+    def _intermediate_output_dir(self, step_num, local=False):
+        """A directory for intermediate output for the given step number."""
         join = os.path.join if local else posixpath.join
 
-        return to_uri(join(
+        return join(
             self._step_output_dir or self._default_step_output_dir(),
-            '%04d' % step_num))
+            '%04d' % step_num)
 
     def _default_step_output_dir(self):
         """Where to put output for steps other than the last one,
@@ -1110,7 +1110,7 @@ class MRJobRunner(object):
                     else to_uri(path)
                     for path in self._get_input_paths()]
         else:
-            return [self._intermediate_output_uri(step_num - 1)]
+            return [to_uri(self._intermediate_output_dir(step_num - 1))]
 
     def _step_output_uri(self, step_num):
         """URI to use as output for the given step. This is either an
@@ -1119,7 +1119,7 @@ class MRJobRunner(object):
         if step_num == len(self._get_steps()) - 1:
             return to_uri(self._output_dir)
         else:
-            return self._intermediate_output_uri(step_num)
+            return to_uri(self._intermediate_output_uri(step_num))
 
     def _jobconf_for_step(self, step_num):
         """Get the jobconf dictionary, optionally including step-specific

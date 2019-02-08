@@ -40,6 +40,7 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.options import CLEANUP_CHOICES
 from mrjob.parse import is_uri
+from mrjob.parse import to_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
@@ -1087,9 +1088,9 @@ class MRJobRunner(object):
         """A URI for intermediate output for the given step number."""
         join = os.path.join if local else posixpath.join
 
-        return join(
+        return to_uri(join(
             self._step_output_dir or self._default_step_output_dir(),
-            '%04d' % step_num)
+            '%04d' % step_num))
 
     def _default_step_output_dir(self):
         """Where to put output for steps other than the last one,
@@ -1105,7 +1106,8 @@ class MRJobRunner(object):
         except the first step, this list will have a single item (a
         directory)."""
         if step_num == 0:
-            return [self._upload_mgr.uri(path) if self._upload_mgr else path
+            return [self._upload_mgr.uri(path) if self._upload_mgr
+                    else to_uri(path)
                     for path in self._get_input_paths()]
         else:
             return [self._intermediate_output_uri(step_num - 1)]
@@ -1115,7 +1117,7 @@ class MRJobRunner(object):
         intermediate dir (see :py:meth:`intermediate_output_uri`) or
         ``self._output_dir`` for the final step."""
         if step_num == len(self._get_steps()) - 1:
-            return self._output_dir
+            return to_uri(self._output_dir)
         else:
             return self._intermediate_output_uri(step_num)
 

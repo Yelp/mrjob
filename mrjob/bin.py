@@ -1001,7 +1001,14 @@ class MRJobBinRunner(MRJobRunner):
 
         # --py-files (Python only)
         if step['type'] in ('spark', 'spark_script'):
-            py_file_uris = self._upload_uris(self._py_files())
+            py_file_uris = self._py_files()
+
+            if self._upload_mgr:
+                # don't assume py_files are in _upload_mgr; for example,
+                # spark-submit doesn't need to upload them
+                path_to_uri = self._upload_mgr.path_to_uri()
+                py_file_uris = [path_to_uri.get(p, p) for p in py_file_uris]
+
             if py_file_uris:
                 args.extend(['--py-files', ','.join(py_file_uris)])
 

@@ -153,6 +153,8 @@ class SparkMRJobRunner(MRJobBinRunner):
         if not self._upload_mgr:
             return
 
+        self.fs.mkdir(self._upload_mgr.prefix)
+
         log.info('Copying local files to %s' % self._upload_mgr.prefix)
         for src_path, uri in self._upload_mgr.path_to_uri().items():
             log.debug('  %s -> %s' % (src_path, uri))

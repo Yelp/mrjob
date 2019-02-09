@@ -12,8 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the Spark runner."""
+from io import BytesIO
+from unittest import skipIf
+
+try:
+    import pyspark
+except ImportError:
+    pyspark = None
+
 from mrjob.parse import is_uri
 from mrjob.spark.runner import SparkMRJobRunner
+from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
+from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
+from mrjob.examples.mr_sparkaboom import MRSparKaboom
+from mrjob.step import StepFailedException
+from mrjob.util import safeeval
+from mrjob.util import to_lines
+
 
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_google import MockGoogleTestCase
@@ -79,3 +94,54 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
         self.assertGreater(len(runner._spark_tmp_dir), len('/path/to/tmp/./'))
 
         self.assertIsNone(runner._upload_mgr)
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class SparkRunnerSparkTestCase(SandboxedTestCase):
+    # these tests are slow (~30s) because they run on
+    # actual Spark, in local-cluster mode
+
+    def test_spark_mrjob(self):
+        text = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = MRSparkWordcount(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(text))
+
+        counts = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                k, v = safeeval(line)
+                counts[k] = v
+
+        self.assertEqual(counts, dict(
+            blue=1, fish=4, one=1, red=1, two=1))
+
+    def test_spark_job_failure(self):
+        job = MRSparKaboom(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(b'line\n'))
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_spark_script_mrjob(self):
+        text = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = MRSparkScriptWordcount(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(text))
+
+        counts = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                k, v = safeeval(line)
+                counts[k] = v
+
+        self.assertEqual(counts, dict(
+            blue=1, fish=4, one=1, red=1, two=1))
+
+    # TODO: add a Spark JAR to the repo, so we can test it

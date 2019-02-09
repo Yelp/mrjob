@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test the Spark runner."""
 from io import BytesIO
+from os.path import exists
 from unittest import skipIf
 
 try:
@@ -33,6 +34,7 @@ from mrjob.util import to_lines
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
+from tests.mr_null_spark import MRNullSpark
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
@@ -96,10 +98,52 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
         self.assertIsNone(runner._upload_mgr)
 
 
+class SparkPyFilesTestCase(MockFilesystemsTestCase):
+
+    # check that py_files don't get uploaded
+
+    def setUp(self):
+        super(SparkPyFilesTestCase, self).setUp()
+
+        # don't bother actually running spark
+        self.start(patch(
+            'mrjob.spark.runner.SparkMRJobRunner._run_spark_submit',
+            return_value=0))
+
+    def test_dont_upload_mrjob_zip(self):
+        job = MRNullSpark(['-r', 'spark', '--spark-master', 'yarn'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertTrue(exists(runner._mrjob_zip_path))
+
+            self.assertNotIn(runner._mrjob_zip_path,
+                             runner._upload_mgr.path_to_uri())
+
+            self.assertIn(runner._mrjob_zip_path, runner._spark_submit_args(0))
+
+    def test_eggs(self):
+        egg1_path = self.makefile('dragon.egg')
+        egg2_path = self.makefile('horton.egg')
+
+        job = MRNullSpark([
+            '-r', 'spark',
+            '--py-files', '%s,%s' % (egg1_path, egg2_path)])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            py_files_arg = '%s,%s,%s' % (
+                egg1_path, egg2_path, runner._mrjob_zip_path)
+            self.assertIn(py_files_arg, runner._spark_submit_args(0))
+
+
 @skipIf(pyspark is None, 'no pyspark module')
-class SparkRunnerSparkTestCase(SandboxedTestCase):
-    # these tests are slow (~30s) because they run on
-    # actual Spark, in local-cluster mode
+class SparkRunnerSparkTestCase(MockFilesystemsTestCase):
+    # these tests are slow (~20s) because they run on actual Spark
 
     def test_spark_mrjob(self):
         text = b'one fish\ntwo fish\nred fish\nblue fish\n'

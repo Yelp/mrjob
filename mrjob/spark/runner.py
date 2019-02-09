@@ -83,6 +83,15 @@ class SparkMRJobRunner(MRJobBinRunner):
         # keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
 
+    def _default_opts(self):
+        return combine_dicts(
+            super(SparkMRJobRunner, self)._default_opts(),
+            dict(
+                spark_master='local[*]',
+                spark_deploy_mode='client',
+            )
+        )
+
     def _run(self):
         self.get_spark_submit_bin()  # find spark-submit up front
         self._create_setup_wrapper_scripts()

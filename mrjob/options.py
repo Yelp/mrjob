@@ -85,6 +85,16 @@ _OPTPARSE_TYPES = dict(
 # use to identify malformed JSON
 _PROBABLY_JSON_RE = re.compile(r'^\s*[\{\[\"].*$')
 
+# names of runners
+_RUNNER_ALIASES = {
+    'dataproc',
+    'emr',
+    'hadoop',
+    'inline',
+    'local',
+    'spark',
+}
+
 
 ### custom actions ###
 
@@ -1558,9 +1568,9 @@ def _add_job_args(parser, include_deprecated=True):
 
     parser.add_argument(
         '-r', '--runner', dest='runner', default=None,
-        choices=('local', 'hadoop', 'emr', 'inline', 'dataproc'),
-        help=('Where to run the job; one of dataproc, emr, hadoop, inline,'
-              ' or local'))
+        choices=sorted(_RUNNER_ALIASES),
+        help=('Where to run the job; one of: %s' % ', '.join(
+            sorted(_RUNNER_ALIASES))))
 
     parser.add_argument(
         '--step-output-dir', dest='step_output_dir', default=None,

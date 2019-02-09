@@ -20,6 +20,9 @@ import signal
 import stat
 import sys
 from io import BytesIO
+from os.path import exists
+from os.path import getsize
+from os.path import join
 from shutil import make_archive
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
@@ -31,6 +34,7 @@ from mrjob.step import GENERIC_ARGS
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.util import cmd_line
+from mrjob.util import which
 
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_cmd_job import MRCmdJob
@@ -586,7 +590,7 @@ class SetupTestCase(SandboxedTestCase):
 
         self.foo_dir = self.makedirs('foo')
 
-        self.foo_py = os.path.join(self.tmp_dir, 'foo', 'foo.py')
+        self.foo_py = join(self.tmp_dir, 'foo', 'foo.py')
 
         # if our job can import foo, getsize will return 2x as many bytes
         with open(self.foo_py, 'w') as foo_py:
@@ -594,7 +598,7 @@ class SetupTestCase(SandboxedTestCase):
                          'from os.path import getsize as _real_getsize\n'
                          'os.path.getsize = lambda p: _real_getsize(p) * 2')
 
-        self.foo_sh = os.path.join(self.tmp_dir, 'foo', 'foo.sh')
+        self.foo_sh = join(self.tmp_dir, 'foo', 'foo.sh')
 
         with open(self.foo_sh, 'w') as foo_sh:
             foo_sh.write('#!/bin/sh\n'
@@ -602,17 +606,17 @@ class SetupTestCase(SandboxedTestCase):
         os.chmod(self.foo_sh, stat.S_IRWXU)
 
         self.foo_tar_gz = make_archive(
-            os.path.join(self.tmp_dir, 'foo'), 'gztar', self.foo_dir)
+            join(self.tmp_dir, 'foo'), 'gztar', self.foo_dir)
 
-        self.foo_zip = os.path.join(self.tmp_dir, 'foo.zip')
+        self.foo_zip = join(self.tmp_dir, 'foo.zip')
         zf = ZipFile(self.foo_zip, 'w', ZIP_DEFLATED)
         zf.write(self.foo_py, 'foo.py')
         zf.close()
 
-        self.foo_py_size = os.path.getsize(self.foo_py)
-        self.foo_sh_size = os.path.getsize(self.foo_sh)
-        self.foo_tar_gz_size = os.path.getsize(self.foo_tar_gz)
-        self.foo_zip_size = os.path.getsize(self.foo_zip)
+        self.foo_py_size = getsize(self.foo_py)
+        self.foo_sh_size = getsize(self.foo_sh)
+        self.foo_tar_gz_size = getsize(self.foo_tar_gz)
+        self.foo_zip_size = getsize(self.foo_zip)
 
     def test_file_upload(self):
         job = MROSWalkJob(['-r', 'local',
@@ -759,8 +763,8 @@ class SetupTestCase(SandboxedTestCase):
             self.assertIn('./foo.sh-made-this', path_to_size)
 
     def test_bad_setup_command(self):
-        bar_path = os.path.join(self.tmp_dir, 'bar')
-        baz_path = os.path.join(self.tmp_dir, 'baz')
+        bar_path = join(self.tmp_dir, 'bar')
+        baz_path = join(self.tmp_dir, 'baz')
 
         job = MROSWalkJob([
             '-r', 'local',
@@ -775,8 +779,8 @@ class SetupTestCase(SandboxedTestCase):
             self.assertRaises(Exception, r.run)
 
             # first command got run but not third one
-            self.assertTrue(os.path.exists(bar_path))
-            self.assertFalse(os.path.exists(baz_path))
+            self.assertTrue(exists(bar_path))
+            self.assertFalse(exists(baz_path))
 
     def test_stdin_bypasses_wrapper_script(self):
         job = MROSWalkJob([
@@ -1671,7 +1675,7 @@ class CreateMrjobZipTestCase(SandboxedTestCase):
         ZipFile(mrjob_zip).extractall(self.tmp_dir)
 
         self.assertTrue(
-            compileall.compile_dir(os.path.join(self.tmp_dir, 'mrjob'),
+            compileall.compile_dir(join(self.tmp_dir, 'mrjob'),
                                    quiet=1))
 
 
@@ -1959,3 +1963,119 @@ class ShBinValidationTestCase(SandboxedTestCase):
         MRJobBinRunner(sh_bin=['zsh', '-v'])
 
         self.assertTrue(self.log.warning.called)
+
+
+class GetSparkSubmitBinTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(GetSparkSubmitBinTestCase, self).setUp()
+
+        self.find_spark_submit_bin = self.start(patch(
+            'mrjob.bin.MRJobBinRunner._find_spark_submit_bin'))
+
+    def test_do_nothing_on_init(self):
+        runner = MRJobBinRunner()
+        self.assertFalse(self.find_spark_submit_bin.called)
+
+    def test_find_spark_submit(self):
+        runner = MRJobBinRunner()
+        self.assertEqual(runner.get_spark_submit_bin(),
+                         self.find_spark_submit_bin.return_value)
+
+    def test_only_find_spark_submit_bin_once(self):
+        runner = MRJobBinRunner()
+        runner.get_spark_submit_bin()
+        runner.get_spark_submit_bin()
+
+        self.assertEqual(self.find_spark_submit_bin.call_count, 1)
+
+    def test_option_short_circuits_find(self):
+        runner = MRJobBinRunner(
+            spark_submit_bin=['/path/to/spark-submit'])
+
+        self.assertEqual(runner.get_spark_submit_bin(),
+                         ['/path/to/spark-submit'])
+        self.assertFalse(self.find_spark_submit_bin.called)
+
+
+class FindSparkSubmitBinTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(FindSparkSubmitBinTestCase, self).setUp()
+
+        # track calls to which()
+        self.which = self.start(patch('mrjob.bin.which', wraps=which))
+
+        # keep which() from searching in /bin, etc.
+        os.environ['PATH'] = self.tmp_dir
+
+        # ignore whatever $SPARK_HOME might be set
+        if 'SPARK_HOME' in os.environ:
+            del os.environ['SPARK_HOME']
+
+        # assume pyspark is not installed
+        self.start(patch('mrjob.bin.pyspark', None))
+
+        self.runner = MRJobBinRunner()
+
+    def test_fallback_and_hard_coded_dirs(self):
+        # don't get caught by real spark install
+        self.which.return_value = None
+
+        os.environ['SPARK_HOME'] = '/path/to/spark/home'
+
+        pyspark = self.start(patch('mrjob.bin.pyspark'))
+        pyspark.__file__ = '/path/to/site-packages/pyspark/__init__.pyc'
+
+        self.assertEqual(self.runner._find_spark_submit_bin(),
+                         ['spark-submit'])
+
+        which_paths = [
+            kwargs.get('path') for args, kwargs in self.which.call_args_list]
+
+        self.assertEqual(which_paths, [
+            '/path/to/spark/home/bin',
+            None,
+            '/path/to/site-packages/pyspark/bin',
+            '/usr/lib/spark/bin',
+            '/usr/local/spark/bin',
+            '/usr/local/lib/spark/bin',
+        ])
+
+    def test_find_in_spark_home(self):
+        spark_submit_bin = self.makefile(
+            join(self.tmp_dir, 'spark', 'bin', 'spark-submit'),
+            executable=True)
+
+        os.environ['SPARK_HOME'] = join(self.tmp_dir, 'spark')
+
+        self.assertEqual(self.runner._find_spark_submit_bin(),
+                         [spark_submit_bin])
+
+        self.assertEqual(self.which.call_count, 1)
+
+    def test_find_in_path(self):
+        spark_submit_bin = self.makefile(
+            join(self.tmp_dir, 'bin', 'spark-submit'),
+            executable=True)
+
+        os.environ['PATH'] = join(self.tmp_dir, 'bin')
+
+        self.assertEqual(self.runner._find_spark_submit_bin(),
+                         [spark_submit_bin])
+
+    def test_find_in_pyspark_installation(self):
+        pyspark_dir = self.makedirs(join('site-packages', 'pyspark'))
+
+        pyspark_init_py = self.makefile(
+            join(pyspark_dir, '__init__.py'))
+
+        spark_submit_bin = self.makefile(
+            join(pyspark_dir, 'bin', 'spark-submit'),
+            executable=True)
+
+        pyspark = self.start(patch('mrjob.bin.pyspark'))
+        pyspark.__file__ = pyspark_init_py
+
+        self.assertEqual(self.runner._find_spark_submit_bin(),
+                         [spark_submit_bin])

@@ -26,11 +26,26 @@ import sys
 from subprocess import Popen
 from subprocess import PIPE
 
+try:
+    import pty
+    pty  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    pty = None
+
+
+try:
+    import pyspark
+    pyspark  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    pyspark = None
+
 import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
+from mrjob.logs.log4j import _parse_hadoop_log4j_records
+from mrjob.logs.step import _yield_lines_from_pty_or_pipe
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
@@ -38,6 +53,8 @@ from mrjob.setup import parse_setup_cmd
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
+from mrjob.util import unique
+from mrjob.util import which
 from mrjob.util import zip_dir
 
 log = logging.getLogger(__name__)
@@ -96,6 +113,10 @@ class MRJobBinRunner(MRJobRunner):
         # --py-files on Spark doesn't allow '#' (see #1375)
         if any('#' in path for path in self._opts['py_files']):
             raise ValueError("py_files cannot contain '#'")
+
+        # Keep track of where the spark-submit binary is
+        self._spark_submit_bin = self._opts['spark_submit_bin']
+
 
     def _default_opts(self):
         return combine_dicts(
@@ -833,11 +854,108 @@ class MRJobBinRunner(MRJobRunner):
 
         return self._interpolate_step_args(args, step_num)
 
-    def get_spark_submit_bin(self):
-        """The spark-submit command, as a list of args. Re-define
-        this in your subclass for runner-specific behavior.
+    def _run_spark_submit(self, spark_submit_args, env, record_callback):
+        """Run the spark submit binary in a subprocess, using a PTY if possible
+
+        :param spark_submit_args: spark-submit binary and arguments, as as list
+        :param env: environment variables, as a dict
+        :param record_callback: a function that takes a single log4j record
+                                as its argument (see
+                                :py:func:`~mrjob.logs.log4j\
+                                ._parse_hadoop_log4j_records)
+
+        :return: the subprocess's return code
         """
-        return self._opts['spark_submit_bin'] or ['spark-submit']
+        log.debug('> %s' % cmd_line(spark_submit_args))
+        log.debug('  with environment: %r' % sorted(env.items()))
+
+        returncode = 0  # should always be set, but just in case
+
+        # try to use a PTY if it's available
+        try:
+            pid, master_fd = pty.fork()
+        except (AttributeError, OSError):
+            # no PTYs, just use Popen
+
+            # user won't get much feedback for a while, so tell them
+            # spark-submit is running
+            log.debug('No PTY available, using Popen() to invoke spark-submit')
+
+            step_proc = Popen(
+                spark_submit_args, stdout=PIPE, stderr=PIPE, env=env)
+
+            for line in step_proc.stderr:
+                for record in _parse_hadoop_log4j_records(
+                        _yield_lines_from_pty_or_pipe(step_proc.stderr)):
+                    record_callback(record)
+
+            # there shouldn't be much output on STDOUT
+            for record in _parse_hadoop_log4j_records(step_proc.stdout):
+                record_callback(record)
+
+            step_proc.stdout.close()
+            step_proc.stderr.close()
+
+            returncode = step_proc.wait()
+        else:
+            # we have PTYs
+            if pid == 0:  # we are the child process
+                os.execvpe(spark_submit_args[0], spark_submit_args, env)
+                # now this process is no longer Python
+            else:
+                log.debug('Invoking spark-submit via PTY')
+
+                with os.fdopen(master_fd, 'rb') as master:
+                    for record in _parse_hadoop_log4j_records(
+                            _yield_lines_from_pty_or_pipe(master)):
+                        record_callback(record)
+                    _, returncode = os.waitpid(pid, 0)
+
+        return returncode
+
+    def get_spark_submit_bin(self):
+        """Return the location of the ``spark-submit`` binary, searching for it
+        if necessary."""
+        if not self._spark_submit_bin:
+            self._spark_submit_bin = self._find_spark_submit_bin()
+        return self._spark_submit_bin
+
+    def _find_spark_submit_bin(self):
+        """Attempt to find the spark binary. Returns a list of arguments.
+        Defaults to ``['spark-submit']``.
+
+        Re-define this in your subclass if you already know where
+        to find spark-submit (e.g. on cloud services).
+        """
+        for path in unique(self._spark_submit_bin_dirs()):
+            log.info('Looking for spark-submit binary in %s...' % (
+                path or '$PATH'))
+
+            spark_submit_bin = which('spark-submit', path=path)
+
+            if spark_submit_bin:
+                log.info('Found spark-submit binary: %s' % spark_submit_bin)
+                return [spark_submit_bin]
+        else:
+            log.info("Falling back to 'spark-submit'")
+            return ['spark-submit']
+
+    def _spark_submit_bin_dirs(self):
+        # $SPARK_HOME
+        spark_home = os.environ.get('SPARK_HOME')
+        if spark_home:
+            yield os.path.join(spark_home, 'bin')
+
+        yield None  # use $PATH
+
+        # look for pyspark installation (see #1984)
+        if pyspark:
+            yield os.path.join(os.path.dirname(pyspark.__file__), 'bin')
+
+        # some other places recommended by install docs (see #1366)
+        yield '/usr/lib/spark/bin'
+        yield '/usr/local/spark/bin'
+        yield '/usr/local/lib/spark/bin'
 
     def _spark_submit_args(self, step_num):
         """Build a list of extra args to the spark-submit binary for
@@ -883,7 +1001,14 @@ class MRJobBinRunner(MRJobRunner):
 
         # --py-files (Python only)
         if step['type'] in ('spark', 'spark_script'):
-            py_file_uris = self._upload_uris(self._py_files())
+            py_file_uris = self._py_files()
+
+            if self._upload_mgr:
+                # don't assume py_files are in _upload_mgr; for example,
+                # spark-submit doesn't need to upload them
+                path_to_uri = self._upload_mgr.path_to_uri()
+                py_file_uris = [path_to_uri.get(p, p) for p in py_file_uris]
+
             if py_file_uris:
                 args.extend(['--py-files', ','.join(py_file_uris)])
 
@@ -898,6 +1023,14 @@ class MRJobBinRunner(MRJobRunner):
 
     def _spark_master(self):
         return self._opts.get('spark_master') or None
+
+    def _spark_master_is_local(self):
+        """Utility method, since this comes up so often"""
+        master = self._spark_master()
+        if master:
+            return master.startswith('local')
+        else:
+            return True  # local is the default
 
     def _spark_deploy_mode(self):
         return self._opts.get('spark_deploy_mode') or None

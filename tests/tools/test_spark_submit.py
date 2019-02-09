@@ -100,7 +100,7 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
     def test_basic(self):
         spark_submit_main(['foo.py', 'arg1', 'arg2'])
 
-        self.assertEqual(self.runner_class.alias, 'hadoop')
+        self.assertEqual(self.runner_class.alias, 'spark')
 
         self.assertTrue(self.runner_class.called)
         self.assertTrue(self.runner.run.called)
@@ -120,7 +120,7 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
     def test_jar_step(self):
         spark_submit_main(['dora.jar', 'arg1', 'arg2', 'arg3'])
 
-        self.assertEqual(self.runner_class.alias, 'hadoop')
+        self.assertEqual(self.runner_class.alias, 'spark')
 
         self.assertTrue(self.runner_class.called)
         self.assertTrue(self.runner.run.called)

@@ -170,9 +170,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         self._hadoop_streaming_jar = self._opts['hadoop_streaming_jar']
         self._searched_for_hadoop_streaming_jar = False
 
-        # Keep track of where the spark-submit binary is
-        self._spark_submit_bin = self._opts['spark_submit_bin']
-
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task' ('step' will always
         # be filled because it comes from the hadoop jar command output,
@@ -318,39 +315,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
         for path in _FALLBACK_HADOOP_LOG_DIRS:
             yield path
-
-    def get_spark_submit_bin(self):
-        if not self._spark_submit_bin:
-            self._spark_submit_bin = self._find_spark_submit_bin()
-        return self._spark_submit_bin
-
-    def _find_spark_submit_bin(self):
-        # TODO: this is very similar to _find_hadoop_bin() (in fs)
-        for path in unique(self._spark_submit_bin_dirs()):
-            log.info('Looking for spark-submit binary in %s...' % (
-                path or '$PATH'))
-
-            spark_submit_bin = which('spark-submit', path=path)
-
-            if spark_submit_bin:
-                log.info('Found spark-submit binary: %s' % spark_submit_bin)
-                return [spark_submit_bin]
-        else:
-            log.info("Falling back to 'spark-submit'")
-            return ['spark-submit']
-
-    def _spark_submit_bin_dirs(self):
-        # $SPARK_HOME
-        spark_home = os.environ.get('SPARK_HOME')
-        if spark_home:
-            yield os.path.join(spark_home, 'bin')
-
-        yield None  # use $PATH
-
-        # some other places recommended by install docs (see #1366)
-        yield '/usr/lib/spark/bin'
-        yield '/usr/local/spark/bin'
-        yield '/usr/local/lib/spark/bin'
 
     def _run(self):
         self._find_binaries_and_jars()

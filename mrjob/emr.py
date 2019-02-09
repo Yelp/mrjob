@@ -1394,10 +1394,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _interpolate_spark_script_path(self, path):
         return self._upload_uri_or_remote_path(path)
 
-    def get_spark_submit_bin(self):
-        if self._opts['spark_submit_bin'] is not None:
-            return self._opts['spark_submit_bin']
-        elif version_gte(self.get_image_version(), '4'):
+    def _find_spark_submit_bin(self):
+        if version_gte(self.get_image_version(), '4'):
             return ['spark-submit']
         else:
             return [_3_X_SPARK_SUBMIT]

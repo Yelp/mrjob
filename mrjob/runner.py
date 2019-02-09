@@ -1210,14 +1210,6 @@ class MRJobRunner(object):
 
             yield '%s#%s' % (uri, name)
 
-    def _upload_uris(self, paths):
-        """If there's an upload manager, convert list of path to list of upload
-        URIs. Otherwise return *paths* as-is"""
-        if self._upload_mgr:
-            return [self._upload_mgr.uri(path) for path in paths]
-        else:
-            return list(paths)
-
     def _write_script(self, lines, path, description):
         """Write text of a setup script, input manifest, etc. to the given
         file.
@@ -1302,6 +1294,10 @@ def _runner_class(alias):
     elif alias == 'local':
         from mrjob.local import LocalMRJobRunner
         return LocalMRJobRunner
+
+    elif alias == 'spark':
+        from mrjob.spark.runner import SparkMRJobRunner
+        return SparkMRJobRunner
 
     else:
         raise ValueError('bad runner alias: %s' % alias)

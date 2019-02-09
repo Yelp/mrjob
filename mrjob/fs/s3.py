@@ -405,3 +405,9 @@ class S3Filesystem(Filesystem):
                 LocationConstraint=region)
 
         client.create_bucket(**params)
+
+
+def _is_permanent_boto3_error(ex):
+    """Used to disable S3Filesystem when boto3 is installed but
+    credentials aren't set up."""
+    return isinstance(ex, botocore.exceptions.NoCredentialsError)

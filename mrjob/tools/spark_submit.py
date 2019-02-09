@@ -27,8 +27,8 @@ Usage::
 
 Options::
 
-  -r {emr,hadoop,local}, --runner {emr,hadoop,local}
-                        Where to run the job (default: "hadoop")
+  -r {emr,hadoop,local,spark}, --runner {emr,hadoop,local,spark}
+                        Where to run the job (default: "spark")
   --class MAIN_CLASS    Your application's main class (for Java / Scala apps).
   --name NAME           The name of your application.
   --jars LIBJARS        Comma-separated list of jars to include on the
@@ -168,16 +168,16 @@ _DEPRECATED_OPT_HELP = (
 # display in default help message
 
 # the only runners that support spark scripts/jars
-_SPARK_RUNNERS = ('emr', 'hadoop', 'local')
+_SPARK_RUNNERS = ('emr', 'hadoop', 'local', 'spark')
 
 # the default spark runner to use
-_DEFAULT_RUNNER = 'hadoop'
+_DEFAULT_RUNNER = 'spark'  # just find spark-submit and use it
 
 
 # our mostly similar version of spark-submit's args, arranged in to groups
 # for the --help message. Differences:
 #
-# spark_master (--master) is in its own "Hadoop runner only" group
+# spark_master (--master) is in its own "Spark and Hadoop runners only" group
 # added upload_dirs (--dirs) which is similar to --archive
 #
 # --runner and other basic options are patched into the first ("None")
@@ -202,7 +202,7 @@ _SPARK_SUBMIT_ARG_GROUPS = [
         'executor_memory',
         'proxy_user',
     ]),
-    ('Hadoop runner only', [
+    ('Spark and Hadoop runners only', [
         'spark_master',
         'spark_deploy_mode',
     ]),

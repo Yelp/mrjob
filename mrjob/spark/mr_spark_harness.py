@@ -27,6 +27,7 @@ class MRSparkHarness(MRJob):
             help='dot-separated module and class name of MRJob',
             default='mrjob.job.MRJob')
 
+        # TODO: these duplicate code in the harness
         self.add_passthru_arg(
             '--compression-codec',
             dest='compression_codec',

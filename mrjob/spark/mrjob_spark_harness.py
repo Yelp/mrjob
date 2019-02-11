@@ -28,16 +28,16 @@ _PASSTHRU_OPTIONS = [
         help=('The arguments pass to the MRJob. Please quote all passthru args'
               ' so that they are in the same string'),
     )),
-    (['--start'], dict(
+    (['--start-step'], dict(
         default=None,
-        dest='start',
+        dest='start_step',
         type=int,
         help=("Don't run steps before the step with this (0-indexed) step"
               " number. Use with --end to define a range of steps to run")
     )),
-    (['--end'], dict(
+    (['--end-step'], dict(
         default=None,
-        dest='end',
+        dest='end_step',
         type=int,
         help=("Don't run the step with this (0-indexed) step number, or steps"
               " after it. Use with --start to define a range of steps to run")
@@ -81,7 +81,9 @@ def main(cmd_line_args=None):
     steps = make_job().steps()
 
     # process steps
-    for step_num, step in list(enumerate(steps))[args.start:args.end]:
+    steps_to_run = list(enumerate(steps))[args.start_step:args.end_step]
+
+    for step_num, step in steps_to_run:
         rdd = _run_step(step, step_num, rdd, make_job)
 
     # write the results

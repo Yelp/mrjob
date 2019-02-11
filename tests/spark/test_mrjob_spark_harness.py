@@ -87,26 +87,26 @@ class SparkHarnessOutputComparisonTestCase(
         return path
 
     def _reference_job(self, job_class, input_bytes=b'', input_paths=(),
-                       runner_alias='inline', extra_args=[]):
+                       runner_alias='inline', job_args=[]):
 
-        job_args = ['-r', runner_alias] + list(input_paths)
+        args = ['-r', runner_alias] + list(job_args) + list(input_paths)
 
-        reference_job = job_class(job_args + extra_args)
+        reference_job = job_class(args)
         reference_job.sandbox(stdin=BytesIO(input_bytes))
 
         return reference_job
 
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
-                     extra_args=None, start_step=None, end_step=None):
+                     job_args=None, start_step=None, end_step=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
         if compression_codec:
             harness_job_args.append('--compression-codec')
             harness_job_args.append(compression_codec)
-        if extra_args:
-            harness_job_args.extend(['--job-args', ' '.join(extra_args)])
+        if job_args:
+            harness_job_args.extend(['--job-args', ' '.join(job_args)])
         if start_step:
             harness_job_args.extend(['--start-step', str(start_step)])
         if end_step:
@@ -120,12 +120,12 @@ class SparkHarnessOutputComparisonTestCase(
         return harness_job
 
     def _assert_output_matches(
-            self, job_class, input_bytes=b'', input_paths=(), extra_args=[]):
+            self, job_class, input_bytes=b'', input_paths=(), job_args=[]):
 
         reference_job = self._reference_job(
             job_class, input_bytes=input_bytes,
             input_paths=input_paths,
-            extra_args=extra_args)
+            job_args=job_args)
 
         with reference_job.make_runner() as runner:
             runner.run()
@@ -135,7 +135,7 @@ class SparkHarnessOutputComparisonTestCase(
         harness_job = self._harness_job(
             job_class, input_bytes=input_bytes,
             input_paths=input_paths,
-            extra_args=extra_args)
+            job_args=job_args)
 
         with harness_job.make_runner() as runner:
             runner.run()
@@ -217,7 +217,7 @@ class SparkHarnessOutputComparisonTestCase(
         self._assert_output_matches(
             MRPassThruArgTest,
             input_bytes=input_bytes,
-            extra_args=['--chars', '--ignore', 'to'])
+            job_args=['--chars', '--ignore', 'to'])
 
 
 # TODO: add back a test of the bare Harness script in local mode (slow)

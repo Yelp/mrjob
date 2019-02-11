@@ -23,6 +23,7 @@ from mrjob.spark import mrjob_spark_harness
 from mrjob.spark.mr_spark_harness import MRSparkHarness
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
+from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
@@ -106,7 +107,7 @@ class SparkHarnessOutputComparisonTestCase(
             harness_job_args.append('--compression-codec')
             harness_job_args.append(compression_codec)
         if job_args:
-            harness_job_args.extend(['--job-args', ' '.join(job_args)])
+            harness_job_args.extend(['--job-args', cmd_line(job_args)])
         if start_step:
             harness_job_args.extend(['--start-step', str(start_step)])
         if end_step:

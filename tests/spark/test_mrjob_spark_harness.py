@@ -25,6 +25,7 @@ from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.util import to_lines
 
+from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.sandbox import SandboxedTestCase
@@ -97,7 +98,7 @@ class SparkHarnessOutputComparisonTestCase(
 
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
-                     extra_args=None):
+                     extra_args=None, start_step=None, end_step=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -106,6 +107,11 @@ class SparkHarnessOutputComparisonTestCase(
             harness_job_args.append(compression_codec)
         if extra_args:
             harness_job_args.extend(['--job-args', ' '.join(extra_args)])
+        if start_step:
+            harness_job_args.extend(['--start-step', str(start_step)])
+        if end_step:
+            harness_job_args.extend(['--end-step', str(end_step)])
+
         harness_job_args.extend(input_paths)
 
         harness_job = MRSparkHarness(harness_job_args)
@@ -147,6 +153,21 @@ class SparkHarnessOutputComparisonTestCase(
         input_bytes = b'foo\nbar\n'
 
         self._assert_output_matches(MRTwoStepJob, input_bytes=input_bytes)
+
+    def test_mixed_job(self):
+        input_bytes = b'foo\nbar\n'
+
+        job = self._harness_job(
+            MRStreamingAndSpark, input_bytes=input_bytes,
+            start_step=0, end_step=1)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # the streaming part is just an identity mapper, but it converts
+            # lines to pairs of JSON
+            self.assertEqual(set(to_lines(runner.cat_output())),
+                             {b'null\t"foo"\n', b'null\t"bar"\n'})
 
     def test_compression(self):
         compression_codec = 'org.apache.hadoop.io.compress.GzipCodec'

@@ -22,8 +22,8 @@ from mrjob.step import SparkStep
 
 class MRStreamingAndSpark(MRJob):
 
-    def mapper(self):
-        return
+    def mapper(self, key, value):
+        yield key, value
 
     def spark(self):
         pass

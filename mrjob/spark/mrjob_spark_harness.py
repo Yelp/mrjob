@@ -22,16 +22,30 @@ from mrjob.util import shlex_split
 #
 # these are tuples of (args, kwargs) for ArgumentParser.add_argument()
 _PASSTHRU_OPTIONS = [
-    (['--compression-codec'], dict(
-        default=None,
-        dest='compression_codec',
-        help=('Java class path of a codec to use to compress output.'),
-    )),
     (['--job-args'], dict(
         default=None,
         dest='job_args',
         help=('The arguments pass to the MRJob. Please quote all passthru args'
               ' so that they are in the same string'),
+    )),
+    (['--start'], dict(
+        default=None,
+        dest='start',
+        type=int,
+        help=("Don't run steps before the step with this (0-indexed) step"
+              " number. Use with --end to define a range of steps to run")
+    )),
+    (['--end'], dict(
+        default=None,
+        dest='end',
+        type=int,
+        help=("Don't run the step with this (0-indexed) step number, or steps"
+              " after it. Use with --start to define a range of steps to run")
+    )),
+    (['--compression-codec'], dict(
+        default=None,
+        dest='compression_codec',
+        help=('Java class path of a codec to use to compress output.'),
     )),
 ]
 
@@ -67,7 +81,7 @@ def main(cmd_line_args=None):
     steps = make_job().steps()
 
     # process steps
-    for step_num, step in enumerate(steps):
+    for step_num, step in list(enumerate(steps))[args.start:args.end]:
         rdd = _run_step(step, step_num, rdd, make_job)
 
     # write the results

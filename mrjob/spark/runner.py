@@ -277,3 +277,9 @@ class SparkMRJobRunner(MRJobBinRunner):
 
     def _run_streaming_steps_in_harness(self, steps, step_num, last_step_num):
         raise NotImplementedError
+
+
+# TODO: get job_script_copy into working dir()
+# TODO: check for bad streaming scripts (similar to inline runner)
+#       temporarily reject Hadoop input and output formats
+# TODO: implement _run_streaming_steps_in_harness()

@@ -22,11 +22,7 @@ import platform
 from functools import partial
 from multiprocessing import cpu_count
 from os.path import dirname
-from os.path import isdir
 from os.path import join
-from os.path import relpath
-from shutil import copy2
-from shutil import copytree
 
 from mrjob.cat import decompress
 from mrjob.cat import is_compressed
@@ -38,6 +34,7 @@ from mrjob.logs.counters import _format_counters
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
 from mrjob.runner import _fix_env
+from mrjob.runner import _symlink_or_copy
 from mrjob.step import _is_spark_step_type
 from mrjob.util import unarchive
 
@@ -779,23 +776,3 @@ def _split_records(record_gen, split_size, reducer_key=None):
     if num_records == 0:
         # special case for empty files
         yield ()
-
-
-def _symlink_or_copy(path, dest):
-    """Symlink from *dest* to *path*, using relative paths if possible.
-
-    If symlinks aren't available, copy path to dest instead.
-    """
-    if hasattr(os, 'symlink'):
-        log.debug('creating symlink %s <- %s' % (path, dest))
-        try:
-            os.symlink(relpath(path, dirname(dest)), dest)
-            return
-        except OSError as ex:
-            log.debug('  %s' % ex)
-
-    log.debug('copying %s -> %s' % (dest, path))
-    if isdir(path):
-        copytree(path, dest)
-    else:
-        copy2(path, dest)

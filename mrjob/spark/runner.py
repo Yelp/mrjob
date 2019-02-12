@@ -15,6 +15,7 @@
 import logging
 import os.path
 import posixpath
+import re
 from subprocess import CalledProcessError
 from tempfile import gettempdir
 
@@ -32,6 +33,7 @@ from mrjob.fs.s3 import _is_permanent_boto3_error
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
+from mrjob.runner import _symlink_or_copy
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
 
@@ -82,6 +84,9 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         # keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
+
+        # a copy of self._mrjob_script_script with a unique module name
+        self._job_script_copy = None
 
     def _default_opts(self):
         return combine_dicts(
@@ -168,6 +173,42 @@ class SparkMRJobRunner(MRJobBinRunner):
         for src_path, uri in self._upload_mgr.path_to_uri().items():
             log.debug('  %s -> %s' % (src_path, uri))
             self.fs.put(src_path, uri)
+
+    # copying mr_job_script
+    #
+    # The Spark harness runs MRJobs based on their module and class name.
+    # The easiest way to ensure that the MRJob has the same module name
+    # in both the driver and the executor is for the module to be at the top
+    # level (not in a package) and have a unique name. We put a copy of
+    # the MRJob script in a subdirectory of the temp directory, and then
+    # upload a copy of it into the working directory inside Spark.
+
+    def _job_script_module_name(self):
+        """A unique module name to use with the MRJob script."""
+        return re.sub(r'[^\w\d]', '_', self._job_key)
+
+    def _get_job_script_dir(self):
+        """Name of directory containing copy of MRJob script, to add
+        to ``$PYTHONPATH`` when running streaming steps.
+        """
+        path = os.path.join(self._get_local_tmp_dir(), 'job_script')
+        os.mkdir(path)
+
+        return path
+
+    def _get_job_script_copy(self):
+        """Get the path to the copy of the MRJob script, which will be inside
+        :py:meth:`_get_job_script_dir`.
+        """
+        if not self._job_script_copy:
+            filename = '%s.py' % self._job_script_module_name()
+            dest = os.path.join(self._get_job_script_dir(), filename)
+
+            _symlink_or_copy(self._script_path, dest)
+
+            self._mrjob_script_copy = dest
+
+        return self._mrjob_script_copy
 
     def _run_steps_on_spark(self):
         for step_num, step in enumerate(self._get_steps()):

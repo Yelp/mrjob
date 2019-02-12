@@ -23,10 +23,12 @@ import os.path
 import posixpath
 import pprint
 import re
-import shutil
 import sys
 import tarfile
 import tempfile
+from shutil import copy2
+from shutil import copytree
+from shutil import rmtree
 
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_dict
@@ -612,7 +614,7 @@ class MRJobRunner(object):
         if self._local_tmp_dir:
             log.info('Removing temp directory %s...' % self._local_tmp_dir)
             try:
-                shutil.rmtree(self._local_tmp_dir)
+                rmtree(self._local_tmp_dir)
             except OSError as e:
                 log.exception(e)
 
@@ -748,7 +750,7 @@ class MRJobRunner(object):
             path = os.path.join(tmp_dir, self._job_key)
             log.info('Creating temp directory %s' % path)
             if os.path.isdir(path):
-                shutil.rmtree(path)
+                rmtree(path)
             os.makedirs(path)
             self._local_tmp_dir = path
 
@@ -1301,3 +1303,27 @@ def _runner_class(alias):
 
     else:
         raise ValueError('bad runner alias: %s' % alias)
+
+
+
+# used by sim runners and Spark runner
+def _symlink_or_copy(path, dest):
+    """Symlink from *dest* to *path*, using relative paths if possible.
+
+    If symlinks aren't available, copy path to dest instead.
+    """
+    if hasattr(os, 'symlink'):
+        log.debug('creating symlink %s <- %s' % (path, dest))
+        try:
+            os.symlink(
+                os.path.relpath(path, os.path.dirname(dest)),
+                dest)
+            return
+        except OSError as ex:
+            log.debug('  %s' % ex)
+
+    log.debug('copying %s -> %s' % (dest, path))
+    if os.path.isdir(path):
+        copytree(path, dest)
+    else:
+        copy2(path, dest)

@@ -65,7 +65,7 @@ class SparkMRJobRunner(MRJobBinRunner):
     # everything except Hadoop JARs
     # streaming jobs will be run using mrjob_spark_harness.py (see #1972)
     _STEP_TYPES = {
-        'spark', 'spark_jar', 'spark_script', # 'streaming',
+        'spark', 'spark_jar', 'spark_script', 'streaming',
     }
 
     def __init__(self, **kwargs):
@@ -211,8 +211,50 @@ class SparkMRJobRunner(MRJobBinRunner):
         return self._mrjob_script_copy
 
     def _run_steps_on_spark(self):
-        for step_num, step in enumerate(self._get_steps()):
-            self._run_step_on_spark(step, step_num)
+        steps = self._get_steps()
+
+        for group in self._group_steps(steps):
+            step_num = group['step_num']
+            last_step_num = step_num + len(group['steps']) - 1
+
+            # the Spark harness can run several streaming steps in one job
+            if step_num == last_step_num:
+                step_desc = 'step %d' % (step_num + 1)
+            else:
+                step_desc = 'steps %d-%d' % (step_num + 1, last_step_num + 1)
+
+            log.info('Running %s of %d' % (step_desc, len(steps)))
+
+            if group['type'] == 'streaming':
+                self._run_streaming_steps_in_harness(
+                    group['steps'], step_num, last_step_num)
+            else:
+                self._run_step_on_spark(group['steps'][0], step_num)
+
+    def _group_steps(self, steps):
+        """Group streaming steps together."""
+        # a list of dicts with:
+        #
+        # type: shared type of steps
+        # steps: list of steps in group
+        # step_num: (0-indexed) number of first step
+        groups = []
+
+        for step_num, step in enumerate(steps):
+            # should we add *step* to existing group of streaming steps?
+            if (step['type'] == 'streaming' and groups and
+                    groups[-1]['type'] == 'streaming' and
+                    step.get('jobconf') ==
+                    groups[-1]['steps'][0].get('jobconf')):
+                groups[-1]['steps'].append(step)
+            else:
+                # start a new step group
+                groups.append(dict(
+                    type=step['type'],
+                    steps=[step],
+                    step_num=step_num))
+
+        return groups
 
     def _run_step_on_spark(self, step, step_num):
         if self._opts['upload_archives'] and self._spark_master() != 'yarn':
@@ -232,3 +274,6 @@ class SparkMRJobRunner(MRJobBinRunner):
             raise StepFailedException(
                 reason=reason, step_num=step_num,
                 num_steps=self._num_steps())
+
+    def _run_streaming_steps_in_harness(self, steps, step_num, last_step_num):
+        raise NotImplementedError

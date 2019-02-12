@@ -98,7 +98,7 @@ class StepFailedException(Exception):
 
     def __init__(
             self, reason=None, step_num=None, num_steps=None,
-            step_desc=None, step_end_num=None):
+            step_desc=None, last_step_num=None):
         """Initialize a reason for step failure.
 
         :param string reason: brief explanation of which step failed
@@ -106,9 +106,9 @@ class StepFailedException(Exception):
         :param int num_steps: number of steps in the job
         :param string step_desc: description of step (if we don't like the
                                  default "Step X of Y")
-        :param int step_end_num: if one of a range of steps failed, the first
-                                 (0-indexed) step not in that range (used for
-                                 streaming steps run by the Spark harness)
+        :param int last_step_num: if one of a range of steps failed, the
+                                  (0-indexed) last step in that range. If this
+                                  equals *step_num*, will be ignored.
 
         *reason* should not be several lines long; use ``log.error(...)``
         for that.
@@ -120,10 +120,10 @@ class StepFailedException(Exception):
 
         # we only need this for streaming steps run by the Spark harness,
         # so don't create noise
-        if step_end_num and step_end_num > step_num + 1:
-            self.step_end_num = step_end_num
+        if last_step_num is None or last_step_num == step_num:
+            self.last_step_num = None
         else:
-            self.step_end_num = None
+            self.last_step_num = last_step_num
 
     def __str__(self):
         """Human-readable version of the exception. Note that this 1-indexes
@@ -131,10 +131,11 @@ class StepFailedException(Exception):
         if self.step_desc:
             step_desc = self.step_desc
         else:
-            if self.step_num:
-                if self.step_end_num:
+            if self.step_num is not None:
+                # 1-index step numbers
+                if self.last_step_num is not None:
                     step_name = 'Steps %d-%d' % (
-                        self.step_num + 1, self.step_end_num)
+                        self.step_num + 1, self.last_step_num + 1)
                 else:
                     step_name = 'Step %d' % (self.step_num + 1)
 

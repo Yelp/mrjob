@@ -100,7 +100,7 @@ class SparkHarnessOutputComparisonTestCase(
 
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
-                     job_args=None, start_step=None, end_step=None):
+                     job_args=None, first_step_num=None, last_step_num=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -109,10 +109,10 @@ class SparkHarnessOutputComparisonTestCase(
             harness_job_args.append(compression_codec)
         if job_args:
             harness_job_args.extend(['--job-args', cmd_line(job_args)])
-        if start_step:
-            harness_job_args.extend(['--start-step', str(start_step)])
-        if end_step:
-            harness_job_args.extend(['--end-step', str(end_step)])
+        if first_step_num is not None:
+            harness_job_args.extend(['--first-step-num', str(first_step_num)])
+        if last_step_num is not None:
+            harness_job_args.extend(['--last-step-num', str(last_step_num)])
 
         harness_job_args.extend(input_paths)
 
@@ -162,7 +162,7 @@ class SparkHarnessOutputComparisonTestCase(
 
         job = self._harness_job(
             MRStreamingAndSpark, input_bytes=input_bytes,
-            start_step=0, end_step=1)
+            first_step_num=0, last_step_num=0)
 
         with job.make_runner() as runner:
             runner.run()
@@ -183,7 +183,7 @@ class SparkHarnessOutputComparisonTestCase(
         # just run two of the five steps
         steps_2_and_3_job = self._harness_job(
             MRDoubler, input_bytes=input_bytes, job_args=['-n', '5'],
-            start_step=2, end_step=4)
+            first_step_num=2, last_step_num=3)
 
         with steps_2_and_3_job.make_runner() as runner:
             runner.run()

@@ -28,19 +28,17 @@ _PASSTHRU_OPTIONS = [
         help=('The arguments pass to the MRJob. Please quote all passthru args'
               ' so that they are in the same string'),
     )),
-    (['--start-step'], dict(
+    (['--first-step-num'], dict(
         default=None,
-        dest='start_step',
+        dest='first_step_num',
         type=int,
-        help=("Don't run steps before the step with this (0-indexed) step"
-              " number. Use with --end to define a range of steps to run")
+        help=("(0-indexed) first step in range of steps to run")
     )),
-    (['--end-step'], dict(
+    (['--last-step-num'], dict(
         default=None,
-        dest='end_step',
+        dest='last_step_num',
         type=int,
-        help=("Don't run the step with this (0-indexed) step number, or steps"
-              " after it. Use with --start to define a range of steps to run")
+        help=("(0-indexed) last step in range of steps to run")
     )),
     (['--compression-codec'], dict(
         default=None,
@@ -72,17 +70,20 @@ def main(cmd_line_args=None):
         j.sandbox()  # so Spark doesn't try to serialize stdin
         return j
 
+    # get job steps. don't pass --steps, which is deprecated
+    steps = make_job().steps()
+
+    # pick steps
+    start = args.first_step_num
+    end = None if args.last_step_num is None else args.last_step_num + 1
+    steps_to_run = list(enumerate(steps))[start:end]
+
     # load initial data
     from pyspark import SparkContext
     sc = SparkContext()
     rdd = sc.textFile(args.input_path, use_unicode=False)
 
-    # get job steps. don't pass --steps, which is deprecated
-    steps = make_job().steps()
-
-    # process steps
-    steps_to_run = list(enumerate(steps))[args.start_step:args.end_step]
-
+    # run steps
     for step_num, step in steps_to_run:
         rdd = _run_step(step, step_num, rdd, make_job)
 

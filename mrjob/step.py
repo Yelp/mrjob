@@ -97,7 +97,8 @@ class StepFailedException(Exception):
     _FIELDS = ('reason', 'step_num', 'num_steps', 'step_desc')
 
     def __init__(
-            self, reason=None, step_num=None, num_steps=None, step_desc=None):
+            self, reason=None, step_num=None, num_steps=None,
+            step_desc=None, step_end_num=None):
         """Initialize a reason for step failure.
 
         :param string reason: brief explanation of which step failed
@@ -105,6 +106,9 @@ class StepFailedException(Exception):
         :param int num_steps: number of steps in the job
         :param string step_desc: description of step (if we don't like the
                                  default "Step X of Y")
+        :param int step_end_num: if one of a range of steps failed, the first
+                                 (0-indexed) step not in that range (used for
+                                 streaming steps run by the Spark harness)
 
         *reason* should not be several lines long; use ``log.error(...)``
         for that.
@@ -114,15 +118,37 @@ class StepFailedException(Exception):
         self.num_steps = num_steps
         self.step_desc = step_desc
 
+        # we only need this for streaming steps run by the Spark harness,
+        # so don't create noise
+        if step_end_num and step_end_num > step_num + 1:
+            self.step_end_num = step_end_num
+        else:
+            self.step_end_num = None
+
     def __str__(self):
         """Human-readable version of the exception. Note that this 1-indexes
         *step_num*."""
-        return '%s failed%s' % (
-            (self.step_desc or 'Step%s%s' % (
-                '' if self.step_num is None else ' %d' % (self.step_num + 1),
-                '' if (self.step_num is None or self.num_steps is None) else (
-                    ' of %d' % self.num_steps))),
-            '' if self.reason is None else ': %s' % self.reason)
+        if self.step_desc:
+            step_desc = self.step_desc
+        else:
+            if self.step_num:
+                if self.step_end_num:
+                    step_name = 'Steps %d-%d' % (
+                        self.step_num + 1, self.step_end_num)
+                else:
+                    step_name = 'Step %d' % (self.step_num + 1)
+
+                if self.num_steps:
+                    step_desc = '%s of %d' % (step_name, self.num_steps)
+                else:
+                    step_desc = step_name
+            else:
+                step_desc = 'Step'
+
+        if self.reason:
+            return '%s failed: %s' % (step_desc, self.reason)
+        else:
+            return '%s failed' % step_desc
 
     def __repr__(self):
         return '%s(%s)' % (

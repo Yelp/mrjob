@@ -26,6 +26,7 @@ from mrjob.step import OUTPUT
 from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
+from tests.mr_doubler import MRDoubler
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_two_step_job import MRTwoStepJob
@@ -156,6 +157,7 @@ class SparkHarnessOutputComparisonTestCase(
         self._assert_output_matches(MRTwoStepJob, input_bytes=input_bytes)
 
     def test_mixed_job(self):
+        # can we run just the streaming part of a job?
         input_bytes = b'foo\nbar\n'
 
         job = self._harness_job(
@@ -169,6 +171,28 @@ class SparkHarnessOutputComparisonTestCase(
             # lines to pairs of JSON
             self.assertEqual(set(to_lines(runner.cat_output())),
                              {b'null\t"foo"\n', b'null\t"bar"\n'})
+
+    def test_range_of_steps(self):
+        # check for off-by-one errors, etc.
+        input_bytes = b'"three"\t3\n"five"\t5'
+
+        # sanity-check
+        self._assert_output_matches(MRDoubler, input_bytes=input_bytes,
+                                    job_args=['-n', '5'])
+
+        # just run two of the five steps
+        steps_2_and_3_job = self._harness_job(
+            MRDoubler, input_bytes=input_bytes, job_args=['-n', '5'],
+            start_step=2, end_step=4)
+
+        with steps_2_and_3_job.make_runner() as runner:
+            runner.run()
+
+            # parse_output() works because internal and output protocols match
+            self.assertEqual(
+                dict(steps_2_and_3_job.parse_output(runner.cat_output())),
+                dict(three=12, five=20),
+            )
 
     def test_compression(self):
         compression_codec = 'org.apache.hadoop.io.compress.GzipCodec'

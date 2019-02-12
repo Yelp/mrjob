@@ -14,7 +14,13 @@
 """A wrapper for mrjob_spark_harness.py, so we can test the harness with
 the inline runner."""
 from mrjob.job import MRJob
+from mrjob.options import _parse_raw_args
+from mrjob.spark.mrjob_spark_harness import _PASSTHRU_OPTIONS
 from mrjob.spark.mrjob_spark_harness import main as harness_main
+
+
+_PASSTHRU_OPTION_STRINGS = {
+    arg for args, kwargs in _PASSTHRU_OPTIONS for arg in args}
 
 
 class MRSparkHarness(MRJob):
@@ -22,36 +28,29 @@ class MRSparkHarness(MRJob):
     def configure_args(self):
         super(MRSparkHarness, self).configure_args()
 
+        # this is a positional argument in the spark harness
         self.add_passthru_arg(
             '--job-class', dest='job_class', type=str,
             help='dot-separated module and class name of MRJob',
             default='mrjob.job.MRJob')
 
-        # TODO: these duplicate code in the harness
-        self.add_passthru_arg(
-            '--compression-codec',
-            dest='compression_codec',
-            help=('Java class path of a codec to use to compress output.'))
-
-        self.add_passthru_arg(
-            '--job-args',
-            dest='job_args',
-            default='',
-            help=('The arguments pass to the MRJob. Please quote all passthru '
-                  ' args so that they are in the same string')
-        )
+        for args, kwargs in _PASSTHRU_OPTIONS:
+            self.add_passthru_arg(*args, **kwargs)
 
     def spark(self, input_path, output_path):
-        args = [
+        harness_args = [
             self.options.job_class,input_path, output_path,
-            '--job-args', self.options.job_args
         ]
 
-        if self.options.compression_codec:
-            args.append('--compression-codec')
-            args.append(self.options.compression_codec)
+        # find arguments to pass through to the Spark harness
+        raw_args = _parse_raw_args(self.arg_parser, self._cl_args)
 
-        harness_main(args)
+        for dest, option_string, args in raw_args:
+            if option_string in _PASSTHRU_OPTION_STRINGS:
+                harness_args.append(option_string)
+                harness_args.extend(args)
+
+        harness_main(harness_args)
 
 
 if __name__ == '__main__':

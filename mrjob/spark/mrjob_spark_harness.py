@@ -18,6 +18,38 @@ from importlib import import_module
 
 from mrjob.util import shlex_split
 
+# switches which mr_spark_harness.py passes through to the harness
+#
+# these are tuples of (args, kwargs) for ArgumentParser.add_argument()
+_PASSTHRU_OPTIONS = [
+    (['--job-args'], dict(
+        default=None,
+        dest='job_args',
+        help=('The arguments pass to the MRJob. Please quote all passthru args'
+              ' so that they are in the same string'),
+    )),
+    (['--start-step'], dict(
+        default=None,
+        dest='start_step',
+        type=int,
+        help=("Don't run steps before the step with this (0-indexed) step"
+              " number. Use with --end to define a range of steps to run")
+    )),
+    (['--end-step'], dict(
+        default=None,
+        dest='end_step',
+        type=int,
+        help=("Don't run the step with this (0-indexed) step number, or steps"
+              " after it. Use with --start to define a range of steps to run")
+    )),
+    (['--compression-codec'], dict(
+        default=None,
+        dest='compression_codec',
+        help=('Java class path of a codec to use to compress output.'),
+    )),
+]
+
+
 def main(cmd_line_args=None):
     if cmd_line_args is None:
         cmd_line_args = sys.argv[1:]
@@ -30,7 +62,10 @@ def main(cmd_line_args=None):
     job_module = import_module(job_module_name)
     job_class = getattr(job_module, job_class_name)
 
-    job_args = shlex_split(args.job_args)
+    if args.job_args:
+        job_args = shlex_split(args.job_args)
+    else:
+        job_args = []
 
     def make_job(*args):
         j = job_class(job_args + list(args))
@@ -46,7 +81,9 @@ def main(cmd_line_args=None):
     steps = make_job().steps()
 
     # process steps
-    for step_num, step in enumerate(steps):
+    steps_to_run = list(enumerate(steps))[args.start_step:args.end_step]
+
+    for step_num, step in steps_to_run:
         rdd = _run_step(step, step_num, rdd, make_job)
 
     # write the results
@@ -139,18 +176,9 @@ def _make_arg_parser():
         dest='output_path',
         help=('An empty directory to write output to. Can be a path or URI.'))
 
-    parser.add_argument(
-        '--compression-codec',
-        dest='compression_codec',
-        help=('Java class path of a codec to use to compress output.'))
+    for args, kwargs in _PASSTHRU_OPTIONS:
+        parser.add_argument(*args, **kwargs)
 
-    parser.add_argument(
-        '--job-args',
-        dest='job_args',
-        default='',
-        help=('The arguments pass to the MRJob. Please quote all passthru args'
-              ' so that they are in the same string')
-    )
     return parser
 
 

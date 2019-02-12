@@ -23,8 +23,11 @@ from mrjob.spark import mrjob_spark_harness
 from mrjob.spark.mr_spark_harness import MRSparkHarness
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
+from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
+from tests.mr_doubler import MRDoubler
+from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.sandbox import SandboxedTestCase
@@ -86,26 +89,31 @@ class SparkHarnessOutputComparisonTestCase(
         return path
 
     def _reference_job(self, job_class, input_bytes=b'', input_paths=(),
-                       runner_alias='inline', extra_args=[]):
+                       runner_alias='inline', job_args=[]):
 
-        job_args = ['-r', runner_alias] + list(input_paths)
+        args = ['-r', runner_alias] + list(job_args) + list(input_paths)
 
-        reference_job = job_class(job_args + extra_args)
+        reference_job = job_class(args)
         reference_job.sandbox(stdin=BytesIO(input_bytes))
 
         return reference_job
 
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
-                     extra_args=None):
+                     job_args=None, start_step=None, end_step=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
         if compression_codec:
             harness_job_args.append('--compression-codec')
             harness_job_args.append(compression_codec)
-        if extra_args:
-            harness_job_args.extend(['--job-args', ' '.join(extra_args)])
+        if job_args:
+            harness_job_args.extend(['--job-args', cmd_line(job_args)])
+        if start_step:
+            harness_job_args.extend(['--start-step', str(start_step)])
+        if end_step:
+            harness_job_args.extend(['--end-step', str(end_step)])
+
         harness_job_args.extend(input_paths)
 
         harness_job = MRSparkHarness(harness_job_args)
@@ -114,12 +122,12 @@ class SparkHarnessOutputComparisonTestCase(
         return harness_job
 
     def _assert_output_matches(
-            self, job_class, input_bytes=b'', input_paths=(), extra_args=[]):
+            self, job_class, input_bytes=b'', input_paths=(), job_args=[]):
 
         reference_job = self._reference_job(
             job_class, input_bytes=input_bytes,
             input_paths=input_paths,
-            extra_args=extra_args)
+            job_args=job_args)
 
         with reference_job.make_runner() as runner:
             runner.run()
@@ -129,7 +137,7 @@ class SparkHarnessOutputComparisonTestCase(
         harness_job = self._harness_job(
             job_class, input_bytes=input_bytes,
             input_paths=input_paths,
-            extra_args=extra_args)
+            job_args=job_args)
 
         with harness_job.make_runner() as runner:
             runner.run()
@@ -147,6 +155,44 @@ class SparkHarnessOutputComparisonTestCase(
         input_bytes = b'foo\nbar\n'
 
         self._assert_output_matches(MRTwoStepJob, input_bytes=input_bytes)
+
+    def test_mixed_job(self):
+        # can we run just the streaming part of a job?
+        input_bytes = b'foo\nbar\n'
+
+        job = self._harness_job(
+            MRStreamingAndSpark, input_bytes=input_bytes,
+            start_step=0, end_step=1)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # the streaming part is just an identity mapper, but it converts
+            # lines to pairs of JSON
+            self.assertEqual(set(to_lines(runner.cat_output())),
+                             {b'null\t"foo"\n', b'null\t"bar"\n'})
+
+    def test_range_of_steps(self):
+        # check for off-by-one errors, etc.
+        input_bytes = b'"three"\t3\n"five"\t5'
+
+        # sanity-check
+        self._assert_output_matches(MRDoubler, input_bytes=input_bytes,
+                                    job_args=['-n', '5'])
+
+        # just run two of the five steps
+        steps_2_and_3_job = self._harness_job(
+            MRDoubler, input_bytes=input_bytes, job_args=['-n', '5'],
+            start_step=2, end_step=4)
+
+        with steps_2_and_3_job.make_runner() as runner:
+            runner.run()
+
+            # parse_output() works because internal and output protocols match
+            self.assertEqual(
+                dict(steps_2_and_3_job.parse_output(runner.cat_output())),
+                dict(three=12, five=20),
+            )
 
     def test_compression(self):
         compression_codec = 'org.apache.hadoop.io.compress.GzipCodec'
@@ -196,7 +242,7 @@ class SparkHarnessOutputComparisonTestCase(
         self._assert_output_matches(
             MRPassThruArgTest,
             input_bytes=input_bytes,
-            extra_args=['--chars', '--ignore', 'to'])
+            job_args=['--chars', '--ignore', 'to'])
 
 
 # TODO: add back a test of the bare Harness script in local mode (slow)

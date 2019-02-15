@@ -99,6 +99,8 @@ class SparkMRJobRunner(MRJobBinRunner):
 
     def _run(self):
         self.get_spark_submit_bin()  # find spark-submit up front
+        if self._has_streaming_steps():
+            self._get_job_script_copy()  # add to working dir
         self._create_setup_wrapper_scripts()
         self._add_job_files_for_upload()
         self._upload_local_files()
@@ -199,12 +201,18 @@ class SparkMRJobRunner(MRJobBinRunner):
     def _get_job_script_copy(self):
         """Get the path to the copy of the MRJob script, which will be inside
         :py:meth:`_get_job_script_dir`.
+
+        This automatically adds the copy to :py:attr:`_spark_files` and
+        :py:attr:`_working_dir_mgr`.
         """
         if not self._job_script_copy:
             filename = '%s.py' % self._job_script_module_name()
             dest = os.path.join(self._get_job_script_dir(), filename)
 
             _symlink_or_copy(self._script_path, dest)
+
+            self._spark_files.append([filename, dest])
+            self._working_dir_mgr.add('file', dest, filename)
 
             self._mrjob_script_copy = dest
 
@@ -278,8 +286,7 @@ class SparkMRJobRunner(MRJobBinRunner):
     def _run_streaming_steps_in_harness(self, steps, step_num, last_step_num):
         raise NotImplementedError
 
-
-# TODO: get job_script_copy into working dir()
 # TODO: check for bad streaming scripts (similar to inline runner)
 #       temporarily reject Hadoop input and output formats
+#       (or just make a comment, this is pending)
 # TODO: implement _run_streaming_steps_in_harness()

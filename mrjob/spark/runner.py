@@ -88,6 +88,10 @@ class SparkMRJobRunner(MRJobBinRunner):
         # a copy of self._mrjob_script_script with a unique module name
         self._job_script_copy = None
 
+        # could raise an exception if *hadoop_input_format* and
+        # *hadoop_output_format* are set, but support for these these will be
+        # added shortly (see #1944)
+
     def _default_opts(self):
         return combine_dicts(
             super(SparkMRJobRunner, self)._default_opts(),
@@ -96,6 +100,24 @@ class SparkMRJobRunner(MRJobBinRunner):
                 spark_deploy_mode='client',
             )
         )
+
+    def _check_step(self, step, step_num):
+        """Don't try to run steps that include commands or use manifests."""
+        super(SparkMRJobRunner, self)._check_step(step, step_num)
+
+        if step.get('input_manifest'):
+            raise NotImplementedError(
+                'spark runner does not support input manifests')
+
+        # we don't currently support commands, but we *could* (see #1956).
+        if step['type'] == 'streaming':
+            for mrc in ('mapper', 'combiner', 'reducer'):
+                if step.get(mrc):
+                    if 'command' in step[mrc] or 'pre_filter' in step[mrc]:
+                        raise NotImplementedError(
+                            "step %d's %s runs a command, but spark"
+                            " runner does not support commands" % (
+                                step_num, mrc))
 
     def _run(self):
         self.get_spark_submit_bin()  # find spark-submit up front

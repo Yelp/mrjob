@@ -833,34 +833,46 @@ class MRJobRunner(object):
                 '%s cannot run steps!' % self.__class__.__name__)
 
         for step_num, step in enumerate(steps):
-            if step.get('type') not in self._STEP_TYPES:
-                raise NotImplementedError(
-                    'step %d has type %r, but %s runner only supports:'
-                    ' %s' % (step_num, step.get('type'), self.alias,
-                             ', '.join(sorted(self._STEP_TYPES))))
+           self._check_step(step, step_num)
 
-            if step.get('input_manifest') and step_num != 0:
+    def _check_step(self, step, step_num):
+        """Raise an exception if the given step is invalid
+        (:py:class:`ValueError`) or not handled by this runner
+        (:py:class:`NotImplementedError`).
+
+        By default, we check that *step* has a support step type,
+        only uses an input manifest if it's the first step, and that
+        :py:attr:`_script_path` exists if necessary. You can re-define
+        this in your subclass.
+        """
+        if step.get('type') not in self._STEP_TYPES:
+            raise NotImplementedError(
+                'step %d has type %r, but %s runner only supports:'
+                ' %s' % (step_num, step.get('type'), self.alias,
+                         ', '.join(sorted(self._STEP_TYPES))))
+
+        if step.get('input_manifest') and step_num != 0:
+            raise ValueError(
+                'step %d may not take an input manifest (only'
+                ' first step can' % step_num)
+
+        # some step types assume a MRJob script
+        if not self._script_path:
+            if step['type'] == 'spark':
                 raise ValueError(
-                    'step %d may not take an input manifest (only'
-                    ' first step can' % step_num)
+                    "SparkStep (step %d) can't run without a MRJob script"
+                    " (try SparkScriptStep instead)" % step_num)
 
-            # some step types assume a MRJob script
-            if not self._script_path:
-                if step['type'] == 'spark':
-                    raise ValueError(
-                        "SparkStep (step %d) can't run without a MRJob script"
-                        " (try SparkScriptStep instead)" % step_num)
+            elif step['type'] == 'streaming':
+                for mrc in ('mapper', 'combiner', 'reducer'):
+                    if not step.get(mrc):
+                        continue
 
-                elif step['type'] == 'streaming':
-                    for mrc in ('mapper', 'combiner', 'reducer'):
-                        if not step.get(mrc):
-                            continue
-
-                        substep = step[mrc]
-                        if substep['type'] == 'script':
-                            raise ValueError(
-                                "%s (step %d) can't run without a MRJob"
-                                " script" % (mrc, step_num))
+                    substep = step[mrc]
+                    if substep['type'] == 'script':
+                        raise ValueError(
+                            "%s (step %d) can't run without a MRJob"
+                            " script" % (mrc, step_num))
 
     def _get_step(self, step_num):
         """Get a single step (calls :py:meth:`_get_steps`)."""

@@ -814,22 +814,28 @@ class MRJobBinRunner(MRJobRunner):
 
     ### spark ###
 
-    def _args_for_spark_step(self, step_num):
+    def _args_for_spark_step(self, step_num, last_step_num=None):
         """The actual arguments used to run the spark-submit command.
 
         This handles both all Spark step types (``spark``, ``spark_jar``,
         and ``spark_script``).
+
+        *last_step_num* is only used by the Spark runner, where multiple
+        streaming steps are run in a single Spark job
         """
         return (
             self.get_spark_submit_bin() +
             self._spark_submit_args(step_num) +
             [self._spark_script_path(step_num)] +
-            self._spark_script_args(step_num)
+            self._spark_script_args(step_num, last_step_num)
         )
 
-    def _spark_script_args(self, step_num):
+    def _spark_script_args(self, step_num, last_step_num=None):
         """A list of args to the spark script/jar, used by
-        _args_for_spark_step()."""
+        _args_for_spark_step().
+
+        *last_step_num* is only used by the Spark runner, where multiple
+        streaming steps are run in a single Spark job."""
         # TODO: this can also return args to the MRJob, which is confusing
         step = self._get_step(step_num)
 

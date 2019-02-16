@@ -35,6 +35,7 @@ from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
 from mrjob.runner import _symlink_or_copy
 from mrjob.setup import UploadDirManager
+from mrjob.spark import mrjob_spark_harness
 from mrjob.step import StepFailedException
 
 log = logging.getLogger(__name__)
@@ -255,11 +256,7 @@ class SparkMRJobRunner(MRJobBinRunner):
 
             log.info('Running %s of %d' % (step_desc, len(steps)))
 
-            if group['type'] == 'streaming':
-                self._run_streaming_steps_in_harness(
-                    group['steps'], step_num, last_step_num)
-            else:
-                self._run_step_on_spark(group['steps'][0], step_num)
+            self._run_step_on_spark(group['steps'][0], step_num, last_step_num)
 
     def _group_steps(self, steps):
         """Group streaming steps together."""
@@ -286,12 +283,12 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         return groups
 
-    def _run_step_on_spark(self, step, step_num):
+    def _run_step_on_spark(self, step, step_num, last_step_num=None):
         if self._opts['upload_archives'] and self._spark_master() != 'yarn':
             log.warning('Spark master %r will probably ignore archives' %
                         self._spark_master())
 
-        spark_submit_args = self._args_for_spark_step(step_num)
+        spark_submit_args = self._args_for_spark_step(step_num, last_step_num)
 
         env = dict(os.environ)
         env.update(self._spark_cmdenv(step_num))
@@ -302,13 +299,31 @@ class SparkMRJobRunner(MRJobBinRunner):
         if returncode:
             reason = str(CalledProcessError(returncode, spark_submit_args))
             raise StepFailedException(
-                reason=reason, step_num=step_num,
+                reason=reason, step_num=step_num, last_step_num=last_step_num,
                 num_steps=self._num_steps())
 
-    def _run_streaming_steps_in_harness(self, steps, step_num, last_step_num):
-        raise NotImplementedError
+    def _spark_script_args(self, step_num, last_step_num=None):
+         step = self._get_step(step_num)
 
-# TODO: check for bad streaming scripts (similar to inline runner)
-#       temporarily reject Hadoop input and output formats
-#       (or just make a comment, this is pending)
-# TODO: implement _run_streaming_steps_in_harness()
+         if step['type'] != 'streaming':
+             return super(SparkMRJobRunner, self)._spark_script_args(
+                 step_num, last_step_num)
+
+         # convert streaming step to call to Spark harness
+
+         # add class, INPUT, OUTPUT
+
+         # add --job-args: self._mrjob_extra_args()
+
+         # handle compression
+
+         # pass in step range (unless it's the entire job)
+
+         raise NotImplementedError
+
+    def _spark_harness_path(self):
+        """Where to find the Spark harness."""
+        path = mrjob_spark_harness.__file__
+        if __file__.endswith('.pyc'):
+            path = path[:-1]
+        return path

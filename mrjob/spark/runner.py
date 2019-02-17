@@ -40,6 +40,7 @@ from mrjob.setup import UploadDirManager
 from mrjob.spark import mrjob_spark_harness
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
+from mrjob.util import _create_zip_file
 
 log = logging.getLogger(__name__)
 
@@ -97,8 +98,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         # keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
 
-        # a copy of self._mrjob_script_script with a unique module name
-        self._job_script_copy = None
+        # where to store a .zip file containing the MRJob, with a unique
+        # module name
+        self._job_script_zip_path = None
 
         # could raise an exception if *hadoop_input_format* and
         # *hadoop_output_format* are set, but support for these these will be
@@ -137,8 +139,6 @@ class SparkMRJobRunner(MRJobBinRunner):
 
     def _run(self):
         self.get_spark_submit_bin()  # find spark-submit up front
-        if self._has_streaming_steps():
-            self._get_job_script_copy()  # add to working dir
         self._create_setup_wrapper_scripts()
         self._add_job_files_for_upload()
         self._upload_local_files()
@@ -211,49 +211,37 @@ class SparkMRJobRunner(MRJobBinRunner):
             log.debug('  %s -> %s' % (src_path, uri))
             self.fs.put(src_path, uri)
 
-    # copying mr_job_script
-    #
-    # The Spark harness runs MRJobs based on their module and class name.
-    # The easiest way to ensure that the MRJob has the same module name
-    # in both the driver and the executor is for the module to be at the top
-    # level (not in a package) and have a unique name. We put a copy of
-    # the MRJob script in a subdirectory of the temp directory, and then
-    # upload a copy of it into the working directory inside Spark.
+    # making mr_job_script visible in Spark
 
     def _job_script_module_name(self):
         """A unique module name to use with the MRJob script."""
         return re.sub(r'[^\w\d]', '_', self._job_key)
 
-    def _get_job_script_dir(self):
-        """Name of directory containing copy of MRJob script, to add
-        to ``$PYTHONPATH`` when running streaming steps.
-        """
-        path = os.path.join(self._get_local_tmp_dir(), 'job_script')
-        if not os.path.exists(path):
-            os.mkdir(path)
+    def _create_job_script_zip(self):
+        if not self._job_script_zip_path:
+            zip_path = os.path.join(self._get_local_tmp_dir(), 'script.zip')
+            name_in_zip = self._job_script_module_name() + '.py'
 
-        return path
+            log.debug('archiving %s -> %s as %s' % (
+                self._script_path, zip_path, name_in_zip))
+            with _create_zip_file(zip_path) as zip_file:
+                zip_file.write(self._script_path, arcname=name_in_zip)
 
-    def _get_job_script_copy(self):
-        """Get the path to the copy of the MRJob script, which will be inside
-        :py:meth:`_get_job_script_dir`.
+            self._job_script_zip_path = zip_path
 
-        This automatically adds the copy to :py:attr:`_spark_files` and
-        :py:attr:`_working_dir_mgr`.
-        """
-        if not self._job_script_copy:
-            filename = '%s.py' % self._job_script_module_name()
-            dest = os.path.join(self._get_job_script_dir(), filename)
+        return self._job_script_zip_path
 
-            log.debug('  copying %s -> %s' % (self._script_path, dest))
-            copy2(self._script_path, dest)
+    def _py_files(self):
+        """Patch in :py:attr:`_job_script_zip_path`, if running streaming
+        steps."""
+        py_files = super(SparkMRJobRunner, self)._py_files()
 
-            self._spark_files.append([filename, dest])
-            self._working_dir_mgr.add('file', dest, filename)
+        if self._has_streaming_steps():
+            py_files.append(self._create_job_script_zip())
 
-            self._mrjob_script_copy = dest
+        return py_files
 
-        return self._mrjob_script_copy
+    # running the job
 
     def _run_steps_on_spark(self):
         steps = self._get_steps()
@@ -306,15 +294,6 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         env = dict(os.environ)
         env.update(self._spark_cmdenv(step_num))
-
-        # in local master there is no working dir, so update PYTHONPATH so we
-        # can find our copy of the mrjob script. Oddly, local-cluster mode
-        # appears to need this as well
-        master = self._spark_master() or 'local'
-        if master.startswith('local'):
-            env = combine_local_envs(
-                env,
-                dict(PYTHONPATH=self._get_job_script_dir()))
 
         returncode = self._run_spark_submit(spark_submit_args, env,
                                             record_callback=_log_log4j_record)

@@ -132,7 +132,7 @@ class ArgsForSparkStepTestCase(GenericLocalRunnerTestCase):
             self.mock_get_spark_submit_bin.assert_called_once_with()
             self.mock_spark_submit_args.assert_called_once_with(step_num)
             self.mock_spark_script_path.assert_called_once_with(step_num)
-            self.mock_spark_script_args.assert_called_once_with(step_num)
+            self.mock_spark_script_args.assert_called_once_with(step_num, None)
 
     def test_step_0(self):
         self._test_step(0)

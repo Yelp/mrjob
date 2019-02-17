@@ -968,9 +968,6 @@ class MRJobBinRunner(MRJobRunner):
         the given spark or spark_script step."""
         step = self._get_step(step_num)
 
-        if not _is_spark_step_type(step['type']):
-            raise TypeError('non-Spark step: %r' % step)
-
         args = []
 
         # add --master

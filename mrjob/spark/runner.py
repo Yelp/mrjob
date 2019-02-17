@@ -20,7 +20,9 @@ from subprocess import CalledProcessError
 from tempfile import gettempdir
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.compat import jobconf_from_dict
 from mrjob.conf import combine_dicts
+from mrjob.conf import combine_local_envs
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import google as google_libs_installed
@@ -37,6 +39,7 @@ from mrjob.runner import _symlink_or_copy
 from mrjob.setup import UploadDirManager
 from mrjob.spark import mrjob_spark_harness
 from mrjob.step import StepFailedException
+from mrjob.util import cmd_line
 
 log = logging.getLogger(__name__)
 
@@ -69,7 +72,15 @@ class SparkMRJobRunner(MRJobBinRunner):
         'spark', 'spark_jar', 'spark_script', 'streaming',
     }
 
-    def __init__(self, **kwargs):
+    def __init__(self, mrjob_cls=None, **kwargs):
+        """Create a spark runner
+
+        :param mrjob_cls: class of the job you want to run. Used for
+                          running streaming steps in Spark
+        """
+        # need to set this before checking steps in superclass __init__()
+        self._mrjob_cls = mrjob_cls
+
         super(SparkMRJobRunner, self).__init__(**kwargs)
 
         self._spark_tmp_dir = self._pick_spark_tmp_dir()
@@ -112,6 +123,10 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         # we don't currently support commands, but we *could* (see #1956).
         if step['type'] == 'streaming':
+            if not self._mrjob_cls:
+                raise ValueError(
+                    'You must set mrjob_cls to run streaming steps')
+
             for mrc in ('mapper', 'combiner', 'reducer'):
                 if step.get(mrc):
                     if 'command' in step[mrc] or 'pre_filter' in step[mrc]:
@@ -217,7 +232,8 @@ class SparkMRJobRunner(MRJobBinRunner):
         to ``$PYTHONPATH`` when running streaming steps.
         """
         path = os.path.join(self._get_local_tmp_dir(), 'job_script')
-        os.mkdir(path)
+        if not os.path.exists(path):
+            os.mkdir(path)
 
         return path
 
@@ -293,6 +309,11 @@ class SparkMRJobRunner(MRJobBinRunner):
         env = dict(os.environ)
         env.update(self._spark_cmdenv(step_num))
 
+        if self._spark_master_is_local():
+            env = combine_local_envs(
+                env,
+                dict(PYTHONPATH=self._get_job_script_dir()))
+
         returncode = self._run_spark_submit(spark_submit_args, env,
                                             record_callback=_log_log4j_record)
 
@@ -302,28 +323,71 @@ class SparkMRJobRunner(MRJobBinRunner):
                 reason=reason, step_num=step_num, last_step_num=last_step_num,
                 num_steps=self._num_steps())
 
+    def _spark_script_path(self, step_num):
+        """For streaming steps, return the path of the harness script
+        (and handle other spark step types the usual way)."""
+        step = self._get_step(step_num)
+
+        if step['type'] == 'streaming':
+            return self._spark_harness_path()
+        else:
+            return super(SparkMRJobRunner, self)._spark_script_path(step_num)
+
     def _spark_script_args(self, step_num, last_step_num=None):
-         step = self._get_step(step_num)
+        """Generate spark harness args for streaming steps (and handle
+        other spark step types the usual way).
+        """
+        step = self._get_step(step_num)
 
-         if step['type'] != 'streaming':
-             return super(SparkMRJobRunner, self)._spark_script_args(
-                 step_num, last_step_num)
+        if step['type'] != 'streaming':
+            return super(SparkMRJobRunner, self)._spark_script_args(
+                step_num, last_step_num)
 
-         # convert streaming step to call to Spark harness
+        if last_step_num is None:
+            last_step_num = step_num
 
-         # add class, INPUT, OUTPUT
+        args = []
 
-         # add --job-args: self._mrjob_extra_args()
+        # class name
+        args.append('%s.%s' % (self._job_script_module_name(),
+                               self._mrjob_cls.__name__))
 
-         # handle compression
+        # INPUT
+        args.append(
+            ','.join(self._step_input_uris(step_num)))
 
-         # pass in step range (unless it's the entire job)
+        # OUTPUT
+        # note that we use the output dir for the *last* step
+        args.append(
+            self._step_output_uri(last_step_num))
 
-         raise NotImplementedError
+        # --first-step-num, --last-step-num, step range
+        if not (step_num == 0 and last_step_num == self._num_steps() - 1):
+            # don't bother with these when running entire job (common case)
+            args.extend(['--first-step-num', step_num,
+                         '--last_step_num', step_num])
+
+        # --job-args (passthrough args)
+        job_args = self._mr_job_extra_args()
+        if job_args:
+            args.extend(['--job-args', cmd_line(job_args)])
+
+        # --compression-codec
+        jobconf = self._jobconf_for_step(step_num)
+
+        compress_conf = jobconf_from_dict(
+            jobconf, 'mapreduce.map.output.compress')
+        codec_conf = jobconf_from_dict(
+            jobconf, 'mapreduce.map.output.compress.codec')
+
+        if compress_conf and compress_conf != 'false' and codec_conf:
+            args.extend(['--compression-codec', codec_conf])
+
+        return args
 
     def _spark_harness_path(self):
         """Where to find the Spark harness."""
         path = mrjob_spark_harness.__file__
-        if __file__.endswith('.pyc'):
+        if path.endswith('.pyc'):
             path = path[:-1]
         return path

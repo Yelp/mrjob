@@ -342,11 +342,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         args.append(
             self._step_output_uri(last_step_num))
 
-        # --first-step-num, --last-step-num, step range
-        if not (step_num == 0 and last_step_num == self._num_steps() - 1):
-            # don't bother with these when running entire job (common case)
-            args.extend(['--first-step-num', step_num,
-                         '--last_step_num', step_num])
+        # --first-step-num, --last-step-num (step range)
+        args.extend(['--first-step-num', str(step_num),
+                     '--last-step-num', str(last_step_num)])
 
         # --job-args (passthrough args)
         job_args = self._mr_job_extra_args()

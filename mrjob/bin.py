@@ -1029,14 +1029,6 @@ class MRJobBinRunner(MRJobRunner):
     def _spark_master(self):
         return self._opts.get('spark_master') or None
 
-    def _spark_master_is_local(self):
-        """Utility method, since this comes up so often"""
-        master = self._spark_master()
-        if master:
-            return master.startswith('local')
-        else:
-            return True  # local is the default
-
     def _spark_deploy_mode(self):
         return self._opts.get('spark_deploy_mode') or None
 

@@ -155,21 +155,18 @@ class SparkMRJobRunner(MRJobBinRunner):
 
     def _pick_spark_tmp_dir(self):
         if self._opts['spark_tmp_dir']:
-            if is_uri(self._opts['spark_tmp_dir']):
-                return posixpath.join(
-                    self._opts['spark_tmp_dir'], self._job_key)
-            else:
-                return os.path.join(
-                    self._opts['spark_tmp_dir'], self._job_key)
-        elif self._spark_master_is_local():
-            # need a local temp dir
-            # add "-spark" so we don't collide with default local temp dir
-            return os.path.join(
-                gettempdir(), self._job_key + '-spark')
+            return self.fs.join(self._opts['spark_tmp_dir'], self._job_key)
         else:
-            # use HDFS (same default as HadoopJobRunner)
-            return posixpath.join(
-                fully_qualify_hdfs_path('tmp/mrjob'), self._job_key)
+            master = self._spark_master() or 'local'
+            if master.startswith('local'):  # including local-cluster
+                # need a local temp dir
+                # add "-spark" so we don't collide with default local temp dir
+                return os.path.join(
+                    gettempdir(), self._job_key + '-spark')
+            else:
+                # use HDFS (same default as HadoopJobRunner)
+                return posixpath.join(
+                    fully_qualify_hdfs_path('tmp/mrjob'), self._job_key)
 
     def _default_step_output_dir(self):
         return posixpath.join(self._spark_tmp_dir, 'step-output')
@@ -310,7 +307,11 @@ class SparkMRJobRunner(MRJobBinRunner):
         env = dict(os.environ)
         env.update(self._spark_cmdenv(step_num))
 
-        if self._spark_master_is_local():
+        # in local master there is no working dir, so update PYTHONPATH so we
+        # can find our copy of the mrjob script. Oddly, local-cluster mode
+        # appears to need this as well
+        master = self._spark_master() or 'local'
+        if master.startswith('local'):
             env = combine_local_envs(
                 env,
                 dict(PYTHONPATH=self._get_job_script_dir()))

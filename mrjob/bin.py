@@ -1003,7 +1003,9 @@ class MRJobBinRunner(MRJobRunner):
         args.extend(self._spark_upload_args())
 
         # --py-files (Python only)
-        if step['type'] in ('spark', 'spark_script'):
+        # spark runner can run 'streaming' steps, so just exclude
+        # non-Python steps
+        if 'jar' not in step['type']:
             py_file_uris = self._py_files()
 
             if self._upload_mgr:

@@ -16,6 +16,7 @@ import logging
 import os.path
 import posixpath
 import re
+from shutil import copy2
 from subprocess import CalledProcessError
 from tempfile import gettempdir
 
@@ -35,7 +36,6 @@ from mrjob.fs.s3 import _is_permanent_boto3_error
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
-from mrjob.runner import _symlink_or_copy
 from mrjob.setup import UploadDirManager
 from mrjob.spark import mrjob_spark_harness
 from mrjob.step import StepFailedException
@@ -248,7 +248,8 @@ class SparkMRJobRunner(MRJobBinRunner):
             filename = '%s.py' % self._job_script_module_name()
             dest = os.path.join(self._get_job_script_dir(), filename)
 
-            _symlink_or_copy(self._script_path, dest)
+            log.debug('  copying %s -> %s' % (self._script_path, dest))
+            copy2(self._script_path, dest)
 
             self._spark_files.append([filename, dest])
             self._working_dir_mgr.add('file', dest, filename)

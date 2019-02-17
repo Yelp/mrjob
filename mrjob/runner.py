@@ -26,8 +26,6 @@ import re
 import sys
 import tarfile
 import tempfile
-from shutil import copy2
-from shutil import copytree
 from shutil import rmtree
 
 from mrjob.compat import translate_jobconf
@@ -1191,22 +1189,27 @@ class MRJobRunner(object):
         return self._upload_args_helper('-files', None, '-archives', None)
 
     def _upload_args_helper(
-            self, files_opt_str, files, archives_opt_str, archives):
+            self, files_opt_str, files, archives_opt_str, archives,
+            always_use_hash=True):
         args = []
 
-        file_hash_paths = list(self._arg_hash_paths('file', files))
+        file_hash_paths = list(
+            self._arg_hash_paths('file', files,
+                                 always_use_hash=always_use_hash))
         if file_hash_paths:
             args.append(files_opt_str)
             args.append(','.join(file_hash_paths))
 
-        archive_hash_paths = list(self._arg_hash_paths('archive', archives))
+        archive_hash_paths = list(
+            self._arg_hash_paths('archive', archives,
+                                 always_use_hash=always_use_hash))
         if archive_hash_paths:
             args.append(archives_opt_str)
             args.append(','.join(archive_hash_paths))
 
         return args
 
-    def _arg_hash_paths(self, type, named_paths=None):
+    def _arg_hash_paths(self, type, named_paths=None, always_use_hash=True):
         """Helper function for the *upload_args methods."""
         if named_paths is None:
             # just return everything managed by _working_dir_mgr
@@ -1222,7 +1225,10 @@ class MRJobRunner(object):
             else:
                 uri = path
 
-            yield '%s#%s' % (uri, name)
+            if not always_use_hash and _basename(uri) == name:
+                yield uri
+            else:
+                yield '%s#%s' % (uri, name)
 
     def _write_script(self, lines, path, description):
         """Write text of a setup script, input manifest, etc. to the given
@@ -1317,25 +1323,8 @@ def _runner_class(alias):
         raise ValueError('bad runner alias: %s' % alias)
 
 
-
-# used by sim runners and Spark runner
-def _symlink_or_copy(path, dest):
-    """Symlink from *dest* to *path*, using relative paths if possible.
-
-    If symlinks aren't available, copy path to dest instead.
-    """
-    if hasattr(os, 'symlink'):
-        log.debug('creating symlink %s <- %s' % (path, dest))
-        try:
-            os.symlink(
-                os.path.relpath(path, os.path.dirname(dest)),
-                dest)
-            return
-        except OSError as ex:
-            log.debug('  %s' % ex)
-
-    log.debug('copying %s -> %s' % (dest, path))
-    if os.path.isdir(path):
-        copytree(path, dest)
+def _basename(path_or_uri):
+    if is_uri(path_or_uri):
+        return posixpath.basename(path_or_uri)
     else:
-        copy2(path, dest)
+        return os.path.basename(path_or_uri)

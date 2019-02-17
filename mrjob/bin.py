@@ -1041,12 +1041,16 @@ class MRJobBinRunner(MRJobRunner):
     def _spark_upload_args(self):
         # if using a setup script, upload all files to working dir
         if self._spark_python_wrapper_path:
-            return self._upload_args_helper('--files', None,
-                                            '--archives', None)
+            return self._upload_args_helper(
+                '--files', None,
+                '--archives', None,
+                always_use_hash=False)
         else:
             # otherwise, just pass through --files and --archives
-            return self._upload_args_helper('--files', self._spark_files,
-                                            '--archives', self._spark_archives)
+            return self._upload_args_helper(
+                '--files', self._spark_files,
+                '--archives', self._spark_archives,
+                always_use_hash=False)
 
     def _spark_script_path(self, step_num):
         """The path of the spark script or JAR, used by

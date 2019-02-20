@@ -135,10 +135,20 @@ def _run_mapper(mapper_job, rdd):
 
     m_read, m_write = mapper_job.pick_protocols(step_num, 'mapper')
 
-    # run the mapper
+    # decode lines into key-value pairs
+    #
+    # line -> (k, v)
     rdd = rdd.map(m_read)
+
+    # run each partition through map_pairs()
+    #
+    # (k, v), ... -> (k, v), ...
     rdd = rdd.mapPartitions(
         lambda pairs: mapper_job.map_pairs(pairs, step_num))
+
+    # encode key-value pairs back into lines
+    #
+    # (k, v) -> line
     rdd = rdd.map(lambda k_v: m_write(*k_v))
 
     return rdd
@@ -160,7 +170,9 @@ def _run_combiner(combiner_job, rdd, sort_values=False):
 
     c_read, c_write = combiner_job.pick_protocols(step_num, 'combiner')
 
-    # run the combiner
+    # decode lines into key-value pairs
+    #
+    # line -> (k, v)
     rdd = rdd.map(c_read)
 
     # The common case for MRJob combiners is to yield a single key-value pair
@@ -176,11 +188,14 @@ def _run_combiner(combiner_job, rdd, sort_values=False):
             pairs1.extend(pairs2)
             return pairs1
 
-    # Spark's combineByKey() only looks at values, but MRJob combiners
-    # expect to know the key as well. So include the key in our "values"
+    # include key in "value", so MRJob combiner can see it
+    #
+    # (k, v) -> (k, (k, v))
     rdd = rdd.map(lambda k_v: (k_v[0], k_v))
 
     # :py:meth:`pyspark.RDD.combineByKey()`, where the magic happens.
+    #
+    # (k, (k, v)), ... -> (k, ([(k, v1), (k, v2), ...]))
     #
     # Our "values" are key-value pairs, and our "combined values" are lists of
     # key-value pairs (single-item lists in the common case).
@@ -192,10 +207,16 @@ def _run_combiner(combiner_job, rdd, sort_values=False):
         mergeValue=lambda k_v_list, k_v: combiner_helper(k_v_list, [k_v]),
         mergeCombiners=combiner_helper,
     )
-    # encode our lists of key-value pairs back into lists of lines
+
+    # encode lists of key-value pairs into lists of lines
+    #
+    # (k, ([(k, v1), (k, v2), ...])) -> (k, [line1, line2, ...])
     rdd = rdd.mapValues(
         lambda pairs: [c_write(*pair) for pair in pairs])
-    # throw away the key and just get lists of lines
+
+    # free the lines!
+    #
+    # (k, [line1, line2, ...]) -> line1, line2, ...
     rdd = _discard_key_and_flatten_values(rdd, sort_values=sort_values)
 
     return rdd
@@ -234,10 +255,22 @@ def _run_reducer(reducer_job, rdd, sort_values=False):
 
     r_read, r_write = reducer_job.pick_protocols(step_num, 'reducer')
 
-    # run the reducer
-    rdd = rdd.map(r_read)
+    # decode lines into key-value pairs (keeping partitions the same)
+    #
+    # line -> (k, v)
+    rdd = rdd.map(r_read, preservesPartitioning=True)
+
+    # run each partition through reducer_pairs(). because we carefully
+    # preserved partitioning, all values belonging to the same key will
+    # be fed to the same call of reducer_pairs()
+    #
+    # (k, v), ... -> (k, v), ...
     rdd = rdd.mapPartitions(
         lambda pairs: reducer_job.reduce_pairs(pairs, step_num))
+
+    # encode key-value pairs back into lines
+    #
+    # (k, v) -> line
     rdd = rdd.map(lambda k_v: r_write(*k_v))
 
     return rdd
@@ -250,12 +283,16 @@ def _discard_key_and_flatten_values(rdd, sort_values=False):
     Given an RDD containing (key, [line1, line2, ...]), discard *key*
     and return an RDD containing line1, line2, ...
 
+    Guarantees that lines in the same list will end up in the same partition.
+
     If *sort_values* is true, sort each list of lines before flattening it.
     """
     if sort_values:
-        return rdd.flatMap(lambda key_and_lines: sorted(key_and_lines[1]))
+        map_f = lambda key_and_lines: sorted(key_and_lines[1])
     else:
-        return rdd.flatMap(lambda key_and_lines: key_and_lines[1])
+        map_f = lambda key_and_lines: key_and_lines[1]
+
+    return rdd.flatMap(map_f, preservesPartitioning=True)
 
 
 def _check_step(step_desc, step_num):

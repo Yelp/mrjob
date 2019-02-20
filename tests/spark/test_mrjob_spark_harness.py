@@ -22,6 +22,9 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.protocol import TextProtocol
 from mrjob.spark import mrjob_spark_harness
 from mrjob.spark.mr_spark_harness import MRSparkHarness
+from mrjob.spark.mrjob_spark_harness import _run_combiner
+from mrjob.spark.mrjob_spark_harness import _run_reducer
+from mrjob.spark.mrjob_spark_harness import _shuffle_and_sort
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.util import cmd_line
@@ -33,6 +36,8 @@ from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_freq_count_with_combiner_cmd import \
      MRWordFreqCountWithCombinerCmd
+from tests.py2 import Mock
+from tests.py2 import call
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
 
@@ -357,3 +362,114 @@ class SparkHarnessOutputComparisonTestCase(
 
         self._assert_output_matches(
             MRWordFreqCountWithCombinerCmd, input_bytes=input_bytes)
+
+
+class PreservesPartitioningTestCase(SandboxedTestCase):
+
+    # ensure that Spark doesn't repartition values once they're grouped
+    # by key.
+    #
+    # unfortunately, it's hard to "catch" Spark re-partitioning (espeically
+    # since our code doesn't give it a good reason to re-partition), so we
+    # instead use mocks and check that the RDD was called with
+    # preservesPartitioning=True when necessary
+
+    def mock_rdd(self):
+        """Make a mock RDD that returns itself."""
+        method_names = [
+            'combineByKey',
+            'flatMap',
+            'groupBy',
+            'map',
+            'mapPartitions',
+            'mapValues',
+        ]
+
+        rdd = Mock(spec=method_names)
+
+        for name in method_names:
+            getattr(rdd, name).return_value = rdd
+
+        return rdd
+
+    def test_run_combiner_with_sort_values(self):
+        self._test_run_combiner(sort_values=True)
+
+    def test_run_combiner_without_sort_values(self):
+        self._test_run_combiner(sort_values=False)
+
+    def _test_run_combiner(self, sort_values):
+        rdd = self.mock_rdd()
+
+        combiner_job = Mock()
+        combiner_job.pick_protocols.return_value = (Mock(), Mock())
+
+        final_rdd = _run_combiner(combiner_job, rdd)
+        self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
+
+        # check that we always preserve partitioning after combineByKey()
+        rdd.combineByKey.assert_called()
+
+        after_combineByKey = False
+        for name, args, kwargs in rdd.method_calls:
+            if after_combineByKey:
+                # mapValues() doesn't have to use preservesPartitioning
+                # because it's just encoding the list of all values for a key
+                if name == 'mapValues':
+                    # check that mapValues() is mapping a list to a list
+                    # of the same size
+                    f = args[0]
+                    f_of_values = f([('k', 'v1'), ('k', 'v2')])
+                    self.assertEqual(type(f_of_values), list)
+                    self.assertEqual(len(f_of_values), 2)
+                    self.assertRaises(TypeError, 123)
+                else:
+                    self.assertEqual(kwargs.get('preservesPartitioning'), True)
+            elif name == 'combineByKey':
+                after_combineByKey = True
+
+        # sanity-check that we found the call to combineByKey()
+        self.assertTrue(after_combineByKey)
+
+    def test_shuffle_and_sort_with_sort_values(self):
+        self._test_shuffle_and_sort(sort_values=True)
+
+    def test_shuffle_and_sort_without_sort_values(self):
+        self._test_shuffle_and_sort(sort_values=False)
+
+    def _test_shuffle_and_sort(self, sort_values):
+        rdd = self.mock_rdd()
+
+        final_rdd = _shuffle_and_sort(rdd)
+        self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
+
+        # check that we always preserve partitioning after groupBy()
+        rdd.groupBy.assert_called()
+
+        after_groupBy = False
+        for name, args, kwargs in rdd.method_calls:
+            if after_groupBy:
+                self.assertEqual(kwargs.get('preservesPartitioning'), True)
+            elif name == 'groupBy':
+                after_groupBy = True
+
+        # sanity-check that we found the call to groupBy()
+        self.assertTrue(after_groupBy)
+
+    def test_run_reducer(self):
+        rdd = self.mock_rdd()
+
+        reducer_job = Mock()
+        reducer_job.pick_protocols.return_value = (Mock(), Mock())
+
+        final_rdd = _run_reducer(reducer_job, rdd)
+        self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
+
+        # check that we preserve partitions until mapPartitions() is called
+        rdd.mapPartitions.assert_called()
+
+        for name, args, kwargs in rdd.method_calls:
+            if name == 'mapPartitions':
+                break
+            else:
+                self.assertEqual(kwargs.get('preservesPartitioning'), True)

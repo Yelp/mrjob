@@ -249,7 +249,7 @@ def _shuffle_and_sort(rdd, sort_values=False):
     return rdd
 
 
-def _run_reducer(reducer_job, rdd, sort_values=False):
+def _run_reducer(reducer_job, rdd):
     """Run our job's combiner, and group lines with the same key together.
 
     :param reducer_job: an instance of our job, instantiated to be the mapper

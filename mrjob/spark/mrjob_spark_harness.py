@@ -105,6 +105,14 @@ def _run_step(step, step_num, rdd, make_job):
         for mrc in ('mapper', 'reducer', 'combiner')
     )
 
+    # if combiner runs subprocesses, skip it. (:py:func:`_check_step`
+    # already screens out mappers and reducers that do, but combiners
+    # are optional)
+    try:
+        _check_substep(step_desc, step_num, 'combiner')
+    except NotImplementedError:
+        combiner_job = None
+
     # is SORT_VALUES enabled?
     sort_values = reducer_job.sort_values() if reducer_job else False
 
@@ -308,20 +316,25 @@ def _check_step(step_desc, step_num):
             'step %d uses an input manifest, which is unsupported')
 
     for mrc in ('mapper', 'reducer'):
-        # bad combiners won't cause an error because they're optional
-        substep_desc = step_desc.get(mrc)
-        if not substep_desc:
-            continue
+        _check_substep(step_desc, step_num, mrc)
 
-        if substep_desc.get('type') != 'script':
-            raise NotImplementedError(
-                "step %d's %s has unexpected type: %r" % (
-                    step_num, mrc, substep_desc.get('type')))
 
-        if substep_desc.get('pre_filter'):
-            raise NotImplementedError(
-                "step %d's %s has pre-filter, which is unsupported" % (
-                    step_num, mrc))
+def _check_substep(step_desc, step_num, mrc):
+    """Raise :py:class:`NotImplementedError` if the given substep
+    (e.g. ``'mapper'``) runs subprocesses."""
+    substep_desc = step_desc.get(mrc)
+    if not substep_desc:
+        return
+
+    if substep_desc.get('type') != 'script':
+        raise NotImplementedError(
+            "step %d's %s has unexpected type: %r" % (
+                step_num, mrc, substep_desc.get('type')))
+
+    if substep_desc.get('pre_filter'):
+        raise NotImplementedError(
+            "step %d's %s has pre-filter, which is unsupported" % (
+                step_num, mrc))
 
 
 def _make_arg_parser():

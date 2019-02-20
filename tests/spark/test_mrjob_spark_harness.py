@@ -31,6 +31,8 @@ from tests.mr_doubler import MRDoubler
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_word_freq_count_with_combiner_cmd import \
+     MRWordFreqCountWithCombinerCmd
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
 
@@ -160,10 +162,19 @@ class SparkHarnessOutputComparisonTestCase(
     def _assert_output_matches(
             self, job_class, input_bytes=b'', input_paths=(), job_args=[]):
 
+        # run classes defined in this module in inline mode, classes
+        # with their own script files in local mode. used by
+        # test_skip_combiner_that_runs_cmd()
+        if job_class.__module__ == __name__:
+            runner_alias = 'inline'
+        else:
+            runner_alias = 'local'
+
         reference_job = self._reference_job(
             job_class, input_bytes=input_bytes,
             input_paths=input_paths,
-            job_args=job_args)
+            job_args=job_args,
+            runner_alias=runner_alias)
 
         with reference_job.make_runner() as runner:
             runner.run()
@@ -293,7 +304,7 @@ class SparkHarnessOutputComparisonTestCase(
         expected_str = MRWordFreqCountFailingCombiner.unique_exception_str
         assert expected_str in exception_text
 
-    def test_combiner_yields_two_values(self):
+    def test_combiner_that_yields_two_values(self):
         input_bytes = b'one two three one two three one two three'
 
         job = self._harness_job(MRWordFreqCountCombinerYieldsTwo,
@@ -316,7 +327,7 @@ class SparkHarnessOutputComparisonTestCase(
                 dict(job.parse_output(runner.cat_output())),
                 dict(one=1003, two=1003, three=1003))
 
-    def test_combiner_yields_zero_values(self):
+    def test_combiner_that_yields_zero_values(self):
         input_bytes = b'a b c\na b c\na b c\na b c'
 
         job = self._harness_job(MRWordFreqCountCombinerYieldsZero,
@@ -329,7 +340,7 @@ class SparkHarnessOutputComparisonTestCase(
                 dict(),
             )
 
-    def test_combiner_sometimes_yields_zero_values(self):
+    def test_combiner_that_sometimes_yields_zero_values(self):
         # a more plausible test of a combiner that sometimes doesn't yield a
         # value that we can compare to the reference job
         input_bytes = b'\n'.join([
@@ -341,5 +352,8 @@ class SparkHarnessOutputComparisonTestCase(
 
         self._assert_output_matches(MRSumValuesByWord, input_bytes=input_bytes)
 
+    def test_skip_combiner_that_runs_cmd(self):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
 
-# TODO: add back a test of the bare Harness script in local mode (slow)
+        self._assert_output_matches(
+            MRWordFreqCountWithCombinerCmd, input_bytes=input_bytes)

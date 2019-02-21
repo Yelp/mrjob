@@ -413,6 +413,9 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         after_combineByKey = False
         for name, args, kwargs in rdd.method_calls:
             if after_combineByKey:
+                if '.' in name:
+                    continue  # Python 3.4/3.5 tracks groupBy.assert_called()
+
                 # mapValues() doesn't have to use preservesPartitioning
                 # because it's just encoding the list of all values for a key
                 if name == 'mapValues':
@@ -449,6 +452,11 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         after_groupBy = False
         for name, args, kwargs in rdd.method_calls:
             if after_groupBy:
+                if '.' in name:
+                    continue  # Python 3.4/3.5 tracks groupBy.assert_called()
+
+                if not kwargs.get('preservesPartitioning'):
+                    import pdb; pdb.set_trace()
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
             elif name == 'groupBy':
                 after_groupBy = True

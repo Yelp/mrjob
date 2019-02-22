@@ -21,6 +21,7 @@ try:
 except ImportError:
     pyspark = None
 
+from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.parse import is_uri
 from mrjob.spark.runner import SparkMRJobRunner
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
@@ -29,7 +30,6 @@ from mrjob.examples.mr_sparkaboom import MRSparKaboom
 from mrjob.step import StepFailedException
 from mrjob.util import safeeval
 from mrjob.util import to_lines
-
 
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_google import MockGoogleTestCase
@@ -142,7 +142,7 @@ class SparkPyFilesTestCase(MockFilesystemsTestCase):
 
 
 @skipIf(pyspark is None, 'no pyspark module')
-class SparkRunnerSparkTestCase(MockFilesystemsTestCase):
+class SparkRunnerSparkStepsTestCase(MockFilesystemsTestCase):
     # these tests are slow (~20s) because they run on actual Spark
 
     def test_spark_mrjob(self):
@@ -189,3 +189,28 @@ class SparkRunnerSparkTestCase(MockFilesystemsTestCase):
             blue=1, fish=4, one=1, red=1, two=1))
 
     # TODO: add a Spark JAR to the repo, so we can test it
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
+    # test that the spark harness works as expected.
+    #
+    # this runs tests similar to those in SparkHarnessOutputComparisonTestCase
+    # in tests/spark/test_mrjob_spark_harness.py. The spark runner
+    # can't run Spark jobs inline through pyspark, so we try to be selective
+    # about tests we run since they take longer through spark-submit
+
+    def test_basic_job(self):
+        job = MRWordFreqCount(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(
+            b'one fish\ntwo fish\nred fish\nblue fish\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(output, dict(blue=1, fish=4, one=1, red=1, two=1))
+
+
+# going to need tests of uploading files once we fix #1922

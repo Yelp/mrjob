@@ -407,32 +407,34 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         final_rdd = _run_combiner(combiner_job, rdd)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
-        # check that we always preserve partitioning after combineByKey()
-        rdd.combineByKey.assert_called()
-
-        after_combineByKey = False
+        # check that we preserve partitions after calling combineByKey()
+        #
+        # Python 3.4 and 3.5's mock modules have slightly different ways
+        # of tracking function calls. to work around this, we avoid calling
+        # assert_called() and just inspect `method_calls` directly
+        called_combineByKey = False
         for name, args, kwargs in rdd.method_calls:
-            if after_combineByKey:
-                if '.' in name:
-                    continue  # Python 3.4/3.5 tracks groupBy.assert_called()
-
+            if called_combineByKey:
                 # mapValues() doesn't have to use preservesPartitioning
                 # because it's just encoding the list of all values for a key
                 if name == 'mapValues':
-                    # check that mapValues() is mapping a list to a list
-                    # of the same size
                     f = args[0]
-                    f_of_values = f([('k', 'v1'), ('k', 'v2')])
-                    self.assertEqual(type(f_of_values), list)
-                    self.assertEqual(len(f_of_values), 2)
-                    self.assertRaises(TypeError, 123)
+                    self._assert_maps_list_to_list_of_same_size(f)
                 else:
                     self.assertEqual(kwargs.get('preservesPartitioning'), True)
             elif name == 'combineByKey':
-                after_combineByKey = True
+                called_combineByKey = True
 
-        # sanity-check that we found the call to combineByKey()
-        self.assertTrue(after_combineByKey)
+        # check that combineByKey() was actually called
+        self.assertTrue(called_combineByKey)
+
+    def _assert_maps_list_to_list_of_same_size(self, f):
+        # used by _test_run_combiner() to ensure that our call to
+        # mapValues() doesn't split keys between partitions
+        f_of_values = f([('k', 'v1'), ('k', 'v2')])
+        self.assertEqual(type(f_of_values), list)
+        self.assertEqual(len(f_of_values), 2)
+        self.assertRaises(TypeError, 123)
 
     def test_shuffle_and_sort_with_sort_values(self):
         self._test_shuffle_and_sort(sort_values=True)
@@ -447,11 +449,9 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         # check that we always preserve partitioning after groupBy()
-        rdd.groupBy.assert_called()
-
-        after_groupBy = False
+        called_groupBy = False
         for name, args, kwargs in rdd.method_calls:
-            if after_groupBy:
+            if called_groupBy:
                 if '.' in name:
                     continue  # Python 3.4/3.5 tracks groupBy.assert_called()
 
@@ -459,10 +459,10 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
                     import pdb; pdb.set_trace()
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
             elif name == 'groupBy':
-                after_groupBy = True
+                called_groupBy = True
 
-        # sanity-check that we found the call to groupBy()
-        self.assertTrue(after_groupBy)
+        # check that groupBy() was actually called
+        self.assertTrue(called_groupBy)
 
     def test_run_reducer(self):
         rdd = self.mock_rdd()
@@ -473,11 +473,13 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         final_rdd = _run_reducer(reducer_job, rdd)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
-        # check that we preserve partitions until mapPartitions() is called
-        rdd.mapPartitions.assert_called()
-
+        called_mapPartitions = False
         for name, args, kwargs in rdd.method_calls:
             if name == 'mapPartitions':
-                break
+                called_mapPartitions = True
+                break  # nothing else to check
             else:
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
+
+        # sanity-check that mapPartitions() was actually called
+        self.assertTrue(called_mapPartitions)

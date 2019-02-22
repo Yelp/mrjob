@@ -96,85 +96,211 @@ def _run_step(step, step_num, rdd, make_job):
     step_desc = step.description(step_num)
     _check_step(step_desc, step_num)
 
-    # creating a separate job instances to ensure that initialization
-    # happens correctly (e.g. mapper_job.is_task() should be True).
-    # probably doesn't actually matter that we pass --step-num
+    # create a separate job instance for each substep. This contains
+    # *step_num* (in ``job.options.step_num``) and ensures that
+    # ``job.is_task()`` is set to true
     mapper_job, reducer_job, combiner_job = (
         make_job('--%s' % mrc, '--step-num=%d' % step_num)
         if step_desc.get(mrc) else None
         for mrc in ('mapper', 'reducer', 'combiner')
     )
 
-    if mapper_job is not None:
-        m_read, m_write = mapper_job.pick_protocols(step_num, 'mapper')
+    # if combiner runs subprocesses, skip it. (:py:func:`_check_step`
+    # already screens out mappers and reducers that do, but combiners
+    # are optional)
+    try:
+        _check_substep(step_desc, step_num, 'combiner')
+    except NotImplementedError:
+        combiner_job = None
 
-        # run the mapper
-        rdd = rdd.map(m_read)
-        rdd = rdd.mapPartitions(
-            lambda pairs: mapper_job.map_pairs(pairs, step_num))
-        rdd = rdd.map(lambda k_v: m_write(*k_v))
+    # is SORT_VALUES enabled?
+    sort_values = reducer_job.sort_values() if reducer_job else False
 
-    if combiner_job is not None:
-        c_read, c_write = combiner_job.pick_protocols(step_num, 'combiner')
+    if mapper_job:
+        rdd = _run_mapper(mapper_job, rdd)
 
-        # run the combiner
-        rdd = rdd.map(c_read)
+    if combiner_job:
+        # _run_combiner() includes shuffle-and-sort
+        rdd = _run_combiner(combiner_job, rdd, sort_values=sort_values)
+    elif reducer_job:
+        rdd = _shuffle_and_sort(rdd, sort_values=sort_values)
 
-        # Most combiners should return a single value per key to shrink the
-        # mapper output. If the combiner does not seem to be doing this, fall
-        # back to recreating the mapper output since Hadoop combiners are
-        # optional anyway and we do not want to run the same values through the
-        # combiner multiple times.
-        def combiner_helper(pairs1, pairs2):
-            if len(pairs1) == len(pairs2) == 1:
-                return list(
-                    combiner_job.combine_pairs(pairs1 + pairs2, step_num),
-                )
-            else:
-                pairs1.extend(pairs2)
-                return pairs1
-
-        # combine_pairs takes a list of key-value pairs; restructuring the
-        # data so that we can provide that
-        rdd = rdd.map(lambda k_v: (k_v[0], k_v))
-
-        # a shuffle is unneccesary in this case since combineByKey returns an
-        # RDD grouped by key.
-        rdd = rdd.combineByKey(
-            createCombiner=lambda k_v: [k_v],
-            mergeValue=lambda k_v_list, k_v: combiner_helper(k_v_list, [k_v]),
-            mergeCombiners=combiner_helper,
-        )
-        rdd = rdd.mapValues(
-            lambda pairs: [c_write(*pair) for pair in pairs])
-        rdd = _flatten_and_maybe_sort_keys(
-            rdd,
-            should_sort=(
-                reducer_job.sort_values() if reducer_job is not None else False
-            ))
-    elif reducer_job is not None and combiner_job is None:
-        # simulate shuffle in Hadoop Streaming
-        rdd = rdd.groupBy(lambda line: line.split(b'\t')[0])
-        rdd = _flatten_and_maybe_sort_keys(
-            rdd, should_sort=reducer_job.sort_values())
-
-    if reducer_job is not None:
-        r_read, r_write = reducer_job.pick_protocols(step_num, 'reducer')
-
-        # run the reducer
-        rdd = rdd.map(r_read)
-        rdd = rdd.mapPartitions(
-            lambda pairs: reducer_job.reduce_pairs(pairs, step_num))
-        rdd = rdd.map(lambda k_v: r_write(*k_v))
+    if reducer_job:
+        rdd = _run_reducer(reducer_job, rdd)
 
     return rdd
 
 
-def _flatten_and_maybe_sort_keys(rdd, should_sort):
-    if should_sort:
-        return rdd.flatMap(lambda key_and_lines: sorted(key_and_lines[1]))
+def _run_mapper(mapper_job, rdd):
+    """Run our job's mapper.
+
+    :param mapper_job: an instance of our job, instantiated to be the mapper
+                       for the step we wish to run
+    :param rdd: an RDD containing lines representing encoded key-value pairs
+    :return: an RDD containing lines representing encoded key-value pairs
+    """
+    step_num = mapper_job.options.step_num
+
+    m_read, m_write = mapper_job.pick_protocols(step_num, 'mapper')
+
+    # decode lines into key-value pairs
+    #
+    # line -> (k, v)
+    rdd = rdd.map(m_read)
+
+    # run each partition through map_pairs()
+    #
+    # (k, v), ... -> (k, v), ...
+    rdd = rdd.mapPartitions(
+        lambda pairs: mapper_job.map_pairs(pairs, step_num))
+
+    # encode key-value pairs back into lines
+    #
+    # (k, v) -> line
+    rdd = rdd.map(lambda k_v: m_write(*k_v))
+
+    return rdd
+
+
+def _run_combiner(combiner_job, rdd, sort_values=False):
+    """Run our job's combiner, and group lines with the same key together.
+
+    :param combiner_job: an instance of our job, instantiated to be the mapper
+                         for the step we wish to run
+    :param rdd: an RDD containing lines representing encoded key-value pairs
+    :sort_values: if true, ensure all lines corresponding to a given key
+                  are sorted (by their encoded value)
+    :return: an RDD containing "reducer ready" lines representing encoded
+             key-value pairs, that is, where all lines with the same key are
+             adjacent and in the same partition
+    """
+    step_num = combiner_job.options.step_num
+
+    c_read, c_write = combiner_job.pick_protocols(step_num, 'combiner')
+
+    # decode lines into key-value pairs
+    #
+    # line -> (k, v)
+    rdd = rdd.map(c_read)
+
+    # The common case for MRJob combiners is to yield a single key-value pair
+    # (for example ``(key, sum(values))``. If the combiner does something
+    # else, just build a list of values so we don't end up running multiple
+    # values through the MRJob's combiner multiple times.
+    def combiner_helper(pairs1, pairs2):
+        if len(pairs1) == len(pairs2) == 1:
+            return list(
+                combiner_job.combine_pairs(pairs1 + pairs2, step_num),
+            )
+        else:
+            pairs1.extend(pairs2)
+            return pairs1
+
+    # include key in "value", so MRJob combiner can see it
+    #
+    # (k, v) -> (k, (k, v))
+    rdd = rdd.map(lambda k_v: (k_v[0], k_v))
+
+    # :py:meth:`pyspark.RDD.combineByKey()`, where the magic happens.
+    #
+    # (k, (k, v)), ... -> (k, ([(k, v1), (k, v2), ...]))
+    #
+    # Our "values" are key-value pairs, and our "combined values" are lists of
+    # key-value pairs (single-item lists in the common case).
+    #
+    # note that unlike Hadoop combiners, combineByKey() sees *all* the
+    # key-value pairs, essentially doing a shuffle-and-sort for free.
+    rdd = rdd.combineByKey(
+        createCombiner=lambda k_v: [k_v],
+        mergeValue=lambda k_v_list, k_v: combiner_helper(k_v_list, [k_v]),
+        mergeCombiners=combiner_helper,
+    )
+
+    # encode lists of key-value pairs into lists of lines
+    #
+    # (k, ([(k, v1), (k, v2), ...])) -> (k, [line1, line2, ...])
+    rdd = rdd.mapValues(
+        lambda pairs: [c_write(*pair) for pair in pairs])
+
+    # free the lines!
+    #
+    # (k, [line1, line2, ...]) -> line1, line2, ...
+    rdd = _discard_key_and_flatten_values(rdd, sort_values=sort_values)
+
+    return rdd
+
+
+def _shuffle_and_sort(rdd, sort_values=False):
+    """Simulate Hadoop's shuffle-and-sort step, so that data will be in the
+    format the reducer expects.
+
+    :param rdd: an RDD containing lines representing encoded key-value pairs,
+                where the encoded key comes first and is followed by a TAB
+                character (the encoded key may not contain TAB).
+    :sort_values: if true, ensure all lines corresponding to a given key
+                  are sorted (by their encoded value)
+    :return: an RDD containing "reducer ready" lines representing encoded
+             key-value pairs, that is, where all lines with the same key are
+             adjacent and in the same partition
+    """
+    rdd = rdd.groupBy(lambda line: line.split(b'\t')[0])
+    rdd = _discard_key_and_flatten_values(rdd, sort_values=sort_values)
+
+    return rdd
+
+
+def _run_reducer(reducer_job, rdd):
+    """Run our job's combiner, and group lines with the same key together.
+
+    :param reducer_job: an instance of our job, instantiated to be the mapper
+                        for the step we wish to run
+    :param rdd: an RDD containing "reducer ready" lines representing encoded
+                key-value pairs, that is, where all lines with the same key are
+                adjacent and in the same partition
+    :return: an RDD containing encoded key-value pairs
+    """
+    step_num = reducer_job.options.step_num
+
+    r_read, r_write = reducer_job.pick_protocols(step_num, 'reducer')
+
+    # decode lines into key-value pairs (keeping partitions the same)
+    #
+    # line -> (k, v)
+    rdd = rdd.map(r_read, preservesPartitioning=True)
+
+    # run each partition through reducer_pairs(). because we carefully
+    # preserved partitioning, all values belonging to the same key will
+    # be fed to the same call of reducer_pairs()
+    #
+    # (k, v), ... -> (k, v), ...
+    rdd = rdd.mapPartitions(
+        lambda pairs: reducer_job.reduce_pairs(pairs, step_num))
+
+    # encode key-value pairs back into lines
+    #
+    # (k, v) -> line
+    rdd = rdd.map(lambda k_v: r_write(*k_v))
+
+    return rdd
+
+
+def _discard_key_and_flatten_values(rdd, sort_values=False):
+    """Helper function for :py:func:`_run_combiner` and
+    :py:func:`_shuffle_and_sort`.
+
+    Given an RDD containing (key, [line1, line2, ...]), discard *key*
+    and return an RDD containing line1, line2, ...
+
+    Guarantees that lines in the same list will end up in the same partition.
+
+    If *sort_values* is true, sort each list of lines before flattening it.
+    """
+    if sort_values:
+        map_f = lambda key_and_lines: sorted(key_and_lines[1])
     else:
-        return rdd.flatMap(lambda key_and_lines: key_and_lines[1])
+        map_f = lambda key_and_lines: key_and_lines[1]
+
+    return rdd.flatMap(map_f, preservesPartitioning=True)
 
 
 def _check_step(step_desc, step_num):
@@ -190,20 +316,25 @@ def _check_step(step_desc, step_num):
             'step %d uses an input manifest, which is unsupported')
 
     for mrc in ('mapper', 'reducer'):
-        # bad combiners won't cause an error because they're optional
-        substep_desc = step_desc.get(mrc)
-        if not substep_desc:
-            continue
+        _check_substep(step_desc, step_num, mrc)
 
-        if substep_desc.get('type') != 'script':
-            raise NotImplementedError(
-                "step %d's %s has unexpected type: %r" % (
-                    step_num, mrc, substep_desc.get('type')))
 
-        if substep_desc.get('pre_filter'):
-            raise NotImplementedError(
-                "step %d's %s has pre-filter, which is unsupported" % (
-                    step_num, mrc))
+def _check_substep(step_desc, step_num, mrc):
+    """Raise :py:class:`NotImplementedError` if the given substep
+    (e.g. ``'mapper'``) runs subprocesses."""
+    substep_desc = step_desc.get(mrc)
+    if not substep_desc:
+        return
+
+    if substep_desc.get('type') != 'script':
+        raise NotImplementedError(
+            "step %d's %s has unexpected type: %r" % (
+                step_num, mrc, substep_desc.get('type')))
+
+    if substep_desc.get('pre_filter'):
+        raise NotImplementedError(
+            "step %d's %s has pre-filter, which is unsupported" % (
+                step_num, mrc))
 
 
 def _make_arg_parser():

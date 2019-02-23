@@ -14,6 +14,7 @@
 """Test the Spark runner."""
 from io import BytesIO
 from os.path import exists
+from os.path import join
 from unittest import skipIf
 
 try:
@@ -196,9 +197,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
     # test that the spark harness works as expected.
     #
     # this runs tests similar to those in SparkHarnessOutputComparisonTestCase
-    # in tests/spark/test_mrjob_spark_harness.py. The spark runner
-    # can't run Spark jobs inline through pyspark, so we try to be selective
-    # about tests we run since they take longer through spark-submit
+    # in tests/spark/test_mrjob_spark_harness.py.
 
     def test_basic_job(self):
         job = MRWordFreqCount(['-r', 'spark'])
@@ -211,6 +210,30 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             output = dict(job.parse_output(runner.cat_output()))
 
             self.assertEqual(output, dict(blue=1, fish=4, one=1, red=1, two=1))
+
+    def test_compression(self):
+        # deliberately mix Hadoop 1 and 2 config properties
+        jobconf_args = [
+            '--jobconf',
+            'mapred.map.output.compression.codec='\
+            'org.apache.hadoop.io.compress.GzipCodec',
+            '--jobconf',
+            'mapreduce.output.fileoutputformat.compress=true',
+        ]
+
+        job = MRWordFreqCount(['-r', 'spark'] + jobconf_args)
+        job.sandbox(stdin=BytesIO(b'fa la la la la\nla la la la\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 'part*.gz')))
+
+            self.assertEqual(dict(job.parse_output(runner.cat_output())),
+                             dict(fa=1, la=8))
+
+
 
 
 # going to need tests of uploading files once we fix #1922

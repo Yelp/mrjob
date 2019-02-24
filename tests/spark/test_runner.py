@@ -263,6 +263,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
                  's': 2, 't': 5, 'u': 1}
             )
 
+    # TODO: test mixed job, range of steps
 
     # TODO: add test of file upload args once we fix #1922
 

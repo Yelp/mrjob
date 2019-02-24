@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the Spark Harness."""
+import uuid
 from io import BytesIO
 from os.path import join
 
@@ -55,6 +56,41 @@ class ReversedTextProtocol(TextProtocol):
 class MRSortAndGroupReversedText(MRSortAndGroup):
 
     INTERNAL_PROTOCOL = ReversedTextProtocol
+
+
+class MRWordFreqCountCombinerYieldsTwo(MRWordFreqCount):
+
+    def combiner(self, word, counts):
+        yield (word, sum(counts))
+        yield (word, 1000)
+
+
+class MRWordFreqCountCombinerYieldsZero(MRWordFreqCount):
+
+    def combiner(self, word, counts):
+        return
+
+
+class MRWordFreqCountFailingCombiner(MRWordFreqCount):
+
+    unique_exception_str = '619dc867a1a34793b2157c258c859e78'
+
+    def combiner(self, word, counts):
+        raise Exception(self.unique_exception_str)
+
+
+class MRSumValuesByWord(MRJob):
+
+    def mapper(self, _, line):
+        word, value_str = line.split('\t', 1)
+        yield word, int(value_str)
+
+    def combiner(self, word, values):
+        values_sum = sum(values)
+        if values_sum != 0:
+            yield word, values_sum
+
+    reducer = combiner
 
 
 class SparkHarnessOutputComparisonTestCase(
@@ -222,6 +258,67 @@ class SparkHarnessOutputComparisonTestCase(
             MRPassThruArgTest,
             input_bytes=input_bytes,
             job_args=['--chars', '--ignore', 'to'])
+
+    def test_combiner_called(self):
+        input_bytes = b'one two three one two three one two three'
+        job = self._harness_job(
+            MRWordFreqCountFailingCombiner, input_bytes=input_bytes)
+
+        with job.make_runner() as runner, \
+                self.assertRaises(Exception) as assert_raises_context:
+            runner.run()
+
+        exception_text = assert_raises_context.exception.__str__()
+        expected_str = MRWordFreqCountFailingCombiner.unique_exception_str
+        assert expected_str in exception_text
+
+    def test_combiner_yields_two_values(self):
+        input_bytes = b'one two three one two three one two three'
+
+        job = self._harness_job(MRWordFreqCountCombinerYieldsTwo,
+                                input_bytes=input_bytes)
+
+        # Given that the combiner for this job yields the count and 1000 for
+        # each word and the mrjob_spark_harness combiner_helper stops running
+        # jobs' combiners if they do not reduce the mapper's output to a single
+        # value per key, we expect the combiner to run once per word, resulting
+        # in an extra 1000 being added to each word's count.
+        #
+        # Note that if combiner_helper did not stop running the combiner in
+        # this case, we would expect 2000 to be added to each word's count
+        # since each word appears 3 times, resulting in 2 calls to
+        # combine_pairs.
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(one=1003, two=1003, three=1003))
+
+    def test_combiner_yields_zero_values(self):
+        input_bytes = b'a b c\na b c\na b c\na b c'
+
+        job = self._harness_job(MRWordFreqCountCombinerYieldsZero,
+                                input_bytes=input_bytes)
+
+        with job.make_runner() as runner:
+            runner.run()
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(),
+            )
+
+    def test_combiner_sometimes_yields_zero_values(self):
+        # a more plausible test of a combiner that sometimes doesn't yield a
+        # value that we can compare to the reference job
+        input_bytes = b'\n'.join([
+            b'happy\t5',
+            b'sad\t3',
+            b'happy\t2',
+            b'sad\t-3',
+        ])
+
+        self._assert_output_matches(MRSumValuesByWord, input_bytes=input_bytes)
 
 
 # TODO: add back a test of the bare Harness script in local mode (slow)

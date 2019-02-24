@@ -319,6 +319,3 @@ class SparkHarnessOutputComparisonTestCase(
         ])
 
         self._assert_output_matches(MRSumValuesByWord, input_bytes=input_bytes)
-
-
-# TODO: add back a test of the bare Harness script in local mode (slow)

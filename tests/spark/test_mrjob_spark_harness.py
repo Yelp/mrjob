@@ -27,12 +27,12 @@ from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
 from tests.mr_doubler import MRDoubler
+from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
-
 
 
 def _rev(s):
@@ -55,27 +55,6 @@ class ReversedTextProtocol(TextProtocol):
 class MRSortAndGroupReversedText(MRSortAndGroup):
 
     INTERNAL_PROTOCOL = ReversedTextProtocol
-
-
-class MRPassThruArgTest(MRJob):
-
-    def configure_args(self):
-        super(MRPassThruArgTest, self).configure_args()
-        self.add_passthru_arg('--chars', action='store_true')
-        self.add_passthru_arg('--ignore')
-
-    def mapper(self, _, value):
-        if self.options.ignore:
-            value = value.replace(self.options.ignore, '')
-        if self.options.chars:
-            for c in value:
-                yield c, 1
-        else:
-            for w in value.split(' '):
-                yield w, 1
-
-    def reducer(self, key, values):
-        yield key, sum(values)
 
 
 class SparkHarnessOutputComparisonTestCase(

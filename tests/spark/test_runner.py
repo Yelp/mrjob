@@ -36,9 +36,10 @@ from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_pass_thru_arg_test import MRPassThruArgTest
+from tests.mr_sort_and_group import MRSortAndGroup
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
-
 
 
 class MockFilesystemsTestCase(
@@ -233,7 +234,39 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             self.assertEqual(dict(job.parse_output(runner.cat_output())),
                              dict(fa=1, la=8))
 
+    def test_sort_values(self):
+        job = MRSortAndGroup(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(
+            b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(a=['actuary', 'alligator', 'artichoke'],
+                     b=['baby', 'balloon', 'bowling']))
+
+    def test_passthru_args(self):
+        job = MRPassThruArgTest(['-r', 'spark', '--chars', '--ignore', 'to'])
+        job.sandbox(stdin=BytesIO(
+            'to be or\nnot to be\nthat is the question'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # should delete 'to' and count remaining chars
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                {' ': 7, 'a': 1, 'b': 2, 'e': 4, 'h': 2,
+                 'i': 2, 'n': 2, 'o': 3, 'q': 1, 'r': 1,
+                 's': 2, 't': 5, 'u': 1}
+            )
+
+
+    # TODO: add test of file upload args once we fix #1922
 
 
 
-# going to need tests of uploading files once we fix #1922
+# going to need tests of uploading files and setting up working dir once we
+# fix #1922

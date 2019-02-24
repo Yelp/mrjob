@@ -22,12 +22,14 @@ try:
 except ImportError:
     pyspark = None
 
-from mrjob.examples.mr_word_freq_count import MRWordFreqCount
-from mrjob.parse import is_uri
-from mrjob.spark.runner import SparkMRJobRunner
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
 from mrjob.examples.mr_sparkaboom import MRSparKaboom
+from mrjob.examples.mr_word_freq_count import MRWordFreqCount
+from mrjob.job import MRJob
+from mrjob.parse import is_uri
+from mrjob.spark.runner import SparkMRJobRunner
+from mrjob.step import MRStep
 from mrjob.step import StepFailedException
 from mrjob.util import safeeval
 from mrjob.util import to_lines
@@ -35,6 +37,7 @@ from mrjob.util import to_lines
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
+from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
@@ -311,24 +314,51 @@ class GroupStepsTestCase(MockFilesystemsTestCase):
         with job.make_runner() as runner:
             runner.run()
 
-        return job.steps()
-
     def test_single_spark_step(self):
-        steps = self._run_job(MRNullSpark)
+        self._run_job(MRNullSpark)
 
-        self.run_step_on_spark.assert_called_with(
+        # the first argument to _run_step_on_spark() is a "step group"
+        # dict whose format we don't care about. we just want to make
+        # sure the first and last step numbers are correct
+        self.run_step_on_spark.assert_called_once_with(
             ANY, 0, 0)
 
     def test_mixed_job(self):
-        steps = self._run_job(MRStreamingAndSpark)
+        self._run_job(MRStreamingAndSpark)
 
         self.run_step_on_spark.assert_has_calls([
             call(ANY, 0, 0),
             call(ANY, 1, 1),
         ])
 
+    def test_five_streaming_steps(self):
+        self._run_job(MRDoubler, '-n', '5')
 
+        self.run_step_on_spark.assert_called_once_with(
+            ANY, 0, 4)
 
+    def tests_streaming_steps_with_different_jobconf(self):
+        class MRDifferentJobconfJob(MRJob):
+
+            def mapper(self, key, value):
+                yield key, value
+
+            def steps(self):
+                return [
+                    MRStep(mapper=self.mapper),
+                    MRStep(mapper=self.mapper, jobconf=dict(foo='bar')),
+                    MRStep(mapper=self.mapper, jobconf=dict(foo='bar')),
+                    MRStep(mapper=self.mapper, jobconf=dict(foo='baz')),
+                ]
+
+        self._run_job(MRDifferentJobconfJob)
+
+        # steps 1 and 2 should be grouped together
+        self.run_step_on_spark.assert_has_calls([
+            call(ANY, 0, 0),
+            call(ANY, 1, 2),
+            call(ANY, 3, 3),
+        ])
 
 
 

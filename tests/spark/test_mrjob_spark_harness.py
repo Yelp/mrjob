@@ -413,7 +413,7 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         f_of_values = f([('k', 'v1'), ('k', 'v2')])
         self.assertEqual(type(f_of_values), list)
         self.assertEqual(len(f_of_values), 2)
-        self.assertRaises(TypeError, 123)
+        self.assertRaises(TypeError, f, 123)  # iterables only, fools
 
     def test_shuffle_and_sort_with_sort_values(self):
         self._test_shuffle_and_sort(sort_values=True)

@@ -215,7 +215,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
         # deliberately mix Hadoop 1 and 2 config properties
         jobconf_args = [
             '--jobconf',
-            'mapred.map.output.compression.codec='\
+            'mapred.output.compression.codec='\
             'org.apache.hadoop.io.compress.GzipCodec',
             '--jobconf',
             'mapreduce.output.fileoutputformat.compress=true',

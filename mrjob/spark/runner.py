@@ -355,9 +355,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         jobconf = self._jobconf_for_step(step_num)
 
         compress_conf = jobconf_from_dict(
-            jobconf, 'mapreduce.map.output.compress')
+            jobconf, 'mapreduce.output.fileoutputformat.compress')
         codec_conf = jobconf_from_dict(
-            jobconf, 'mapreduce.map.output.compress.codec')
+            jobconf, 'mapreduce.output.fileoutputformat.compress.codec')
 
         if compress_conf and compress_conf != 'false' and codec_conf:
             args.extend(['--compression-codec', codec_conf])

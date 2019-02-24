@@ -38,6 +38,7 @@ from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
@@ -250,7 +251,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
     def test_passthru_args(self):
         job = MRPassThruArgTest(['-r', 'spark', '--chars', '--ignore', 'to'])
         job.sandbox(stdin=BytesIO(
-            'to be or\nnot to be\nthat is the question'))
+            b'to be or\nnot to be\nthat is the question'))
 
         with job.make_runner() as runner:
             runner.run()
@@ -263,11 +264,33 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
                  's': 2, 't': 5, 'u': 1}
             )
 
-    # TODO: test mixed job, range of steps
+    def test_mixed_job(self):
+        # test a combination of streaming and spark steps
+        job = MRStreamingAndSpark(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(
+            b'foo\nbar\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # converts to 'null\t"foo"', 'null\t"bar"' and then counts chars
+            self.assertEqual(
+                sorted(to_lines(runner.cat_output())),
+                [
+                    '\t 2\n',
+                    '" 4\n',
+                    'a 1\n',
+                    'b 1\n',
+                    'f 1\n',
+                    'l 4\n',
+                    'n 2\n',
+                    'o 2\n',
+                    'r 1\n',
+                    'u 2\n',
+                ]
+            )
 
     # TODO: add test of file upload args once we fix #1922
 
 
-
-# going to need tests of uploading files and setting up working dir once we
-# fix #1922
+# TODO: test uploading files and setting up working dir once we fix #1922

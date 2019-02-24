@@ -39,6 +39,8 @@ from tests.mr_null_spark import MRNullSpark
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
+from tests.py2 import ANY
+from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
@@ -291,6 +293,43 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             )
 
     # TODO: add test of file upload args once we fix #1922
+
+
+class GroupStepsTestCase(MockFilesystemsTestCase):
+    # test the way the runner groups multiple streaming steps together
+
+    def setUp(self):
+        super(GroupStepsTestCase, self).setUp()
+
+        self.run_step_on_spark = self.start(patch(
+            'mrjob.spark.runner.SparkMRJobRunner._run_step_on_spark'))
+
+    def _run_job(self, job_class, *extra_args):
+        job = job_class(['-r', 'spark'] + list(extra_args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        return job.steps()
+
+    def test_single_spark_step(self):
+        steps = self._run_job(MRNullSpark)
+
+        self.run_step_on_spark.assert_called_with(
+            ANY, 0, 0)
+
+    def test_mixed_job(self):
+        steps = self._run_job(MRStreamingAndSpark)
+
+        self.run_step_on_spark.assert_has_calls([
+            call(ANY, 0, 0),
+            call(ANY, 1, 1),
+        ])
+
+
+
+
 
 
 # TODO: test uploading files and setting up working dir once we fix #1922

@@ -282,16 +282,16 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             self.assertEqual(
                 sorted(to_lines(runner.cat_output())),
                 [
-                    '\t 2\n',
-                    '" 4\n',
-                    'a 1\n',
-                    'b 1\n',
-                    'f 1\n',
-                    'l 4\n',
-                    'n 2\n',
-                    'o 2\n',
-                    'r 1\n',
-                    'u 2\n',
+                    b'\t 2\n',
+                    b'" 4\n',
+                    b'a 1\n',
+                    b'b 1\n',
+                    b'f 1\n',
+                    b'l 4\n',
+                    b'n 2\n',
+                    b'o 2\n',
+                    b'r 1\n',
+                    b'u 2\n',
                 ]
             )
 
@@ -359,7 +359,6 @@ class GroupStepsTestCase(MockFilesystemsTestCase):
             call(ANY, 1, 2),
             call(ANY, 3, 3),
         ])
-
 
 
 # TODO: test uploading files and setting up working dir once we fix #1922

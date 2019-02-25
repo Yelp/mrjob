@@ -195,8 +195,20 @@ class TestJobName(BasicTestCase):
 
 class TestCatOutput(SandboxedTestCase):
 
+    def setUp(self):
+        super(TestCatOutput, self).setUp()
+
+        self.output_dir = os.path.join(self.tmp_dir, 'job_output')
+        os.mkdir(self.output_dir)
+
+        self.runner = InlineMRJobRunner(
+            conf_paths=[], output_dir=self.output_dir)
+
+    # TODO: basic test, break up test below, test hidden files inside dirs,
+    # test "hidden" output dir
+
     # Test regression for #269
-    def test_cat_output(self):
+    def test_part_files_in_subdirs_and_hidden_dirs(self):
         a_dir_path = os.path.join(self.tmp_dir, 'a')
         b_dir_path = os.path.join(self.tmp_dir, 'b')
         l_dir_path = os.path.join(self.tmp_dir, '_logs')

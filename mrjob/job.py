@@ -492,10 +492,11 @@ class MRJob(MRJobLauncher):
             return super(MRJob, self)._runner_class()
 
     def _runner_kwargs(self):
-        """If we're building an inline runner, include mrjob_cls in kwargs."""
+        """If we're building an inline or Spark runner,
+        include mrjob_cls in kwargs."""
         kwargs = super(MRJob, self)._runner_kwargs()
 
-        if self._runner_class().alias == 'inline':
+        if self._runner_class().alias in ('inline', 'spark'):
             kwargs = dict(mrjob_cls=self.__class__, **kwargs)
 
         # pass steps to runner (see #1845)

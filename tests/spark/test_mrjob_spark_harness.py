@@ -31,6 +31,7 @@ from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
 from tests.mr_doubler import MRDoubler
+from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_two_step_job import MRTwoStepJob
@@ -40,7 +41,6 @@ from tests.py2 import Mock
 from tests.py2 import call
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
-
 
 
 def _rev(s):
@@ -100,27 +100,6 @@ class MRSumValuesByWord(MRJob):
     reducer = combiner
 
 
-class MRPassThruArgTest(MRJob):
-
-    def configure_args(self):
-        super(MRPassThruArgTest, self).configure_args()
-        self.add_passthru_arg('--chars', action='store_true')
-        self.add_passthru_arg('--ignore')
-
-    def mapper(self, _, value):
-        if self.options.ignore:
-            value = value.replace(self.options.ignore, '')
-        if self.options.chars:
-            for c in value:
-                yield c, 1
-        else:
-            for w in value.split(' '):
-                yield w, 1
-
-    def reducer(self, key, values):
-        yield key, sum(values)
-
-
 class SparkHarnessOutputComparisonTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
 
@@ -143,7 +122,7 @@ class SparkHarnessOutputComparisonTestCase(
 
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
-                     job_args=None, start_step=None, end_step=None):
+                     job_args=None, first_step_num=None, last_step_num=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -152,10 +131,10 @@ class SparkHarnessOutputComparisonTestCase(
             harness_job_args.append(compression_codec)
         if job_args:
             harness_job_args.extend(['--job-args', cmd_line(job_args)])
-        if start_step:
-            harness_job_args.extend(['--start-step', str(start_step)])
-        if end_step:
-            harness_job_args.extend(['--end-step', str(end_step)])
+        if first_step_num is not None:
+            harness_job_args.extend(['--first-step-num', str(first_step_num)])
+        if last_step_num is not None:
+            harness_job_args.extend(['--last-step-num', str(last_step_num)])
 
         harness_job_args.extend(input_paths)
 
@@ -214,7 +193,7 @@ class SparkHarnessOutputComparisonTestCase(
 
         job = self._harness_job(
             MRStreamingAndSpark, input_bytes=input_bytes,
-            start_step=0, end_step=1)
+            first_step_num=0, last_step_num=0)
 
         with job.make_runner() as runner:
             runner.run()
@@ -235,7 +214,7 @@ class SparkHarnessOutputComparisonTestCase(
         # just run two of the five steps
         steps_2_and_3_job = self._harness_job(
             MRDoubler, input_bytes=input_bytes, job_args=['-n', '5'],
-            start_step=2, end_step=4)
+            first_step_num=2, last_step_num=3)
 
         with steps_2_and_3_job.make_runner() as runner:
             runner.run()
@@ -434,7 +413,7 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         f_of_values = f([('k', 'v1'), ('k', 'v2')])
         self.assertEqual(type(f_of_values), list)
         self.assertEqual(len(f_of_values), 2)
-        self.assertRaises(TypeError, 123)
+        self.assertRaises(TypeError, f, 123)  # iterables only, fools
 
     def test_shuffle_and_sort_with_sort_values(self):
         self._test_shuffle_and_sort(sort_values=True)

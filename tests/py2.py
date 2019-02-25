@@ -30,6 +30,9 @@ if sys.version_info < (3, 3):
 else:
     from unittest import mock
 
+ANY = mock.ANY
+ANY
+
 MagicMock = mock.MagicMock
 MagicMock
 

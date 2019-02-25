@@ -14,6 +14,7 @@
 """Test the Spark runner."""
 from io import BytesIO
 from os.path import exists
+from os.path import join
 from unittest import skipIf
 
 try:
@@ -21,23 +22,30 @@ try:
 except ImportError:
     pyspark = None
 
-from mrjob.parse import is_uri
-from mrjob.spark.runner import SparkMRJobRunner
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
 from mrjob.examples.mr_sparkaboom import MRSparKaboom
+from mrjob.examples.mr_word_freq_count import MRWordFreqCount
+from mrjob.job import MRJob
+from mrjob.parse import is_uri
+from mrjob.spark.runner import SparkMRJobRunner
+from mrjob.step import MRStep
 from mrjob.step import StepFailedException
 from mrjob.util import safeeval
 from mrjob.util import to_lines
 
-
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
+from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_pass_thru_arg_test import MRPassThruArgTest
+from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_streaming_and_spark import MRStreamingAndSpark
+from tests.py2 import ANY
+from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
-
 
 
 class MockFilesystemsTestCase(
@@ -142,7 +150,7 @@ class SparkPyFilesTestCase(MockFilesystemsTestCase):
 
 
 @skipIf(pyspark is None, 'no pyspark module')
-class SparkRunnerSparkTestCase(MockFilesystemsTestCase):
+class SparkRunnerSparkStepsTestCase(MockFilesystemsTestCase):
     # these tests are slow (~20s) because they run on actual Spark
 
     def test_spark_mrjob(self):
@@ -189,3 +197,168 @@ class SparkRunnerSparkTestCase(MockFilesystemsTestCase):
             blue=1, fish=4, one=1, red=1, two=1))
 
     # TODO: add a Spark JAR to the repo, so we can test it
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
+    # test that the spark harness works as expected.
+    #
+    # this runs tests similar to those in SparkHarnessOutputComparisonTestCase
+    # in tests/spark/test_mrjob_spark_harness.py.
+
+    def test_basic_job(self):
+        job = MRWordFreqCount(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(
+            b'one fish\ntwo fish\nred fish\nblue fish\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(output, dict(blue=1, fish=4, one=1, red=1, two=1))
+
+    def test_compression(self):
+        # deliberately mix Hadoop 1 and 2 config properties
+        jobconf_args = [
+            '--jobconf',
+            'mapred.output.compression.codec='\
+            'org.apache.hadoop.io.compress.GzipCodec',
+            '--jobconf',
+            'mapreduce.output.fileoutputformat.compress=true',
+        ]
+
+        job = MRWordFreqCount(['-r', 'spark'] + jobconf_args)
+        job.sandbox(stdin=BytesIO(b'fa la la la la\nla la la la\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 'part*.gz')))
+
+            self.assertEqual(dict(job.parse_output(runner.cat_output())),
+                             dict(fa=1, la=8))
+
+    def test_sort_values(self):
+        job = MRSortAndGroup(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(
+            b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(a=['actuary', 'alligator', 'artichoke'],
+                     b=['baby', 'balloon', 'bowling']))
+
+    def test_passthru_args(self):
+        job = MRPassThruArgTest(['-r', 'spark', '--chars', '--ignore', 'to'])
+        job.sandbox(stdin=BytesIO(
+            b'to be or\nnot to be\nthat is the question'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # should delete 'to' and count remaining chars
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                {' ': 7, 'a': 1, 'b': 2, 'e': 4, 'h': 2,
+                 'i': 2, 'n': 2, 'o': 3, 'q': 1, 'r': 1,
+                 's': 2, 't': 5, 'u': 1}
+            )
+
+    def test_mixed_job(self):
+        # test a combination of streaming and spark steps
+        job = MRStreamingAndSpark(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(
+            b'foo\nbar\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # converts to 'null\t"foo"', 'null\t"bar"' and then counts chars
+            self.assertEqual(
+                sorted(to_lines(runner.cat_output())),
+                [
+                    b'\t 2\n',
+                    b'" 4\n',
+                    b'a 1\n',
+                    b'b 1\n',
+                    b'f 1\n',
+                    b'l 4\n',
+                    b'n 2\n',
+                    b'o 2\n',
+                    b'r 1\n',
+                    b'u 2\n',
+                ]
+            )
+
+    # TODO: add test of file upload args once we fix #1922
+
+
+class GroupStepsTestCase(MockFilesystemsTestCase):
+    # test the way the runner groups multiple streaming steps together
+
+    def setUp(self):
+        super(GroupStepsTestCase, self).setUp()
+
+        self.run_step_on_spark = self.start(patch(
+            'mrjob.spark.runner.SparkMRJobRunner._run_step_on_spark'))
+
+    def _run_job(self, job_class, *extra_args):
+        job = job_class(['-r', 'spark'] + list(extra_args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+    def test_single_spark_step(self):
+        self._run_job(MRNullSpark)
+
+        # the first argument to _run_step_on_spark() is a "step group"
+        # dict whose format we don't care about. we just want to make
+        # sure the first and last step numbers are correct
+        self.run_step_on_spark.assert_called_once_with(
+            ANY, 0, 0)
+
+    def test_mixed_job(self):
+        self._run_job(MRStreamingAndSpark)
+
+        self.run_step_on_spark.assert_has_calls([
+            call(ANY, 0, 0),
+            call(ANY, 1, 1),
+        ])
+
+    def test_five_streaming_steps(self):
+        self._run_job(MRDoubler, '-n', '5')
+
+        self.run_step_on_spark.assert_called_once_with(
+            ANY, 0, 4)
+
+    def tests_streaming_steps_with_different_jobconf(self):
+        class MRDifferentJobconfJob(MRJob):
+
+            def mapper(self, key, value):
+                yield key, value
+
+            def steps(self):
+                return [
+                    MRStep(mapper=self.mapper),
+                    MRStep(mapper=self.mapper, jobconf=dict(foo='bar')),
+                    MRStep(mapper=self.mapper, jobconf=dict(foo='bar')),
+                    MRStep(mapper=self.mapper, jobconf=dict(foo='baz')),
+                ]
+
+        self._run_job(MRDifferentJobconfJob)
+
+        # steps 1 and 2 should be grouped together
+        self.run_step_on_spark.assert_has_calls([
+            call(ANY, 0, 0),
+            call(ANY, 1, 2),
+            call(ANY, 3, 3),
+        ])
+
+
+# TODO: test uploading files and setting up working dir once we fix #1922

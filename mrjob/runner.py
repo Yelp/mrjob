@@ -23,10 +23,10 @@ import os.path
 import posixpath
 import pprint
 import re
-import shutil
 import sys
 import tarfile
 import tempfile
+from shutil import rmtree
 
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_dict
@@ -612,7 +612,7 @@ class MRJobRunner(object):
         if self._local_tmp_dir:
             log.info('Removing temp directory %s...' % self._local_tmp_dir)
             try:
-                shutil.rmtree(self._local_tmp_dir)
+                rmtree(self._local_tmp_dir)
             except OSError as e:
                 log.exception(e)
 
@@ -748,7 +748,7 @@ class MRJobRunner(object):
             path = os.path.join(tmp_dir, self._job_key)
             log.info('Creating temp directory %s' % path)
             if os.path.isdir(path):
-                shutil.rmtree(path)
+                rmtree(path)
             os.makedirs(path)
             self._local_tmp_dir = path
 
@@ -831,34 +831,46 @@ class MRJobRunner(object):
                 '%s cannot run steps!' % self.__class__.__name__)
 
         for step_num, step in enumerate(steps):
-            if step.get('type') not in self._STEP_TYPES:
-                raise NotImplementedError(
-                    'step %d has type %r, but %s runner only supports:'
-                    ' %s' % (step_num, step.get('type'), self.alias,
-                             ', '.join(sorted(self._STEP_TYPES))))
+           self._check_step(step, step_num)
 
-            if step.get('input_manifest') and step_num != 0:
+    def _check_step(self, step, step_num):
+        """Raise an exception if the given step is invalid
+        (:py:class:`ValueError`) or not handled by this runner
+        (:py:class:`NotImplementedError`).
+
+        By default, we check that *step* has a support step type,
+        only uses an input manifest if it's the first step, and that
+        :py:attr:`_script_path` exists if necessary. You can re-define
+        this in your subclass.
+        """
+        if step.get('type') not in self._STEP_TYPES:
+            raise NotImplementedError(
+                'step %d has type %r, but %s runner only supports:'
+                ' %s' % (step_num, step.get('type'), self.alias,
+                         ', '.join(sorted(self._STEP_TYPES))))
+
+        if step.get('input_manifest') and step_num != 0:
+            raise ValueError(
+                'step %d may not take an input manifest (only'
+                ' first step can' % step_num)
+
+        # some step types assume a MRJob script
+        if not self._script_path:
+            if step['type'] == 'spark':
                 raise ValueError(
-                    'step %d may not take an input manifest (only'
-                    ' first step can' % step_num)
+                    "SparkStep (step %d) can't run without a MRJob script"
+                    " (try SparkScriptStep instead)" % step_num)
 
-            # some step types assume a MRJob script
-            if not self._script_path:
-                if step['type'] == 'spark':
-                    raise ValueError(
-                        "SparkStep (step %d) can't run without a MRJob script"
-                        " (try SparkScriptStep instead)" % step_num)
+            elif step['type'] == 'streaming':
+                for mrc in ('mapper', 'combiner', 'reducer'):
+                    if not step.get(mrc):
+                        continue
 
-                elif step['type'] == 'streaming':
-                    for mrc in ('mapper', 'combiner', 'reducer'):
-                        if not step.get(mrc):
-                            continue
-
-                        substep = step[mrc]
-                        if substep['type'] == 'script':
-                            raise ValueError(
-                                "%s (step %d) can't run without a MRJob"
-                                " script" % (mrc, step_num))
+                    substep = step[mrc]
+                    if substep['type'] == 'script':
+                        raise ValueError(
+                            "%s (step %d) can't run without a MRJob"
+                            " script" % (mrc, step_num))
 
     def _get_step(self, step_num):
         """Get a single step (calls :py:meth:`_get_steps`)."""
@@ -1177,22 +1189,27 @@ class MRJobRunner(object):
         return self._upload_args_helper('-files', None, '-archives', None)
 
     def _upload_args_helper(
-            self, files_opt_str, files, archives_opt_str, archives):
+            self, files_opt_str, files, archives_opt_str, archives,
+            always_use_hash=True):
         args = []
 
-        file_hash_paths = list(self._arg_hash_paths('file', files))
+        file_hash_paths = list(
+            self._arg_hash_paths('file', files,
+                                 always_use_hash=always_use_hash))
         if file_hash_paths:
             args.append(files_opt_str)
             args.append(','.join(file_hash_paths))
 
-        archive_hash_paths = list(self._arg_hash_paths('archive', archives))
+        archive_hash_paths = list(
+            self._arg_hash_paths('archive', archives,
+                                 always_use_hash=always_use_hash))
         if archive_hash_paths:
             args.append(archives_opt_str)
             args.append(','.join(archive_hash_paths))
 
         return args
 
-    def _arg_hash_paths(self, type, named_paths=None):
+    def _arg_hash_paths(self, type, named_paths=None, always_use_hash=True):
         """Helper function for the *upload_args methods."""
         if named_paths is None:
             # just return everything managed by _working_dir_mgr
@@ -1208,7 +1225,10 @@ class MRJobRunner(object):
             else:
                 uri = path
 
-            yield '%s#%s' % (uri, name)
+            if not always_use_hash and _basename(uri) == name:
+                yield uri
+            else:
+                yield '%s#%s' % (uri, name)
 
     def _write_script(self, lines, path, description):
         """Write text of a setup script, input manifest, etc. to the given
@@ -1301,3 +1321,10 @@ def _runner_class(alias):
 
     else:
         raise ValueError('bad runner alias: %s' % alias)
+
+
+def _basename(path_or_uri):
+    if is_uri(path_or_uri):
+        return posixpath.basename(path_or_uri)
+    else:
+        return os.path.basename(path_or_uri)

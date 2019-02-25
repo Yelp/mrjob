@@ -522,13 +522,7 @@ def zip_dir(dir, out_path, filter=None, prefix=''):
     if not filter:
         filter = lambda path: True
 
-    def create_zip_file():
-        try:
-            return ZipFile(out_path, mode='w', compression=ZIP_DEFLATED)
-        except RuntimeError:  # zlib not available
-            return ZipFile(out_path, mode='w', compression=ZIP_STORED)
-
-    with create_zip_file() as zip_file:
+    with _create_zip_file(out_path) as zip_file:
         for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
             for filename in filenames:
                 path = os.path.join(dirpath, filename)
@@ -539,3 +533,11 @@ def zip_dir(dir, out_path, filter=None, prefix=''):
                     real_path = os.path.realpath(path)
                     path_in_zip_file = os.path.join(prefix, rel_path)
                     zip_file.write(real_path, arcname=path_in_zip_file)
+
+
+# this is also used by spark runner
+def _create_zip_file(path):
+    try:
+        return ZipFile(path, mode='w', compression=ZIP_DEFLATED)
+    except RuntimeError:  # zlib not available
+        return ZipFile(path, mode='w', compression=ZIP_STORED)

@@ -132,7 +132,7 @@ class ArgsForSparkStepTestCase(GenericLocalRunnerTestCase):
             self.mock_get_spark_submit_bin.assert_called_once_with()
             self.mock_spark_submit_args.assert_called_once_with(step_num)
             self.mock_spark_script_path.assert_called_once_with(step_num)
-            self.mock_spark_script_args.assert_called_once_with(step_num)
+            self.mock_spark_script_args.assert_called_once_with(step_num, None)
 
     def test_step_0(self):
         self._test_step(0)
@@ -1641,15 +1641,6 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
                 runner._spark_submit_args(0),
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy')))
-
-    def test_streaming_step_not_allowed(self):
-        job = MRTwoStepJob(['-r', 'local'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertRaises(
-                TypeError,
-                runner._spark_submit_args, 0)
 
 
 class CreateMrjobZipTestCase(SandboxedTestCase):

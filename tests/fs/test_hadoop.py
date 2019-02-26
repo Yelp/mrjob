@@ -193,8 +193,12 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.fs.rm('hdfs:///baz')
 
     def test_touchz(self):
-        # mockhadoop doesn't implement this (see #1981)
-        pass
+        self.assertEqual(list(self.fs.ls('hdfs:///')), [])
+
+        self.fs.touchz('hdfs:///empty')
+
+        self.assertEqual(list(self.fs.ls('hdfs:///')),
+                         ['hdfs:///empty'])
 
 
 class Hadoop1FSTestCase(HadoopFSTestCase):

@@ -521,6 +521,13 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    cluster_cache_file=dict(
+        switches=[
+            (['--cluster-cache-file'], dict(
+                help='Location of file we use for the cluster cache',
+            )),
+        ],
+    ),
     cluster_id=dict(
         switches=[
             (['--cluster-id'], dict(

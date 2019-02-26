@@ -49,6 +49,7 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
+from mrjob.cache import ClusterCache
 from mrjob.cloud import HadoopInTheCloudJobRunner
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
@@ -224,6 +225,12 @@ _CLUSTER_SELF_TERMINATED_RE = re.compile(
 # is available to read even if it's Glacier-archived
 _RESTORED_FROM_GLACIER = 'ongoing-request="false"'
 
+# Since our file cache of cluster info will grow unboundedly as clusters
+# terminate and new clusters start we must cleanup at some point. When the
+# cache is strictly greater than this many days old, we delete the cache
+# and begin again.
+_CLUSTER_FILE_CACHE_TTL_DAYS = 3
+
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
@@ -305,6 +312,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'bootstrap_actions',
         'bootstrap_spark',
         'cloud_log_dir',
+        'cluster_cache_file',
         'core_instance_bid_price',
         'ebs_root_volume_gb',
         'ec2_endpoint',
@@ -443,6 +451,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # set of step numbers (0-indexed) where we waited 5 minutes for logs to
         # transfer to S3 (so we don't do it twice)
         self._waited_for_logs_on_s3 = set()
+
+        # setup cluster cache
+        self._cluster_cache = None
+        if self._opts['cluster_cache_file'] is not None:
+            ClusterCache.setup(self._opts['cluster_cache_file'])
 
     ### Options ###
 
@@ -691,6 +704,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._fs.add_fs('local', LocalFilesystem())
 
         return self._fs
+
+    @property
+    def cluster_cache(self):
+        if self._cluster_cache is None:
+            self._cluster_cache = ClusterCache(
+                                        self.make_emr_client(),
+                                        self._opts['cluster_cache_file'],
+                                        _CLUSTER_FILE_CACHE_TTL_DAYS)
+        return self._cluster_cache
 
     def _run(self):
         self._launch()
@@ -2572,8 +2594,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 'Clusters', emr_client, 'list_clusters',
                 ClusterStates=['WAITING']):
 
-            cluster = emr_client.describe_cluster(
-                ClusterId=cluster_summary['Id'])['Cluster']
+            cluster = self.cluster_cache.describe_cluster(cluster_id)
 
             add_if_match(cluster)
 

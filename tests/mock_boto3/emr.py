@@ -109,6 +109,14 @@ DEFAULT_MAX_STEPS_RETURNED = 50
 DUMMY_APPLICATION_VERSION = '0.0.0'
 
 
+def count_calls(f):
+    def wrapped(*args, **kwargs):
+        wrapped.calls += 1
+        return f(*args, **kwargs)
+    wrapped.calls = 0
+    return wrapped
+
+
 # TODO: raise InvalidRequest: Missing required header for this
 # request: x-amz-content-sha256 when region name is clearly invalid
 
@@ -1241,6 +1249,7 @@ class MockEMRClient(object):
 
         self._add_tags('AddTags', Tags, cluster)
 
+    @count_calls
     def describe_cluster(self, ClusterId):
         _validate_param_type(ClusterId, string_types)
         cluster = self._get_mock_cluster('DescribeCluster', ClusterId)

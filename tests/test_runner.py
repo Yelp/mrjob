@@ -204,42 +204,68 @@ class TestCatOutput(SandboxedTestCase):
         self.runner = InlineMRJobRunner(
             conf_paths=[], output_dir=self.output_dir)
 
-    # TODO: basic test, break up test below, test hidden files inside dirs,
-    # test "hidden" output dir
+    def test_empty(self):
+        self.assertEqual(list(self.runner.cat_output()), [])
 
-    # Test regression for #269
-    def test_part_files_in_subdirs_and_hidden_dirs(self):
-        a_dir_path = os.path.join(self.tmp_dir, 'a')
-        b_dir_path = os.path.join(self.tmp_dir, 'b')
-        l_dir_path = os.path.join(self.tmp_dir, '_logs')
-        os.mkdir(a_dir_path)
-        os.mkdir(b_dir_path)
-        os.mkdir(l_dir_path)
+    def test_typical_output(self):
+        # actual output
+        self.makefile(os.path.join(self.output_dir, 'part-00000'),
+                      b'line0\n')
+        self.makefile(os.path.join(self.output_dir, 'part-00001'),
+                      b'line1\n')
 
-        a_file_path = os.path.join(a_dir_path, 'part-00000')
-        b_file_path = os.path.join(b_dir_path, 'part-00001')
-        c_file_path = os.path.join(self.tmp_dir, 'part-00002')
-        x_file_path = os.path.join(l_dir_path, 'log.xml')
-        y_file_path = os.path.join(self.tmp_dir, '_SUCCESS')
+        # hidden .crc file
+        self.makefile(os.path.join(self.output_dir, '.crc.part-00000'),
+                      b'42\n')
 
-        with open(a_file_path, 'w') as f:
-            f.write('A')
+        # hidden _SUCCESS file (ignore)
+        self.makefile(os.path.join(self.output_dir, '_SUCCESS'),
+                      b'such a relief!\n')
 
-        with open(b_file_path, 'w') as f:
-            f.write('B')
+        # hidden _logs dir
+        self.makefile(os.path.join(self.output_dir, '_logs', 'log.xml'),
+                      b'pretty much the usual\n')
 
-        with open(c_file_path, 'w') as f:
-            f.write('C')
+        self.assertEqual(sorted(to_lines(self.runner.cat_output())),
+                         [b'line0\n', b'line1\n'])
 
-        with open(x_file_path, 'w') as f:
-            f.write('<XML XML XML/>')
+    def test_output_in_subdirs(self):
+        # test for output being placed in subdirs, for example with nicknack
+        self.makefile(os.path.join(self.output_dir, 'a', 'part-00000'),
+                      b'line-a0\n')
+        self.makefile(os.path.join(self.output_dir, 'a', 'part-00001'),
+                      b'line-a1\n')
 
-        with open(y_file_path, 'w') as f:
-            f.write('I win')
+        self.makefile(os.path.join(self.output_dir, 'b', 'part-00000'),
+                      b'line-b0\n')
 
-        runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
-        self.assertEqual(sorted(to_lines(runner.cat_output())),
-                         [b'A', b'B', b'C'])
+        self.makefile(os.path.join(self.output_dir, 'b', '.crc.part-00000'),
+                      b'42\n')
+
+        self.assertEqual(sorted(to_lines(self.runner.cat_output())),
+                         [b'line-a0\n', b'line-a1\n', b'line-b0\n'])
+
+    def test_read_all_non_hidden_files(self):
+        self.makefile(os.path.join(self.output_dir, 'baz'),
+                      b'qux\n')
+
+        self.makefile(os.path.join(self.output_dir, 'foo', 'bar'),
+                      b'baz\n')
+
+        self.assertEqual(sorted(to_lines(self.runner.cat_output())),
+                         [b'baz\n', b'qux\n'])
+
+    def test_empty_string_between_files(self):
+        self.makefile(os.path.join(self.output_dir, 'part-00000'), b'A')
+        self.makefile(os.path.join(self.output_dir, 'part-00001'), b'\n')
+        self.makefile(os.path.join(self.output_dir, 'part-00002'), b'C')
+
+        # order isn't guaranteed, but there should be 3 chunks separated
+        # by two empty strings
+        chunks = list(self.runner.cat_output())
+        self.assertEqual(len(chunks), 5)
+        self.assertEqual(chunks[1], b'')
+        self.assertEqual(chunks[3], b'')
 
     def test_deprecated_stream_output(self):
         self.makefile('part-00000', contents=b'1\n2')

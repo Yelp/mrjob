@@ -12,20 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the Spark Harness."""
+import inspect
 import uuid
-import os
 import random
 import string
 import sys
 import json
 from io import BytesIO
-from os.path import join
 from collections import defaultdict
 from contextlib import contextmanager
 from io import StringIO
+from os.path import abspath
+from os.path import dirname
+from os.path import join
 from tempfile import gettempdir
 from shutil import rmtree
 
+from mrjob.examples.mr_nick_nack import MRNickNack
+from mrjob.examples.mr_nick_nack_input_format import \
+    MRNickNackWithHadoopInputFormat
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
 from mrjob.local import LocalMRJobRunner
@@ -111,7 +116,7 @@ class MRSumValuesByWord(MRJob):
     reducer = combiner
 
 
-class SparkHarnessOutputComparisonTestCase(
+class SparkHarnessOutputComparisonBaseTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
 
     def _spark_harness_path(self):
@@ -133,11 +138,15 @@ class SparkHarnessOutputComparisonTestCase(
 
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
-                     job_args=None, first_step_num=None, last_step_num=None,
-                     counter_output_dir=None):
+                     job_args=None, spark_conf=None, first_step_num=None,
+                     last_step_num=None, counter_output_dir=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
+        if spark_conf:
+            for key, value in spark_conf.items():
+                harness_job_args.append('--jobconf')
+                harness_job_args.append('%s=%s' % (key, value))
         if compression_codec:
             harness_job_args.append('--compression-codec')
             harness_job_args.append(compression_codec)
@@ -191,6 +200,10 @@ class SparkHarnessOutputComparisonTestCase(
             harness_output = sorted(to_lines(runner.cat_output()))
 
         self.assertEqual(harness_output, reference_output)
+
+
+class SparkHarnessOutputComparisonTestCase(
+        SparkHarnessOutputComparisonBaseTestCase):
 
     def test_basic_job(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
@@ -396,6 +409,99 @@ class SparkHarnessOutputComparisonTestCase(
 
         assert combined_reference_counter == harness_counter
 
+
+
+class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):
+
+    SPARK_CONF = {
+        'spark.jars': abspath(join(
+            dirname(inspect.getsourcefile(MRNickNack)),
+            'nicknack-1.0.1.jar')),
+
+        # limit tests to a single executor
+        'spark.executor.cores': 1,
+        'spark.cores.max': 1,
+    }
+
+    def test_hadoop_output_format(self):
+        input_bytes = b'ee eye ee eye oh'
+
+        job = self._harness_job(
+            MRNickNack, input_bytes=input_bytes, runner_alias='local',
+            spark_conf=self.SPARK_CONF)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 'e')))
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 'o')))
+
+            output_counts = dict(
+                line.strip().split(b'\t')
+                for line in to_lines(runner.cat_output()))
+
+        expected_output_counts = {
+            b'"ee"': b'2', b'"eye"': b'2', b'"oh"': b'1'}
+
+        self.assertEqual(expected_output_counts, output_counts)
+
+    def test_hadoop_output_format_with_compression(self):
+        input_bytes = b"one two one two"
+        compression_codec = 'org.apache.hadoop.io.compress.GzipCodec'
+
+        job = self._harness_job(
+            MRNickNack, input_bytes=input_bytes, runner_alias='local',
+            spark_conf=self.SPARK_CONF, compression_codec=compression_codec)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 'o', 'part*.gz')))
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 't', 'part*.gz')))
+
+            output_counts = dict(
+                line.strip().split(b'\t')
+                for line in to_lines(runner.cat_output()))
+
+        expected_output_counts = {b'"one"': b'2', b'"two"': b'2'}
+
+        self.assertEqual(expected_output_counts, output_counts)
+
+    def test_hadoop_input_format(self):
+        input_file_bytes = b'potato tomato'
+
+        manifest_filename = join(self.tmp_dir, 'manifest')
+        input1_filename = join(self.tmp_dir, 'input1')
+        input2_filename = join(self.tmp_dir, 'input2')
+
+        with open(input1_filename, 'wb') as input1_file:
+            input1_file.write(input_file_bytes)
+        with open(input2_filename, 'wb') as input2_file:
+            input2_file.write(input_file_bytes)
+
+        with open(manifest_filename, 'w') as manifest_file:
+            manifest_file.writelines([
+                '%s\n' % input1_filename, '%s\n' % input2_filename])
+
+        job = self._harness_job(
+            MRNickNackWithHadoopInputFormat, runner_alias='local',
+            spark_conf=self.SPARK_CONF, input_paths=([manifest_filename]))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output_counts = dict(
+                line.strip().split(b'\t')
+                for line in to_lines(runner.cat_output()))
+
+        expected_output_counts = {b'"tomato"': b'2', b'"potato"': b'2'}
+        self.assertEqual(expected_output_counts, output_counts)
 
 
 class PreservesPartitioningTestCase(SandboxedTestCase):

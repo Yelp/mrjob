@@ -108,10 +108,6 @@ class SparkMRJobRunner(MRJobBinRunner):
         # module name
         self._job_script_zip_path = None
 
-        # could raise an exception if *hadoop_input_format* and
-        # *hadoop_output_format* are set, but support for these these will be
-        # added shortly (see #1944)
-
     def _check_step(self, step, step_num):
         """Don't try to run steps that include commands or use manifests."""
         super(SparkMRJobRunner, self)._check_step(step, step_num)

@@ -675,6 +675,25 @@ def hadoop_fs_test(stdout, stderr, environ, *args):
         return 1
 
 
+def hadoop_fs_touchz(stdout, stderr, environ, *args):
+    """Implements hadoop fs -touchz'"""
+    # TODO: check what hadoop fs -touchz prints once I have internet access
+    if len(args) < 1:
+        print('Usage: java FsShell [-touchz <dst>]')
+
+    dst = args[0]
+    path = hdfs_uri_to_real_path(dst, environ)
+
+    if os.path.exists(path):
+        # TODO: check actual message and return code
+        print('%s already exists!' % path)
+        return -1
+    else:
+        with open(path, 'w'):
+            pass
+        return 0
+
+
 def hadoop_jar(stdout, stderr, environ, *args):
     if len(args) < 1:
         print('RunJar jarFile [mainClass] args...', file=stderr)

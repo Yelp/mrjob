@@ -508,6 +508,15 @@ class SubnetTestCase(MockBoto3TestCase):
         self.assertEqual(cluster['Ec2InstanceAttributes'].get('Ec2SubnetId'),
                          None)
 
+    def test_blank_out_subnet_in_mrjob_conf(self):
+        # regression test for #1931
+        self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
+            subnet='subnet-ffffffff')))))
+
+        cluster = self.run_and_get_cluster('--subnet', '')
+        self.assertEqual(cluster['Ec2InstanceAttributes'].get('Ec2SubnetId'),
+                         None)
+
     def test_subnets_option(self):
         instance_fleets = [dict(
             InstanceFleetType='MASTER',

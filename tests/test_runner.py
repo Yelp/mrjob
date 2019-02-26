@@ -267,6 +267,17 @@ class TestCatOutput(SandboxedTestCase):
         self.assertEqual(chunks[1], b'')
         self.assertEqual(chunks[3], b'')
 
+    def test_output_dir_not_considered_hidden(self):
+        output_dir = os.path.join(self.tmp_dir, '_hidden', '_output_dir')
+
+        self.makefile(os.path.join(output_dir, 'part-00000'),
+                      b'cats\n')
+
+        runner = InlineMRJobRunner(conf_paths=[], output_dir=output_dir)
+
+        self.assertEqual(sorted(to_lines(runner.stream_output())),
+                         [b'cats\n'])
+
     def test_deprecated_stream_output(self):
         self.makefile(os.path.join(self.output_dir, 'part-00000'),
                       b'1\n2')

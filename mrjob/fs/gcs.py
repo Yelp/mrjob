@@ -61,8 +61,11 @@ class GCSFilesystem(Filesystem):
     """
     def __init__(self, local_tmp_dir=None, credentials=None, project_id=None):
         self._credentials = credentials
-        self._local_tmp_dir = local_tmp_dir
         self._project_id = project_id
+
+        if local_tmp_dir is not None:
+            log.warning('local_tmp_dir does nothing and will be removed'
+                        'in v0.7.0')
 
     @property
     def client(self):

@@ -352,6 +352,16 @@ class InterpreterTestCase(BasicTestCase):
         self.assertEqual(runner._interpreter(steps=True),
                          [sys.executable])
 
+    def test_empty_python_bin_means_default(self):
+        # interpreter and steps_python_bin opts are deprecated, so
+        # not bothering to test them
+        runner = MRJobBinRunner(python_bin=[], task_python_bin=[])
+
+        self.assertEqual(runner._python_bin(), [PYTHON_BIN])
+        self.assertEqual(runner._interpreter(), [PYTHON_BIN])
+        self.assertEqual(runner._interpreter(steps=True),
+                         [sys.executable])
+
     def test_interpreter(self):
         runner = MRJobBinRunner(interpreter=['ruby'])
         self.assertEqual(runner._interpreter(), ['ruby'])

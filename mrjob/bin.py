@@ -50,7 +50,6 @@ from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
 from mrjob.setup import parse_setup_cmd
-from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 from mrjob.util import unique
@@ -123,7 +122,6 @@ class MRJobBinRunner(MRJobRunner):
             super(MRJobBinRunner, self)._default_opts(),
             dict(
                 read_logs=True,
-                sh_bin=['/bin/sh', '-ex'],
             )
         )
 
@@ -132,14 +130,15 @@ class MRJobBinRunner(MRJobRunner):
         opt_value = super(MRJobBinRunner, self)._fix_opt(
             opt_key, opt_value, source)
 
+        # check that sh_bin doesn't have too many args
         if opt_key == 'sh_bin':
             # opt_value is usually a string, combiner makes it a list of args
             sh_bin = combine_cmds(opt_value)
 
-            if len(sh_bin) == 0:
-                raise ValueError('sh_bin (from %s) may not be empty!' % source)
+            # empty sh_bin just means to use the default, see #1926
+
             # make these hard requirements in v0.7.0?
-            elif len(sh_bin) > 1 and not os.path.isabs(sh_bin[0]):
+            if len(sh_bin) > 1 and not os.path.isabs(sh_bin[0]):
                 log.warning('sh_bin (from %s) should use an absolute path'
                             ' if you want it to take arguments' % source)
             elif len(sh_bin) > 2:
@@ -794,7 +793,11 @@ class MRJobBinRunner(MRJobRunner):
         if, for example, a runner needs different default values
         depending on circumstances (see :py:class:`~mrjob.emr.EMRJobRunner`).
         """
-        return self._opts['sh_bin']
+        return self._opts['sh_bin'] or self._default_sh_bin()
+
+    def _default_sh_bin(self):
+        """The default sh binary, if :mrjob-opt:`sh_bin` isn't set."""
+        return ['/bin/sh', '-ex']
 
     def _sh_pre_commands(self):
         """A list of lines to put at the very start of any sh script

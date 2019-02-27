@@ -1937,8 +1937,12 @@ class ShBinValidationTestCase(SandboxedTestCase):
 
         self.log = self.start(patch('mrjob.bin.log'))
 
-    def test_empty_sh_bin(self):
-        self.assertRaises(ValueError, MRJobBinRunner, sh_bin=[])
+    def test_empty_sh_bin_means_default(self):
+        runner = MRJobBinRunner(sh_bin=[])
+        self.assertFalse(self.log.warning.called)
+
+        default_sh_bin = MRJobBinRunner()._sh_bin()
+        self.assertEqual(runner._sh_bin(), default_sh_bin)
 
     def test_absolute_sh_bin(self):
         MRJobBinRunner(sh_bin=['/bin/zsh'])

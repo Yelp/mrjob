@@ -652,10 +652,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # where this issue is fixed. See #1548
         return self._image_version_gte(_BAD_BASH_IMAGE_VERSION)
 
-    def _sh_bin(self):
-        if self._opts['sh_bin']:
-            return self._opts['sh_bin']
-        elif self._bash_is_bad():
+    def _default_sh_bin(self):
+        if self._bash_is_bad():
             return _BAD_BASH_SH_BIN
         else:
             return _GOOD_BASH_SH_BIN

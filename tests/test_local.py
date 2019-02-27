@@ -896,6 +896,25 @@ class SortBinTestCase(SandboxedTestCase):
 
         self.assertEqual(sort_args[:2], ['sort', '-r'])
 
+    def test_empty_sort_bin_means_default(self):
+        job = MRGroup(['-r', 'local', '--sort-bin', ''])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbuffaloes\nbears'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                sorted(job.parse_output(runner.cat_output())),
+                [('a', ['apples']), ('b', ['buffaloes', 'bears'])])
+
+        self.assertTrue(self.check_call.called)
+        self.assertFalse(self._sort_lines_in_memory.called)
+
+        sort_args = self.check_call.call_args[0][0]
+        self.assertEqual(sort_args[:6],
+                         ['sort', '-t', '\t', '-k', '1,1', '-s'])
+
     def test_sort_in_memory_on_windows(self):
         self.start(patch('platform.system', return_value='Windows'))
 

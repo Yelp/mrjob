@@ -2503,7 +2503,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if isinstance(self._opts['subnet'], list):
                 matches = (subnet in self._opts['subnet'])
             else:
-                matches = (subnet == self._opts['subnet'])
+                # empty subnet is the same as no subnet. see #1931
+                matches = (subnet == (self._opts['subnet'] or None))
 
             if not matches:
                 log.debug('    subnet mismatch')

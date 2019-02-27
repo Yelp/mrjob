@@ -671,6 +671,37 @@ class ExtraClusterParamsTestCase(MockBoto3TestCase):
         self.assertEqual(cluster['AutoScalingRole'], 'HankPym')
         self.assertEqual(cluster['Name'], 'Dave')
 
+    def test_set_nested_param(self):
+        cluster = self.run_and_get_cluster(
+            '--zone', 'us-west-1a',
+            '--subnet', 'subnet-ffffffff',
+            '--extra-cluster-param',
+            'Instances.Placement.AvailabilityZone=danger-2a')
+
+        self.assertEqual(
+            cluster['Ec2InstanceAttributes']['Ec2AvailabilityZone'],
+            'danger-2a')
+
+        # shoudn't blow away subnet, also set in Instances
+        self.assertEqual(
+            cluster['Ec2InstanceAttributes']['Ec2SubnetId'],
+            'subnet-ffffffff')
+
+    def test_unset_nested_param(self):
+        cluster = self.run_and_get_cluster(
+            '--zone', 'us-west-1a',
+            '--subnet', 'subnet-ffffffff',
+            '--extra-cluster-param',
+            'Instances.Placement=null')
+
+        self.assertIsNone(
+            cluster['Ec2InstanceAttributes'].get('Ec2AvailabilityZone'))
+
+        # shoudn't blow away subnet, also set in Instances
+        self.assertEqual(
+            cluster['Ec2InstanceAttributes']['Ec2SubnetId'],
+            'subnet-ffffffff')
+
 
 class DeprecatedEMRAPIParamsTestCase(MockBoto3TestCase):
 

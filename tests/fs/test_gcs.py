@@ -21,6 +21,7 @@ from mrjob.fs.gcs import _CAT_CHUNK_SIZE
 
 from tests.compress import gzip_compress
 from tests.mock_google import MockGoogleTestCase
+from tests.py2 import Mock
 from tests.py2 import patch
 
 
@@ -237,3 +238,38 @@ class GCSFSTestCase(MockGoogleTestCase):
         self.fs.rm('gs://walrus/data')
         self.assertEqual(self.fs.exists('gs://walrus/data/foo'), False)
         self.assertEqual(self.fs.exists('gs://walrus/data/bar/baz'), False)
+
+
+class GCSFilesystemInitTestCase(MockGoogleTestCase):
+
+    def setUp(self):
+        super(GCSFilesystemInitTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.fs.gcs.log'))
+
+        self.Client = self.start(patch('google.cloud.storage.client.Client'))
+
+    def test_default(self):
+        fs = GCSFilesystem()
+        self.assertFalse(self.log.warning.called)
+
+        self.assertEqual(fs.client,
+                         self.Client(project=None, credentials=None))
+
+    def test_set_credentials_and_project_id(self):
+        creds = Mock()
+        project_id = 'alan-parsons'
+
+        fs = GCSFilesystem(credentials=creds, project_id=project_id)
+        self.assertFalse(self.log.warning.called)
+
+        self.assertEqual(fs.client,
+                         self.Client(project=project_id, credentials=creds))
+
+    def test_local_tmp_dir_is_deprecated_and_does_nothing(self):
+        fs = GCSFilesystem(local_tmp_dir=self.tmp_dir)
+        self.assertTrue(self.log.warning.called)
+
+        self.assertEqual(fs.client,
+                         self.Client(project=None, credentials=None))
+        self.assertFalse(hasattr(fs, '_local_tmp_dir'))

@@ -182,6 +182,15 @@ class GetSparkSubmitBinTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(runner.get_spark_submit_bin(),
                              ['spork-submit', '-kfc'])
 
+    def test_empty_spark_submit_bin_means_default(self):
+        job = MRNullSpark(['-r', 'local',
+                           '--spark-submit-bin', ''])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner.get_spark_submit_bin(),
+                             ['spork-submit'])
+
 
 class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
 

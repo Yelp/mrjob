@@ -5589,10 +5589,15 @@ class ProgressHtmlOverSshTestCase(MockBoto3TestCase):
 
         self.assertFalse(self._ssh_run.called)
 
-    def test_no_ssh_bin(self):
-        self.assertIsNone(self._launch_and_get_progress_html('--ssh-bin', ''))
+    def test_empty_ssh_bin_means_default(self):
+        html = self._launch_and_get_progress_html('--ssh-bin', '')
 
-        self.assertFalse(self._ssh_run.called)
+        self.assertIsNotNone(html)
+        self._ssh_run.assert_called_once_with(
+            self.MOCK_MASTER,
+            ['curl', self.MOCK_JOB_TRACKER_URL])
+
+        self.assertEqual(html, self._ssh_run.return_value[0])
 
     def test_no_key_pair_file(self):
         self.assertIsNone(self._launch_and_get_progress_html(

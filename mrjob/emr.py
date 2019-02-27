@@ -461,8 +461,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 pool_name='default',
                 pool_wait_minutes=0,
                 region=_DEFAULT_EMR_REGION,
-                sh_bin=None,  # see _sh_bin(), below
-                ssh_bin=['ssh'],
                 visible_to_all_users=True,
             )
         )
@@ -652,10 +650,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # where this issue is fixed. See #1548
         return self._image_version_gte(_BAD_BASH_IMAGE_VERSION)
 
-    def _sh_bin(self):
-        if self._opts['sh_bin']:
-            return self._opts['sh_bin']
-        elif self._bash_is_bad():
+    def _default_sh_bin(self):
+        if self._bash_is_bad():
             return _BAD_BASH_SH_BIN
         else:
             return _GOOD_BASH_SH_BIN
@@ -676,9 +672,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
             if self._opts['ec2_key_pair_file']:
                 self._fs.add_fs('ssh', SSHFilesystem(
-                    ssh_bin=self._opts['ssh_bin'],
+                    ssh_bin=self._ssh_bin(),
                     ec2_key_pair_file=self._opts['ec2_key_pair_file']))
-
 
             self._fs.add_fs('s3', S3Filesystem(
                 aws_access_key_id=self._opts['aws_access_key_id'],
@@ -872,6 +867,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # part size is in MB, as the minimum is 5 MB
         return int((self._opts['cloud_part_size_mb'] or 0) * 1024 * 1024)
 
+    def _ssh_bin(self):
+        # the args of the ssh binary
+        return self._opts['ssh_bin'] or ['ssh']
+
     def _set_up_ssh_tunnel_and_hdfs(self):
         if hasattr(self.fs, 'hadoop'):
             self.fs.hadoop.set_hadoop_bin(self._ssh_hadoop_bin())
@@ -905,7 +904,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _ssh_tunnel_args(self, bind_port):
         for opt_name in ('ec2_key_pair', 'ec2_key_pair_file',
-                         'ssh_bin', 'ssh_bind_ports'):
+                         'ssh_bind_ports'):
             if not self._opts[opt_name]:
                 log.warning(
                     "  You must set %s in order to set up the SSH tunnel!"
@@ -917,7 +916,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if not host:
             return
 
-        return self._opts['ssh_bin'] + [
+        return self._ssh_bin() + [
             '-o', 'VerifyHostKeyDNS=no',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'ExitOnForwardFailure=yes',
@@ -928,15 +927,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         ]
 
     def _ssh_hadoop_bin(self):
-        if not (self._opts['ec2_key_pair_file'] and
-                self._opts['ssh_bin']):
+        if not self._opts['ec2_key_pair_file']:
             return []
 
         host = self._address_of_master()
         if not host:
             return []
 
-        return self._opts['ssh_bin'] + [
+        return self._ssh_bin() + [
             '-o', 'VerifyHostKeyDNS=no',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'ExitOnForwardFailure=yes',
@@ -1752,9 +1750,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         ``None``"""
         host = self._address_of_master()
 
-        if not (self._opts['ssh_bin'] and
-                self._opts['ec2_key_pair_file'] and
-                host):
+        if not self._opts['ec2_key_pair_file']:
             return None
 
         if not host:

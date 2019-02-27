@@ -194,8 +194,12 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         if self._fs is None:
             self._fs = CompositeFilesystem()
 
+            # don't pass [] to fs; this means not to use hadoop until
+            # fs.set_hadoop_bin() is called (used for running hadoop over SSH).
+            hadoop_bin = self._opts['hadoop_bin'] or None
+
             self._fs.add_fs('hadoop',
-                            HadoopFilesystem(self._opts['hadoop_bin']))
+                            HadoopFilesystem(hadoop_bin))
             self._fs.add_fs('local', LocalFilesystem())
 
         return self._fs

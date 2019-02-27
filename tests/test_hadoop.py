@@ -1548,3 +1548,31 @@ class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
             runner._warn_about_spark_archives(runner._get_step(0))
 
         self.assertFalse(self.log.warning.called)
+
+
+class GetHadoopBinTestCase(MockHadoopTestCase):
+    # mostly exists to test --hadoop-bin ''
+
+    def test_default(self):
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner.get_hadoop_bin(),
+                             [self.hadoop_bin])
+
+    def test_custom_hadoop_bin(self):
+        job = MRTwoStepJob(['-r', 'hadoop', '--hadoop-bin', 'hadoop -v'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner.get_hadoop_bin(),
+                             ['hadoop', '-v'])
+
+    def test_empty_hadoop_bin_means_find_hadoop_bin(self):
+        job = MRTwoStepJob(['-r', 'hadoop', '--hadoop-bin', ''])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner.get_hadoop_bin(),
+                             [self.hadoop_bin])

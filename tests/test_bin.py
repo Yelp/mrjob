@@ -1636,13 +1636,15 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 ]
             )
 
-    def test_file_args(self):
+    def test_non_yarn_file_args(self):
         # non-YARN runners don't support archives or hash paths
         foo1_path = self.makefile('foo1')
         foo2_path = self.makefile('foo2')
 
         job = MRNullSpark([
             '-r', 'spark',
+            # local master has no working dir
+            '--spark-master', 'local-cluster[1,2,1024]',
             '--files', '%s,%s' % (foo1_path, foo2_path),
         ])
         job.sandbox()
@@ -1652,7 +1654,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0), [
-                    '--master', 'local[*]',
+                    '--master', 'local-cluster[1,2,1024]',
                     '--deploy-mode', 'client',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--files',
@@ -1666,7 +1668,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         qux_path = self.makefile('qux')
 
         job = MRNullSpark([
-            '-r', 'local',
+            '-r', 'spark',
             '--extra-file', qux_path,  # file upload arg
         ])
         job.sandbox()
@@ -1675,37 +1677,35 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             runner._upload_mgr = _mock_upload_mgr()
 
             self.assertEqual(
-                runner._spark_submit_args(0), (
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy')
-                    ) + [
-                        '--files',
-                        runner._upload_mgr.uri(qux_path) + '#qux'
-                    ]
-                )
+                runner._spark_submit_args(0),[
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--files',
+                    runner._upload_mgr.uri(qux_path),
+                ]
             )
 
-    def test_override_spark_upload_args(self):
+    def test_override_spark_upload_args_method(self):
         # just confirm that _spark_submit_args() uses _spark_upload_args()
         self.start(patch('mrjob.bin.MRJobBinRunner._spark_upload_args',
                          return_value=['--files', 'foo,bar']))
 
-        job = MRNullSpark(['-r', 'local'])
+        job = MRNullSpark(['-r', 'spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_submit_args(0), (
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy')
-                    ) + [
-                        '--files', 'foo,bar',
-                    ]
-                )
+                runner._spark_submit_args(0), [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--files', 'foo,bar',
+                ]
             )
 
     def test_py_files(self):
-        job = MRNullSpark(['-r', 'local'])
+        job = MRNullSpark(['-r', 'spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1714,18 +1714,17 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             )
 
             self.assertEqual(
-                runner._spark_submit_args(0), (
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy')
-                    ) + [
-                        '--py-files',
-                        '<first py_file>,<second py_file>'
-                    ]
-                )
+                runner._spark_submit_args(0), [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--py-files',
+                    '<first py_file>,<second py_file>'
+                ]
             )
 
     def test_spark_jar_step(self):
-        job = MRSparkJar(['-r', 'local',
+        job = MRSparkJar(['-r', 'spark',
                           '--jar-main-class', 'foo.Bar',
                           '--cmdenv', 'BAZ=qux',
                           '-D', 'QUX=baz'])
@@ -1739,25 +1738,27 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             # should handle cmdenv and --class
             # but not set PYSPARK_PYTHON or --py-files
             self.assertEqual(
-                runner._spark_submit_args(0), (
-                    ['--class', 'foo.Bar'] +
-                    self._expected_conf_args(
-                        cmdenv=dict(BAZ='qux'),
-                        jobconf=dict(QUX='baz')
-                    )
-                )
+                runner._spark_submit_args(0), [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--class', 'foo.Bar',
+                    '--conf', 'QUX=baz',
+                    '--conf', 'spark.executorEnv.BAZ=qux',
+                ]
             )
 
     def test_spark_script_step(self):
-        job = MRSparkScript(['-r', 'local'])
+        job = MRSparkScript(['-r', 'spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_submit_args(0),
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
-
+                runner._spark_submit_args(0), [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
 class CreateMrjobZipTestCase(SandboxedTestCase):
 

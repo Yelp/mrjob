@@ -412,9 +412,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # did we create the cluster we're running on?
         self._created_cluster = False
 
-        # when did our particular task start?
-        self._emr_job_start = None
-
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
 
@@ -1504,9 +1501,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.debug('Calling add_job_flow_steps(%s)' % ','.join(
             ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
         emr_client.add_job_flow_steps(**steps_kwargs)
-
-        # keep track of when we launched our job
-        self._emr_job_start = time.time()
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if hasattr(self.fs, 'ssh') and version_gte(

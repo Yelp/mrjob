@@ -413,12 +413,9 @@ class MRJobBinRunner(MRJobRunner):
         """
         return self._opts['libjars']
 
-    def _interpolate_step_args(self, args, step_num):
-        """Replace :py:data:`~mrjob.step.INPUT` and
-        :py:data:`~mrjob.step.OUTPUT` in arguments to a jar or Spark
-        step.
-
-        Also replaces `~mrjob.step.GENERIC_ARGS` with
+    def _interpolate_jar_step_args(self, args, step_num):
+        """Like :py:meth:`_interpolate_step_args` except it
+        also replaces `~mrjob.step.GENERIC_ARGS` with
         :py:meth:`_hadoop_generic_args_for_step`. This only
         makes sense for jar steps; Spark should raise an error
         if `~mrjob.step.GENERIC_ARGS` is encountered.
@@ -429,19 +426,10 @@ class MRJobBinRunner(MRJobRunner):
             if arg == mrjob.step.GENERIC_ARGS:
                 result.extend(
                     self._hadoop_generic_args_for_step(step_num))
-
-            elif arg == mrjob.step.INPUT:
-                result.append(
-                    ','.join(self._step_input_uris(step_num)))
-
-            elif arg == mrjob.step.OUTPUT:
-                result.append(
-                    self._step_output_uri(step_num))
-
             else:
                 result.append(arg)
 
-        return result
+        return self._interpolate_step_args(result, step_num)
 
     ### setup scripts ###
 
@@ -832,36 +820,6 @@ class MRJobBinRunner(MRJobRunner):
             [self._spark_script_path(step_num)] +
             self._spark_script_args(step_num, last_step_num)
         )
-
-    def _spark_script_args(self, step_num, last_step_num=None):
-        """A list of args to the spark script/jar, used by
-        _args_for_spark_step().
-
-        *last_step_num* is only used by the Spark runner, where multiple
-        streaming steps are run in a single Spark job."""
-        # TODO: this can also return args to the MRJob, which is confusing
-        step = self._get_step(step_num)
-
-        if step['type'] == 'spark':
-            args = (
-                [
-                    '--step-num=%d' % step_num,
-                    '--spark',
-                ] + self._mr_job_extra_args() + [
-                    mrjob.step.INPUT,
-                    mrjob.step.OUTPUT,
-                ]
-            )
-        elif step['type'] in ('spark_jar', 'spark_script'):
-            args = step['args']
-
-            if mrjob.step.GENERIC_ARGS in args:
-                raise ValueError(
-                    'GENERIC_ARGS is not allowed in spark steps')
-        else:
-            raise TypeError('Bad step type: %r' % step['type'])
-
-        return self._interpolate_step_args(args, step_num)
 
     def _run_spark_submit(self, spark_submit_args, env, record_callback):
         """Run the spark submit binary in a subprocess, using a PTY if possible

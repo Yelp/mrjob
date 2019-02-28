@@ -1878,7 +1878,7 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
 
             upload_args = cmd_line(runner._spark_upload_args())
 
-            self.assertIn('#foo', upload_args)
+            self.assertIn('foo', upload_args)
 
     def test_setup_interpolation(self):
         job = MRNullSpark(
@@ -1894,9 +1894,9 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
 
             upload_args = cmd_line(runner._spark_upload_args())
 
-            self.assertIn('#Makefile', upload_args)
-            self.assertIn('#python-wrapper.sh', upload_args)
-            self.assertIn('#foo', upload_args)
+            self.assertIn('Makefile', upload_args)
+            self.assertIn('python-wrapper.sh', upload_args)
+            self.assertIn('foo', upload_args)
 
             self.assertFalse(self.log.warning.called)
 
@@ -1915,10 +1915,10 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
 
             upload_args = cmd_line(runner._spark_upload_args())
 
-            self.assertIn('#foo', upload_args)
+            self.assertIn('foo', upload_args)
 
-            self.assertNotIn('#Makefile', upload_args)
-            self.assertNotIn('#python-wrapper.sh', upload_args)
+            self.assertNotIn('Makefile', upload_args)
+            self.assertNotIn('python-wrapper.sh', upload_args)
 
             self.assertTrue(self.log.warning.called)
 

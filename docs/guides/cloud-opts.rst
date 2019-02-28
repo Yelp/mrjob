@@ -392,6 +392,12 @@ Cluster software configuration
               SupportedProducts:
               - mapr-m3
 
+    .. versionchanged:: 0.6.8
+
+       You may use a *name* with dots in it to set (or unset) nested
+       properties. For example:
+       ``--extra-cluster-param Instances.EmrManagedMasterSecurityGroup=sg-foo``.
+
     .. versionadded:: 0.6.0
 
        This replaces the old `emr_api_params` option, which only worked

@@ -427,7 +427,7 @@ class MRJobBinRunner(MRJobRunner):
                 result.extend(
                     self._hadoop_generic_args_for_step(step_num))
             else:
-                result.append(args)
+                result.append(arg)
 
         return self._interpolate_step_args(result, step_num)
 

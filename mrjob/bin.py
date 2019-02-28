@@ -1028,10 +1028,10 @@ class MRJobBinRunner(MRJobRunner):
         return args
 
     def _spark_master(self):
-        return self._opts.get('spark_master') or None
+        return self._opts.get('spark_master') or 'local[*]'
 
     def _spark_deploy_mode(self):
-        return self._opts.get('spark_deploy_mode') or None
+        return self._opts.get('spark_deploy_mode') or 'client'
 
     def _spark_upload_args(self):
         # if using a setup script, upload all files to working dir

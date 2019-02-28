@@ -106,15 +106,6 @@ class SparkMRJobRunner(MRJobBinRunner):
         # *hadoop_output_format* are set, but support for these these will be
         # added shortly (see #1944)
 
-    def _default_opts(self):
-        return combine_dicts(
-            super(SparkMRJobRunner, self)._default_opts(),
-            dict(
-                spark_master='local[*]',
-                spark_deploy_mode='client',
-            )
-        )
-
     def _check_step(self, step, step_num):
         """Don't try to run steps that include commands or use manifests."""
         super(SparkMRJobRunner, self)._check_step(step, step_num)

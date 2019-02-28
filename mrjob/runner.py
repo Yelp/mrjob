@@ -46,6 +46,7 @@ from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
+from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.step import _is_spark_step_type
 from mrjob.step import _is_pyspark_step_type
@@ -930,6 +931,52 @@ class MRJobRunner(object):
                     result.append(self._working_dir_mgr.name(**extra_arg))
             else:
                 result.append(extra_arg)
+
+        return result
+
+    def _spark_script_args(self, step_num, last_step_num=None):
+        """A list of args to the spark script/jar/MRJob, used by
+        _args_for_spark_step().
+
+        *last_step_num* is only used by the Spark runner, where multiple
+        streaming steps are run in a single Spark job."""
+        step = self._get_step(step_num)
+
+        if step['type'] == 'spark':
+            args = (
+                [
+                    '--step-num=%d' % step_num,
+                    '--spark',
+                ] + self._mr_job_extra_args() + [
+                    INPUT,
+                    OUTPUT,
+                ]
+            )
+        elif step['type'] in ('spark_jar', 'spark_script'):
+            args = step['args']
+        else:
+            raise TypeError('Bad step type: %r' % step['type'])
+
+        return self._interpolate_step_args(args, step_num)
+
+    def _interpolate_step_args(self, args, step_num):
+        """Replace :py:data:`~mrjob.step.INPUT` and
+        :py:data:`~mrjob.step.OUTPUT` in arguments to a jar or Spark
+        step.
+        """
+        result = []
+
+        for arg in args:
+            if arg == INPUT:
+                result.append(
+                    ','.join(self._step_input_uris(step_num)))
+
+            elif arg == OUTPUT:
+                result.append(
+                    self._step_output_uri(step_num))
+
+            else:
+                result.append(arg)
 
         return result
 

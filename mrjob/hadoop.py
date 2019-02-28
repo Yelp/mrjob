@@ -510,7 +510,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
         if step.get('args'):
             args.extend(
-                self._interpolate_step_args(step['args'], step_num))
+                self._interpolate_jar_step_args(step['args'], step_num))
 
         return args
 

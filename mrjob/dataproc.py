@@ -647,7 +647,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         hadoop_job = {}
 
         hadoop_job['args'] = (
-            self._interpolate_step_args(step['args'], step_num))
+            self._interpolate_jar_step_args(step['args'], step_num))
 
         jar_uri = self._upload_mgr.uri(step['jar'])
 

@@ -992,7 +992,8 @@ class MRJobBinRunner(MRJobRunner):
         jobconf = {}
         for key, value in self._spark_cmdenv(step_num).items():
             jobconf['spark.executorEnv.%s' % key] = value
-            jobconf['spark.yarn.appMasterEnv.%s' % key] = value
+            if self._spark_master() == 'yarn':  # YARN only, see #1919
+                jobconf['spark.yarn.appMasterEnv.%s' % key] = value
 
         jobconf.update(self._jobconf_for_step(step_num))
 

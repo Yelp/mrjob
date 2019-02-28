@@ -56,6 +56,7 @@ from tests.py2 import patch
 from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.sandbox import SingleSparkContextTestCase
 from tests.sandbox import mrjob_conf_patcher
 
 
@@ -1223,221 +1224,300 @@ class SparkScriptArgsTestCase(GenericLocalRunnerTestCase):
                 runner._spark_script_args, 0)
 
 
-class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
+class SparkSubmitArgsTestCase(SandboxedTestCase):
+    # mostly testing on the spark runner because it doesn't override
+    # _spark_submit_args(), _spark_master(), or _spark_deploy_mode()
 
     def setUp(self):
         super(SparkSubmitArgsTestCase, self).setUp()
-
-        self.start(patch('mrjob.bin.MRJobBinRunner._python_bin',
-                         return_value=['mypy']))
 
         # bootstrapping mrjob is tested below in SparkPyFilesTestCase
         self.start(patch('mrjob.bin.MRJobBinRunner._bootstrap_mrjob',
                          return_value=False))
 
-    def _expected_conf_args(self, cmdenv=None, jobconf=None):
-        conf = {}
-
-        if cmdenv:
-            for key, value in cmdenv.items():
-                conf['spark.executorEnv.%s' % key] = value
-                conf['spark.yarn.appMasterEnv.%s' % key] = value
-
-        if jobconf:
-            conf.update(jobconf)
-
-        args = []
-
-        for key, value in sorted(conf.items()):
-            args.extend(['--conf', '%s=%s' % (key, value)])
-
-        return args
+    def _expected_conf_args(self, cmdenv=None, jobconf=None, yarn=False):
+        from unittest import SkipTest
+        raise SkipTest
 
     def test_default(self):
-        job = MRNullSpark(['-r', 'local'])
+        job = MRNullSpark(['-r', 'spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
     def test_spark_master_and_deploy_mode(self):
-        self.start(patch('mrjob.bin.MRJobBinRunner._spark_master',
-                         return_value='yoda'))
-        self.start(patch('mrjob.bin.MRJobBinRunner._spark_deploy_mode',
-                         return_value='the-force'))
-
-        job = MRNullSpark(['-r', 'local'])
+        job = MRNullSpark([
+            '-r', 'spark',
+            '--spark-master', 'yoda',
+            '--spark-deploy-mode', 'the-force',
+        ])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                ['--master', 'yoda', '--deploy-mode', 'the-force'] +
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+                [
+                    '--master', 'yoda',
+                    '--deploy-mode', 'the-force',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
-    def test_empty_string_spark_master_and_deploy_mode(self):
-        self.start(patch('mrjob.bin.MRJobBinRunner._spark_master',
-                         return_value=''))
-        self.start(patch('mrjob.bin.MRJobBinRunner._spark_deploy_mode',
-                         return_value=''))
-
-        job = MRNullSpark(['-r', 'local'])
+    def test_empty_spark_master_and_deploy_mode_mean_defaults(self):
+        job = MRNullSpark([
+            '-r', 'spark',
+            '--spark-master', '',
+            '--spark-deploy-mode', '',
+        ])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
     def test_cmdenv(self):
-        job = MRNullSpark(['-r', 'local',
-                           '--cmdenv', 'FOO=bar', '--cmdenv', 'BAZ=qux'])
+        job = MRNullSpark(['-r', 'spark',
+                           '--cmdenv', 'FOO=bar',
+                           '--cmdenv', 'BAZ=qux'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='mypy', FOO='bar', BAZ='qux')))
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.BAZ=qux',
+                    '--conf', 'spark.executorEnv.FOO=bar',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
+
+    def test_custom_python_bin(self):
+        job = MRNullSpark(['-r', 'spark',
+                           '--python-bin', 'mypy'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=mypy',
+                ]
+            )
 
     def test_cmdenv_can_override_python_bin(self):
-        job = MRNullSpark(['-r', 'local', '--cmdenv', 'PYSPARK_PYTHON=ourpy'])
+        job = MRNullSpark(['-r', 'spark', '--cmdenv', 'PYSPARK_PYTHON=ourpy'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='ourpy')))
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=ourpy',
+                ]
+            )
 
     def test_spark_cmdenv_method(self):
         # test that _spark_submit_args() uses _spark_cmdenv(),
         # so we can just test _spark_cmdenv() in other test cases
         hard_coded_env = dict(FOO='bar')
 
-        self.start(patch('mrjob.local.LocalMRJobRunner._spark_cmdenv',
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_cmdenv',
                          return_value=hard_coded_env, create=True))
 
-        job = MRNullSpark(['-r', 'local'])
+        job = MRNullSpark(['-r', 'spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                self._expected_conf_args(cmdenv=hard_coded_env))
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.FOO=bar',
+                ]
+            )
 
     def test_jobconf(self):
-        job = MRNullSpark(['-r', 'local',
+        job = MRNullSpark(['-r', 'spark',
                            '-D', 'spark.executor.memory=10g'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='mypy'),
-                    jobconf={'spark.executor.memory': '10g'}))
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executor.memory=10g',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
-    def test_jobconf_uses_jobconf_for_step(self):
-        job = MRNullSpark(['-r', 'local'])
+    def test_jobconf_uses_jobconf_for_step_method(self):
+        job = MRNullSpark(['-r', 'spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
-            with patch.object(
-                    runner, '_jobconf_for_step',
-                    return_value=dict(foo='bar')) as mock_jobconf_for_step:
+            self.start(patch.object(
+                runner, '_jobconf_for_step', return_value=dict(foo='bar')))
 
-                self.assertEqual(
-                    runner._spark_submit_args(0),
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy'),
-                        jobconf=dict(foo='bar')))
-
-                mock_jobconf_for_step.assert_called_once_with(0)
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'foo=bar',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
     def test_jobconf_can_override_python_bin_and_cmdenv(self):
         job = MRNullSpark(
-            ['-r', 'local',
+            ['-r', 'spark',
              '--cmdenv', 'FOO=bar',
+             '--python-bin', 'mypy',
              '-D', 'spark.executorEnv.FOO=baz',
-             '-D', 'spark.yarn.appMasterEnv.PYSPARK_PYTHON=ourpy'])
+             '-D', 'spark.executorEnv.PYSPARK_PYTHON=ourpy'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                self._expected_conf_args(
-                    jobconf={
-                        'spark.executorEnv.FOO': 'baz',
-                        'spark.executorEnv.PYSPARK_PYTHON': 'mypy',
-                        'spark.yarn.appMasterEnv.FOO': 'bar',
-                        'spark.yarn.appMasterEnv.PYSPARK_PYTHON': 'ourpy',
-                    }
-                )
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.FOO=baz',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=ourpy',
+                ]
+            )
+
+    def test_yarn_app_master_env(self):
+        job = MRNullSpark(
+            ['-r', 'spark',
+             '--spark-master', 'yarn',
+             '--cmdenv', 'FOO=bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                [
+                    '--master', 'yarn',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.FOO=bar',
+                    '--conf',
+                    'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--conf', 'spark.yarn.appMasterEnv.FOO=bar',
+                    '--conf',
+                    'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
+
+    def test_spark_master_method_triggers_yarn_app_master_env(self):
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_master',
+                         return_value='yarn'))
+
+        job = MRNullSpark(['-r', 'spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                [
+                    '--master', 'yarn',
+                    '--deploy-mode', 'client',
+                    '--conf',
+                    'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--conf',
+                    'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
             )
 
     def test_non_string_jobconf_values_in_mrjob_conf(self):
         # regression test for #323
-        MRJOB_CONF = dict(runners=dict(local=dict(jobconf=dict(
+        MRJOB_CONF = dict(runners=dict(spark=dict(jobconf=dict(
             BAX=True,
             BAZ=False,
             FOO=None,
             QUX='null',
         ))))
+        self.start(mrjob_conf_patcher(MRJOB_CONF))
 
-        with mrjob_conf_patcher(MRJOB_CONF):
-            job = MRNullSpark(['-r', 'local'])
-            job.sandbox()
+        job = MRNullSpark(['-r', 'spark'])
+        job.sandbox()
 
-            with job.make_runner() as runner:
-                # FOO is blanked out because it's None (use "null")
-                self.assertEqual(
-                    runner._spark_submit_args(0),
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy'),
-                        jobconf=dict(
-                            BAX='true',
-                            BAZ='false',
-                            QUX='null',
-                        )
-                    )
-                )
+        with job.make_runner() as runner:
+            # FOO is blanked out because it's None (use "null")
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'BAX=true',
+                    '--conf', 'BAZ=false',
+                    '--conf', 'QUX=null',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
     def test_libjars_option(self):
         fake_libjar = self.makefile('fake_lib.jar')
 
         job = MRNullSpark(
-            ['-r', 'local', '--libjars', fake_libjar])
+            ['-r', 'spark', '--libjars', fake_libjar])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                ['--jars', fake_libjar] +
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--jars', fake_libjar,
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
     def test_deprecated_libjar_switch(self):
         fake_libjar = self.makefile('fake_lib.jar')
 
         job = MRNullSpark(
-            ['-r', 'local', '--libjar', fake_libjar])
+            ['-r', 'spark', '--libjar', fake_libjar])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                ['--jars', fake_libjar] +
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--jars', fake_libjar,
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
     def test_libjar_paths_override(self):
-        job = MRNullSpark(['-r', 'local'])
+        job = MRNullSpark(['-r', 'spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1447,78 +1527,87 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0),
-                ['--jars', 's3://a/a.jar,s3://b/b.jar'] +
-                self._expected_conf_args(
-                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--jars', 's3://a/a.jar,s3://b/b.jar',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                ]
+            )
 
-    def test_option_spark_args(self):
-        job = MRNullSpark(['-r', 'local',
+    def test_spark_args_switch(self):
+        job = MRNullSpark(['-r', 'spark',
                            '--spark-args=--name Dave'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_submit_args(0), (
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy')) +
-                    ['--name', 'Dave']
-                )
+                runner._spark_submit_args(0),
+                [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--name', 'Dave',
+                ]
             )
 
     def test_deprecated_spark_arg_switch(self):
-        job = MRNullSpark(['-r', 'local',
+        job = MRNullSpark(['-r', 'spark',
                            '--spark-arg=--name',
                            '--spark-arg=Dave'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_submit_args(0), (
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy')) +
-                    ['--name', 'Dave']
-                )
+                runner._spark_submit_args(0), [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--name', 'Dave',
+                ]
             )
 
     def test_job_spark_args(self):
         # --extra-spark-arg is a passthrough option for MRNullSpark
-        job = MRNullSpark(['-r', 'local',
+        job = MRNullSpark(['-r', 'spark',
                            '--extra-spark-arg=-v'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_submit_args(0), (
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy')) +
-                    ['-v']
-                )
+                runner._spark_submit_args(0), [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '-v',
+                ]
             )
 
     def test_job_spark_args_come_after_option_spark_args(self):
         job = MRNullSpark(
-            ['-r', 'local',
+            ['-r', 'spark',
              '--extra-spark-arg=-v',
              '--spark-args=--name Dave'])
         job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_submit_args(0), (
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy')) +
-                    ['--name', 'Dave', '-v']
-                )
+                runner._spark_submit_args(0), [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--name', 'Dave', '-v',
+                ]
             )
 
-    def test_file_args(self):
+    def test_yarn_file_args(self):
         foo1_path = self.makefile('foo1')
         foo2_path = self.makefile('foo2')
         baz_path = self.makefile('baz.tar.gz')
         qux_path = self.makedirs('qux')
 
         job = MRNullSpark([
-            '-r', 'local',
+            '-r', 'spark',
             '--files', '%s#foo1,%s#bar' % (foo1_path, foo2_path),
             '--archives', baz_path,
             '--dirs', qux_path,
@@ -1529,21 +1618,46 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             runner._upload_mgr = _mock_upload_mgr()
 
             self.assertEqual(
-                runner._spark_submit_args(0), (
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy')
-                    ) + [
-                        '--files',
-                        (runner._upload_mgr.uri(foo1_path) + '#foo1' +
-                         ',' +
-                         runner._upload_mgr.uri(foo2_path) + '#bar'),
-                        '--archives',
-                        runner._upload_mgr.uri(baz_path) + '#baz.tar.gz' +
-                        ',' +
-                        runner._upload_mgr.uri(
-                            runner._dir_archive_path(qux_path)) + '#qux'
-                    ]
-                )
+                runner._spark_submit_args(0), [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--files',
+                    (runner._upload_mgr.uri(foo1_path) + '#foo1' +
+                     ',' +
+                     runner._upload_mgr.uri(foo2_path) + '#bar'),
+                     '--archives',
+                     runner._upload_mgr.uri(baz_path) + '#baz.tar.gz' +
+                     ',' +
+                     runner._upload_mgr.uri(
+                         runner._dir_archive_path(qux_path)) + '#qux'
+                ]
+            )
+
+    def test_file_args(self):
+        # non-YARN runners don't support archives or hash paths
+        foo1_path = self.makefile('foo1')
+        foo2_path = self.makefile('foo2')
+
+        job = MRNullSpark([
+            '-r', 'spark',
+            '--files', '%s,%s' % (foo1_path, foo2_path),
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = _mock_upload_mgr()
+
+            self.assertEqual(
+                runner._spark_submit_args(0), [
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--files',
+                    (runner._upload_mgr.uri(foo1_path) +
+                     ',' +
+                     runner._upload_mgr.uri(foo2_path)),
+                ]
             )
 
     def test_file_upload_args(self):

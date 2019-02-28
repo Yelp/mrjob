@@ -69,7 +69,8 @@ else:
 
 def _mock_upload_mgr():
     def mock_uri(path):
-        return '<uri of %s>' % path
+        # use same filename as *path*
+        return 'uri-of://%s' % path
 
     m = Mock()
     m.uri = Mock(side_effect=mock_uri)
@@ -1623,11 +1624,12 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--deploy-mode', 'client',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--files',
-                    (runner._upload_mgr.uri(foo1_path) + '#foo1' +
+                    # foo1_path's URI has same name, no # needed
+                    (runner._upload_mgr.uri(foo1_path) +
                      ',' +
                      runner._upload_mgr.uri(foo2_path) + '#bar'),
                      '--archives',
-                     runner._upload_mgr.uri(baz_path) + '#baz.tar.gz' +
+                     runner._upload_mgr.uri(baz_path) +
                      ',' +
                      runner._upload_mgr.uri(
                          runner._dir_archive_path(qux_path)) + '#qux'

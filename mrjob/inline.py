@@ -179,21 +179,3 @@ class InlineMRJobRunner(SimMRJobRunner):
         """Get step descriptions without calling a subprocess."""
         job_args = ['--steps'] + self._mr_job_extra_args(local=True)
         return self._mrjob_cls(args=job_args)._steps_desc()
-
-    def _spark_script_args(self, step_num):
-        # TODO: this is a simpler version of _spark_script_args() in bin.py.
-        # Some of this code should be pushed up into runner.py
-        step = self._get_step(step_num)
-
-        if step['type'] != 'spark':
-            raise TypeError('Bad step type: %r' % step['type'])
-
-        return (
-            [
-                '--step-num=%d' % step_num,
-                '--spark',
-            ] + self._mr_job_extra_args() + [
-                ','.join(self._step_input_uris(step_num)),
-                self._step_output_uri(step_num),
-            ]
-        )

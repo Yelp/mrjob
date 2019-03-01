@@ -30,9 +30,6 @@ from zipfile import ZIP_DEFLATED
 from mrjob.bin import MRJobBinRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
-from mrjob.step import GENERIC_ARGS
-from mrjob.step import INPUT
-from mrjob.step import OUTPUT
 from mrjob.util import cmd_line
 from mrjob.util import which
 
@@ -163,35 +160,6 @@ class BootstrapMRJobTestCase(BasicTestCase):
         runner = MRJobBinRunner(
             conf_paths=[], interpreter=['ruby'], bootstrap_mrjob=True)
         self.assertEqual(runner._bootstrap_mrjob(), True)
-
-
-class GetSparkSubmitBinTestCase(GenericLocalRunnerTestCase):
-
-    def test_default(self):
-        job = MRNullSpark(['-r', 'local'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(runner.get_spark_submit_bin(),
-                             ['spark-submit'])
-
-    def test_spark_submit_bin_option(self):
-        job = MRNullSpark(['-r', 'local',
-                           '--spark-submit-bin', 'spork-submit -kfc'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(runner.get_spark_submit_bin(),
-                             ['spork-submit', '-kfc'])
-
-    def test_empty_spark_submit_bin_means_default(self):
-        job = MRNullSpark(['-r', 'local',
-                           '--spark-submit-bin', ''])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(runner.get_spark_submit_bin(),
-                             ['spork-submit'])
 
 
 class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
@@ -1116,135 +1084,7 @@ class SparkScriptPathTestCase(GenericLocalRunnerTestCase):
                 runner._spark_script_path, 0)
 
 
-class SparkScriptArgsTestCase(GenericLocalRunnerTestCase):
-
-    def setUp(self):
-        super(SparkScriptArgsTestCase, self).setUp()
-
-        # don't bother with actual input/output URIs, which
-        # are tested elsewhere
-        def mock_interpolate_step_args(args, step_num):
-            def interpolate(arg):
-                if arg == INPUT:
-                    return '<step %d input>' % step_num
-                elif arg == OUTPUT:
-                    return '<step %d output>' % step_num
-                else:
-                    return arg
-
-            return [interpolate(arg) for arg in args]
-
-        self.start(patch(
-            'mrjob.bin.MRJobBinRunner._interpolate_step_args',
-            side_effect=mock_interpolate_step_args))
-
-    def test_spark_mr_job(self):
-        job = MRNullSpark(['-r', 'local'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['--step-num=0',
-                 '--spark',
-                 '<step 0 input>',
-                 '<step 0 output>'])
-
-    def test_spark_passthrough_arg(self):
-        job = MRNullSpark(['-r', 'local', '--extra-spark-arg=--verbose'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['--step-num=0',
-                 '--spark',
-                 '--extra-spark-arg=--verbose',
-                 '<step 0 input>',
-                 '<step 0 output>'])
-
-    def test_spark_file_arg(self):
-        foo_path = self.makefile('foo')
-
-        job = MRNullSpark(['-r', 'local', '--extra-file', foo_path])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['--step-num=0',
-                 '--spark',
-                 '--extra-file',
-                 'foo',
-                 '<step 0 input>',
-                 '<step 0 output>'])
-
-            name_to_path = runner._working_dir_mgr.name_to_path('file')
-            self.assertIn('foo', name_to_path)
-            self.assertEqual(name_to_path['foo'], foo_path)
-
-    def test_spark_jar(self):
-        job = MRSparkJar(['-r', 'local',
-                          '--jar-arg', 'foo', '--jar-arg', 'bar'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['foo', 'bar'])
-
-    def test_spark_jar_interpolation(self):
-        job = MRSparkJar(['-r', 'local',
-                          '--jar-arg', OUTPUT, '--jar-arg', INPUT])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['<step 0 output>', '<step 0 input>'])
-
-    def test_spark_script(self):
-        job = MRSparkScript(['-r', 'local',
-                             '--script-arg', 'foo', '--script-arg', 'bar'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['foo', 'bar'])
-
-    def test_spark_script_interpolation(self):
-        job = MRSparkScript(['-r', 'local',
-                             '--script-arg', OUTPUT, '--script-arg', INPUT])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['<step 0 output>', '<step 0 input>'])
-
-    def test_generic_args_not_okay(self):
-        # GENERIC_ARGS is only for JarSteps (they're Hadoop generic args)
-        job = MRSparkScript(['-r', 'local',
-                             '--script-arg', GENERIC_ARGS])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertRaises(
-                ValueError,
-                runner._spark_script_args, 0)
-
-    def test_streaming_step_not_okay(self):
-        job = MRTwoStepJob(['-r', 'local'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertRaises(
-                TypeError,
-                runner._spark_script_args, 0)
-
-
-class SparkSubmitArgsTestCase(SandboxedTestCase):
+class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
     # mostly testing on the spark runner because it doesn't override
     # _spark_submit_args(), _spark_master(), or _spark_deploy_mode()
 
@@ -2105,10 +1945,10 @@ class GetSparkSubmitBinTestCase(SandboxedTestCase):
             'mrjob.bin.MRJobBinRunner._find_spark_submit_bin'))
 
     def test_do_nothing_on_init(self):
-        runner = MRJobBinRunner()
+        MRJobBinRunner()
         self.assertFalse(self.find_spark_submit_bin.called)
 
-    def test_find_spark_submit(self):
+    def test_default(self):
         runner = MRJobBinRunner()
         self.assertEqual(runner.get_spark_submit_bin(),
                          self.find_spark_submit_bin.return_value)
@@ -2127,6 +1967,15 @@ class GetSparkSubmitBinTestCase(SandboxedTestCase):
         self.assertEqual(runner.get_spark_submit_bin(),
                          ['/path/to/spark-submit'])
         self.assertFalse(self.find_spark_submit_bin.called)
+
+    def test_empty_string_submit_bin_means_default(self):
+        job = MRNullSpark(['-r', 'local',
+                           '--spark-submit-bin', ''])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner.get_spark_submit_bin(),
+                             self.find_spark_submit_bin.return_value)
 
 
 class FindSparkSubmitBinTestCase(SandboxedTestCase):

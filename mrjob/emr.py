@@ -1488,8 +1488,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._cluster_id = self._create_cluster()
             self._created_cluster = True
         else:
-            log.info('Adding our job to existing cluster %s (%s)' %
-                     (self._cluster_id, self._address_of_master()))
+            log.info('Adding our job to existing cluster %s' %
+                     self._cluster_id)
 
         # now that we know which cluster it is, check for Spark support
         if self._has_spark_steps():

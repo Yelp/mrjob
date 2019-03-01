@@ -181,8 +181,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             super(HadoopJobRunner, self)._default_opts(),
             dict(
                 hadoop_tmp_dir='tmp/mrjob',
-                spark_deploy_mode='client',
-                spark_master='yarn',
             )
         )
 
@@ -462,10 +460,13 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         and *spark_master* is not ``'yarn'``, warn that *upload_archives*
         will be ignored by Spark."""
         if (_is_spark_step_type(step['type']) and
-                self._opts['spark_master'] != 'yarn' and
+                self._spark_master() != 'yarn' and
                 self._opts['upload_archives']):
             log.warning('Spark will probably ignore archives because'
-                        " spark_master is not set to 'yarn'")
+                        " spark_master is not 'yarn'")
+
+    def _spark_master(self):
+        return self._opts['spark_master'] or 'yarn'
 
     def _args_for_step(self, step_num):
         step = self._get_step(step_num)

@@ -953,7 +953,8 @@ class MRJobBinRunner(MRJobRunner):
         jobconf = {}
         for key, value in self._spark_cmdenv(step_num).items():
             jobconf['spark.executorEnv.%s' % key] = value
-            jobconf['spark.yarn.appMasterEnv.%s' % key] = value
+            if self._spark_master() == 'yarn':  # YARN only, see #1919
+                jobconf['spark.yarn.appMasterEnv.%s' % key] = value
 
         jobconf.update(self._jobconf_for_step(step_num))
 
@@ -988,10 +989,10 @@ class MRJobBinRunner(MRJobRunner):
         return args
 
     def _spark_master(self):
-        return self._opts.get('spark_master') or None
+        return self._opts.get('spark_master') or 'local[*]'
 
     def _spark_deploy_mode(self):
-        return self._opts.get('spark_deploy_mode') or None
+        return self._opts.get('spark_deploy_mode') or 'client'
 
     def _spark_upload_args(self):
         # if using a setup script, upload all files to working dir

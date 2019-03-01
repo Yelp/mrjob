@@ -508,6 +508,15 @@ class SubnetTestCase(MockBoto3TestCase):
         self.assertEqual(cluster['Ec2InstanceAttributes'].get('Ec2SubnetId'),
                          None)
 
+    def test_blank_out_subnet_in_mrjob_conf(self):
+        # regression test for #1931
+        self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
+            subnet='subnet-ffffffff')))))
+
+        cluster = self.run_and_get_cluster('--subnet', '')
+        self.assertEqual(cluster['Ec2InstanceAttributes'].get('Ec2SubnetId'),
+                         None)
+
     def test_subnets_option(self):
         instance_fleets = [dict(
             InstanceFleetType='MASTER',
@@ -661,6 +670,37 @@ class ExtraClusterParamsTestCase(MockBoto3TestCase):
 
         self.assertEqual(cluster['AutoScalingRole'], 'HankPym')
         self.assertEqual(cluster['Name'], 'Dave')
+
+    def test_set_nested_param(self):
+        cluster = self.run_and_get_cluster(
+            '--zone', 'us-west-1a',
+            '--subnet', 'subnet-ffffffff',
+            '--extra-cluster-param',
+            'Instances.Placement.AvailabilityZone=danger-2a')
+
+        self.assertEqual(
+            cluster['Ec2InstanceAttributes']['Ec2AvailabilityZone'],
+            'danger-2a')
+
+        # shoudn't blow away subnet, also set in Instances
+        self.assertEqual(
+            cluster['Ec2InstanceAttributes']['Ec2SubnetId'],
+            'subnet-ffffffff')
+
+    def test_unset_nested_param(self):
+        cluster = self.run_and_get_cluster(
+            '--zone', 'us-west-1a',
+            '--subnet', 'subnet-ffffffff',
+            '--extra-cluster-param',
+            'Instances.Placement=null')
+
+        self.assertIsNone(
+            cluster['Ec2InstanceAttributes'].get('Ec2AvailabilityZone'))
+
+        # shoudn't blow away subnet, also set in Instances
+        self.assertEqual(
+            cluster['Ec2InstanceAttributes']['Ec2SubnetId'],
+            'subnet-ffffffff')
 
 
 class DeprecatedEMRAPIParamsTestCase(MockBoto3TestCase):
@@ -5589,10 +5629,15 @@ class ProgressHtmlOverSshTestCase(MockBoto3TestCase):
 
         self.assertFalse(self._ssh_run.called)
 
-    def test_no_ssh_bin(self):
-        self.assertIsNone(self._launch_and_get_progress_html('--ssh-bin', ''))
+    def test_empty_ssh_bin_means_default(self):
+        html = self._launch_and_get_progress_html('--ssh-bin', '')
 
-        self.assertFalse(self._ssh_run.called)
+        self.assertIsNotNone(html)
+        self._ssh_run.assert_called_once_with(
+            self.MOCK_MASTER,
+            ['curl', self.MOCK_JOB_TRACKER_URL])
+
+        self.assertEqual(html, self._ssh_run.return_value[0])
 
     def test_no_key_pair_file(self):
         self.assertIsNone(self._launch_and_get_progress_html(

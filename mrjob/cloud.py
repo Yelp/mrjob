@@ -20,6 +20,7 @@ import socket
 import random
 import signal
 import time
+from copy import deepcopy
 from os.path import basename
 from subprocess import Popen
 from subprocess import PIPE
@@ -410,9 +411,10 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
     def _add_extra_cluster_params(self, params):
         """Return a dict with the *extra_cluster_params* opt patched into
         *params*, and ``None`` values removed."""
-        params = params.copy()
-        params.update(self._opts['extra_cluster_params'])
-        params = {k: v for k, v in params.items() if v is not None}
+        params = deepcopy(params)
+
+        for k, v in sorted(self._opts['extra_cluster_params'].items()):
+            _patch_params(params, k, v)
 
         return params
 
@@ -597,3 +599,29 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:
             random.setstate(random_state)
+
+
+def _patch_params(params, name, value):
+    """Helper method for _add_extra_cluster_params().
+
+    Set *name* in *params* to *value*
+
+    If *name* has one or more dots in it, recursively set the value
+    in successive nested dictionaries, creating them if necessary.
+    For example, if *name* is ``Instances.EmrManagedMasterSecurityGroup``,
+    set ``params['Instances']['EmrManagedMasterSecurityGroup']``
+
+    If *value* is ``None``, delete the value (if it exists), rather than
+    setting it to ``None``.
+    """
+    if not isinstance(params, dict):
+        raise TypeError('must be a dictionary')
+
+    if '.' in name:
+        head, rest = name.split('.', 1)
+        _patch_params(params.setdefault(head, {}), rest, value)
+    elif value is None:
+        if name in params:
+            del params[name]
+    else:
+        params[name] = value

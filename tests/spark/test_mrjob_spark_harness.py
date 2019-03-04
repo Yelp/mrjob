@@ -21,7 +21,6 @@ from mrjob.job import MRJob
 from mrjob.local import LocalMRJobRunner
 from mrjob.protocol import TextProtocol
 from mrjob.spark import mrjob_spark_harness
-from mrjob.spark.mr_spark_harness import MRSparkHarness
 from mrjob.spark.mrjob_spark_harness import _run_combiner
 from mrjob.spark.mrjob_spark_harness import _run_reducer
 from mrjob.spark.mrjob_spark_harness import _shuffle_and_sort
@@ -34,6 +33,7 @@ from tests.mr_doubler import MRDoubler
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_spark_harness import MRSparkHarness
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_freq_count_with_combiner_cmd import \
      MRWordFreqCountWithCombinerCmd

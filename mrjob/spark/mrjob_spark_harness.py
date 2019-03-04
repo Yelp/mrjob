@@ -18,9 +18,11 @@ from importlib import import_module
 
 from mrjob.util import shlex_split
 
-# switches which mr_spark_harness.py passes through to the harness
+# tuples of (args, kwargs) for ArgumentParser.add_argument()
 #
-# these are tuples of (args, kwargs) for ArgumentParser.add_argument()
+# TODO: this is shared code with mr_spark_harness.py, which started out
+# in this directory but has since been moved to tests/. Totally fine to
+# inline this stuff and reduplicate it in mr_spark_harness.py
 _PASSTHRU_OPTIONS = [
     (['--job-args'], dict(
         default=None,

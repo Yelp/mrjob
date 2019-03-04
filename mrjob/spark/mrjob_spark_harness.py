@@ -14,9 +14,11 @@
 """A Spark script that can run a MRJob without Hadoop."""
 import sys
 from argparse import ArgumentParser
+from collections import defaultdict
 from importlib import import_module
 
 from mrjob.util import shlex_split
+from pyspark.accumulators import AccumulatorParam
 
 # tuples of (args, kwargs) for ArgumentParser.add_argument()
 #
@@ -50,9 +52,22 @@ _PASSTHRU_OPTIONS = [
 ]
 
 
+class CounterAccumulator(AccumulatorParam):
+
+    def zero(self, value):
+        return value
+
+    def addInPlace(self, value1, value2):
+        for key in value2:
+            value1[key] += value2[key]
+        return value1
+
+
 def main(cmd_line_args=None):
     if cmd_line_args is None:
         cmd_line_args = sys.argv[1:]
+    if stderr is None:
+        stderr = sys.stderr
 
     parser = _make_arg_parser()
     args = parser.parse_args(cmd_line_args)
@@ -62,14 +77,27 @@ def main(cmd_line_args=None):
     job_module = import_module(job_module_name)
     job_class = getattr(job_module, job_class_name)
 
+    # load initial data
+    from pyspark import SparkContext
+
     if args.job_args:
         job_args = shlex_split(args.job_args)
     else:
         job_args = []
 
+    sc = SparkContext()
+    counter = sc.accumulator(
+        defaultdict(int),
+        CounterAccumulator()
+    )
+    def increment_counter(group, name, amount=1):
+        nonlocal counter
+        counter += {(group, name):  amount}
+
     def make_job(*args):
         j = job_class(job_args + list(args))
         j.sandbox()  # so Spark doesn't try to serialize stdin
+        j.increment_counter = increment_counter
         return j
 
     # get job steps. don't pass --steps, which is deprecated
@@ -80,9 +108,6 @@ def main(cmd_line_args=None):
     end = None if args.last_step_num is None else args.last_step_num + 1
     steps_to_run = list(enumerate(steps))[start:end]
 
-    # load initial data
-    from pyspark import SparkContext
-    sc = SparkContext()
     rdd = sc.textFile(args.input_path, use_unicode=False)
 
     # run steps
@@ -92,6 +117,13 @@ def main(cmd_line_args=None):
     # write the results
     rdd.saveAsTextFile(
         args.output_path, compressionCodecClass=args.compression_codec)
+
+    prev_group = None
+    for (group, name), val in counter.value.items():
+        if group != prev_group:
+            print(group + ':')
+            prev_group = group
+        print('\t{}: {}'.format(name, val))
 
 
 def _run_step(step, step_num, rdd, make_job):

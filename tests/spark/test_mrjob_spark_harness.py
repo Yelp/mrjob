@@ -13,12 +13,17 @@
 # limitations under the License.
 """Test the Spark Harness."""
 import uuid
+import sys
 from io import BytesIO
 from os.path import join
+from contextlib import contextmanager
+from io import StringIO
 
+from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
 from mrjob.local import LocalMRJobRunner
+from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import TextProtocol
 from mrjob.spark import mrjob_spark_harness
 from mrjob.spark.mrjob_spark_harness import _run_combiner
@@ -41,6 +46,7 @@ from tests.py2 import Mock
 from tests.py2 import call
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
+from tests.mr_counting_job import MRCountingJob
 
 
 def _rev(s):
@@ -139,7 +145,7 @@ class SparkHarnessOutputComparisonTestCase(
         harness_job_args.extend(input_paths)
 
         harness_job = MRSparkHarness(harness_job_args)
-        harness_job.sandbox(stdin=BytesIO(input_bytes))
+        harness_job.sandbox(stdin=BytesIO(input_bytes), stdout=BytesIO(b''))
 
         return harness_job
 
@@ -342,6 +348,31 @@ class SparkHarnessOutputComparisonTestCase(
         self._assert_output_matches(
             MRWordFreqCountWithCombinerCmd, input_bytes=input_bytes)
 
+    @contextmanager
+    def captured_output(self):
+        new_out, new_err = StringIO(), StringIO()
+        old_out, old_err = sys.stdout, sys.stderr
+        try:
+            sys.stdout, sys.stderr = new_out, new_err
+            yield sys.stdout, sys.stderr
+        finally:
+            sys.stdout, sys.stderr = old_out, old_err
+
+    def test_increment_counter(self):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+        reference_job = self._reference_job(
+            MRCountingJob, input_bytes=input_bytes)
+        harness_job = self._harness_job(
+            MRCountingJob, input_bytes=input_bytes
+        )
+        with reference_job.make_runner() as runner:
+            runner.run()
+            reference_counter = parse_mr_job_stderr(reference_job.stderr)
+
+        with self.captured_output() as (out, err):
+            harness_counter = parse_mr_job_stderr(err)
+
+        assert reference_counter == harness_counter
 
 class PreservesPartitioningTestCase(SandboxedTestCase):
 

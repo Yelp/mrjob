@@ -62,12 +62,18 @@ class CounterAccumulator(AccumulatorParam):
             value1[key] += value2[key]
         return value1
 
+def print_counter_status(counter, output_stream):
+    prev_group = None
+    for (group, name), val in counter.value.items():
+        if group != prev_group:
+            output_stream.write(group + ':\n')
+            prev_group = group
+        output_stream.write('\t{}: {}\n'.format(name, val))
+
 
 def main(cmd_line_args=None):
     if cmd_line_args is None:
         cmd_line_args = sys.argv[1:]
-    if stderr is None:
-        stderr = sys.stderr
 
     parser = _make_arg_parser()
     args = parser.parse_args(cmd_line_args)
@@ -118,12 +124,8 @@ def main(cmd_line_args=None):
     rdd.saveAsTextFile(
         args.output_path, compressionCodecClass=args.compression_codec)
 
-    prev_group = None
-    for (group, name), val in counter.value.items():
-        if group != prev_group:
-            print(group + ':')
-            prev_group = group
-        print('\t{}: {}'.format(name, val))
+    # Output result of counters
+    print_counter_status(counter, sys.stderr)
 
 
 def _run_step(step, step_num, rdd, make_job):

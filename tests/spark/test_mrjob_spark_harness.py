@@ -34,6 +34,7 @@ from mrjob.step import OUTPUT
 from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
+from tests.mr_counting_job import MRCountingJob
 from tests.mr_doubler import MRDoubler
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
@@ -46,7 +47,6 @@ from tests.py2 import Mock
 from tests.py2 import call
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
-from tests.mr_counting_job import MRCountingJob
 
 
 def _rev(s):
@@ -145,7 +145,7 @@ class SparkHarnessOutputComparisonTestCase(
         harness_job_args.extend(input_paths)
 
         harness_job = MRSparkHarness(harness_job_args)
-        harness_job.sandbox(stdin=BytesIO(input_bytes), stdout=BytesIO(b''))
+        harness_job.sandbox(stdin=BytesIO(input_bytes))
 
         return harness_job
 

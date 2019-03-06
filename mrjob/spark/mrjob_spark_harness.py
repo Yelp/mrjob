@@ -114,18 +114,19 @@ def main(cmd_line_args=None):
     end = None if args.last_step_num is None else args.last_step_num + 1
     steps_to_run = list(enumerate(steps))[start:end]
 
-    rdd = sc.textFile(args.input_path, use_unicode=False)
+    try:
+        rdd = sc.textFile(args.input_path, use_unicode=False)
 
-    # run steps
-    for step_num, step in steps_to_run:
-        rdd = _run_step(step, step_num, rdd, make_job)
+        # run steps
+        for step_num, step in steps_to_run:
+            rdd = _run_step(step, step_num, rdd, make_job)
 
-    # write the results
-    rdd.saveAsTextFile(
-        args.output_path, compressionCodecClass=args.compression_codec)
-
-    # Output result of counters
-    print_counter_status(counter, sys.stderr)
+        # write the results
+        rdd.saveAsTextFile(
+            args.output_path, compressionCodecClass=args.compression_codec)
+    finally:
+        # Output result of counters
+        print_counter_status(counter, sys.stderr)
 
 
 def _run_step(step, step_num, rdd, make_job):

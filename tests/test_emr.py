@@ -2179,7 +2179,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         def side_effect_usable_clusters(*args, **kwargs):
             return [
                 (cluster_id, 0) for cluster_id in self.mock_cluster_ids
-                if cluster_id not in kwargs['exclude']]
+                if cluster_id not in args[2]]
 
         def side_effect_time_sleep(*args):
             self.sleep_counter += 1

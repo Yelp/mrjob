@@ -249,6 +249,9 @@ class MRJobRunner(object):
 
         # set this to an :py:class:`~mrjob.setup.UploadDirManager` in
         # runners that upload files to HDFS, S3, etc.
+        #
+        # this manager should handle files belonging to self._working_dir_mgr,
+        # which, if they are uploaded, will go into self._wd_upload_dir()
         self._upload_mgr = None
 
         self._script_path = mr_job_script
@@ -1142,6 +1145,16 @@ class MRJobRunner(object):
         if self._upload_mgr:
             for path in self._get_input_paths():
                 self._upload_mgr.add(path)
+
+    def _wd_upload_dir(self):
+        """A directory to upload files belonging to
+         :py:attr:`_working_dir_mgr`. This will be a subdir of
+         ``self._upload_mgr.prefix`, if it exists, and otherwise will
+         be ``None``."""
+         if not (self._upload_mgr and self._upload_mgr.prefix):
+             return None
+
+         return posixpath.join(self._upload_mgr.prefix, 'wd')
 
     def _intermediate_output_dir(self, step_num, local=False):
         """A directory for intermediate output for the given step number."""

@@ -340,8 +340,8 @@ class UploadDirManager(object):
 
 
 class WorkingDirManager(object):
-    """Represents the working directory of hadoop tasks (or bootstrap
-    commands on EMR).
+    """Represents the working directory of hadoop/Spark tasks (or bootstrap
+    commands in the cloud).
 
     To support Hadoop's distributed cache, paths can be for ordinary
     files, or for archives (which are automatically uncompressed into

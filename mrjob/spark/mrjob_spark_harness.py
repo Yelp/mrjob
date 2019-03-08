@@ -49,6 +49,13 @@ _PASSTHRU_OPTIONS = [
         dest='compression_codec',
         help=('Java class path of a codec to use to compress output.'),
     )),
+    (['--counter-output-dir'], dict(
+        default=None,
+        dest='counter_output_path',
+        help=(
+            'An empty directory to write counter output to. '
+            'Can be a path or URI.')
+    )),
 ]
 
 
@@ -92,12 +99,13 @@ def main(cmd_line_args=None):
         job_args = []
 
     sc = SparkContext()
+    global counter
     counter = sc.accumulator(
         defaultdict(int),
         CounterAccumulator()
     )
     def increment_counter(group, name, amount=1):
-        nonlocal counter
+        global counter
         counter += {(group, name):  amount}
 
     def make_job(*args):
@@ -127,6 +135,12 @@ def main(cmd_line_args=None):
     finally:
         # Output result of counters
         print_counter_status(counter, sys.stderr)
+        if args.counter_output_path is not None:
+            sc.parallelize(
+                [json.dumps(counter.value)]
+            ).saveAsTextFile(
+                args.counter_output_path
+            )
 
 
 def _run_step(step, step_num, rdd, make_job):

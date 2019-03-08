@@ -1146,15 +1146,85 @@ class MRJobRunner(object):
             for path in self._get_input_paths():
                 self._upload_mgr.add(path)
 
-    def _wd_upload_dir(self):
+    def _wd_mirror(self):
         """A directory to upload files belonging to
-         :py:attr:`_working_dir_mgr`. This will be a subdir of
-         ``self._upload_mgr.prefix`, if it exists, and otherwise will
-         be ``None``."""
-         if not (self._upload_mgr and self._upload_mgr.prefix):
-             return None
+        :py:attr:`_working_dir_mgr`. This will be a subdir of
+        ``self._upload_mgr.prefix`, if it exists, and otherwise will
+        be ``None``."""
+        if not (self._upload_mgr and self._upload_mgr.prefix):
+            return None
 
-         return posixpath.join(self._upload_mgr.prefix, 'wd')
+        return posixpath.join(self._upload_mgr.prefix, 'wd')
+
+    def _wd_filenames_must_match(self):
+        """When we tell Hadoop/Spark to put files in the working directory,
+        must they have the same names as the files in the working dir?
+
+        This basically only happens with Spark on non-YARN masters. YARN/Hadoop
+        has the hash-path trick (``path#name_in_wd``).
+        """
+        return self._has_spark_steps() and self._spark_master() != 'yarn'
+
+    def _dest_in_wd_mirror(self, path, name):
+        """Return the URI of where to upload *path* so it can appear in the
+        working dir as *name*, or ``None`` if it doesn't need to be uploaded.
+        """
+        # the only reason to re-upload a URI is if it has the wrong name
+        if is_uri(path) and (
+                posixpath.basename(path) == name or
+                not self._wd_filenames_must_match()):
+            return None
+
+        dest_dir = self._wd_mirror()
+        if not dest_dir:
+            return None
+
+        return posixpath.join(dest_dir, name)
+
+    def _upload_file_to_wd_mirror(self, path, name):
+        """Upload *path* to the appropriate place in the working dir
+        mirror, if necessary.
+
+        We don't track whether something has already been uploaded.
+        """
+        dest = self._dest_in_wd_mirror(path, name)
+        if not dest:
+            return
+
+        if is_uri(path):
+            # file is visible to non-YARN Spark, but has the wrong name, so
+            # download and re-upload it
+            wd_tmp = os.path.join(self._get_local_tmp_dir, 'wd-mirror')
+            self.fs.mkdir(wd_tmp)
+
+            tmp_path = os.path.join(wd_tmp, name)
+
+            log.debug('  downloading %s -> %s' % (path, tmp_path))
+            try:
+                with open(tmp_path, 'wb') as tmp_f:
+                    for chunk in self.fs.cat(path):
+                        tmp_f.write(chunk)
+
+                log.debug('  uploading %s -> %s' % (tmp_path, dest))
+                self.fs.put(tmp_path, dest)
+            finally:
+                os.remove(tmp_path)
+        else:
+            # upload it
+            log.debug('  uploading %s -> %s' % (path, dest))
+            self.fs.put(path, dest)
+
+    def _upload_files_to_wd_mirror(self, type):
+        """Upload working archives/files (determined by *type*) to the
+        working dir mirror, if necessary."""
+        wd_mirror = self._wd_mirror()
+        if not wd_mirror:
+            return
+
+        log.info('uploading working dir %ss to %s...' % (type, wd_mirror))
+        named_paths = sorted(self._working_dir_mgr.name_to_path(type).items())
+        for name, path in named_paths:
+            self._upload_file_to_wd_mirror(path, name)
 
     def _intermediate_output_dir(self, step_num, local=False):
         """A directory for intermediate output for the given step number."""

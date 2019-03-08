@@ -475,7 +475,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._create_setup_wrapper_scripts()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
-        self._upload_local_files_to_fs()
+        self._upload_local_files()
+        self._wait_for_fs_sync()
 
     def _check_output_not_exists(self):
         """Verify the output path does not already exist. This avoids
@@ -521,20 +522,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for step in self._get_steps():
             if step.get('jar'):
                 self._upload_mgr.add(step['jar'])
-
-    def _upload_local_files_to_fs(self):
-        """Copy local files tracked by self._upload_mgr to FS."""
-        bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
-        self._create_fs_tmp_bucket(bucket_name)
-
-        log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
-
-        for path, gcs_uri in self._upload_mgr.path_to_uri().items():
-            log.debug('uploading %s -> %s' % (path, gcs_uri))
-
-            self.fs.put(path, gcs_uri, part_size_mb=self._fs_chunk_size())
-
-        self._wait_for_fs_sync()
 
     def _create_fs_tmp_bucket(self, bucket_name, location=None):
         """Create a temp bucket if missing

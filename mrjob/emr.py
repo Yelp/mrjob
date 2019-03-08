@@ -710,7 +710,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._add_bootstrap_files_for_upload()
         self._add_master_node_setup_files_for_upload()
         self._add_job_files_for_upload()
-        self._upload_local_files_to_s3()
+        self._create_s3_tmp_bucket_if_needed()
+        self._upload_local_files()
 
     def _launch(self):
         """Set up files and then launch our job on EMR."""
@@ -842,16 +843,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             for key in 'jar', 'script':
                 if step.get(key):
                     self._upload_mgr.add(step[key])
-
-    def _upload_local_files_to_s3(self):
-        """Copy local files tracked by self._upload_mgr to S3."""
-        self._create_s3_tmp_bucket_if_needed()
-
-        log.info('Copying local files to %s...' % self._upload_mgr.prefix)
-
-        for path, s3_uri in self._upload_mgr.path_to_uri().items():
-            log.debug('  %s -> %s' % (path, s3_uri))
-            self._upload_contents(s3_uri, path)
 
     def _upload_contents(self, s3_uri, path):
         """Uploads the file at the given path to S3, possibly using
@@ -2325,7 +2316,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.info('Creating persistent cluster to run several jobs in...')
 
         self._add_bootstrap_files_for_upload(persistent=True)
-        self._upload_local_files_to_s3()
+        self._create_s3_tmp_bucket_if_needed()
+        self._upload_local_files()
 
         # don't allow user to call run()
         self._ran_job = True

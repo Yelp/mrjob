@@ -322,7 +322,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         self._find_binaries_and_jars()
         self._create_setup_wrapper_scripts()
         self._add_job_files_for_upload()
-        self._upload_local_files_to_hdfs()
+        self._upload_local_files()
         self._run_job_in_hadoop()
 
     def _find_binaries_and_jars(self):
@@ -348,19 +348,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             self._upload_mgr.add(path)
         for path in self._py_files():
             self._upload_mgr.add(path)
-
-    def _upload_local_files_to_hdfs(self):
-        """Copy files managed by self._upload_mgr to HDFS
-        """
-        self.fs.mkdir(self._upload_mgr.prefix)
-
-        log.info('Copying local files to %s...' % self._upload_mgr.prefix)
-        for path, uri in self._upload_mgr.path_to_uri().items():
-            self._upload_to_hdfs(path, uri)
-
-    def _upload_to_hdfs(self, path, target):
-        log.debug('  %s -> %s' % (path, target))
-        self.fs.hadoop.put(path, target)
 
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""

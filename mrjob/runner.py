@@ -1238,6 +1238,14 @@ class MRJobRunner(object):
         for name, path in named_paths:
             self._upload_file_to_wd_mirror(path, name)
 
+    def _upload_part_size(self):
+        """Part size for uploads, in bytes, or ``None``,
+        from :mrjob-opt:`cloud_part_size_mb`"""
+        if not self._opts.get('cloud_part_size_mb'):
+            return int(self._opts['cloud_part_size_mb'] * 1024 * 1024)
+        else:
+            return None
+
     def _intermediate_output_dir(self, step_num, local=False):
         """A directory for intermediate output for the given step number."""
         join = os.path.join if local else posixpath.join

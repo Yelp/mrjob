@@ -1651,22 +1651,6 @@ class SetUpSSHTunnelTestCase(MockGoogleTestCase):
 
         self.assertEqual(args[:4], ['/path/to/gcloud', '-v', 'compute', 'ssh'])
 
-    def test_empty_gcloud_bin_means_default(self):
-        job = MRWordCount(
-            ['-r', 'dataproc', '--ssh-tunnel', '--gcloud-bin', ''])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner.run()
-
-        self.assertEqual(self.mock_Popen.call_count, 1)
-        args_tuple, kwargs = self.mock_Popen.call_args
-        args = args_tuple[0]
-
-        self.assertEqual(kwargs, dict(stdin=PIPE, stdout=PIPE, stderr=PIPE))
-
-        self.assertEqual(args[:3], ['gcloud', 'compute', 'ssh'])
-
     def test_missing_gcloud_bin(self):
         self.mock_Popen.side_effect = OSError(2, 'No such file or directory')
 
@@ -2061,17 +2045,17 @@ class CloudPartSizeTestCase(MockGoogleTestCase):
     def test_default(self):
         runner = DataprocJobRunner()
 
-        self.assertEqual(runner._fs_chunk_size(), 100 * 1024 * 1024)
+        self.assertEqual(runner._cloud_part_size(), 100 * 1024 * 1024)
 
     def test_float(self):
         runner = DataprocJobRunner(cloud_part_size_mb=0.25)
 
-        self.assertEqual(runner._fs_chunk_size(), 256 * 1024)
+        self.assertEqual(runner._cloud_part_size(), 256 * 1024)
 
     def test_zero(self):
         runner = DataprocJobRunner(cloud_part_size_mb=0)
 
-        self.assertEqual(runner._fs_chunk_size(), None)
+        self.assertEqual(runner._cloud_part_size(), None)
 
     def test_multipart_upload(self):
         job = MRWordCount(

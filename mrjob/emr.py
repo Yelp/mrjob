@@ -208,9 +208,6 @@ _CHEAPEST_INSTANCE_TYPE = 'm4.large'
 # these are the only kinds of instance roles that exist
 _INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
 
-# use to disable multipart uploading
-_HUGE_PART_THRESHOLD = 2 ** 256
-
 # where to find the history log in HDFS
 _YARN_HDFS_HISTORY_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging/history'
 
@@ -679,7 +676,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 aws_session_token=self._opts['aws_session_token'],
                 s3_endpoint=self._opts['s3_endpoint'],
-                s3_region=self._opts['region']))
+                s3_region=self._opts['region'],
+                part_size=self._upload_part_size()))
 
             if self._opts['ec2_key_pair_file']:
                 # add hadoop fs after S3 because it tries to handle all URIs
@@ -843,19 +841,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             for key in 'jar', 'script':
                 if step.get(key):
                     self._upload_mgr.add(step[key])
-
-    def _upload_contents(self, s3_uri, path):
-        """Uploads the file at the given path to S3, possibly using
-        multipart upload."""
-        # use _HUGE_PART_THRESHOLD to disable multipart uploading
-        # (could use put() directly, but that would be another code path)
-        part_size_mb = self._get_upload_part_size() or _HUGE_PART_THRESHOLD
-
-        self.fs.put(path, s3_uri, part_size_mb)
-
-    def _get_upload_part_size(self):
-        # part size is in MB, as the minimum is 5 MB
-        return int((self._opts['cloud_part_size_mb'] or 0) * 1024 * 1024)
 
     def _ssh_bin(self):
         # the args of the ssh binary

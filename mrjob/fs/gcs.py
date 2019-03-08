@@ -53,15 +53,22 @@ def _path_glob_to_parsed_gcs_uri(path_glob):
 
 
 class GCSFilesystem(Filesystem):
-    """Filesystem for Google Cloud Storage (GCS) URIs. Typically you will get
-    one of these via
-    ``DataprocJobRunner().fs``, composed with
-    :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
-    :py:class:`~mrjob.fs.local.LocalFilesystem`.
+    """Filesystem for Google Cloud Storage (GCS) URIs
+
+    :param local_tmp_dir: deprecated, does nothing, do not use
+    :param credentials: an optional
+                        :py:class:`google.auth.credentials.Credentials`, used
+                        to initialize the storage client
+    :param project_id: an optional project ID, used to initialize the storage
+                       client
+    :param part_size: Part size for multi-part uploading, in bytes, or ``None``
+
     """
-    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None):
+    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None,
+                 part_size=None):
         self._credentials = credentials
         self._project_id = project_id
+        self._part_size = part_size
 
         if local_tmp_dir is not None:
             log.warning('local_tmp_dir does nothing and will be removed'
@@ -195,24 +202,25 @@ class GCSFilesystem(Filesystem):
 
         self._blob(dest_uri).upload_from_string(b'')
 
-    def put(self, src_path, dest_uri, part_size_mb=None, chunk_size=None):
+    def put(self, src_path, dest_uri, chunk_size=None):
         """Uploads a local file to a specific destination.
 
-        *chunk_size* is a deprecated alias for *part_size_mb* and will
+        *chunk_size* is a deprecated alias for *part_size* and will
         be removed in v0.7.0.
         """
-        # support old name for *part_size_mb*
+        part_size = self._part_size
+
+        # support old way of setting *part_size* at call time
         if chunk_size:
-            log.warning('chunk_size is a deprecated alias for part_size_mb'
-                        ' and will be removed in v0.7.0')
-        if part_size_mb is None:
-            part_size_mb = chunk_size
+            log.warning('chunk_size is deprecated and will be removed in'
+                        ' v0.7.0 (set part_size at init time).')
+            part_size = chunk_size
 
         old_blob = self._get_blob(dest_uri)
         if old_blob:
             raise IOError('File already exists: %s' % dest_uri)
 
-        self._blob(dest_uri, chunk_size=part_size_mb).upload_from_filename(
+        self._blob(dest_uri, chunk_size=part_size).upload_from_filename(
             src_path)
 
     def get_all_bucket_names(self, prefix=None):

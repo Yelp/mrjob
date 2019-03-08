@@ -155,8 +155,8 @@ class CompositeFilesystem(Filesystem):
     def join(self, path, *paths):
         return self._handle('join', path, path, *paths)
 
-    def put(self, src, path, part_size_mb=None):
-        return self._handle('put', path, src, path, part_size_mb)
+    def put(self, src, path):
+        return self._handle('put', path, src, path)
 
     def rm(self, path_glob):
         return self._do('rm', path_glob)

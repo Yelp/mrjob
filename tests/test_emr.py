@@ -45,7 +45,6 @@ from mrjob.emr import _3_X_SPARK_SUBMIT
 from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
 from mrjob.emr import _BAD_BASH_IMAGE_VERSION
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
-from mrjob.emr import _HUGE_PART_THRESHOLD
 from mrjob.emr import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.job import MRJob
@@ -2968,14 +2967,6 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
             side_effect=tests.mock_boto3.s3.MockS3Object.upload_file,
             autospec=True))
 
-    def upload_data(self, runner, data):
-        """Upload some bytes to S3"""
-        data_path = os.path.join(self.tmp_dir, self.TEST_FILENAME)
-        with open(data_path, 'wb') as fp:
-            fp.write(data)
-
-        runner._upload_contents(self.TEST_S3_URI, data_path)
-
     def assert_upload_succeeds(self, runner, data, expected_part_size):
         """Write the data to a temp file, and then upload it to (mock) S3,
         checking that the data successfully uploaded."""
@@ -2985,7 +2976,7 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         with open(data_path, 'wb') as fp:
             fp.write(data)
 
-        runner._upload_contents(self.TEST_S3_URI, data_path)
+        runner.fs.put(data_path, self.TEST_S3_URI)
 
         s3_key = runner.fs.s3._get_s3_key(self.TEST_S3_URI)
         self.assertEqual(s3_key.get()['Body'].read(), data)
@@ -3019,7 +3010,7 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         runner = EMRJobRunner(cloud_part_size_mb=0)
 
         data = b'Mew' * 20
-        self.assert_upload_succeeds(runner, data, _HUGE_PART_THRESHOLD)
+        self.assert_upload_succeeds(runner, data, None)
 
 
 class AWSSessionTokenTestCase(MockBoto3TestCase):

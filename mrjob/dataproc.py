@@ -408,13 +408,14 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 credentials=self._credentials,
                 local_tmp_dir=self._get_local_tmp_dir(),
                 project_id=self._project_id,
+                part_size=self._upload_part_size(),
             ))
 
             self._fs.add_fs('local', LocalFilesystem())
 
         return self._fs
 
-    def _fs_chunk_size(self):
+    def _part_size_mb(self):
         """Chunk size for cloud storage Blob objects. Currently
         only used for uploading."""
         if self._opts['cloud_part_size_mb']:

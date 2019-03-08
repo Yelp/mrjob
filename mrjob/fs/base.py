@@ -111,14 +111,10 @@ class Filesystem(object):
         """
         raise NotImplementedError
 
-    def put(self, src, path, part_size_mb=None):
+    def put(self, src, path):
         """Upload a file on the local filesystem (*src*) to *path*.
         Like with :py:func:`shutil.copyfile`, *path* should be the full path
         of the new file, not a directory which should contain it.
-
-        You may optionally specify *part_size_mb*, the part size in megabytes
-        for multi-part uploading. Filesystems that do not support multi-part
-        uploading will ignore this.
 
         Corresponds roughly to ``hadoop fs -put src path``.
         """

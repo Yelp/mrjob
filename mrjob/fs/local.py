@@ -56,7 +56,7 @@ class LocalFilesystem(Filesystem):
         if not os.path.isdir(path):
             os.makedirs(path)
 
-    def put(self, src, path, part_size_mb=None):
+    def put(self, src, path):
         """Copy a file from *src* to *path*"""
         shutil.copyfile(src, path)
 

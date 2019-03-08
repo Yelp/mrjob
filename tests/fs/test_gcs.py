@@ -196,14 +196,16 @@ class GCSFSTestCase(MockGoogleTestCase):
         self.fs.put(local_path, dest)
         self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
-    def test_put_part_size_mb(self):
+    def test_put_with_part_size(self):
         local_path = self.makefile('foo', contents=b'bar')
         dest = 'gs://bar-files/foo'
         self.storage_client().bucket('bar-files').create()
 
+        fs = GCSFilesystem(part_size=12345)
+
         with patch.object(GCSFilesystem, '_blob') as blob_meth:
-            self.fs.put(local_path, dest, part_size_mb=99999)
-            blob_meth.assert_called_once_with(dest, chunk_size=99999)
+            fs.put(local_path, dest)
+            blob_meth.assert_called_once_with(dest, chunk_size=12345)
 
     def test_put_chunk_size(self):
         local_path = self.makefile('foo', contents=b'bar')

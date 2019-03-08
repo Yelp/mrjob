@@ -476,6 +476,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._create_setup_wrapper_scripts()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
+        bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
+        self._create_fs_tmp_bucket(bucket_name)
         self._upload_local_files()
         self._wait_for_fs_sync()
 

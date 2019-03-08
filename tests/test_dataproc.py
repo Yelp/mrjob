@@ -2045,17 +2045,17 @@ class CloudPartSizeTestCase(MockGoogleTestCase):
     def test_default(self):
         runner = DataprocJobRunner()
 
-        self.assertEqual(runner._cloud_part_size(), 100 * 1024 * 1024)
+        self.assertEqual(runner._upload_part_size(), 100 * 1024 * 1024)
 
     def test_float(self):
         runner = DataprocJobRunner(cloud_part_size_mb=0.25)
 
-        self.assertEqual(runner._cloud_part_size(), 256 * 1024)
+        self.assertEqual(runner._upload_part_size(), 256 * 1024)
 
     def test_zero(self):
         runner = DataprocJobRunner(cloud_part_size_mb=0)
 
-        self.assertEqual(runner._cloud_part_size(), None)
+        self.assertEqual(runner._upload_part_size(), None)
 
     def test_multipart_upload(self):
         job = MRWordCount(

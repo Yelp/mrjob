@@ -1241,7 +1241,7 @@ class MRJobRunner(object):
     def _upload_part_size(self):
         """Part size for uploads, in bytes, or ``None``,
         from :mrjob-opt:`cloud_part_size_mb`"""
-        if not self._opts.get('cloud_part_size_mb'):
+        if self._opts.get('cloud_part_size_mb'):
             return int(self._opts['cloud_part_size_mb'] * 1024 * 1024)
         else:
             return None

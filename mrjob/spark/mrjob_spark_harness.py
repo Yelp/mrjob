@@ -13,6 +13,7 @@
 # limitations under the License.
 """A Spark script that can run a MRJob without Hadoop."""
 import sys
+import json
 from argparse import ArgumentParser
 from collections import defaultdict
 from importlib import import_module
@@ -65,17 +66,19 @@ class CounterAccumulator(AccumulatorParam):
         return value
 
     def addInPlace(self, value1, value2):
-        for key in value2:
-            value1[key] += value2[key]
+        for group in value2:
+            for key in value2[group]:
+                if key not in value1[group]:
+                    value1[group][key] = value2[group][key]
+                else:
+                    value1[group][key] += value2[group][key]
         return value1
 
 def print_counter_status(counter, output_stream):
-    prev_group = None
-    for (group, name), val in counter.value.items():
-        if group != prev_group:
-            output_stream.write(group + ':\n')
-            prev_group = group
-        output_stream.write('\t{}: {}\n'.format(name, val))
+    for group, key_and_values in counter.value.items():
+        output_stream.write('{}:\n'.format(group))
+        for key, value in key_and_values.items():
+            output_stream.write('\t{}: {}\n'.format(key, value))
 
 
 def main(cmd_line_args=None):
@@ -101,12 +104,12 @@ def main(cmd_line_args=None):
     sc = SparkContext()
     global counter
     counter = sc.accumulator(
-        defaultdict(int),
+        defaultdict(dict),
         CounterAccumulator()
     )
     def increment_counter(group, name, amount=1):
         global counter
-        counter += {(group, name):  amount}
+        counter += {group: {name:  amount}}
 
     def make_job(*args):
         j = job_class(job_args + list(args))
@@ -137,7 +140,8 @@ def main(cmd_line_args=None):
         print_counter_status(counter, sys.stderr)
         if args.counter_output_path is not None:
             sc.parallelize(
-                [json.dumps(counter.value)]
+                [json.dumps(counter.value)],
+                numSlices=1
             ).saveAsTextFile(
                 args.counter_output_path
             )

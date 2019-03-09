@@ -1105,7 +1105,7 @@ class MRJobRunner(object):
                 if self._upload_mgr:
                     uris.append(self._upload_mgr.uri(path))
                 else:
-                    # just make sure job can find files from it's working dir
+                    # just make sure job can find files from its working dir
                     uris.append(os.path.abspath(path))
 
         log.info('found %d input files' % len(uris))

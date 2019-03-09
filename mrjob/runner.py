@@ -1153,7 +1153,7 @@ class MRJobRunner(object):
 
         self.fs.mkdir(self._upload_mgr.prefix)
 
-        self._upload_files_to_wd_mirror(type)
+        self._upload_files_to_wd_mirror()
 
         log.info('Copying other local files to %s' % self._upload_mgr.prefix)
         for src_path, uri in self._upload_mgr.path_to_uri().items():
@@ -1236,7 +1236,7 @@ class MRJobRunner(object):
             return
 
         log.info('uploading working dir %ss to %s...' % (type, wd_mirror))
-        for name, path in sorted(self._working_dir_mgr.name_to_path().items())
+        for name, path in sorted(self._working_dir_mgr.name_to_path().items()):
             self._upload_file_to_wd_mirror(path, name)
 
     def _upload_part_size(self):
@@ -1371,10 +1371,7 @@ class MRJobRunner(object):
             if not name:
                 name = self._working_dir_mgr.name(type, path)
 
-            if self._upload_mgr:
-                uri = self._upload_mgr.uri(path)
-            else:
-                uri = path
+            uri = self._dest_in_wd_mirror(path, name) or path
 
             if not always_use_hash and _basename(uri) == name:
                 yield uri

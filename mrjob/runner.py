@@ -1153,7 +1153,9 @@ class MRJobRunner(object):
 
         self.fs.mkdir(self._upload_mgr.prefix)
 
-        log.info('Copying local files to %s' % self._upload_mgr.prefix)
+        self._upload_files_to_wd_mirror(type)
+
+        log.info('Copying other local files to %s' % self._upload_mgr.prefix)
         for src_path, uri in self._upload_mgr.path_to_uri().items():
             log.debug('  %s -> %s' % (src_path, uri))
             self.fs.put(src_path, uri)
@@ -1173,7 +1175,7 @@ class MRJobRunner(object):
         must they have the same names as the files in the working dir?
 
         This basically only happens with Spark on non-YARN masters. YARN/Hadoop
-        has the hash-path trick (``path#name_in_wd``).
+        allows you to specify a name for each file (``path#name_in_wd``).
         """
         return self._has_spark_steps() and self._spark_master() != 'yarn'
 
@@ -1211,22 +1213,22 @@ class MRJobRunner(object):
 
             tmp_path = os.path.join(wd_tmp, name)
 
-            log.debug('  downloading %s -> %s' % (path, tmp_path))
+            log.debug('  %s <- %s' % (tmp_path, path))
             try:
                 with open(tmp_path, 'wb') as tmp_f:
                     for chunk in self.fs.cat(path):
                         tmp_f.write(chunk)
 
-                log.debug('  uploading %s -> %s' % (tmp_path, dest))
+                log.debug('  %s -> %s' % (tmp_path, dest))
                 self.fs.put(tmp_path, dest)
             finally:
                 os.remove(tmp_path)
         else:
             # upload it
-            log.debug('  uploading %s -> %s' % (path, dest))
+            log.debug('  %s -> %s' % (path, dest))
             self.fs.put(path, dest)
 
-    def _upload_files_to_wd_mirror(self, type):
+    def _upload_files_to_wd_mirror(self):
         """Upload working archives/files (determined by *type*) to the
         working dir mirror, if necessary."""
         wd_mirror = self._wd_mirror()
@@ -1234,8 +1236,7 @@ class MRJobRunner(object):
             return
 
         log.info('uploading working dir %ss to %s...' % (type, wd_mirror))
-        named_paths = sorted(self._working_dir_mgr.name_to_path(type).items())
-        for name, path in named_paths:
+        for name, path in sorted(self._working_dir_mgr.name_to_path().items())
             self._upload_file_to_wd_mirror(path, name)
 
     def _upload_part_size(self):

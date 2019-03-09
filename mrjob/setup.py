@@ -432,7 +432,7 @@ class WorkingDirManager(object):
 
         return self._typed_path_to_auto_name[(type, path)]
 
-    def name_to_path(self, type):
+    def name_to_path(self, type=None):
         """Get a map from name (in the setup directory) to path for
         all known files/archives, so we can build :option:`-file` and
         :option:`-archive` options to Hadoop (or fake them in a bootstrap
@@ -440,16 +440,17 @@ class WorkingDirManager(object):
 
         :param type: either ``'archive'`` or ``'file'``
         """
-        self._check_type(type)
+        if type is not None:
+            self._check_type(type)
 
         for path_type, path in self._typed_path_to_auto_name:
-            if path_type == type:
-                self.name(type, path)
+            if type is None or path_type == type:
+                self.name(path_type, path)
 
         return dict((name, typed_path[1])
                     for name, typed_path
                     in self._name_to_typed_path.items()
-                    if typed_path[0] == type)
+                    if (type is None or typed_path[0] == type))
 
     def paths(self):
         """Get a set of all paths tracked by this WorkingDirManager."""

@@ -74,12 +74,6 @@ class CounterAccumulator(AccumulatorParam):
                     value1[group][key] += value2[group][key]
         return value1
 
-def print_counter_status(counter, output_stream):
-    for group, key_and_values in counter.value.items():
-        output_stream.write('{}:\n'.format(group))
-        for key, value in key_and_values.items():
-            output_stream.write('\t{}: {}\n'.format(key, value))
-
 
 def main(cmd_line_args=None):
     if cmd_line_args is None:
@@ -103,6 +97,7 @@ def main(cmd_line_args=None):
 
     sc = SparkContext()
     global counter
+
     counter = sc.accumulator(
         defaultdict(dict),
         CounterAccumulator()
@@ -136,8 +131,6 @@ def main(cmd_line_args=None):
         rdd.saveAsTextFile(
             args.output_path, compressionCodecClass=args.compression_codec)
     finally:
-        # Output result of counters
-        print_counter_status(counter, sys.stderr)
         if args.counter_output_path is not None:
             sc.parallelize(
                 [json.dumps(counter.value)],

@@ -13,17 +13,23 @@
 # limitations under the License.
 """Test the Spark Harness."""
 import uuid
+import os
+import random
+import string
 import sys
+import json
 from io import BytesIO
 from os.path import join
+from collections import defaultdict
 from contextlib import contextmanager
 from io import StringIO
+from tempfile import gettempdir
+from shutil import rmtree
 
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
 from mrjob.local import LocalMRJobRunner
-from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import TextProtocol
 from mrjob.spark import mrjob_spark_harness
 from mrjob.spark.mrjob_spark_harness import _run_combiner
@@ -128,7 +134,8 @@ class SparkHarnessOutputComparisonTestCase(
 
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
-                     job_args=None, first_step_num=None, last_step_num=None):
+                     job_args=None, first_step_num=None, last_step_num=None,
+                     counter_output_dir=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -141,6 +148,9 @@ class SparkHarnessOutputComparisonTestCase(
             harness_job_args.extend(['--first-step-num', str(first_step_num)])
         if last_step_num is not None:
             harness_job_args.extend(['--last-step-num', str(last_step_num)])
+        if counter_output_dir is not None:
+            harness_job_args.extend(
+                ['--counter-output-dir', counter_output_dir])
 
         harness_job_args.extend(input_paths)
 
@@ -349,30 +359,45 @@ class SparkHarnessOutputComparisonTestCase(
             MRWordFreqCountWithCombinerCmd, input_bytes=input_bytes)
 
     @contextmanager
-    def captured_output(self):
-        new_out, new_err = StringIO(), StringIO()
-        old_out, old_err = sys.stdout, sys.stderr
-        try:
-            sys.stdout, sys.stderr = new_out, new_err
-            yield sys.stdout, sys.stderr
-        finally:
-            sys.stdout, sys.stderr = old_out, old_err
+    def create_temp_counter_dir(self):
+        random_folder_name = 'test_' + ''.join(random.choice(
+            string.ascii_uppercase + string.digits) for _ in range(10))
+        output_counter_dir = join(gettempdir(), random_folder_name)
+        yield output_counter_dir
+        rmtree(output_counter_dir)
 
     def test_increment_counter(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
         reference_job = self._reference_job(
             MRCountingJob, input_bytes=input_bytes)
-        harness_job = self._harness_job(
-            MRCountingJob, input_bytes=input_bytes
-        )
+
         with reference_job.make_runner() as runner:
             runner.run()
-            reference_counter = parse_mr_job_stderr(reference_job.stderr)
+            reference_counters = runner.counters()
+        # reference separate counters by step, but spark will combine them
+        # all together
+        combined_reference_counter = defaultdict(lambda :defaultdict(int))
+        for counter in reference_counters:
+            for g in counter:
+                for k, v in counter[g].items():
+                    combined_reference_counter[g][k] += v
 
-        with self.captured_output() as (out, err):
-            harness_counter = parse_mr_job_stderr(err)
+        with self.create_temp_counter_dir() as output_counter_dir:
+            harness_job = self._harness_job(
+                MRCountingJob, input_bytes=input_bytes,
+                counter_output_dir='file://{}'.format(output_counter_dir)
+            )
+            with harness_job.make_runner() as runner:
+                runner.run()
 
-        assert reference_counter == harness_counter
+            harness_counter = json.loads(
+                self.spark_context.textFile(
+                    'file://' + output_counter_dir
+            ).collect()[0])
+
+        assert combined_reference_counter == harness_counter
+
+
 
 class PreservesPartitioningTestCase(SandboxedTestCase):
 

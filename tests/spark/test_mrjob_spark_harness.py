@@ -139,7 +139,8 @@ class SparkHarnessOutputComparisonBaseTestCase(
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
                      job_args=None, spark_conf=None, first_step_num=None,
-                     last_step_num=None, counter_output_dir=None):
+                     last_step_num=None, counter_output_dir=None,
+                     num_output_files=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -159,6 +160,9 @@ class SparkHarnessOutputComparisonBaseTestCase(
         if counter_output_dir is not None:
             harness_job_args.extend(
                 ['--counter-output-dir', counter_output_dir])
+        if num_output_files:
+            harness_job_args.extend(
+                ['--num-output-files', str(num_output_files)])
 
         harness_job_args.extend(input_paths)
 
@@ -409,6 +413,25 @@ class SparkHarnessOutputComparisonTestCase(
 
         assert combined_reference_counter == harness_counter
 
+    def test_num_output_files(self):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+        harness_job_unlimited = self._harness_job(
+            MRWordFreqCount, input_bytes=input_bytes)
+        harness_job_limited_output_files = self._harness_job(
+            MRWordFreqCount, input_bytes=input_bytes, num_output_files=1)
+
+        with harness_job_unlimited.make_runner() as runner:
+            runner.run()
+            unlimited_part_files = sum(
+                1 for f in os.listdir(runner.get_output_dir())
+                if f.startswith('part'))
+        with harness_job_limited_output_files.make_runner() as runner:
+            runner.run()
+            limited_part_files = sum(
+                1 for f in os.listdir(runner.get_output_dir())
+                if f.startswith('part'))
+        assert limited_part_files < unlimited_part_files
+        assert limited_part_files == 1
 
 
 class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):

@@ -57,6 +57,12 @@ _PASSTHRU_OPTIONS = [
             'An empty directory to write counter output to. '
             'Can be a path or URI.')
     )),
+    (['--num-output-files'], dict(
+        default=None,
+        dest='num_output_files',
+        type=int,
+        help=('limit output file numbers.')
+    )),
 ]
 
 
@@ -140,6 +146,9 @@ def main(cmd_line_args=None):
         # run steps
         for step_num, step in steps_to_run:
             rdd = _run_step(step, step_num, rdd, make_job)
+
+        if args.num_output_files is not None:
+            rdd = rdd.coalesce(args.num_output_files)
 
         # write the results
         if job.hadoop_output_format() is not None:

@@ -1509,12 +1509,14 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
         # non-YARN runners don't support archives or hash paths
         foo1_path = self.makefile('foo1')
         foo2_path = self.makefile('foo2')
+        foo3_uri = 'hdfs:///path/to/foo3'
+        foo4_uri = 'hdfs:///path/to/foo4'
 
         job = MRNullSpark([
             '-r', 'spark',
-            # local master has no working dir
-            '--spark-master', 'local-cluster[1,2,1024]',
-            '--files', '%s,%s' % (foo1_path, foo2_path),
+            '--spark-master', 'mesos://host:12345',
+            '--files', '%s,%s#bar,%s,%s#baz' % (
+                foo1_path, foo2_path, foo3_uri, foo4_uri)
         ])
         job.sandbox()
 
@@ -1523,13 +1525,20 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0), [
-                    '--master', 'local-cluster[1,2,1024]',
+                    '--master', 'mesos://host:12345',
                     '--deploy-mode', 'client',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--files',
                     (runner._dest_in_wd_mirror(foo1_path, 'foo1') +
                      ',' +
-                     runner._dest_in_wd_mirror(foo2_path, 'foo2')),
+                     runner._dest_in_wd_mirror(foo2_path, 'bar') +
+                     ',' +
+                     # can use URIs with same name as-is
+                     foo3_uri +
+                     ',' +
+                     # but URIs with different name have to be re-uploaded
+                     runner._dest_in_wd_mirror(foo4_uri, 'baz')
+                     ),
                 ]
             )
 

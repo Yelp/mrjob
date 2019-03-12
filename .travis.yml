@@ -19,5 +19,8 @@ install:
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
   - "pip install pyspark || true"
+env:
+  global:
+    - JAVA_HOME=/usr/lib/jvm/java-8-oracle/
 script: python -m unittest discover -v
 sudo: false

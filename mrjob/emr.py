@@ -1359,8 +1359,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             Args=self._args_for_spark_step(step_num))
 
     def _interpolate_spark_script_path(self, path):
-        return self._dest_in_wd_mirror(path,
-                                       self._working_dir_mgr.name('file', path))
+        if path in self._working_dir_mgr.paths():
+            return self._dest_in_wd_mirror(
+                path, self._working_dir_mgr.name('file', path)) or path
+        else:
+            return self._upload_mgr.uri(path)
 
     def _find_spark_submit_bin(self):
         if version_gte(self.get_image_version(), '4'):

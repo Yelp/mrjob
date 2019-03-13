@@ -2746,7 +2746,9 @@ class SparkStepTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            script_uri = runner._upload_mgr.uri(runner._script_path)
+            script_uri = runner._dest_in_wd_mirror(
+                runner._script_path,
+                runner._working_dir_mgr.name('file', runner._script_path))
             input1_uri = runner._upload_mgr.uri(input1)
             input2_uri = runner._upload_mgr.uri(input2)
 

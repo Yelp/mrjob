@@ -359,11 +359,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         super(EMRJobRunner, self).__init__(**kwargs)
 
-        # if we're going to create a bucket to use as temp space, we don't
-        # want to actually create it until we run the job (Issue #50).
-        # This variable helps us create the bucket as needed
-        self._s3_tmp_bucket_to_create = None
-
         self._fix_s3_tmp_and_log_uri_opts()
 
         # use job key to make a unique tmp dir
@@ -607,7 +602,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # That may have all failed. If so, pick a name.
         bucket_name = 'mrjob-' + random_identifier()
-        self._s3_tmp_bucket_to_create = bucket_name
         self._opts['cloud_tmp_dir'] = 's3://%s/tmp/' % bucket_name
         log.info('Auto-created temp S3 bucket %s' % bucket_name)
         self._wait_for_s3_eventual_consistency()
@@ -622,15 +616,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     log_uri.replace('s3n://', 's3://'), self._cluster_id)
 
         return self._s3_log_dir_uri
-
-    def _create_s3_tmp_bucket_if_needed(self):
-        """Make sure temp bucket exists"""
-        if self._s3_tmp_bucket_to_create:
-            log.debug('creating S3 bucket %r to use as temp space' %
-                      self._s3_tmp_bucket_to_create)
-            self.fs.s3.create_bucket(self._s3_tmp_bucket_to_create,
-                                     self._opts['region'])
-            self._s3_tmp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
         """Helper for __init__"""
@@ -708,7 +693,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._add_bootstrap_files_for_upload()
         self._add_master_node_setup_files_for_upload()
         self._add_job_files_for_upload()
-        self._create_s3_tmp_bucket_if_needed()
         self._upload_local_files()
 
     def _launch(self):
@@ -1447,7 +1431,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Create an empty cluster on EMR, and set self._cluster_id to
         its ID.
         """
-        self._create_s3_tmp_bucket_if_needed()
         emr_client = self.make_emr_client()
 
         # try to find a cluster from the pool. basically auto-fill
@@ -2302,7 +2285,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.info('Creating persistent cluster to run several jobs in...')
 
         self._add_bootstrap_files_for_upload(persistent=True)
-        self._create_s3_tmp_bucket_if_needed()
         self._upload_local_files()
 
         # don't allow user to call run()

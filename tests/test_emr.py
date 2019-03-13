@@ -877,7 +877,7 @@ class TmpBucketTestCase(MockBoto3TestCase):
         existing_bucket_names = set(self.mock_s3_fs)
 
         runner = EMRJobRunner(conf_paths=[], **runner_kwargs)
-        runner._create_s3_tmp_bucket_if_needed()
+        runner._upload_local_files()
 
         bucket_name, path = parse_s3_uri(runner._opts['cloud_tmp_dir'])
 

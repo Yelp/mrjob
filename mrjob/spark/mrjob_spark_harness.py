@@ -13,10 +13,13 @@
 # limitations under the License.
 """A Spark script that can run a MRJob without Hadoop."""
 import sys
+import json
 from argparse import ArgumentParser
+from collections import defaultdict
 from importlib import import_module
 
 from mrjob.util import shlex_split
+from pyspark.accumulators import AccumulatorParam
 
 # tuples of (args, kwargs) for ArgumentParser.add_argument()
 #
@@ -47,7 +50,29 @@ _PASSTHRU_OPTIONS = [
         dest='compression_codec',
         help=('Java class path of a codec to use to compress output.'),
     )),
+    (['--counter-output-dir'], dict(
+        default=None,
+        dest='counter_output_dir',
+        help=(
+            'An empty directory to write counter output to. '
+            'Can be a path or URI.')
+    )),
 ]
+
+
+class CounterAccumulator(AccumulatorParam):
+
+    def zero(self, value):
+        return value
+
+    def addInPlace(self, value1, value2):
+        for group in value2:
+            for key in value2[group]:
+                if key not in value1[group]:
+                    value1[group][key] = value2[group][key]
+                else:
+                    value1[group][key] += value2[group][key]
+        return value1
 
 
 def main(cmd_line_args=None):
@@ -62,14 +87,29 @@ def main(cmd_line_args=None):
     job_module = import_module(job_module_name)
     job_class = getattr(job_module, job_class_name)
 
+    # load initial data
+    from pyspark import SparkContext
+
     if args.job_args:
         job_args = shlex_split(args.job_args)
     else:
         job_args = []
 
+    sc = SparkContext()
+    global counter
+
+    counter = sc.accumulator(
+        defaultdict(dict),
+        CounterAccumulator()
+    )
+    def increment_counter(group, name, amount=1):
+        global counter
+        counter += {group: {name:  amount}}
+
     def make_job(*args):
         j = job_class(job_args + list(args))
         j.sandbox()  # so Spark doesn't try to serialize stdin
+        j.increment_counter = increment_counter
         return j
 
     # get job steps. don't pass --steps, which is deprecated
@@ -80,18 +120,24 @@ def main(cmd_line_args=None):
     end = None if args.last_step_num is None else args.last_step_num + 1
     steps_to_run = list(enumerate(steps))[start:end]
 
-    # load initial data
-    from pyspark import SparkContext
-    sc = SparkContext()
-    rdd = sc.textFile(args.input_path, use_unicode=False)
+    try:
+        rdd = sc.textFile(args.input_path, use_unicode=False)
 
-    # run steps
-    for step_num, step in steps_to_run:
-        rdd = _run_step(step, step_num, rdd, make_job)
+        # run steps
+        for step_num, step in steps_to_run:
+            rdd = _run_step(step, step_num, rdd, make_job)
 
-    # write the results
-    rdd.saveAsTextFile(
-        args.output_path, compressionCodecClass=args.compression_codec)
+        # write the results
+        rdd.saveAsTextFile(
+            args.output_path, compressionCodecClass=args.compression_codec)
+    finally:
+        if args.counter_output_dir is not None:
+            sc.parallelize(
+                [json.dumps(counter.value)],
+                numSlices=1
+            ).saveAsTextFile(
+                args.counter_output_dir
+            )
 
 
 def _run_step(step, step_num, rdd, make_job):

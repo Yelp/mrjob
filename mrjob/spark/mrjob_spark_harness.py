@@ -52,7 +52,7 @@ _PASSTHRU_OPTIONS = [
     )),
     (['--counter-output-dir'], dict(
         default=None,
-        dest='counter_output_path',
+        dest='counter_output_dir',
         help=(
             'An empty directory to write counter output to. '
             'Can be a path or URI.')
@@ -131,12 +131,12 @@ def main(cmd_line_args=None):
         rdd.saveAsTextFile(
             args.output_path, compressionCodecClass=args.compression_codec)
     finally:
-        if args.counter_output_path is not None:
+        if args.counter_output_dir is not None:
             sc.parallelize(
                 [json.dumps(counter.value)],
                 numSlices=1
             ).saveAsTextFile(
-                args.counter_output_path
+                args.counter_output_dir
             )
 
 

@@ -27,7 +27,6 @@ from tempfile import gettempdir
 from shutil import rmtree
 
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
-from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
 from mrjob.local import LocalMRJobRunner
 from mrjob.protocol import TextProtocol

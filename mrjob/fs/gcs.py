@@ -62,13 +62,16 @@ class GCSFilesystem(Filesystem):
     :param project_id: an optional project ID, used to initialize the storage
                        client
     :param part_size: Part size for multi-part uploading, in bytes, or ``None``
-
+    :param location: Default location to use when creating a bucket
+    :param object_ttl_days: Default object expiry for newly created buckets
     """
     def __init__(self, local_tmp_dir=None, credentials=None, project_id=None,
-                 part_size=None):
+                 part_size=None, location=None, object_ttl_days=None):
         self._credentials = credentials
         self._project_id = project_id
         self._part_size = part_size
+        self._location = location
+        self._object_ttl_days = object_ttl_days
 
         if local_tmp_dir is not None:
             log.warning('local_tmp_dir does nothing and will be removed'
@@ -250,12 +253,20 @@ class GCSFilesystem(Filesystem):
         and time-to-live."""
         bucket = self.client.bucket(name)
 
+        if location is None:
+            location = self._location
+
         # as of google-cloud 0.32.0, there isn't a direct way to set location
         if location:
             bucket._changes.add('location')
             bucket._properties['location'] = location
 
         bucket.create()
+
+        if object_ttl_days is None:
+            object_ttl_days = self._object_ttl_days
+        elif not object_ttl_days:  # give a way to override the default
+            object_ttl_days = None
 
         bucket.lifecycle_rules = [
             dict(

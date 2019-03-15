@@ -175,10 +175,16 @@ class GCSFilesystem(Filesystem):
             start = end
 
     def mkdir(self, dest):
-        """Make a directory. This does nothing on GCS because there are
-        no directories.
+        """Does not actually create a directory on GCS (because GCS doesn't
+        have directories), but creates the underlying bucket if it does not
+        exist already.
         """
-        pass
+        bucket_name, base_name = parse_gcs_uri(dest)
+
+        try:
+            self.get_bucket(bucket_name)
+        except google.api_core.exceptions.NotFound:
+            self.create_bucket(bucket_name)
 
     def exists(self, path_glob):
         """Does the given path exist?

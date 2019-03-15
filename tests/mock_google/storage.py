@@ -61,17 +61,17 @@ class MockGoogleStorageBucket(object):
         # always returns something whether it exists or not
         return MockGoogleStorageBlob(blob_name, self, chunk_size=chunk_size)
 
-    def create(self):
+    def create(self, location=None):
         if self.exists():
             raise Conflict(
                 'POST https://www.googleapis.com/storage/v1'
                 '/b?project=%s: Sorry, that name is not available.'
                 ' Please try a different one.')
 
-        if 'location' in self._changes and 'location' in self._properties:
-            location = self._properties['location'].upper()
+        if location:
+            location = location.upper()
         else:
-            location = 'US'
+            location = 'US'  # default bucket location
 
         self.client.mock_gcs_fs[self.name] = dict(
             blobs={}, lifecycle_rules=[], location=location)
@@ -92,10 +92,11 @@ class MockGoogleStorageBucket(object):
         fs = self.client.mock_gcs_fs
 
         if self.name in fs:
-            return deepcopy(fs[self.name]['lifecycle_rules'])
-        else:
-            # google-cloud-sdk silently ignores missing buckets
-            return []
+            # as of google-cloud-storage 1.11.0, this is a generator
+            for rule in fs[self.name]['lifecycle_rules']:
+                yield deepcopy(rule)
+
+        # if bucket doesn't exist, yield nothing
 
     @lifecycle_rules.setter
     def lifecycle_rules(self, rules):
@@ -126,7 +127,7 @@ class MockGoogleStorageBucket(object):
             return fs[self.name]['location']
         else:
             # google-cloud-sdk silently ignores missing buckets
-            return []
+            return None
 
 
 class MockGoogleStorageBlob(object):

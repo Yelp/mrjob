@@ -664,7 +664,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         self.assertEqual(current_bucket.location, location.upper())
 
         # Verify that we setup bucket lifecycle rules of 28-day retention
-        first_lifecycle_rule = current_bucket.lifecycle_rules[0]
+        first_lifecycle_rule = list(current_bucket.lifecycle_rules)[0]
         self.assertEqual(first_lifecycle_rule['action'], dict(type='Delete'))
         self.assertEqual(first_lifecycle_rule['condition'],
                          dict(age=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS))

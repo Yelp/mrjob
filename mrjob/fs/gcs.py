@@ -261,13 +261,10 @@ class GCSFilesystem(Filesystem):
 
         if location is None:
             location = self._location
+        elif not location:
+            location = None  # leave a way to use the API default
 
-        # as of google-cloud 0.32.0, there isn't a direct way to set location
-        if location:
-            bucket._changes.add('location')
-            bucket._properties['location'] = location
-
-        bucket.create()
+        bucket.create(location=location)
 
         if object_ttl_days is None:
             object_ttl_days = self._object_ttl_days

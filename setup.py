@@ -31,7 +31,7 @@ try:
             'PyYAML>=3.08',
             'google-cloud-dataproc>=0.2.0',
             'google-cloud-logging>=1.5.0',
-            'google-cloud-storage>=1.9.0',
+            'google-cloud-storage>=1.11.0',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',

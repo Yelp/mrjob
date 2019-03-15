@@ -406,7 +406,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
             self._fs.add_fs('gcs', GCSFilesystem(
                 credentials=self._credentials,
-                local_tmp_dir=self._get_local_tmp_dir(),
                 project_id=self._project_id,
                 part_size=self._upload_part_size(),
             ))

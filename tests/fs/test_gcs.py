@@ -82,23 +82,106 @@ class CatTestCase(MockGoogleTestCase):
 
 class CreateBucketTestCase(MockGoogleTestCase):
 
-    def setUp(self):
-        super(CreateBucketTestCase, self).setUp()
-
-        self.bucket = Mock()
-
-        self.start(patch(
-            'tests.mock_google.storage.MockGoogleStorageClient.bucket',
-            return_value=self.bucket))
-
     def test_default(self):
         fs = GCSFilesystem()
 
         fs.create_bucket('walrus')
 
-        # TODO: check location
+        bucket = fs.get_bucket('walrus')
 
-        self.assertFalse(isinstance(self.bucket.lifecycle_rules, dict))
+        self.assertEqual(bucket.location, 'US')
+        self.assertEqual(list(bucket.lifecycle_rules), [])
+
+    def test_location(self):
+        fs = GCSFilesystem()
+
+        fs.create_bucket('walrus', location='us-central1')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US-CENTRAL1')
+
+    def test_location_set_at_init(self):
+        fs = GCSFilesystem(location='us-central1')
+
+        fs.create_bucket('walrus')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US-CENTRAL1')
+
+    def test_override_location_set_at_init(self):
+        fs = GCSFilesystem(location='us-central1')
+
+        fs.create_bucket('walrus', location='us-east1')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US-EAST1')
+
+    def test_blank_out_location_set_at_init(self):
+        fs = GCSFilesystem(location='us-central1')
+
+        fs.create_bucket('walrus', location='')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US')
+
+    def test_lifecycle_rules(self):
+        fs = GCSFilesystem()
+
+        fs.create_bucket('walrus', object_ttl_days=123)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(
+            list(bucket.lifecycle_rules),
+            [dict(action=dict(type='Delete'), condition=dict(age=123))])
+
+    def test_object_ttl_days_set_at_init(self):
+        fs = GCSFilesystem(object_ttl_days=234)
+
+        fs.create_bucket('walrus')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(
+            list(bucket.lifecycle_rules),
+            [dict(action=dict(type='Delete'), condition=dict(age=234))])
+
+    def test_override_object_ttl_days_set_at_init(self):
+        fs = GCSFilesystem(object_ttl_days=234)
+
+        fs.create_bucket('walrus', object_ttl_days=123)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(
+            list(bucket.lifecycle_rules),
+            [dict(action=dict(type='Delete'), condition=dict(age=123))])
+
+    def test_blank_out_object_ttl_days_set_at_init(self):
+        fs = GCSFilesystem(object_ttl_days=234)
+
+        fs.create_bucket('walrus', object_ttl_days=0)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(list(bucket.lifecycle_rules), [])
+
+    def test_mkdir_bucket(self):
+        fs = GCSFilesystem(location='us-central1', object_ttl_days=123)
+
+        fs.mkdir('gs://walrus/data')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US-CENTRAL1')
+
+        self.assertEqual(
+            list(bucket.lifecycle_rules),
+            [dict(action=dict(type='Delete'), condition=dict(age=123))])
 
 
 

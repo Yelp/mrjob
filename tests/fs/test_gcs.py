@@ -184,7 +184,6 @@ class CreateBucketTestCase(MockGoogleTestCase):
             [dict(action=dict(type='Delete'), condition=dict(age=123))])
 
 
-
 class GCSFSTestCase(MockGoogleTestCase):
 
     def setUp(self):

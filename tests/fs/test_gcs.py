@@ -80,6 +80,28 @@ class CatTestCase(MockGoogleTestCase):
             [b'a' * _CAT_CHUNK_SIZE, b'b' * _CAT_CHUNK_SIZE])
 
 
+class CreateBucketTestCase(MockGoogleTestCase):
+
+    def setUp(self):
+        super(CreateBucketTestCase, self).setUp()
+
+        self.bucket = Mock()
+
+        self.start(patch(
+            'tests.mock_google.storage.MockGoogleStorageClient.bucket',
+            return_value=self.bucket))
+
+    def test_default(self):
+        fs = GCSFilesystem()
+
+        fs.create_bucket('walrus')
+
+        # TODO: check location
+
+        self.assertFalse(isinstance(self.bucket.lifecycle_rules, dict))
+
+
+
 class GCSFSTestCase(MockGoogleTestCase):
 
     def setUp(self):
@@ -187,6 +209,22 @@ class GCSFSTestCase(MockGoogleTestCase):
         })
 
         self.assertRaises(IOError, self.fs.md5sum, 'gs://walrus/data/bar')
+
+    def test_mkdir_creates_buckets(self):
+        self.assertNotIn('walrus', self.mock_gcs_fs)
+
+        self.fs.mkdir('gs://walrus/data')
+
+        self.assertIn('walrus', self.mock_gcs_fs)
+
+    def test_mkdir_does_not_create_directories(self):
+        self.fs.create_bucket('walrus')
+
+        self.assertEqual(list(self.fs.ls('gs://walrus/')), [])
+
+        self.fs.mkdir('gs://walrus/data')
+
+        self.assertEqual(list(self.fs.ls('gs://walrus/')), [])
 
     def test_put(self):
         local_path = self.makefile('foo', contents=b'bar')

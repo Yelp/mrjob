@@ -271,15 +271,14 @@ class GCSFilesystem(Filesystem):
 
         if object_ttl_days is None:
             object_ttl_days = self._object_ttl_days
-        elif not object_ttl_days:  # give a way to override the default
-            object_ttl_days = None
 
-        bucket.lifecycle_rules = [
-            dict(
-                action=dict(type='Delete'),
-                condition=dict(age=object_ttl_days)
-            )
-        ]
+        if object_ttl_days:
+            bucket.lifecycle_rules = [
+                dict(
+                    action=dict(type='Delete'),
+                    condition=dict(age=object_ttl_days)
+                )
+            ]
 
     def delete_bucket(self, bucket):
         raise NotImplementedError(

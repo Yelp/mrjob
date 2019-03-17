@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """A runner that can run jobs on Spark, with or without Hadoop."""
+import json
 import logging
 import os.path
 import posixpath
 import re
-from shutil import copy2
 from subprocess import CalledProcessError
 from tempfile import gettempdir
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.compat import jobconf_from_dict
-from mrjob.conf import combine_dicts
-from mrjob.conf import combine_local_envs
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import google as google_libs_installed
@@ -34,6 +32,7 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import boto3 as boto3_installed
 from mrjob.fs.s3 import _is_permanent_boto3_error
 from mrjob.hadoop import fully_qualify_hdfs_path
+from mrjob.logs.counters import _format_counters
 from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
 from mrjob.setup import UploadDirManager
@@ -93,7 +92,7 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         # where to put job output (if not set explicitly)
         if not self._output_dir:
-            self._output_dir = posixpath.join(self._spark_tmp_dir, 'output')
+            self._output_dir = self.fs.join(self._spark_tmp_dir, 'output')
 
         # keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
@@ -101,6 +100,13 @@ class SparkMRJobRunner(MRJobBinRunner):
         # where to store a .zip file containing the MRJob, with a unique
         # module name
         self._job_script_zip_path = None
+
+        # counters, one per job step. (Counters will be {} for non-streaming
+        # steps because Spark doesn't have counters).
+        self._counters = []
+
+        # TODO: we may eventually want log interpretation, but it shouldn't
+        # include counters, as they are not found in logs.
 
         # could raise an exception if *hadoop_input_format* and
         # *hadoop_output_format* are set, but support for these these will be
@@ -160,7 +166,11 @@ class SparkMRJobRunner(MRJobBinRunner):
                     fully_qualify_hdfs_path('tmp/mrjob'), self._job_key)
 
     def _default_step_output_dir(self):
-        return posixpath.join(self._spark_tmp_dir, 'step-output')
+        return self.fs.join(self._spark_tmp_dir, 'step-output')
+
+    def _counter_output_dir(self, step_num):
+        return self.fs.join(
+            self._spark_tmp_dir, 'counter-output-step-%d' % step_num)
 
     @property
     def fs(self):
@@ -289,6 +299,22 @@ class SparkMRJobRunner(MRJobBinRunner):
         returncode = self._run_spark_submit(spark_submit_args, env,
                                             record_callback=_log_log4j_record)
 
+        counter_dict = {}
+        if step['type'] == 'streaming':
+            counter_file = self.fs.join(
+                self._counter_output_dir(step_num), 'part-*')
+            counter_json = b''.join(self.fs.cat(counter_file))
+            if counter_json.strip():
+                counter_dict = json.loads(counter_json)
+                if counter_dict:
+                    log.info(_format_counters(counter_dict))
+
+        self._counters.append(counter_dict)
+
+        # pad counters for multi-step runs
+        for _ in range(last_step_num - step_num):
+            self._counters.append({})
+
         if returncode:
             reason = str(CalledProcessError(returncode, spark_submit_args))
             raise StepFailedException(
@@ -332,6 +358,10 @@ class SparkMRJobRunner(MRJobBinRunner):
         # note that we use the output dir for the *last* step
         args.append(
             self._step_output_uri(last_step_num))
+
+        # --counter-output-dir, to simulate counters
+        args.extend(['--counter-output-dir',
+                     self._counter_output_dir(step_num)])
 
         # --first-step-num, --last-step-num (step range)
         args.extend(['--first-step-num', str(step_num),

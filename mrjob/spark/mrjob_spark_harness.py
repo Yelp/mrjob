@@ -95,30 +95,40 @@ def main(cmd_line_args=None):
     else:
         job_args = []
 
-    sc = SparkContext()
-    global counter
-
-    counter = sc.accumulator(
-        defaultdict(dict),
-        CounterAccumulator()
-    )
-    def increment_counter(group, name, amount=1):
-        global counter
-        counter += {group: {name:  amount}}
-
-    def make_job(*args):
-        j = job_class(job_args + list(args))
-        j.sandbox()  # so Spark doesn't try to serialize stdin
-        j.increment_counter = increment_counter
-        return j
-
     # get job steps. don't pass --steps, which is deprecated
-    steps = make_job().steps()
+    steps = job_class(job_args).steps()
 
     # pick steps
-    start = args.first_step_num
+    start = args.first_step_num or 0
     end = None if args.last_step_num is None else args.last_step_num + 1
     steps_to_run = list(enumerate(steps))[start:end]
+
+    sc = SparkContext()
+
+    # keep track of one set of counters per job step
+    counter_accumulators = [
+        sc.accumulator(defaultdict(dict), CounterAccumulator())
+        for _ in steps_to_run
+    ]
+
+    def make_increment_counter(step_num):
+        counter_accumulator = counter_accumulators[step_num - start]
+
+        def increment_counter(group, name, amount=1):
+            counter_accumulator.add({group: {name:  amount}})
+
+        return increment_counter
+
+    def make_job(mrc, step_num):
+        j = job_class(job_args + [
+            '--%s' % mrc, '--step-num=%d' % step_num
+        ])
+        j.sandbox()  # so Spark doesn't try to serialize stdin
+
+        # patch increment_counter() to update the accumulator for this step
+        j.increment_counter = make_increment_counter(step_num)
+
+        return j
 
     try:
         rdd = sc.textFile(args.input_path, use_unicode=False)
@@ -132,8 +142,10 @@ def main(cmd_line_args=None):
             args.output_path, compressionCodecClass=args.compression_codec)
     finally:
         if args.counter_output_dir is not None:
+            counters = [ca.value for ca in counter_accumulators]
+
             sc.parallelize(
-                [json.dumps(counter.value)],
+                [json.dumps(counters)],
                 numSlices=1
             ).saveAsTextFile(
                 args.counter_output_dir
@@ -149,8 +161,7 @@ def _run_step(step, step_num, rdd, make_job):
     # *step_num* (in ``job.options.step_num``) and ensures that
     # ``job.is_task()`` is set to true
     mapper_job, reducer_job, combiner_job = (
-        make_job('--%s' % mrc, '--step-num=%d' % step_num)
-        if step_desc.get(mrc) else None
+        make_job(mrc, step_num) if step_desc.get(mrc) else None
         for mrc in ('mapper', 'reducer', 'combiner')
     )
 

@@ -17,6 +17,7 @@ import logging
 import os.path
 import posixpath
 import re
+from copy import deepcopy
 from subprocess import CalledProcessError
 from tempfile import gettempdir
 
@@ -173,7 +174,7 @@ class SparkMRJobRunner(MRJobBinRunner):
             self._spark_tmp_dir, 'counter-output-step-%d' % step_num)
 
     def counters(self):
-        return self._counters
+        return deepcopy(self._counters)
 
     @property
     def fs(self):

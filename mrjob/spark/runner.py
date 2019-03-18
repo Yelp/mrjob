@@ -299,20 +299,21 @@ class SparkMRJobRunner(MRJobBinRunner):
         returncode = self._run_spark_submit(spark_submit_args, env,
                                             record_callback=_log_log4j_record)
 
-        counter_dict = {}
+        counters = None
         if step['type'] == 'streaming':
             counter_file = self.fs.join(
                 self._counter_output_dir(step_num), 'part-*')
             counter_json = b''.join(self.fs.cat(counter_file))
             if counter_json.strip():
-                counter_dict = json.loads(counter_json)
-                if counter_dict:
-                    log.info(_format_counters(counter_dict))
+                counters = json.loads(counter_json)
 
-        self._counters.append(counter_dict)
+        if isinstance(counters, list):
+            for counter_dict in counters:
+                log.info(_format_counters(counter_dict))
+            self._counters.extend(counters)
 
-        # pad counters for multi-step runs
-        for _ in range(last_step_num - step_num):
+        # pad self._counters to match number of steps
+        while len(self._counters) < (last_step_num or step_num) + 1:
             self._counters.append({})
 
         if returncode:

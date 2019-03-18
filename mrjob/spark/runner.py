@@ -308,10 +308,17 @@ class SparkMRJobRunner(MRJobBinRunner):
                 counters = json.loads(counter_json)
 
         if isinstance(counters, list):
-            for counter_dict in counters:
-                log.info(_format_counters(counter_dict))
             self._counters.extend(counters)
 
+            # desc_num is 1-indexed user-readable step num
+            for desc_num, counter_dict in enumerate(
+                    counters, start=(step_num + 1)):
+                if counter_dict:
+                    log.info(_format_counters(
+                        counter_dict,
+                        desc=('Counters for step %d' % desc_num)))
+
+        # for non-streaming steps, there are no counters.
         # pad self._counters to match number of steps
         while len(self._counters) < (last_step_num or step_num) + 1:
             self._counters.append({})

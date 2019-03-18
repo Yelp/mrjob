@@ -115,7 +115,6 @@ class MRSumValuesByWord(MRJob):
 
     reducer = combiner
 
-
 class SparkHarnessOutputComparisonBaseTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
 
@@ -123,7 +122,6 @@ class SparkHarnessOutputComparisonBaseTestCase(
         path = mrjob_spark_harness.__file__
         if path.endswith('.pyc'):
             path = path[:-1]
-
         return path
 
     def _reference_job(self, job_class, input_bytes=b'', input_paths=(),
@@ -140,7 +138,7 @@ class SparkHarnessOutputComparisonBaseTestCase(
                      runner_alias='inline', compression_codec=None,
                      job_args=None, spark_conf=None, first_step_num=None,
                      last_step_num=None, counter_output_dir=None,
-                     num_output_files=None):
+                     num_reducers=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -160,9 +158,9 @@ class SparkHarnessOutputComparisonBaseTestCase(
         if counter_output_dir is not None:
             harness_job_args.extend(
                 ['--counter-output-dir', counter_output_dir])
-        if num_output_files:
+        if num_reducers:
             harness_job_args.extend(
-                ['--num-output-files', str(num_output_files)])
+                ['--num-reducers', str(num_reducers)])
 
         harness_job_args.extend(input_paths)
 
@@ -170,6 +168,10 @@ class SparkHarnessOutputComparisonBaseTestCase(
         harness_job.sandbox(stdin=BytesIO(input_bytes))
 
         return harness_job
+
+
+class SparkHarnessOutputComparisonTestCase(
+        SparkHarnessOutputComparisonBaseTestCase):
 
     def _assert_output_matches(
             self, job_class, input_bytes=b'', input_paths=(), job_args=[]):
@@ -205,9 +207,6 @@ class SparkHarnessOutputComparisonBaseTestCase(
 
         self.assertEqual(harness_output, reference_output)
 
-
-class SparkHarnessOutputComparisonTestCase(
-        SparkHarnessOutputComparisonBaseTestCase):
 
     def test_basic_job(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
@@ -413,25 +412,46 @@ class SparkHarnessOutputComparisonTestCase(
 
         assert combined_reference_counter == harness_counter
 
-    def test_num_output_files(self):
-        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
-        harness_job_unlimited = self._harness_job(
-            MRWordFreqCount, input_bytes=input_bytes)
-        harness_job_limited_output_files = self._harness_job(
-            MRWordFreqCount, input_bytes=input_bytes, num_output_files=1)
+class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
 
-        with harness_job_unlimited.make_runner() as runner:
+    def _count_partitions_files(self, runner):
+        return sum(
+            1
+            for f in os.listdir(runner.get_output_dir())
+            if f.startswith('part')
+        )
+
+    def _assert_partition_count_different(self, cls, num_reducers):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+        unlimited_job = self._harness_job(cls, input_bytes=input_bytes)
+        with unlimited_job.make_runner() as runner:
             runner.run()
-            unlimited_part_files = sum(
-                1 for f in os.listdir(runner.get_output_dir())
-                if f.startswith('part'))
-        with harness_job_limited_output_files.make_runner() as runner:
+            default_partitions = self._count_partitions_files(runner)
+
+        job = self._harness_job(
+            cls, input_bytes=input_bytes, num_reducers=num_reducers)
+        with job.make_runner() as runner:
             runner.run()
-            limited_part_files = sum(
-                1 for f in os.listdir(runner.get_output_dir())
-                if f.startswith('part'))
-        assert limited_part_files < unlimited_part_files
-        assert limited_part_files == 1
+            part_files = self._count_partitions_files(runner)
+
+        assert part_files != default_partitions
+        assert part_files == num_reducers
+
+
+    def test_reducer_less_reducer(self):
+        self._assert_partition_count_different(MRWordFreqCount, num_reducers=1)
+
+    def test_reducer_more_reducer(self):
+        self._assert_partition_count_different(
+            MRWordFreqCount, num_reducers=10)
+
+    def test_combiner_less_reducer(self):
+        self._assert_partition_count_different(
+            MRWordFreqCountWithCombinerCmd, num_reducers=1)
+
+    def test_combiner_more_reducer(self):
+        self._assert_partition_count_different(
+            MRWordFreqCountWithCombinerCmd, num_reducers=10)
 
 
 class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):

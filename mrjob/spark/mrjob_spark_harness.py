@@ -57,11 +57,11 @@ _PASSTHRU_OPTIONS = [
             'An empty directory to write counter output to. '
             'Can be a path or URI.')
     )),
-    (['--num-output-files'], dict(
+    (['--num-reducers'], dict(
         default=None,
-        dest='num_output_files',
+        dest='num_reducers',
         type=int,
-        help=('limit output file numbers.')
+        help=('limit number of reducers and also number of final output files')
     )),
 ]
 
@@ -145,10 +145,7 @@ def main(cmd_line_args=None):
 
         # run steps
         for step_num, step in steps_to_run:
-            rdd = _run_step(step, step_num, rdd, make_job)
-
-        if args.num_output_files is not None:
-            rdd = rdd.coalesce(args.num_output_files)
+            rdd = _run_step(step, step_num, rdd, make_job, args.num_reducers)
 
         # write the results
         if job.hadoop_output_format() is not None:
@@ -173,7 +170,7 @@ def main(cmd_line_args=None):
             )
 
 
-def _run_step(step, step_num, rdd, make_job):
+def _run_step(step, step_num, rdd, make_job, num_reducers):
     """Run the given step on the RDD and return the transformed RDD."""
     step_desc = step.description(step_num)
     _check_step(step_desc, step_num)
@@ -203,9 +200,13 @@ def _run_step(step, step_num, rdd, make_job):
 
     if combiner_job:
         # _run_combiner() includes shuffle-and-sort
-        rdd = _run_combiner(combiner_job, rdd, sort_values=sort_values)
+        rdd = _run_combiner(
+            combiner_job, rdd,
+            sort_values=sort_values,
+            num_reducers=num_reducers)
     elif reducer_job:
-        rdd = _shuffle_and_sort(rdd, sort_values=sort_values)
+        rdd = _shuffle_and_sort(
+            rdd, sort_values=sort_values, num_reducers=num_reducers)
 
     if reducer_job:
         rdd = _run_reducer(reducer_job, rdd)
@@ -244,14 +245,16 @@ def _run_mapper(mapper_job, rdd):
     return rdd
 
 
-def _run_combiner(combiner_job, rdd, sort_values=False):
+def _run_combiner(combiner_job, rdd, sort_values=False, num_reducers=None):
     """Run our job's combiner, and group lines with the same key together.
 
     :param combiner_job: an instance of our job, instantiated to be the mapper
                          for the step we wish to run
     :param rdd: an RDD containing lines representing encoded key-value pairs
-    :sort_values: if true, ensure all lines corresponding to a given key
-                  are sorted (by their encoded value)
+    :param sort_values: if true, ensure all lines corresponding to a given key
+                        are sorted (by their encoded value)
+    :param num_reducers: limit the number of paratitions of output rdd, which
+                         is similar to mrjob's limit on number of reducers.
     :return: an RDD containing "reducer ready" lines representing encoded
              key-value pairs, that is, where all lines with the same key are
              adjacent and in the same partition
@@ -296,6 +299,7 @@ def _run_combiner(combiner_job, rdd, sort_values=False):
         createCombiner=lambda k_v: [k_v],
         mergeValue=lambda k_v_list, k_v: combiner_helper(k_v_list, [k_v]),
         mergeCombiners=combiner_helper,
+        numPartitions=num_reducers
     )
 
     # encode lists of key-value pairs into lists of lines
@@ -312,20 +316,23 @@ def _run_combiner(combiner_job, rdd, sort_values=False):
     return rdd
 
 
-def _shuffle_and_sort(rdd, sort_values=False):
+def _shuffle_and_sort(rdd, sort_values=False, num_reducers=None):
     """Simulate Hadoop's shuffle-and-sort step, so that data will be in the
     format the reducer expects.
 
     :param rdd: an RDD containing lines representing encoded key-value pairs,
                 where the encoded key comes first and is followed by a TAB
                 character (the encoded key may not contain TAB).
-    :sort_values: if true, ensure all lines corresponding to a given key
-                  are sorted (by their encoded value)
+    :param sort_values: if true, ensure all lines corresponding to a given key
+                        are sorted (by their encoded value)
+    :param num_reducers: limit the number of paratitions of output rdd, which
+                         is similar to mrjob's limit on number of reducers.
     :return: an RDD containing "reducer ready" lines representing encoded
              key-value pairs, that is, where all lines with the same key are
              adjacent and in the same partition
     """
-    rdd = rdd.groupBy(lambda line: line.split(b'\t')[0])
+    rdd = rdd.groupBy(
+        lambda line: line.split(b'\t')[0], numPartitions=num_reducers)
     rdd = _discard_key_and_flatten_values(rdd, sort_values=sort_values)
 
     return rdd

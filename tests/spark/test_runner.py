@@ -39,6 +39,7 @@ from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
@@ -362,3 +363,57 @@ class GroupStepsTestCase(MockFilesystemsTestCase):
 
 
 # TODO: test uploading files and setting up working dir once we fix #1922
+
+
+class SparkCounterSimulationTestCase(MockFilesystemsTestCase):
+    # trying to keep number of tests small, since they run actual Spark jobs
+
+    def setUp(self):
+        super(MockFilesystemsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.spark.runner.log'))
+
+    def test_two_step_job(self):
+        # good all-around test. MRTwoStepJob's first step logs counters, but
+        # its second step does not
+        job = MRTwoStepJob(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        counters = runner.counters()
+
+        # should have two steps worth of counters, even though it runs as a
+        # single Spark job
+        self.assertEqual(len(counters), 2)
+
+        # first step counters should be {'count': {'combiners': <int>}}
+        self.assertEqual(sorted(counters[0]), ['count'])
+        self.assertEqual(sorted(counters[0]['count']), ['combiners'])
+        self.assertIsInstance(counters[0]['count']['combiners'], int)
+
+        # second step counters should be empty
+        self.assertEqual(counters[1], {})
+
+        log_output = '\n'.join(c[0][0] for c in self.log.info.call_args_list)
+        log_lines = log_output.split('\n')
+
+        # should log first step counters but not second step
+        self.assertIn('Counters for step 1: 1', log_lines)
+        self.assertIn('\tcount', log_output)
+        self.assertNotIn('Counters for step 2', log_output)
+
+    def test_mixed_job(self):
+        job = MRStreamingAndSpark(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        # should have empty counters for each step
+        self.assertEqual(runner.counters(), [{}, {}])
+
+        # shouldn't log empty counters
+        log_output = '\n'.join(c[0][0] for c in self.log.info.call_args_list)
+        self.assertNotIn('Counters', log_output)

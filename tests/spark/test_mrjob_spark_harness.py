@@ -12,30 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the Spark Harness."""
-import uuid
-import os
 import random
 import string
-import sys
 import json
 from io import BytesIO
 from os.path import join
-from collections import defaultdict
 from contextlib import contextmanager
-from io import StringIO
 from tempfile import gettempdir
 from shutil import rmtree
 
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
-from mrjob.local import LocalMRJobRunner
 from mrjob.protocol import TextProtocol
 from mrjob.spark import mrjob_spark_harness
 from mrjob.spark.mrjob_spark_harness import _run_combiner
 from mrjob.spark.mrjob_spark_harness import _run_reducer
 from mrjob.spark.mrjob_spark_harness import _shuffle_and_sort
-from mrjob.step import INPUT
-from mrjob.step import OUTPUT
 from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
@@ -49,7 +41,6 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_freq_count_with_combiner_cmd import \
      MRWordFreqCountWithCombinerCmd
 from tests.py2 import Mock
-from tests.py2 import call
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
 

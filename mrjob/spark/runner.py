@@ -172,6 +172,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         return self.fs.join(
             self._spark_tmp_dir, 'counter-output-step-%d' % step_num)
 
+    def counters(self):
+        return self._counters
+
     @property
     def fs(self):
         # Spark supports basically every filesystem there is

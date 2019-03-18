@@ -373,13 +373,6 @@ class SparkHarnessOutputComparisonTestCase(
         with reference_job.make_runner() as runner:
             runner.run()
             reference_counters = runner.counters()
-        # reference separate counters by step, but spark will combine them
-        # all together
-        combined_reference_counter = defaultdict(lambda :defaultdict(int))
-        for counter in reference_counters:
-            for g in counter:
-                for k, v in counter[g].items():
-                    combined_reference_counter[g][k] += v
 
         with self.create_temp_counter_dir() as output_counter_dir:
             harness_job = self._harness_job(
@@ -389,13 +382,12 @@ class SparkHarnessOutputComparisonTestCase(
             with harness_job.make_runner() as runner:
                 runner.run()
 
-            harness_counter = json.loads(
-                self.spark_context.textFile(
-                    'file://' + output_counter_dir
-            ).collect()[0])
+                harness_counters = json.loads(
+                    self.spark_context.textFile(
+                        'file://' + output_counter_dir
+                    ).collect()[0])
 
-        assert combined_reference_counter == harness_counter
-
+        self.assertEqual(harness_counters, reference_counters)
 
 
 class PreservesPartitioningTestCase(SandboxedTestCase):

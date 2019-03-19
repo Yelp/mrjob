@@ -242,12 +242,7 @@ class GCSFilesystem(Filesystem):
         and time-to-live."""
         bucket = self.client.bucket(name)
 
-        # as of google-cloud 0.32.0, there isn't a direct way to set location
-        if location:
-            bucket._changes.add('location')
-            bucket._properties['location'] = location
-
-        bucket.create()
+        bucket.create(location=location)
 
         bucket.lifecycle_rules = [
             dict(

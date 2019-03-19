@@ -348,6 +348,11 @@ class SparkMRJobRunner(MRJobBinRunner):
         if compress_conf and compress_conf != 'false' and codec_conf:
             args.extend(['--compression-codec', codec_conf])
 
+        # --num-reducers
+        num_reducers = jobconf_from_dict(jobconf, 'mapreduce.job.reduces')
+        if num_reducers and int(num_reducers) > 0:
+            args.extend(['--num-reducers', str(num_reducers)])
+
         return args
 
     def _spark_harness_path(self):

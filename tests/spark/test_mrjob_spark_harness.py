@@ -437,6 +437,11 @@ class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
         assert part_files != default_partitions
         assert part_files == num_reducers
 
+    def test_reducer_cannot_set_to_zero(self):
+        with self.assertRaises(ValueError):
+            job = self._harness_job(MRWordFreqCount, num_reducers=0)
+            with job.make_runner() as runner:
+                runner.run()
 
     def test_reducer_less_reducer(self):
         self._assert_partition_count_different(MRWordFreqCount, num_reducers=1)

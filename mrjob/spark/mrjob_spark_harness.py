@@ -21,6 +21,7 @@ from importlib import import_module
 from mrjob.util import shlex_split
 from pyspark.accumulators import AccumulatorParam
 
+
 # tuples of (args, kwargs) for ArgumentParser.add_argument()
 #
 # TODO: this is shared code with mr_spark_harness.py, which started out
@@ -87,6 +88,10 @@ def main(cmd_line_args=None):
 
     parser = _make_arg_parser()
     args = parser.parse_args(cmd_line_args)
+
+    if args.num_reducers <= 0:
+        raise ValueError(
+            'You can only configure num_reducers to positive number.')
 
     # get job_class
     job_module_name, job_class_name = args.job_class.rsplit('.', 1)

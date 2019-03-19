@@ -28,7 +28,7 @@ try:
         'install_requires': [
             'boto3>=1.4.6',
             'botocore>=1.6.0',
-            'PyYAML>=3.08',
+            'PyYAML>=3.10',
             'google-cloud-dataproc>=0.3.0',
             'google-cloud-logging>=1.5.0',
             'google-cloud-storage>=1.9.0',

@@ -417,3 +417,16 @@ class SparkCounterSimulationTestCase(MockFilesystemsTestCase):
         # shouldn't log empty counters
         log_output = '\n'.join(c[0][0] for c in self.log.info.call_args_list)
         self.assertNotIn('Counters', log_output)
+
+    def test_blank_out_counters_if_not_output(self):
+        self.start(patch('mrjob.bin.MRJobBinRunner._run_spark_submit',
+                         return_value=2))
+
+        job = MRTwoStepJob(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+        # should blank out counters from failed step
+        self.assertEqual(runner.counters(), [{}, {}])

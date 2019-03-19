@@ -36,6 +36,7 @@ from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
+from mrjob.py2 import to_unicode
 from mrjob.setup import UploadDirManager
 from mrjob.spark import mrjob_spark_harness
 from mrjob.step import StepFailedException
@@ -309,7 +310,8 @@ class SparkMRJobRunner(MRJobBinRunner):
                 self._counter_output_dir(step_num), 'part-*')
             counter_json = b''.join(self.fs.cat(counter_file))
             if counter_json.strip():
-                counters = json.loads(counter_json)
+                # json.loads() on Python 3.4/3.5 can't take bytes
+                counters = json.loads(to_unicode(counter_json))
 
         if isinstance(counters, list):
             self._counters.extend(counters)

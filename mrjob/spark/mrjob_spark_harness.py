@@ -89,7 +89,7 @@ def main(cmd_line_args=None):
     parser = _make_arg_parser()
     args = parser.parse_args(cmd_line_args)
 
-    if args.num_reducers and args.num_reducers <= 0:
+    if args.num_reducers is not None and args.num_reducers <= 0:
         raise ValueError(
             'You can only configure num_reducers to positive number.')
 
@@ -175,7 +175,7 @@ def main(cmd_line_args=None):
             )
 
 
-def _run_step(step, step_num, rdd, make_job, num_reducers):
+def _run_step(step, step_num, rdd, make_job, num_reducers=None):
     """Run the given step on the RDD and return the transformed RDD."""
     step_desc = step.description(step_num)
     _check_step(step_desc, step_num)
@@ -214,7 +214,7 @@ def _run_step(step, step_num, rdd, make_job, num_reducers):
             rdd, sort_values=sort_values, num_reducers=num_reducers)
 
     if reducer_job:
-        rdd = _run_reducer(reducer_job, rdd)
+        rdd = _run_reducer(reducer_job, rdd, num_reducers=num_reducers)
 
     return rdd
 
@@ -343,7 +343,7 @@ def _shuffle_and_sort(rdd, sort_values=False, num_reducers=None):
     return rdd
 
 
-def _run_reducer(reducer_job, rdd):
+def _run_reducer(reducer_job, rdd, num_reducers=None):
     """Run our job's combiner, and group lines with the same key together.
 
     :param reducer_job: an instance of our job, instantiated to be the mapper
@@ -351,9 +351,12 @@ def _run_reducer(reducer_job, rdd):
     :param rdd: an RDD containing "reducer ready" lines representing encoded
                 key-value pairs, that is, where all lines with the same key are
                 adjacent and in the same partition
+    :param num_reducers: limit the number of paratitions of output rdd, which
+                         is similar to mrjob's limit on number of reducers.
     :return: an RDD containing encoded key-value pairs
     """
     step_num = reducer_job.options.step_num
+    should_preserve_final_partitions = bool(num_reducers)
 
     r_read, r_write = reducer_job.pick_protocols(step_num, 'reducer')
 
@@ -368,12 +371,15 @@ def _run_reducer(reducer_job, rdd):
     #
     # (k, v), ... -> (k, v), ...
     rdd = rdd.mapPartitions(
-        lambda pairs: reducer_job.reduce_pairs(pairs, step_num))
+        lambda pairs: reducer_job.reduce_pairs(pairs, step_num),
+        preservesPartitioning=should_preserve_final_partitions)
 
     # encode key-value pairs back into lines
     #
     # (k, v) -> line
-    rdd = rdd.map(lambda k_v: r_write(*k_v))
+    rdd = rdd.map(
+        lambda k_v: r_write(*k_v),
+        preservesPartitioning=should_preserve_final_partitions)
 
     return rdd
 

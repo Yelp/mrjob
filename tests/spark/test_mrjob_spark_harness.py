@@ -158,7 +158,7 @@ class SparkHarnessOutputComparisonBaseTestCase(
         if counter_output_dir is not None:
             harness_job_args.extend(
                 ['--counter-output-dir', counter_output_dir])
-        if num_reducers:
+        if num_reducers is not None:
             harness_job_args.extend(
                 ['--num-reducers', str(num_reducers)])
 
@@ -583,16 +583,21 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
     def test_run_combiner_with_sort_values(self):
         self._test_run_combiner(sort_values=True)
 
-    def test_run_combiner_without_sort_values(self):
-        self._test_run_combiner(sort_values=False)
+    def test_run_combiner_with_num_reducers(self):
+        self._test_run_combiner(num_reducers=1)
 
-    def _test_run_combiner(self, sort_values):
+    def test_run_combiner_without_sort_values_and_num_reducers(self):
+        self._test_run_combiner()
+
+    def _test_run_combiner(self, sort_values=False, num_reducers=None):
         rdd = self.mock_rdd()
 
         combiner_job = Mock()
         combiner_job.pick_protocols.return_value = (Mock(), Mock())
 
-        final_rdd = _run_combiner(combiner_job, rdd)
+        final_rdd = _run_combiner(
+            combiner_job, rdd,
+            sort_values=sort_values, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         # check that we preserve partitions after calling combineByKey()
@@ -627,13 +632,17 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
     def test_shuffle_and_sort_with_sort_values(self):
         self._test_shuffle_and_sort(sort_values=True)
 
-    def test_shuffle_and_sort_without_sort_values(self):
-        self._test_shuffle_and_sort(sort_values=False)
+    def test_shuffle_and_sort_with_num_reducers(self):
+        self._test_shuffle_and_sort(num_reducers=1)
 
-    def _test_shuffle_and_sort(self, sort_values):
+    def test_shuffle_and_sort_without_sort_values_and_num_reducers(self):
+        self._test_shuffle_and_sort()
+
+    def _test_shuffle_and_sort(self, sort_values=False, num_reducers=None):
         rdd = self.mock_rdd()
 
-        final_rdd = _shuffle_and_sort(rdd)
+        final_rdd = _shuffle_and_sort(
+            rdd, sort_values=sort_values, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         # check that we always preserve partitioning after groupBy()
@@ -642,9 +651,6 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
             if called_groupBy:
                 if '.' in name:
                     continue  # Python 3.4/3.5 tracks groupBy.assert_called()
-
-                if not kwargs.get('preservesPartitioning'):
-                    import pdb; pdb.set_trace()
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
             elif name == 'groupBy':
                 called_groupBy = True
@@ -652,22 +658,33 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         # check that groupBy() was actually called
         self.assertTrue(called_groupBy)
 
-    def test_run_reducer(self):
+    def test_run_reducer_with_num_reducers(self):
+        self._test_run_reducer(num_reducers=1)
+
+    def test_run_reducer_without_num_reducers(self):
+        self._test_run_reducer()
+
+    def _test_run_reducer(self, num_reducers=None):
         rdd = self.mock_rdd()
 
         reducer_job = Mock()
         reducer_job.pick_protocols.return_value = (Mock(), Mock())
 
-        final_rdd = _run_reducer(reducer_job, rdd)
+        final_rdd = _run_reducer(reducer_job, rdd, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         called_mapPartitions = False
-        for name, args, kwargs in rdd.method_calls:
+        expected_preservePartitioning_vals = [
+            True, bool(num_reducers), bool(num_reducers)]
+
+        for (name, args, kwargs), expected_preservePartitioning in zip(
+            rdd.method_calls, expected_preservePartitioning_vals
+        ):
             if name == 'mapPartitions':
                 called_mapPartitions = True
-                break  # nothing else to check
-            else:
-                self.assertEqual(kwargs.get('preservesPartitioning'), True)
+            self.assertEqual(
+                kwargs.get('preservesPartitioning'),
+                expected_preservePartitioning)
 
         # sanity-check that mapPartitions() was actually called
         self.assertTrue(called_mapPartitions)

@@ -214,7 +214,6 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
         with job.make_runner() as runner:
             runner.run()
-
             output = dict(job.parse_output(runner.cat_output()))
 
             self.assertEqual(output, dict(blue=1, fish=4, one=1, red=1, two=1))

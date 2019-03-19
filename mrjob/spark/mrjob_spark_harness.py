@@ -89,7 +89,7 @@ def main(cmd_line_args=None):
     parser = _make_arg_parser()
     args = parser.parse_args(cmd_line_args)
 
-    if args.num_reducers <= 0:
+    if args.num_reducers and args.num_reducers <= 0:
         raise ValueError(
             'You can only configure num_reducers to positive number.')
 

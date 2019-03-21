@@ -404,10 +404,15 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._fs is None:
             self._fs = CompositeFilesystem()
 
+            location = self._opts['region'] or _zone_to_region(
+                self._opts['zone'])
+
             self._fs.add_fs('gcs', GCSFilesystem(
                 credentials=self._credentials,
                 project_id=self._project_id,
                 part_size=self._upload_part_size(),
+                location=location,
+                object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS,
             ))
 
             self._fs.add_fs('local', LocalFilesystem())
@@ -467,8 +472,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._create_setup_wrapper_scripts()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
-        bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
-        self._create_fs_tmp_bucket(bucket_name)
         self._upload_local_files()
         self._wait_for_fs_sync()
 
@@ -513,33 +516,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for step in self._get_steps():
             if step.get('jar'):
                 self._upload_mgr.add(step['jar'])
-
-    def _create_fs_tmp_bucket(self, bucket_name, location=None):
-        """Create a temp bucket if missing
-
-        Tie the temporary bucket to the same region as the GCE job and set a
-        28-day TTL
-        """
-        # Return early if our bucket already exists
-        try:
-            self.fs.gcs.get_bucket(bucket_name)
-            return
-        except google.api_core.exceptions.NotFound:
-            pass
-
-        log.info('creating FS bucket %r' % bucket_name)
-
-        location = location or self._opts['region'] or _zone_to_region(
-            self._opts['zone'])
-
-        # NOTE - By default, we create a bucket in the same GCE region as our
-        # job (tmp buckets ONLY)
-        # https://cloud.google.com/storage/docs/bucket-locations
-        self.fs.gcs.create_bucket(
-            bucket_name, location=location,
-            object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS)
-
-        self._wait_for_fs_sync()
 
     ### Running the job ###
 
@@ -648,8 +624,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _launch_cluster(self):
         """Create an empty cluster on Dataproc, and set self._cluster_id to
         its ID."""
-        bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
-        self._create_fs_tmp_bucket(bucket_name)
+        self.fs.mkdir(self._job_tmpdir)
 
         # clusterName must be a match of
         # regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'

@@ -261,6 +261,8 @@ class GCSFilesystem(Filesystem):
 
         if location is None:
             location = self._location
+        elif not location:
+            location = None  # leave a way to use the API default
 
         bucket.create(location=location)
 

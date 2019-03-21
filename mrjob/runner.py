@@ -250,7 +250,8 @@ class MRJobRunner(object):
         # set this to an :py:class:`~mrjob.setup.UploadDirManager` in
         # runners that upload files to HDFS, S3, etc.
         #
-        # this manager should handle files belonging to self._working_dir_mgr,
+        # this manager should not handle files belonging to
+        # self._working_dir_mgr,
         # which, if they are uploaded, will go into self._wd_upload_dir()
         self._upload_mgr = None
 

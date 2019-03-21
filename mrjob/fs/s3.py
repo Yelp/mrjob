@@ -136,15 +136,18 @@ class S3Filesystem(Filesystem):
     """
 
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
-                 aws_session_token=None, s3_endpoint=None, s3_region=None):
+                 aws_session_token=None, s3_endpoint=None, s3_region=None,
+                 part_size=None):
         """
         :param aws_access_key_id: Your AWS access key ID
         :param aws_secret_access_key: Your AWS secret access key
         :param aws_session_token: session token for use with temporary
                                    AWS credentials
         :param s3_endpoint: If set, always use this endpoint
-        :param s3_region: Region name corresponding to s3_endpoint. Only used
-                          if *s3_endpoint* is set
+-       :param s3_region: Region name corresponding to s3_endpoint. Only used
+-                          if *s3_endpoint* is set
+        :param part_size: Part size for multi-part uploading, in bytes, or
+                          ``None``
         """
         super(S3Filesystem, self).__init__()
         self._s3_endpoint_url = _endpoint_url(s3_endpoint)
@@ -152,6 +155,7 @@ class S3Filesystem(Filesystem):
         self._aws_access_key_id = aws_access_key_id
         self._aws_secret_access_key = aws_secret_access_key
         self._aws_session_token = aws_session_token
+        self._part_size = part_size
 
     def can_handle_path(self, path):
         return is_s3_uri(path)
@@ -247,15 +251,15 @@ class S3Filesystem(Filesystem):
         """
         pass
 
-    def put(self, src, path, part_size_mb=None):
+    def put(self, src, path):
         """Uploads a local file to a specific destination."""
         s3_key = self._get_s3_key(path)
 
         s3_key.upload_file(
             src,
             Config=boto3.s3.transfer.TransferConfig(
-                multipart_chunksize=part_size_mb,
-                multipart_threshold=part_size_mb,
+                multipart_chunksize=self._part_size,
+                multipart_threshold=self._part_size,
             ),
         )
 

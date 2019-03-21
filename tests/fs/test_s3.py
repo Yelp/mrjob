@@ -168,22 +168,24 @@ class S3FSTestCase(MockBoto3TestCase):
         self.fs.put(local_path, dest)
         self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
-    def test_put_part_size_mb(self):
+    def test_put_with_part_size(self):
         self.add_mock_s3_data({'bar-files': {}})
 
         local_path = self.makefile('foo', contents=b'bar')
         dest = 's3://bar-files/foo'
 
+        fs = S3Filesystem(part_size=12345)
+
         with patch.object(MockS3Object, 'upload_file') as upload_file:
             with patch('boto3.s3.transfer.TransferConfig') as TransferConfig:
-                self.fs.put(local_path, dest, part_size_mb=99999)
+                fs.put(local_path, dest)
 
                 upload_file.assert_called_once_with(
                     local_path, Config=TransferConfig.return_value)
 
                 TransferConfig.assert_called_once_with(
-                    multipart_chunksize=99999,
-                    multipart_threshold=99999,
+                    multipart_chunksize=12345,
+                    multipart_threshold=12345,
                 )
 
     def test_rm(self):

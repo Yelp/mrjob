@@ -407,19 +407,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._fs.add_fs('gcs', GCSFilesystem(
                 credentials=self._credentials,
                 project_id=self._project_id,
+                part_size=self._upload_part_size(),
             ))
 
             self._fs.add_fs('local', LocalFilesystem())
 
         return self._fs
-
-    def _fs_chunk_size(self):
-        """Chunk size for cloud storage Blob objects. Currently
-        only used for uploading."""
-        if self._opts['cloud_part_size_mb']:
-            return int(self._opts['cloud_part_size_mb'] * 1024 * 1024)
-        else:
-            return None
 
     def _get_tmpdir(self, given_tmpdir):
         """Helper for _fix_tmpdir"""
@@ -531,7 +524,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for path, gcs_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, gcs_uri))
 
-            self.fs.put(path, gcs_uri, part_size_mb=self._fs_chunk_size())
+            self.fs.put(path, gcs_uri)
 
         self._wait_for_fs_sync()
 

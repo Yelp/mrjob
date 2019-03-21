@@ -709,11 +709,11 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    google_region=dict(
+    gcs_region=dict(
         cloud_role='connect',
         switches=[
-            (['--google-region'], dict(
-                help='Google cloud region to create GCS buckets in',
+            (['--gcs-region'], dict(
+                help='region to create Google Cloud Storage buckets in',
             )),
         ],
     ),

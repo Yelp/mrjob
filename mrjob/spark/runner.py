@@ -23,8 +23,6 @@ from tempfile import gettempdir
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.compat import jobconf_from_dict
-from mrjob.conf import combine_dicts
-from mrjob.conf import combine_local_envs
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem

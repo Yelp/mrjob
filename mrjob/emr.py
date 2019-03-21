@@ -208,9 +208,6 @@ _CHEAPEST_INSTANCE_TYPE = 'm4.large'
 # these are the only kinds of instance roles that exist
 _INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
 
-# use to disable multipart uploading
-_HUGE_PART_THRESHOLD = 2 ** 256
-
 # where to find the history log in HDFS
 _YARN_HDFS_HISTORY_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging/history'
 

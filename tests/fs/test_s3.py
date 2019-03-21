@@ -241,7 +241,14 @@ class S3FSTestCase(MockBoto3TestCase):
         self.assertRaises(OSError,
                           self.fs.touchz, 's3://walrus/full')
 
-    def test_mkdir_does_nothing(self):
+    def test_mkdir_creates_buckets(self):
+        self.assertNotIn('walrus', self.mock_s3_fs)
+
+        self.fs.mkdir('s3://walrus/data')
+
+        self.assertIn('walrus', self.mock_s3_fs)
+
+    def test_mkdir_does_not_create_directories(self):
         self.add_mock_s3_data({'walrus': {}})
 
         self.assertEqual(list(self.fs.ls('s3://walrus/')), [])
@@ -427,6 +434,34 @@ class S3FSRegionTestCase(MockBoto3TestCase):
                          'https://s3-us-west-2.amazonaws.com')
         self.assertEqual(bucket.meta.client.meta.region_name,
                          'us-west-2')
+
+    def test_create_bucket_in_region_set_at_init_time(self):
+        fs = S3Filesystem(s3_region='us-west-2')
+
+        fs.create_bucket('walrus')
+
+        s3_client = fs.make_s3_client()
+        self.assertEqual(
+            s3_client.get_bucket_location('walrus')['LocationConstraint'],
+            'us-west-2')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3-us-west-2.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-west-2')
+
+    def test_create_bucket_with_mkdir(self):
+        # mkdir() doesn't have a way to specify bucket location, so we
+        # do it at init time
+        fs = S3Filesystem(s3_region='us-west-1')
+
+        fs.mkdir('s3://walrus/data')
+
+        bucket = fs.get_bucket('walrus')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-west-1')
 
 
 class WrapAWSClientTestCase(MockBoto3TestCase):

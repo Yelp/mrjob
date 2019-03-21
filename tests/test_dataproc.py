@@ -653,7 +653,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         runner = DataprocJobRunner(conf_paths=[], **runner_kwargs)
 
         bucket_name, path = parse_gcs_uri(runner._cloud_tmp_dir)
-        runner._create_fs_tmp_bucket(bucket_name, location=location)
+        runner._upload_local_files()
 
         self.assertTrue(bucket_name.startswith('mrjob-'))
         self.assertNotIn(bucket_name, existing_buckets)

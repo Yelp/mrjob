@@ -144,10 +144,11 @@ class S3Filesystem(Filesystem):
         :param aws_session_token: session token for use with temporary
                                    AWS credentials
         :param s3_endpoint: If set, always use this endpoint
--       :param s3_region: Region name corresponding to s3_endpoint. Only used
--                          if *s3_endpoint* is set
-        :param part_size: Part size for multi-part uploading, in bytes, or
-                          ``None``
+        :param s3_region: Default region for connections to the S3 API and
+                          newly created buckets.
+        :param part_size_mb: Part size for multi-part uploading, in bytes, or
+                             ``None``
+
         """
         super(S3Filesystem, self).__init__()
         self._s3_endpoint_url = _endpoint_url(s3_endpoint)
@@ -246,10 +247,21 @@ class S3Filesystem(Filesystem):
         return any(self._ls(path_glob))
 
     def mkdir(self, dest):
-        """Make a directory. This does nothing on S3 because there are
-        no directories.
+        """Make a directory. This doesn't actually create directories on S3
+        (because there is no such thing), but it will create the corresponding
+        bucket if it doesn't exist.
         """
-        pass
+        bucket_name, key_name = parse_s3_uri(dest)
+
+        client = self.make_s3_client()
+
+        try:
+            client.head_bucket(Bucket=bucket_name)
+        except botocore.exceptions.ClientError as ex:
+            if _client_error_status(ex) != 404:
+                raise
+
+            self.create_bucket(bucket_name)
 
     def put(self, src, path):
         """Uploads a local file to a specific destination."""
@@ -402,9 +414,12 @@ class S3Filesystem(Filesystem):
 
         params = dict(Bucket=bucket_name)
 
+        if region is None:
+            region = self._s3_region
+
         # CreateBucketConfiguration can't be empty, so don't set it
         # unless there's a location constraint (see #1927)
-        if region != _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
+        if region and region != _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
             params['CreateBucketConfiguration'] = dict(
                 LocationConstraint=region)
 

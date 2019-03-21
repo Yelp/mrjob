@@ -22,6 +22,7 @@ from io import BytesIO
 from collections import defaultdict
 from contextlib import contextmanager
 from io import StringIO
+from os import listdir
 from os.path import abspath
 from os.path import dirname
 from os.path import join
@@ -417,7 +418,7 @@ class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
     def _count_partitions_files(self, runner):
         return sum(
             1
-            for f in os.listdir(runner.get_output_dir())
+            for f in listdir(runner.get_output_dir())
             if f.startswith('part')
         )
 
@@ -674,17 +675,25 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         called_mapPartitions = False
-        expected_preservePartitioning_vals = [
-            True, bool(num_reducers), bool(num_reducers)]
 
-        for (name, args, kwargs), expected_preservePartitioning in zip(
-            rdd.method_calls, expected_preservePartitioning_vals
-        ):
+        before_map_partition = True
+        for name, args, kwargs in rdd.method_calls:
             if name == 'mapPartitions':
                 called_mapPartitions = True
-            self.assertEqual(
-                kwargs.get('preservesPartitioning'),
-                expected_preservePartitioning)
+                before_map_partition = False
+
+            # We want to make sure we keep the original partition before
+            # reaching to map_partition
+            if before_map_partition:
+                self.assertEqual(kwargs.get('preservesPartitioning'), True)
+
+            # Once we finished from map_paratition, we don't care about if
+            # we keep the same partition unless we want to fixed on number
+            # of partitions
+            else:
+                self.assertEqual(
+                    kwargs.get('preservesPartitioning'), bool(num_reducers))
+
 
         # sanity-check that mapPartitions() was actually called
         self.assertTrue(called_mapPartitions)

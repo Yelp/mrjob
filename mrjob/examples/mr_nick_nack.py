@@ -33,7 +33,7 @@ class MRNickNack(MRJob):
     #
     # This JAR was downloaded from https://github.com/empiricalresults/nicknack
     # and is also under the Apache 2.0 license.
-    LIBJARS = ['nicknack-1.0.0.jar']
+    LIBJARS = ['nicknack-1.0.1.jar']
 
     # tell mrjob not to format our output -- leave that to hadoop
     OUTPUT_PROTOCOL = RawValueProtocol

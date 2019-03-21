@@ -112,8 +112,10 @@ def main(cmd_line_args=None):
         j.increment_counter = increment_counter
         return j
 
+    job = make_job()
+
     # get job steps. don't pass --steps, which is deprecated
-    steps = make_job().steps()
+    steps = job.steps()
 
     # pick steps
     start = args.first_step_num
@@ -121,15 +123,37 @@ def main(cmd_line_args=None):
     steps_to_run = list(enumerate(steps))[start:end]
 
     try:
-        rdd = sc.textFile(args.input_path, use_unicode=False)
+        if job.hadoop_input_format() is not None:
+            rdd = sc.hadoopFile(
+                args.input_path,
+                inputFormatClass=job.hadoop_input_format(),
+                keyClass='org.apache.hadoop.io.Text',
+                valueClass='org.apache.hadoop.io.Text')
+
+            # hadoopFile loads each line as a key-value pair in which the contents
+            # of the line are the key and the value is an empty string. Convert to
+            # an rdd of just lines, encoded as bytes.
+            rdd = rdd.map(lambda kv: kv[0].encode('utf-8'))
+        else:
+            rdd = sc.textFile(args.input_path, use_unicode=False)
 
         # run steps
         for step_num, step in steps_to_run:
             rdd = _run_step(step, step_num, rdd, make_job)
 
         # write the results
-        rdd.saveAsTextFile(
-            args.output_path, compressionCodecClass=args.compression_codec)
+        if job.hadoop_output_format() is not None:
+            # saveAsHadoopFile takes an rdd of key-value pairs, so convert to that
+            # format
+            rdd = rdd.map(lambda line: tuple(
+                x.decode('utf-8') for x in line.split(b'\t', 1)))
+            rdd.saveAsHadoopFile(
+                args.output_path,
+                outputFormatClass=job.hadoop_output_format(),
+                compressionCodecClass=args.compression_codec)
+        else:
+            rdd.saveAsTextFile(
+                args.output_path, compressionCodecClass=args.compression_codec)
     finally:
         if args.counter_output_dir is not None:
             sc.parallelize(

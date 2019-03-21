@@ -643,6 +643,7 @@ class RegionAndZoneOptsTestCase(MockGoogleTestCase):
 
 
 class TmpBucketTestCase(MockGoogleTestCase):
+
     def assert_new_tmp_bucket(self, location, **runner_kwargs):
         """Assert that if we create an DataprocJobRunner with the given keyword
         args, it'll create a new tmp bucket with the given location
@@ -654,6 +655,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         runner._upload_local_files()
 
         bucket_name, path = parse_gcs_uri(runner._cloud_tmp_dir)
+        runner._upload_local_files()
 
         self.assertTrue(bucket_name.startswith('mrjob-'))
         self.assertNotIn(bucket_name, existing_buckets)

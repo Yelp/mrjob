@@ -877,7 +877,7 @@ class TmpBucketTestCase(MockBoto3TestCase):
         existing_bucket_names = set(self.mock_s3_fs)
 
         runner = EMRJobRunner(conf_paths=[], **runner_kwargs)
-        runner._create_s3_tmp_bucket_if_needed()
+        runner._upload_local_files()
 
         bucket_name, path = parse_s3_uri(runner._opts['cloud_tmp_dir'])
 
@@ -2966,14 +2966,6 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
             'tests.mock_boto3.s3.MockS3Object.upload_file',
             side_effect=tests.mock_boto3.s3.MockS3Object.upload_file,
             autospec=True))
-
-    def upload_data(self, runner, data):
-        """Upload some bytes to S3"""
-        data_path = os.path.join(self.tmp_dir, self.TEST_FILENAME)
-        with open(data_path, 'wb') as fp:
-            fp.write(data)
-
-        runner.fs.put(data_path, self.TEST_S3_URI)
 
     def assert_upload_succeeds(self, runner, data, expected_part_size):
         """Write the data to a temp file, and then upload it to (mock) S3,

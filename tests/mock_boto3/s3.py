@@ -102,6 +102,11 @@ class MockS3Client(object):
 
         return dict(LocationConstraint=location_constraint)
 
+    def head_bucket(self, Bucket):
+        self._check_bucket_exists(Bucket, 'HeadBucket')
+
+        return dict()
+
     def list_buckets(self):
         buckets = [
             dict(CreationDate=b['creation_date'], Name=name)

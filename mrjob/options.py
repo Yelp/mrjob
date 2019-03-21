@@ -701,14 +701,6 @@ _RUNNER_OPTS = dict(
             (['--gcloud-bin'], dict(help='path to gcloud binary')),
         ],
     ),
-    google_project_id=dict(
-        cloud_role='connect',
-        switches=[
-            (['--google-project-id'], dict(
-                help='project ID to use when connecting to GCS',
-            )),
-        ],
-    ),
     gcs_region=dict(
         cloud_role='connect',
         switches=[
@@ -1053,7 +1045,8 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--project-id'], dict(
                 deprecated_aliases=['--gcp-project'],
-                help='Project to run Dataproc jobs in'
+                help=('Project to use when connecting to Google Cloud Services'
+                      ' and to run Cloud Dataproc jobs in')
             )),
         ],
     ),

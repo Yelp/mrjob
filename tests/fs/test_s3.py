@@ -168,7 +168,7 @@ class S3FSTestCase(MockBoto3TestCase):
         self.fs.put(local_path, dest)
         self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
-    def test_put_part_size_mb(self):
+    def test_put_with_part_size(self):
         self.add_mock_s3_data({'bar-files': {}})
 
         local_path = self.makefile('foo', contents=b'bar')

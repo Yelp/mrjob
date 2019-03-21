@@ -214,8 +214,8 @@ class GCSFilesystem(Filesystem):
     def put(self, src_path, dest_uri, chunk_size=None):
         """Uploads a local file to a specific destination.
 
-        *chunk_size* is a deprecated alias for *part_size* and will
-        be removed in v0.7.0.
+        *chunk_size* is a deprecated alias for *part_size* (set at init
+        time) and will be removed in v0.7.0.
         """
         part_size = self._part_size
 

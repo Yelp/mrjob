@@ -318,7 +318,6 @@ class HadoopFilesystem(Filesystem):
         if path.endswith('/'):
             raise ValueError('put() destination may not be a directory')
 
-        # ignore part_size_mb, not supported by `hadoop fs`
         self.invoke_hadoop(['fs', '-put', src, path])
 
     def rm(self, path_glob):

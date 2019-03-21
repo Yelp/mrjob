@@ -62,12 +62,16 @@ class GCSFilesystem(Filesystem):
     :param project_id: an optional project ID, used to initialize the storage
                        client
     :param part_size: Part size for multi-part uploading, in bytes, or ``None``
+    :param location: Default location to use when creating a bucket
+    :param object_ttl_days: Default object expiry for newly created buckets
     """
     def __init__(self, local_tmp_dir=None, credentials=None, project_id=None,
-                 part_size=None):
+                 part_size=None, location=None, object_ttl_days=None):
         self._credentials = credentials
         self._project_id = project_id
         self._part_size = part_size
+        self._location = location
+        self._object_ttl_days = object_ttl_days
 
         if local_tmp_dir is not None:
             log.warning('local_tmp_dir does nothing and will be removed'
@@ -171,10 +175,16 @@ class GCSFilesystem(Filesystem):
             start = end
 
     def mkdir(self, dest):
-        """Make a directory. This does nothing on GCS because there are
-        no directories.
+        """Does not actually create a directory on GCS (because GCS doesn't
+        have directories), but creates the underlying bucket if it does not
+        exist already.
         """
-        pass
+        bucket_name, base_name = parse_gcs_uri(dest)
+
+        try:
+            self.get_bucket(bucket_name)
+        except google.api_core.exceptions.NotFound:
+            self.create_bucket(bucket_name)
 
     def exists(self, path_glob):
         """Does the given path exist?
@@ -204,8 +214,8 @@ class GCSFilesystem(Filesystem):
     def put(self, src_path, dest_uri, chunk_size=None):
         """Uploads a local file to a specific destination.
 
-        *chunk_size* is a deprecated alias for *part_size* (set at init
-        time) and will be removed in v0.7.0.
+        *chunk_size* is a deprecated alias for *part_size* and will
+        be removed in v0.7.0.
         """
         part_size = self._part_size
 
@@ -249,14 +259,23 @@ class GCSFilesystem(Filesystem):
         and time-to-live."""
         bucket = self.client.bucket(name)
 
+        if location is None:
+            location = self._location
+        elif not location:
+            location = None  # leave a way to use the API default
+
         bucket.create(location=location)
 
-        bucket.lifecycle_rules = [
-            dict(
-                action=dict(type='Delete'),
-                condition=dict(age=object_ttl_days)
-            )
-        ]
+        if object_ttl_days is None:
+            object_ttl_days = self._object_ttl_days
+
+        if object_ttl_days:
+            bucket.lifecycle_rules = [
+                dict(
+                    action=dict(type='Delete'),
+                    condition=dict(age=object_ttl_days)
+                )
+            ]
 
     def delete_bucket(self, bucket):
         raise NotImplementedError(

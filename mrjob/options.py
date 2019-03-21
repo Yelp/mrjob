@@ -701,6 +701,22 @@ _RUNNER_OPTS = dict(
             (['--gcloud-bin'], dict(help='path to gcloud binary')),
         ],
     ),
+    google_project_id=dict(
+        cloud_role='connect',
+        switches=[
+            (['--google-project-id'], dict(
+                help='project ID to use when connecting to GCS',
+            )),
+        ],
+    ),
+    google_region=dict(
+        cloud_role='connect',
+        switches=[
+            (['--google-region'], dict(
+                help='Google cloud region to create GCS buckets in',
+            )),
+        ],
+    ),
     hadoop_bin=dict(
         combiner=combine_cmds,
         switches=[
@@ -1107,6 +1123,14 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    s3_region=dict(
+        cloud_role='connect',
+        switches=[
+            (['--s3-region'], dict(
+                help='AWS region to create s3 buckets in',
+            )),
+        ],
+    ),
     service_account=dict(
         cloud_role='launch',
         switches=[
@@ -1198,6 +1222,16 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--spark-submit-bin'], dict(
                 help='spark-submit binary. You may include arguments.'
+            )),
+        ],
+    ),
+    spark_tmp_dir=dict(
+        cloud_role='launch',
+        combiner=combine_paths,
+        switches=[
+            (['--spark-tmp-dir'], dict(
+                help=('optional URI visible to Spark executors to use as our'
+                      ' temp directory.'),
             )),
         ],
     ),

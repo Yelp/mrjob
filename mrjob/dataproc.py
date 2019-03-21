@@ -414,14 +414,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         return self._fs
 
-    def _part_size_mb(self):
-        """Chunk size for cloud storage Blob objects. Currently
-        only used for uploading."""
-        if self._opts['cloud_part_size_mb']:
-            return int(self._opts['cloud_part_size_mb'] * 1024 * 1024)
-        else:
-            return None
-
     def _get_tmpdir(self, given_tmpdir):
         """Helper for _fix_tmpdir"""
         if given_tmpdir:

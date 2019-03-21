@@ -80,6 +80,110 @@ class CatTestCase(MockGoogleTestCase):
             [b'a' * _CAT_CHUNK_SIZE, b'b' * _CAT_CHUNK_SIZE])
 
 
+class CreateBucketTestCase(MockGoogleTestCase):
+
+    def test_default(self):
+        fs = GCSFilesystem()
+
+        fs.create_bucket('walrus')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US')
+        self.assertEqual(list(bucket.lifecycle_rules), [])
+
+    def test_location(self):
+        fs = GCSFilesystem()
+
+        fs.create_bucket('walrus', location='us-central1')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US-CENTRAL1')
+
+    def test_location_set_at_init(self):
+        fs = GCSFilesystem(location='us-central1')
+
+        fs.create_bucket('walrus')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US-CENTRAL1')
+
+    def test_override_location_set_at_init(self):
+        fs = GCSFilesystem(location='us-central1')
+
+        fs.create_bucket('walrus', location='us-east1')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US-EAST1')
+
+    def test_blank_out_location_set_at_init(self):
+        fs = GCSFilesystem(location='us-central1')
+
+        fs.create_bucket('walrus', location='')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US')
+
+    def test_lifecycle_rules(self):
+        fs = GCSFilesystem()
+
+        fs.create_bucket('walrus', object_ttl_days=123)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(
+            list(bucket.lifecycle_rules),
+            [dict(action=dict(type='Delete'), condition=dict(age=123))])
+
+    def test_object_ttl_days_set_at_init(self):
+        fs = GCSFilesystem(object_ttl_days=234)
+
+        fs.create_bucket('walrus')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(
+            list(bucket.lifecycle_rules),
+            [dict(action=dict(type='Delete'), condition=dict(age=234))])
+
+    def test_override_object_ttl_days_set_at_init(self):
+        fs = GCSFilesystem(object_ttl_days=234)
+
+        fs.create_bucket('walrus', object_ttl_days=123)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(
+            list(bucket.lifecycle_rules),
+            [dict(action=dict(type='Delete'), condition=dict(age=123))])
+
+    def test_blank_out_object_ttl_days_set_at_init(self):
+        fs = GCSFilesystem(object_ttl_days=234)
+
+        fs.create_bucket('walrus', object_ttl_days=0)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(list(bucket.lifecycle_rules), [])
+
+    def test_mkdir_bucket(self):
+        fs = GCSFilesystem(location='us-central1', object_ttl_days=123)
+
+        fs.mkdir('gs://walrus/data')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.location, 'US-CENTRAL1')
+
+        self.assertEqual(
+            list(bucket.lifecycle_rules),
+            [dict(action=dict(type='Delete'), condition=dict(age=123))])
+
+
 class GCSFSTestCase(MockGoogleTestCase):
 
     def setUp(self):
@@ -188,6 +292,22 @@ class GCSFSTestCase(MockGoogleTestCase):
 
         self.assertRaises(IOError, self.fs.md5sum, 'gs://walrus/data/bar')
 
+    def test_mkdir_creates_buckets(self):
+        self.assertNotIn('walrus', self.mock_gcs_fs)
+
+        self.fs.mkdir('gs://walrus/data')
+
+        self.assertIn('walrus', self.mock_gcs_fs)
+
+    def test_mkdir_does_not_create_directories(self):
+        self.fs.create_bucket('walrus')
+
+        self.assertEqual(list(self.fs.ls('gs://walrus/')), [])
+
+        self.fs.mkdir('gs://walrus/data')
+
+        self.assertEqual(list(self.fs.ls('gs://walrus/')), [])
+
     def test_put(self):
         local_path = self.makefile('foo', contents=b'bar')
         dest = 'gs://bar-files/foo'
@@ -196,14 +316,16 @@ class GCSFSTestCase(MockGoogleTestCase):
         self.fs.put(local_path, dest)
         self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
-    def test_put_part_size_mb(self):
+    def test_put_with_part_size(self):
         local_path = self.makefile('foo', contents=b'bar')
         dest = 'gs://bar-files/foo'
         self.storage_client().bucket('bar-files').create()
 
+        fs = GCSFilesystem(part_size=12345)
+
         with patch.object(GCSFilesystem, '_blob') as blob_meth:
-            self.fs.put(local_path, dest, part_size_mb=99999)
-            blob_meth.assert_called_once_with(dest, chunk_size=99999)
+            fs.put(local_path, dest)
+            blob_meth.assert_called_once_with(dest, chunk_size=12345)
 
     def test_put_chunk_size(self):
         local_path = self.makefile('foo', contents=b'bar')

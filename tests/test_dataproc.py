@@ -653,7 +653,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         runner = DataprocJobRunner(conf_paths=[], **runner_kwargs)
 
         bucket_name, path = parse_gcs_uri(runner._cloud_tmp_dir)
-        runner._create_fs_tmp_bucket(bucket_name, location=location)
+        runner._upload_local_files()
 
         self.assertTrue(bucket_name.startswith('mrjob-'))
         self.assertNotIn(bucket_name, existing_buckets)
@@ -2061,17 +2061,17 @@ class CloudPartSizeTestCase(MockGoogleTestCase):
     def test_default(self):
         runner = DataprocJobRunner()
 
-        self.assertEqual(runner._fs_chunk_size(), 100 * 1024 * 1024)
+        self.assertEqual(runner._upload_part_size(), 100 * 1024 * 1024)
 
     def test_float(self):
         runner = DataprocJobRunner(cloud_part_size_mb=0.25)
 
-        self.assertEqual(runner._fs_chunk_size(), 256 * 1024)
+        self.assertEqual(runner._upload_part_size(), 256 * 1024)
 
     def test_zero(self):
         runner = DataprocJobRunner(cloud_part_size_mb=0)
 
-        self.assertEqual(runner._fs_chunk_size(), None)
+        self.assertEqual(runner._upload_part_size(), None)
 
     def test_multipart_upload(self):
         job = MRWordCount(

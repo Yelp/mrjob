@@ -23,6 +23,9 @@ from tempfile import gettempdir
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.compat import jobconf_from_dict
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_local_envs
+from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import google as google_libs_installed
@@ -60,6 +63,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         'cloud_fs_sync_secs',
         'cloud_part_size_mb',
         'google_project_id',  # used by GCS filesystem
+        'google_region',  # used when creating buckets on GCS
         'hadoop_bin',
         's3_endpoint',
         's3_region',  # only used along with s3_endpoint
@@ -79,6 +83,12 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         :param mrjob_cls: class of the job you want to run. Used for
                           running streaming steps in Spark
+
+        SparkMRJobRunner ignores the keyword arguments *hadoop_input_format*,
+        *hadoop_output_format*, and *sort_values* (see
+        :py:meth:`MRJobRunner.__init__`). These are only set by the job as a
+        way to communicate certain attributes to the runner, and the Spark
+        runner instead inspects the job directly.
         """
         # need to set this before checking steps in superclass __init__()
         self._mrjob_cls = mrjob_cls
@@ -195,27 +205,18 @@ class SparkMRJobRunner(MRJobBinRunner):
 
             if google_libs_installed:
                 self._fs.add_fs('gcs', GCSFilesystem(
-                    project_id=self._opts['google_project_id']
+                    project_id=self._opts['google_project_id'],
+                    location=self._opts['google_region'],
+                    object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS,
                 ), disable_if=_is_permanent_google_error)
 
+            # Hadoop FS is responsible for all URIs that fall through to it
             self._fs.add_fs('hadoop', HadoopFilesystem(
                 self._opts['hadoop_bin']))
 
             self._fs.add_fs('local', LocalFilesystem())
 
         return self._fs
-
-    def _upload_local_files(self):
-        # in local mode, nothing to upload
-        if not self._upload_mgr:
-            return
-
-        self.fs.mkdir(self._upload_mgr.prefix)
-
-        log.info('Copying local files to %s' % self._upload_mgr.prefix)
-        for src_path, uri in self._upload_mgr.path_to_uri().items():
-            log.debug('  %s -> %s' % (src_path, uri))
-            self.fs.put(src_path, uri)
 
     # making mr_job_script visible in Spark
 

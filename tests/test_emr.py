@@ -2974,7 +2974,7 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         with open(data_path, 'wb') as fp:
             fp.write(data)
 
-        runner._upload_contents(self.TEST_S3_URI, data_path)
+        runner.fs.put(data_path, self.TEST_S3_URI)
 
     def assert_upload_succeeds(self, runner, data, expected_part_size):
         """Write the data to a temp file, and then upload it to (mock) S3,
@@ -2985,7 +2985,7 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         with open(data_path, 'wb') as fp:
             fp.write(data)
 
-        runner._upload_contents(self.TEST_S3_URI, data_path)
+        runner.fs.put(data_path, self.TEST_S3_URI)
 
         s3_key = runner.fs.s3._get_s3_key(self.TEST_S3_URI)
         self.assertEqual(s3_key.get()['Body'].read(), data)
@@ -3019,7 +3019,7 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         runner = EMRJobRunner(cloud_part_size_mb=0)
 
         data = b'Mew' * 20
-        self.assert_upload_succeeds(runner, data, _HUGE_PART_THRESHOLD)
+        self.assert_upload_succeeds(runner, data, None)
 
 
 class AWSSessionTokenTestCase(MockBoto3TestCase):

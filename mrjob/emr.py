@@ -679,7 +679,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 aws_session_token=self._opts['aws_session_token'],
                 s3_endpoint=self._opts['s3_endpoint'],
-                s3_region=self._opts['region']))
+                s3_region=self._opts['region'],
+                part_size=self._upload_part_size()))
 
             if self._opts['ec2_key_pair_file']:
                 # add hadoop fs after S3 because it tries to handle all URIs
@@ -851,20 +852,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         for path, s3_uri in self._upload_mgr.path_to_uri().items():
             log.debug('  %s -> %s' % (path, s3_uri))
-            self._upload_contents(s3_uri, path)
-
-    def _upload_contents(self, s3_uri, path):
-        """Uploads the file at the given path to S3, possibly using
-        multipart upload."""
-        # use _HUGE_PART_THRESHOLD to disable multipart uploading
-        # (could use put() directly, but that would be another code path)
-        part_size_mb = self._get_upload_part_size() or _HUGE_PART_THRESHOLD
-
-        self.fs.put(path, s3_uri, part_size_mb)
-
-    def _get_upload_part_size(self):
-        # part size is in MB, as the minimum is 5 MB
-        return int((self._opts['cloud_part_size_mb'] or 0) * 1024 * 1024)
+            self.fs.put(path, s3_uri)
 
     def _ssh_bin(self):
         # the args of the ssh binary

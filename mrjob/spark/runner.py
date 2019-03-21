@@ -188,7 +188,7 @@ class SparkMRJobRunner(MRJobBinRunner):
 
             if google_libs_installed:
                 self._fs.add_fs('gcs', GCSFilesystem(
-                    project_id=self._opts['google_project_id'],
+                    project_id=self._opts['project_id'],
                     location=self._opts['gcs_region'],
                     object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS,
                 ), disable_if=_is_permanent_google_error)

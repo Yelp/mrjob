@@ -298,6 +298,33 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
     # TODO: add test of file upload args once we fix #1922
 
 
+class RunnerIgnoresJobKwargsTestCase(MockFilesystemsTestCase):
+
+    def test_ignore_format_and_sort_kwargs(self):
+        # hadoop formats and SORT_VALUES are read directly from the job,
+        # so the runner's constructor ignores the corresponding kwargs
+        #
+        # see #2022
+
+        # same set up as test_sort_values(), above
+        runner = SparkMRJobRunner(
+            mr_job_script=MRSortAndGroup.mr_job_script(),
+            mrjob_cls=MRSortAndGroup,
+            stdin=BytesIO(
+                b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n'),
+            hadoop_input_format='TerribleInputFormat',
+            hadoop_output_format='AwfulOutputFormat',
+            sort_values=False)
+
+        runner.run()
+
+        self.assertEqual(
+            dict(MRSortAndGroup().parse_output(runner.cat_output())),
+            dict(a=['actuary', 'alligator', 'artichoke'],
+                 b=['baby', 'balloon', 'bowling']))
+
+
+
 class GroupStepsTestCase(MockFilesystemsTestCase):
     # test the way the runner groups multiple streaming steps together
 

@@ -196,18 +196,6 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         return self._fs
 
-    def _upload_local_files(self):
-        # in local mode, nothing to upload
-        if not self._upload_mgr:
-            return
-
-        self.fs.mkdir(self._upload_mgr.prefix)
-
-        log.info('Copying local files to %s' % self._upload_mgr.prefix)
-        for src_path, uri in self._upload_mgr.path_to_uri().items():
-            log.debug('  %s -> %s' % (src_path, uri))
-            self.fs.put(src_path, uri)
-
     # making mr_job_script visible in Spark
 
     def _job_script_module_name(self):

@@ -23,6 +23,7 @@ from botocore.exceptions import ClientError
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _wrap_aws_client
 from mrjob.fs.s3 import _AWS_MAX_TRIES
+from mrjob.fs.s3 import _HUGE_PART_SIZE
 
 from tests.compress import gzip_compress
 from tests.mock_boto3 import MockBoto3TestCase
@@ -74,6 +75,9 @@ class S3FSTestCase(MockBoto3TestCase):
     def setUp(self):
         super(S3FSTestCase, self).setUp()
         self.fs = S3Filesystem()
+
+        self.TransferConfig = self.start(
+            patch('boto3.s3.transfer.TransferConfig'))
 
     def test_ls_key(self):
         self.add_mock_s3_data(
@@ -168,6 +172,11 @@ class S3FSTestCase(MockBoto3TestCase):
         self.fs.put(local_path, dest)
         self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
+        self.TransferConfig.assert_called_once_with(
+            multipart_chunksize=_HUGE_PART_SIZE,
+            multipart_threshold=_HUGE_PART_SIZE,
+        )
+
     def test_put_with_part_size(self):
         self.add_mock_s3_data({'bar-files': {}})
 
@@ -176,17 +185,13 @@ class S3FSTestCase(MockBoto3TestCase):
 
         fs = S3Filesystem(part_size=12345)
 
-        with patch.object(MockS3Object, 'upload_file') as upload_file:
-            with patch('boto3.s3.transfer.TransferConfig') as TransferConfig:
-                fs.put(local_path, dest)
+        fs.put(local_path, dest)
+        self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
-                upload_file.assert_called_once_with(
-                    local_path, Config=TransferConfig.return_value)
-
-                TransferConfig.assert_called_once_with(
-                    multipart_chunksize=12345,
-                    multipart_threshold=12345,
-                )
+        self.TransferConfig.assert_called_once_with(
+            multipart_chunksize=12345,
+            multipart_threshold=12345,
+        )
 
     def test_rm(self):
         self.add_mock_s3_data({

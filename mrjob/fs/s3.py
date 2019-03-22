@@ -60,6 +60,9 @@ _AWS_BACKOFF = 20
 _AWS_BACKOFF_MULTIPLIER = 1.5
 _AWS_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
+# used to disable multipart upload
+_HUGE_PART_SIZE = 2 ** 256
+
 
 def _client_error_code(ex):
     """Get the error code for the given ClientError"""
@@ -267,14 +270,16 @@ class S3Filesystem(Filesystem):
         """Uploads a local file to a specific destination."""
         s3_key = self._get_s3_key(path)
 
-        transfer_config = None
-        if self._part_size:
-            transfer_config = boto3.s3.transfer.TransferConfig(
-                multipart_chunksize=self._part_size,
-                multipart_threshold=self._part_size,
-            )
+        # if part_size is None or 0, disable multipart upload
+        part_size = self._part_size or _HUGE_PART_SIZE
 
-        s3_key.upload_file(src, Config=transfer_config)
+        s3_key.upload_file(
+            src,
+            Config=boto3.s3.transfer.TransferConfig(
+                multipart_chunksize=part_size,
+                multipart_threshold=part_size,
+            ),
+        )
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""

@@ -149,9 +149,8 @@ class S3Filesystem(Filesystem):
         :param s3_endpoint: If set, always use this endpoint
         :param s3_region: Default region for connections to the S3 API and
                           newly created buckets.
-        :param part_size_mb: Part size for multi-part uploading, in bytes, or
-                             ``None``
-
+        :param part_size: Part size for multi-part uploading, in bytes, or
+                          ``None``
         """
         super(S3Filesystem, self).__init__()
         self._s3_endpoint_url = _endpoint_url(s3_endpoint)

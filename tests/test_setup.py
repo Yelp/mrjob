@@ -446,9 +446,10 @@ class WorkingDirManagerTestCase(BasicTestCase):
         wd = WorkingDirManager()
         self.assertEqual(wd.name_to_path('archive'), {})
         self.assertEqual(wd.name_to_path('file'), {})
+        self.assertEqual(wd.name_to_path(), {})
         self.assertEqual(wd.paths(), set())
 
-    def test_simple(self):
+    def test_basic(self):
         wd = WorkingDirManager()
         wd.add('archive', 's3://bucket/path/to/baz.tar.gz')
         wd.add('file', 'foo/bar.py')
@@ -456,6 +457,9 @@ class WorkingDirManagerTestCase(BasicTestCase):
                          {'bar.py': 'foo/bar.py'})
         self.assertEqual(wd.name_to_path('archive'),
                          {'baz.tar.gz': 's3://bucket/path/to/baz.tar.gz'})
+        self.assertEqual(wd.name_to_path(),
+                         {'bar.py': 'foo/bar.py',
+                          'baz.tar.gz': 's3://bucket/path/to/baz.tar.gz'})
         self.assertEqual(
             wd.paths(),
             set(['foo/bar.py', 's3://bucket/path/to/baz.tar.gz']))

@@ -153,18 +153,8 @@ class SparkMRJobRunner(MRJobBinRunner):
     def _run(self):
         self.get_spark_submit_bin()  # find spark-submit up front
         self._create_setup_wrapper_scripts()
-        self._add_job_files_for_upload()
         self._upload_local_files()
         self._run_steps_on_spark()
-
-    def _add_job_files_for_upload(self):
-        """Add files needed for running the job (setup and input)
-        to self._upload_mgr."""
-        if self._upload_mgr:
-            for path in self._working_dir_mgr.paths():
-                self._upload_mgr.add(path)
-
-        # no need to upload py_files, spark-submit handles this
 
     def _pick_spark_tmp_dir(self):
         if self._opts['spark_tmp_dir']:

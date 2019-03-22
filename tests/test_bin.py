@@ -72,6 +72,8 @@ def _mock_upload_mgr():
     m = Mock()
     m.uri = Mock(side_effect=mock_uri)
 
+    m.prefix = 'uri-of://files'
+
     return m
 
 
@@ -85,7 +87,6 @@ class GenericLocalRunnerTestCase(SandboxedTestCase):
         super(GenericLocalRunnerTestCase, self).setUp()
 
         # couldn't figure out how to delete a method with mock
-
         _spark_master_method = LocalMRJobRunner._spark_master
         def restore_spark_master_method():
             LocalMRJobRunner._spark_master = _spark_master_method
@@ -1463,12 +1464,15 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
     def test_yarn_file_args(self):
         foo1_path = self.makefile('foo1')
         foo2_path = self.makefile('foo2')
+        foo3_uri = 'hdfs:///path/to/foo3'
         baz_path = self.makefile('baz.tar.gz')
         qux_path = self.makedirs('qux')
 
         job = MRNullSpark([
             '-r', 'spark',
-            '--files', '%s#foo1,%s#bar' % (foo1_path, foo2_path),
+            '--spark-master', 'yarn',
+            '--files', '%s#foo1,%s#bar,%s#baz' % (
+                foo1_path, foo2_path, foo3_uri),
             '--archives', baz_path,
             '--dirs', qux_path,
         ])
@@ -1479,19 +1483,25 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0), [
-                    '--master', 'local[*]',
+                    '--master', 'yarn',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--conf',
+                    'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    # there's a separate conf for envvars in YARN
+                    '--conf',
+                    'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--files',
-                    # foo1_path's URI has same name, no # needed
-                    (runner._upload_mgr.uri(foo1_path) +
+                    (runner._dest_in_wd_mirror(foo1_path, 'foo1') +
                      ',' +
-                     runner._upload_mgr.uri(foo2_path) + '#bar'),
+                     runner._dest_in_wd_mirror(foo2_path, 'bar') +
+                     ',' +
+                     # we're in YARN, so we can just add #baz to rename foo3
+                     'hdfs:///path/to/foo3#baz'),
                      '--archives',
-                     runner._upload_mgr.uri(baz_path) +
+                    (runner._dest_in_wd_mirror(baz_path, 'baz.tar.gz') +
                      ',' +
-                     runner._upload_mgr.uri(
-                         runner._dir_archive_path(qux_path)) + '#qux'
+                     runner._dest_in_wd_mirror(
+                         runner._dir_archive_path(qux_path), 'qux'))
                 ]
             )
 
@@ -1499,12 +1509,14 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
         # non-YARN runners don't support archives or hash paths
         foo1_path = self.makefile('foo1')
         foo2_path = self.makefile('foo2')
+        foo3_uri = 'hdfs:///path/to/foo3'
+        foo4_uri = 'hdfs:///path/to/foo4'
 
         job = MRNullSpark([
             '-r', 'spark',
-            # local master has no working dir
-            '--spark-master', 'local-cluster[1,2,1024]',
-            '--files', '%s,%s' % (foo1_path, foo2_path),
+            '--spark-master', 'mesos://host:12345',
+            '--files', '%s,%s#bar,%s,%s#baz' % (
+                foo1_path, foo2_path, foo3_uri, foo4_uri)
         ])
         job.sandbox()
 
@@ -1513,13 +1525,20 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0), [
-                    '--master', 'local-cluster[1,2,1024]',
+                    '--master', 'mesos://host:12345',
                     '--deploy-mode', 'client',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--files',
-                    (runner._upload_mgr.uri(foo1_path) +
+                    (runner._dest_in_wd_mirror(foo1_path, 'foo1') +
                      ',' +
-                     runner._upload_mgr.uri(foo2_path)),
+                     runner._dest_in_wd_mirror(foo2_path, 'bar') +
+                     ',' +
+                     # can use URIs with same name as-is
+                     foo3_uri +
+                     ',' +
+                     # but URIs with different name have to be re-uploaded
+                     runner._dest_in_wd_mirror(foo4_uri, 'baz')
+                     ),
                 ]
             )
 
@@ -1536,12 +1555,12 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             runner._upload_mgr = _mock_upload_mgr()
 
             self.assertEqual(
-                runner._spark_submit_args(0),[
+                runner._spark_submit_args(0), [
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--files',
-                    runner._upload_mgr.uri(qux_path),
+                    runner._dest_in_wd_mirror(qux_path, 'qux'),
                 ]
             )
 

@@ -22,6 +22,7 @@ from io import BytesIO
 from collections import defaultdict
 from contextlib import contextmanager
 from io import StringIO
+from os import listdir
 from os.path import abspath
 from os.path import dirname
 from os.path import join
@@ -115,7 +116,6 @@ class MRSumValuesByWord(MRJob):
 
     reducer = combiner
 
-
 class SparkHarnessOutputComparisonBaseTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
 
@@ -123,7 +123,6 @@ class SparkHarnessOutputComparisonBaseTestCase(
         path = mrjob_spark_harness.__file__
         if path.endswith('.pyc'):
             path = path[:-1]
-
         return path
 
     def _reference_job(self, job_class, input_bytes=b'', input_paths=(),
@@ -139,7 +138,8 @@ class SparkHarnessOutputComparisonBaseTestCase(
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
                      job_args=None, spark_conf=None, first_step_num=None,
-                     last_step_num=None, counter_output_dir=None):
+                     last_step_num=None, counter_output_dir=None,
+                     num_reducers=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -159,6 +159,9 @@ class SparkHarnessOutputComparisonBaseTestCase(
         if counter_output_dir is not None:
             harness_job_args.extend(
                 ['--counter-output-dir', counter_output_dir])
+        if num_reducers is not None:
+            harness_job_args.extend(
+                ['--num-reducers', str(num_reducers)])
 
         harness_job_args.extend(input_paths)
 
@@ -166,6 +169,10 @@ class SparkHarnessOutputComparisonBaseTestCase(
         harness_job.sandbox(stdin=BytesIO(input_bytes))
 
         return harness_job
+
+
+class SparkHarnessOutputComparisonTestCase(
+        SparkHarnessOutputComparisonBaseTestCase):
 
     def _assert_output_matches(
             self, job_class, input_bytes=b'', input_paths=(), job_args=[]):
@@ -201,9 +208,6 @@ class SparkHarnessOutputComparisonBaseTestCase(
 
         self.assertEqual(harness_output, reference_output)
 
-
-class SparkHarnessOutputComparisonTestCase(
-        SparkHarnessOutputComparisonBaseTestCase):
 
     def test_basic_job(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
@@ -409,6 +413,51 @@ class SparkHarnessOutputComparisonTestCase(
 
         assert combined_reference_counter == harness_counter
 
+class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
+
+    def _count_partitions_files(self, runner):
+        return sum(
+            1
+            for f in listdir(runner.get_output_dir())
+            if f.startswith('part')
+        )
+
+    def _assert_partition_count_different(self, cls, num_reducers):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+        unlimited_job = self._harness_job(cls, input_bytes=input_bytes)
+        with unlimited_job.make_runner() as runner:
+            runner.run()
+            default_partitions = self._count_partitions_files(runner)
+
+        job = self._harness_job(
+            cls, input_bytes=input_bytes, num_reducers=num_reducers)
+        with job.make_runner() as runner:
+            runner.run()
+            part_files = self._count_partitions_files(runner)
+
+        assert part_files != default_partitions
+        assert part_files == num_reducers
+
+    def test_reducer_cannot_set_to_zero(self):
+        with self.assertRaises(ValueError):
+            job = self._harness_job(MRWordFreqCount, num_reducers=0)
+            with job.make_runner() as runner:
+                runner.run()
+
+    def test_reducer_less_reducer(self):
+        self._assert_partition_count_different(MRWordFreqCount, num_reducers=1)
+
+    def test_reducer_more_reducer(self):
+        self._assert_partition_count_different(
+            MRWordFreqCount, num_reducers=10)
+
+    def test_combiner_less_reducer(self):
+        self._assert_partition_count_different(
+            MRWordFreqCountWithCombinerCmd, num_reducers=1)
+
+    def test_combiner_more_reducer(self):
+        self._assert_partition_count_different(
+            MRWordFreqCountWithCombinerCmd, num_reducers=10)
 
 
 class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):
@@ -535,16 +584,21 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
     def test_run_combiner_with_sort_values(self):
         self._test_run_combiner(sort_values=True)
 
-    def test_run_combiner_without_sort_values(self):
-        self._test_run_combiner(sort_values=False)
+    def test_run_combiner_with_num_reducers(self):
+        self._test_run_combiner(num_reducers=1)
 
-    def _test_run_combiner(self, sort_values):
+    def test_run_combiner_without_sort_values_and_num_reducers(self):
+        self._test_run_combiner()
+
+    def _test_run_combiner(self, sort_values=False, num_reducers=None):
         rdd = self.mock_rdd()
 
         combiner_job = Mock()
         combiner_job.pick_protocols.return_value = (Mock(), Mock())
 
-        final_rdd = _run_combiner(combiner_job, rdd)
+        final_rdd = _run_combiner(
+            combiner_job, rdd,
+            sort_values=sort_values, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         # check that we preserve partitions after calling combineByKey()
@@ -579,13 +633,17 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
     def test_shuffle_and_sort_with_sort_values(self):
         self._test_shuffle_and_sort(sort_values=True)
 
-    def test_shuffle_and_sort_without_sort_values(self):
-        self._test_shuffle_and_sort(sort_values=False)
+    def test_shuffle_and_sort_with_num_reducers(self):
+        self._test_shuffle_and_sort(num_reducers=1)
 
-    def _test_shuffle_and_sort(self, sort_values):
+    def test_shuffle_and_sort_without_sort_values_and_num_reducers(self):
+        self._test_shuffle_and_sort()
+
+    def _test_shuffle_and_sort(self, sort_values=False, num_reducers=None):
         rdd = self.mock_rdd()
 
-        final_rdd = _shuffle_and_sort(rdd)
+        final_rdd = _shuffle_and_sort(
+            rdd, sort_values=sort_values, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         # check that we always preserve partitioning after groupBy()
@@ -594,9 +652,6 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
             if called_groupBy:
                 if '.' in name:
                     continue  # Python 3.4/3.5 tracks groupBy.assert_called()
-
-                if not kwargs.get('preservesPartitioning'):
-                    import pdb; pdb.set_trace()
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
             elif name == 'groupBy':
                 called_groupBy = True
@@ -604,22 +659,41 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         # check that groupBy() was actually called
         self.assertTrue(called_groupBy)
 
-    def test_run_reducer(self):
+    def test_run_reducer_with_num_reducers(self):
+        self._test_run_reducer(num_reducers=1)
+
+    def test_run_reducer_without_num_reducers(self):
+        self._test_run_reducer()
+
+    def _test_run_reducer(self, num_reducers=None):
         rdd = self.mock_rdd()
 
         reducer_job = Mock()
         reducer_job.pick_protocols.return_value = (Mock(), Mock())
 
-        final_rdd = _run_reducer(reducer_job, rdd)
+        final_rdd = _run_reducer(reducer_job, rdd, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         called_mapPartitions = False
+
+        before_map_partition = True
         for name, args, kwargs in rdd.method_calls:
             if name == 'mapPartitions':
                 called_mapPartitions = True
-                break  # nothing else to check
-            else:
+                before_map_partition = False
+
+            # We want to make sure we keep the original partition before
+            # reaching to map_partition
+            if before_map_partition:
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
+
+            # Once we finished from map_paratition, we don't care about if
+            # we keep the same partition unless we want to fixed on number
+            # of partitions
+            else:
+                self.assertEqual(
+                    kwargs.get('preservesPartitioning'), bool(num_reducers))
+
 
         # sanity-check that mapPartitions() was actually called
         self.assertTrue(called_mapPartitions)

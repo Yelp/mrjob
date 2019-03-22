@@ -59,9 +59,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         'aws_session_token',
         'cloud_fs_sync_secs',
         'cloud_part_size_mb',
-        'google_project_id',  # used by GCS filesystem
-        'google_region',  # used when creating buckets on GCS
+        'gcs_region',  # used when creating buckets on GCS
         'hadoop_bin',
+        'project_id',  # used by GCS filesystem
         's3_endpoint',
         's3_region',  # only used along with s3_endpoint
         'spark_deploy_mode',
@@ -109,10 +109,6 @@ class SparkMRJobRunner(MRJobBinRunner):
         # where to store a .zip file containing the MRJob, with a unique
         # module name
         self._job_script_zip_path = None
-
-        # could raise an exception if *hadoop_input_format* and
-        # *hadoop_output_format* are set, but support for these these will be
-        # added shortly (see #1944)
 
     def _check_step(self, step, step_num):
         """Don't try to run steps that include commands or use manifests."""
@@ -178,8 +174,8 @@ class SparkMRJobRunner(MRJobBinRunner):
 
             if google_libs_installed:
                 self._fs.add_fs('gcs', GCSFilesystem(
-                    project_id=self._opts['google_project_id'],
-                    location=self._opts['google_region'],
+                    project_id=self._opts['project_id'],
+                    location=self._opts['gcs_region'],
                     object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS,
                 ), disable_if=_is_permanent_google_error)
 
@@ -341,6 +337,11 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         if compress_conf and compress_conf != 'false' and codec_conf:
             args.extend(['--compression-codec', codec_conf])
+
+        # --num-reducers
+        num_reducers = jobconf_from_dict(jobconf, 'mapreduce.job.reduces')
+        if num_reducers and int(num_reducers) > 0:
+            args.extend(['--num-reducers', str(num_reducers)])
 
         return args
 

@@ -25,7 +25,7 @@ class MRSparkNickNackWordCount(MRJob):
     #
     # This JAR was downloaded from https://github.com/empiricalresults/nicknack
     # and is also under the Apache 2.0 license.
-    LIBJARS = ['nicknack-1.0.0.jar']
+    LIBJARS = ['nicknack-1.0.1.jar']
 
     def spark(self, input_path, output_path):
         # Spark may not be available where script is launched

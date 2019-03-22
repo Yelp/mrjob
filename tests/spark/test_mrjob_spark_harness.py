@@ -12,20 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the Spark Harness."""
+import inspect
 import uuid
-import os
 import random
 import string
 import sys
 import json
 from io import BytesIO
-from os.path import join
 from collections import defaultdict
 from contextlib import contextmanager
 from io import StringIO
+from os import listdir
+from os.path import abspath
+from os.path import dirname
+from os.path import join
 from tempfile import gettempdir
 from shutil import rmtree
 
+from mrjob.examples.mr_nick_nack import MRNickNack
+from mrjob.examples.mr_nick_nack_input_format import \
+    MRNickNackWithHadoopInputFormat
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
 from mrjob.local import LocalMRJobRunner
@@ -110,15 +116,13 @@ class MRSumValuesByWord(MRJob):
 
     reducer = combiner
 
-
-class SparkHarnessOutputComparisonTestCase(
+class SparkHarnessOutputComparisonBaseTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
 
     def _spark_harness_path(self):
         path = mrjob_spark_harness.__file__
         if path.endswith('.pyc'):
             path = path[:-1]
-
         return path
 
     def _reference_job(self, job_class, input_bytes=b'', input_paths=(),
@@ -133,11 +137,16 @@ class SparkHarnessOutputComparisonTestCase(
 
     def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
                      runner_alias='inline', compression_codec=None,
-                     job_args=None, first_step_num=None, last_step_num=None,
-                     counter_output_dir=None):
+                     job_args=None, spark_conf=None, first_step_num=None,
+                     last_step_num=None, counter_output_dir=None,
+                     num_reducers=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
+        if spark_conf:
+            for key, value in spark_conf.items():
+                harness_job_args.append('--jobconf')
+                harness_job_args.append('%s=%s' % (key, value))
         if compression_codec:
             harness_job_args.append('--compression-codec')
             harness_job_args.append(compression_codec)
@@ -150,6 +159,9 @@ class SparkHarnessOutputComparisonTestCase(
         if counter_output_dir is not None:
             harness_job_args.extend(
                 ['--counter-output-dir', counter_output_dir])
+        if num_reducers is not None:
+            harness_job_args.extend(
+                ['--num-reducers', str(num_reducers)])
 
         harness_job_args.extend(input_paths)
 
@@ -157,6 +169,10 @@ class SparkHarnessOutputComparisonTestCase(
         harness_job.sandbox(stdin=BytesIO(input_bytes))
 
         return harness_job
+
+
+class SparkHarnessOutputComparisonTestCase(
+        SparkHarnessOutputComparisonBaseTestCase):
 
     def _assert_output_matches(
             self, job_class, input_bytes=b'', input_paths=(), job_args=[]):
@@ -191,6 +207,7 @@ class SparkHarnessOutputComparisonTestCase(
             harness_output = sorted(to_lines(runner.cat_output()))
 
         self.assertEqual(harness_output, reference_output)
+
 
     def test_basic_job(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
@@ -396,6 +413,144 @@ class SparkHarnessOutputComparisonTestCase(
 
         assert combined_reference_counter == harness_counter
 
+class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
+
+    def _count_partitions_files(self, runner):
+        return sum(
+            1
+            for f in listdir(runner.get_output_dir())
+            if f.startswith('part')
+        )
+
+    def _assert_partition_count_different(self, cls, num_reducers):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+        unlimited_job = self._harness_job(cls, input_bytes=input_bytes)
+        with unlimited_job.make_runner() as runner:
+            runner.run()
+            default_partitions = self._count_partitions_files(runner)
+
+        job = self._harness_job(
+            cls, input_bytes=input_bytes, num_reducers=num_reducers)
+        with job.make_runner() as runner:
+            runner.run()
+            part_files = self._count_partitions_files(runner)
+
+        assert part_files != default_partitions
+        assert part_files == num_reducers
+
+    def test_reducer_cannot_set_to_zero(self):
+        with self.assertRaises(ValueError):
+            job = self._harness_job(MRWordFreqCount, num_reducers=0)
+            with job.make_runner() as runner:
+                runner.run()
+
+    def test_reducer_less_reducer(self):
+        self._assert_partition_count_different(MRWordFreqCount, num_reducers=1)
+
+    def test_reducer_more_reducer(self):
+        self._assert_partition_count_different(
+            MRWordFreqCount, num_reducers=10)
+
+    def test_combiner_less_reducer(self):
+        self._assert_partition_count_different(
+            MRWordFreqCountWithCombinerCmd, num_reducers=1)
+
+    def test_combiner_more_reducer(self):
+        self._assert_partition_count_different(
+            MRWordFreqCountWithCombinerCmd, num_reducers=10)
+
+
+class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):
+
+    SPARK_CONF = {
+        'spark.jars': abspath(join(
+            dirname(inspect.getsourcefile(MRNickNack)),
+            'nicknack-1.0.1.jar')),
+
+        # limit tests to a single executor
+        'spark.executor.cores': 1,
+        'spark.cores.max': 1,
+    }
+
+    def test_hadoop_output_format(self):
+        input_bytes = b'ee eye ee eye oh'
+
+        job = self._harness_job(
+            MRNickNack, input_bytes=input_bytes, runner_alias='local',
+            spark_conf=self.SPARK_CONF)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 'e')))
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 'o')))
+
+            output_counts = dict(
+                line.strip().split(b'\t')
+                for line in to_lines(runner.cat_output()))
+
+        expected_output_counts = {
+            b'"ee"': b'2', b'"eye"': b'2', b'"oh"': b'1'}
+
+        self.assertEqual(expected_output_counts, output_counts)
+
+    def test_hadoop_output_format_with_compression(self):
+        input_bytes = b"one two one two"
+        compression_codec = 'org.apache.hadoop.io.compress.GzipCodec'
+
+        job = self._harness_job(
+            MRNickNack, input_bytes=input_bytes, runner_alias='local',
+            spark_conf=self.SPARK_CONF, compression_codec=compression_codec)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 'o', 'part*.gz')))
+
+            self.assertTrue(runner.fs.exists(
+                join(runner.get_output_dir(), 't', 'part*.gz')))
+
+            output_counts = dict(
+                line.strip().split(b'\t')
+                for line in to_lines(runner.cat_output()))
+
+        expected_output_counts = {b'"one"': b'2', b'"two"': b'2'}
+
+        self.assertEqual(expected_output_counts, output_counts)
+
+    def test_hadoop_input_format(self):
+        input_file_bytes = b'potato tomato'
+
+        manifest_filename = join(self.tmp_dir, 'manifest')
+        input1_filename = join(self.tmp_dir, 'input1')
+        input2_filename = join(self.tmp_dir, 'input2')
+
+        with open(input1_filename, 'wb') as input1_file:
+            input1_file.write(input_file_bytes)
+        with open(input2_filename, 'wb') as input2_file:
+            input2_file.write(input_file_bytes)
+
+        with open(manifest_filename, 'w') as manifest_file:
+            manifest_file.writelines([
+                '%s\n' % input1_filename, '%s\n' % input2_filename])
+
+        job = self._harness_job(
+            MRNickNackWithHadoopInputFormat, runner_alias='local',
+            spark_conf=self.SPARK_CONF, input_paths=([manifest_filename]))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output_counts = dict(
+                line.strip().split(b'\t')
+                for line in to_lines(runner.cat_output()))
+
+        expected_output_counts = {b'"tomato"': b'2', b'"potato"': b'2'}
+        self.assertEqual(expected_output_counts, output_counts)
 
 
 class PreservesPartitioningTestCase(SandboxedTestCase):
@@ -429,16 +584,21 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
     def test_run_combiner_with_sort_values(self):
         self._test_run_combiner(sort_values=True)
 
-    def test_run_combiner_without_sort_values(self):
-        self._test_run_combiner(sort_values=False)
+    def test_run_combiner_with_num_reducers(self):
+        self._test_run_combiner(num_reducers=1)
 
-    def _test_run_combiner(self, sort_values):
+    def test_run_combiner_without_sort_values_and_num_reducers(self):
+        self._test_run_combiner()
+
+    def _test_run_combiner(self, sort_values=False, num_reducers=None):
         rdd = self.mock_rdd()
 
         combiner_job = Mock()
         combiner_job.pick_protocols.return_value = (Mock(), Mock())
 
-        final_rdd = _run_combiner(combiner_job, rdd)
+        final_rdd = _run_combiner(
+            combiner_job, rdd,
+            sort_values=sort_values, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         # check that we preserve partitions after calling combineByKey()
@@ -473,13 +633,17 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
     def test_shuffle_and_sort_with_sort_values(self):
         self._test_shuffle_and_sort(sort_values=True)
 
-    def test_shuffle_and_sort_without_sort_values(self):
-        self._test_shuffle_and_sort(sort_values=False)
+    def test_shuffle_and_sort_with_num_reducers(self):
+        self._test_shuffle_and_sort(num_reducers=1)
 
-    def _test_shuffle_and_sort(self, sort_values):
+    def test_shuffle_and_sort_without_sort_values_and_num_reducers(self):
+        self._test_shuffle_and_sort()
+
+    def _test_shuffle_and_sort(self, sort_values=False, num_reducers=None):
         rdd = self.mock_rdd()
 
-        final_rdd = _shuffle_and_sort(rdd)
+        final_rdd = _shuffle_and_sort(
+            rdd, sort_values=sort_values, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         # check that we always preserve partitioning after groupBy()
@@ -488,9 +652,6 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
             if called_groupBy:
                 if '.' in name:
                     continue  # Python 3.4/3.5 tracks groupBy.assert_called()
-
-                if not kwargs.get('preservesPartitioning'):
-                    import pdb; pdb.set_trace()
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
             elif name == 'groupBy':
                 called_groupBy = True
@@ -498,22 +659,41 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         # check that groupBy() was actually called
         self.assertTrue(called_groupBy)
 
-    def test_run_reducer(self):
+    def test_run_reducer_with_num_reducers(self):
+        self._test_run_reducer(num_reducers=1)
+
+    def test_run_reducer_without_num_reducers(self):
+        self._test_run_reducer()
+
+    def _test_run_reducer(self, num_reducers=None):
         rdd = self.mock_rdd()
 
         reducer_job = Mock()
         reducer_job.pick_protocols.return_value = (Mock(), Mock())
 
-        final_rdd = _run_reducer(reducer_job, rdd)
+        final_rdd = _run_reducer(reducer_job, rdd, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         called_mapPartitions = False
+
+        before_map_partition = True
         for name, args, kwargs in rdd.method_calls:
             if name == 'mapPartitions':
                 called_mapPartitions = True
-                break  # nothing else to check
-            else:
+                before_map_partition = False
+
+            # We want to make sure we keep the original partition before
+            # reaching to map_partition
+            if before_map_partition:
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
+
+            # Once we finished from map_paratition, we don't care about if
+            # we keep the same partition unless we want to fixed on number
+            # of partitions
+            else:
+                self.assertEqual(
+                    kwargs.get('preservesPartitioning'), bool(num_reducers))
+
 
         # sanity-check that mapPartitions() was actually called
         self.assertTrue(called_mapPartitions)

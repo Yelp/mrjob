@@ -34,7 +34,6 @@ except ImportError:
 
 try:
     import boto3
-    import boto3.s3.transfer
     boto3  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     # don't require boto3; MRJobs don't actually need it when running

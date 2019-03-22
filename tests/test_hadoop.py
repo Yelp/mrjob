@@ -1459,7 +1459,7 @@ class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
         with mr_job.make_runner() as runner:
             runner._add_job_files_for_upload()
             self.assertEqual(
-                runner._spark_submit_args(0)[:4],
+                runner._spark_submit_args(0)[4:8],
                 ['--master', 'yarn', '--deploy-mode', 'client']
             )
 
@@ -1471,7 +1471,7 @@ class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
         with mr_job.make_runner() as runner:
             runner._add_job_files_for_upload()
             self.assertEqual(
-                runner._spark_submit_args(0)[:4],
+                runner._spark_submit_args(0)[2:6],
                 ['--master', 'local', '--deploy-mode', 'client']
             )
 
@@ -1485,7 +1485,7 @@ class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
             runner._add_job_files_for_upload()
 
             self.assertEqual(
-                runner._spark_submit_args(0)[:4],
+                runner._spark_submit_args(0)[4:8],
                 ['--master', 'yarn', '--deploy-mode', 'cluster']
             )
 

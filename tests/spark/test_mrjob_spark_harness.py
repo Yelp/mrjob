@@ -13,15 +13,11 @@
 # limitations under the License.
 """Test the Spark Harness."""
 import inspect
-import uuid
 import random
 import string
-import sys
 import json
 from io import BytesIO
-from collections import defaultdict
 from contextlib import contextmanager
-from io import StringIO
 from os import listdir
 from os.path import abspath
 from os.path import dirname
@@ -34,14 +30,11 @@ from mrjob.examples.mr_nick_nack_input_format import \
     MRNickNackWithHadoopInputFormat
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
-from mrjob.local import LocalMRJobRunner
 from mrjob.protocol import TextProtocol
 from mrjob.spark import mrjob_spark_harness
 from mrjob.spark.mrjob_spark_harness import _run_combiner
 from mrjob.spark.mrjob_spark_harness import _run_reducer
 from mrjob.spark.mrjob_spark_harness import _shuffle_and_sort
-from mrjob.step import INPUT
-from mrjob.step import OUTPUT
 from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
@@ -55,7 +48,6 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_freq_count_with_combiner_cmd import \
      MRWordFreqCountWithCombinerCmd
 from tests.py2 import Mock
-from tests.py2 import call
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
 
@@ -390,13 +382,6 @@ class SparkHarnessOutputComparisonTestCase(
         with reference_job.make_runner() as runner:
             runner.run()
             reference_counters = runner.counters()
-        # reference separate counters by step, but spark will combine them
-        # all together
-        combined_reference_counter = defaultdict(lambda :defaultdict(int))
-        for counter in reference_counters:
-            for g in counter:
-                for k, v in counter[g].items():
-                    combined_reference_counter[g][k] += v
 
         with self.create_temp_counter_dir() as output_counter_dir:
             harness_job = self._harness_job(
@@ -406,12 +391,13 @@ class SparkHarnessOutputComparisonTestCase(
             with harness_job.make_runner() as runner:
                 runner.run()
 
-            harness_counter = json.loads(
-                self.spark_context.textFile(
-                    'file://' + output_counter_dir
-            ).collect()[0])
+                harness_counters = json.loads(
+                    self.spark_context.textFile(
+                        'file://' + output_counter_dir
+                    ).collect()[0])
 
-        assert combined_reference_counter == harness_counter
+        self.assertEqual(harness_counters, reference_counters)
+
 
 class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
 

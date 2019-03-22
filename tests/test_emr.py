@@ -47,6 +47,7 @@ from mrjob.emr import _BAD_BASH_IMAGE_VERSION
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
 from mrjob.emr import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
+from mrjob.fs.s3 import _HUGE_PART_SIZE
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _extract_tags
@@ -3018,7 +3019,7 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         runner = EMRJobRunner(cloud_part_size_mb=0)
 
         data = b'Mew' * 20
-        self.assert_upload_succeeds(runner, data, None)
+        self.assert_upload_succeeds(runner, data, _HUGE_PART_SIZE)
 
 
 class AWSSessionTokenTestCase(MockBoto3TestCase):

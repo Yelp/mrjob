@@ -1,5 +1,5 @@
-# Copyright 2009-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2009-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1108,9 +1108,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                 ]
             )
 
@@ -1126,9 +1126,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'yoda',
                     '--deploy-mode', 'the-force',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                 ]
             )
 
@@ -1144,9 +1144,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                 ]
             )
 
@@ -1160,11 +1160,11 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
                     '--conf', 'spark.executorEnv.BAZ=qux',
                     '--conf', 'spark.executorEnv.FOO=bar',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1177,9 +1177,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=mypy',
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=mypy',
                 ]
             )
 
@@ -1191,9 +1191,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=ourpy',
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=ourpy',
                 ]
             )
 
@@ -1212,9 +1212,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.FOO=bar',
+                   '--conf', 'spark.executorEnv.FOO=bar',
+                   '--master', 'local[*]',
+                   '--deploy-mode', 'client',
                 ]
             )
 
@@ -1227,10 +1227,10 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
                     '--conf', 'spark.executor.memory=10g',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1245,10 +1245,10 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
                     '--conf', 'foo=bar',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1265,10 +1265,10 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
                     '--conf', 'spark.executorEnv.FOO=baz',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=ourpy',
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1283,14 +1283,14 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'yarn',
-                    '--deploy-mode', 'client',
                     '--conf', 'spark.executorEnv.FOO=bar',
                     '--conf',
                     'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--conf', 'spark.yarn.appMasterEnv.FOO=bar',
                     '--conf',
                     'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'yarn',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1305,12 +1305,12 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'yarn',
-                    '--deploy-mode', 'client',
                     '--conf',
                     'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--conf',
                     'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'yarn',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1332,12 +1332,12 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
                     '--conf', 'BAX=true',
                     '--conf', 'BAZ=false',
                     '--conf', 'QUX=null',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1352,10 +1352,10 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
                     '--jars', fake_libjar,
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1370,10 +1370,10 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
                     '--jars', fake_libjar,
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1389,10 +1389,10 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
                     '--jars', 's3://a/a.jar,s3://b/b.jar',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1405,9 +1405,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--name', 'Dave',
                 ]
             )
@@ -1421,9 +1421,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--name', 'Dave',
                 ]
             )
@@ -1437,9 +1437,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '-v',
                 ]
             )
@@ -1454,9 +1454,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--name', 'Dave', '-v',
                 ]
             )
@@ -1483,13 +1483,13 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0), [
-                    '--master', 'yarn',
-                    '--deploy-mode', 'client',
                     '--conf',
                     'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     # there's a separate conf for envvars in YARN
                     '--conf',
                     'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'yarn',
+                    '--deploy-mode', 'client',
                     '--files',
                     (runner._dest_in_wd_mirror(foo1_path, 'foo1') +
                      ',' +
@@ -1525,9 +1525,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'mesos://host:12345',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--files',
                     (runner._dest_in_wd_mirror(foo1_path, 'foo1') +
                      ',' +
@@ -1556,9 +1556,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--files',
                     runner._dest_in_wd_mirror(qux_path, 'qux'),
                 ]
@@ -1575,9 +1575,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--files', 'foo,bar',
                 ]
             )
@@ -1593,9 +1593,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--py-files',
                     '<first py_file>,<second py_file>'
                 ]
@@ -1617,11 +1617,11 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             # but not set PYSPARK_PYTHON or --py-files
             self.assertEqual(
                 runner._spark_submit_args(0), [
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
                     '--class', 'foo.Bar',
                     '--conf', 'QUX=baz',
                     '--conf', 'spark.executorEnv.BAZ=qux',
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1632,9 +1632,9 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                 ]
             )
 

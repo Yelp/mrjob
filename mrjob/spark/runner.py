@@ -22,6 +22,7 @@ from subprocess import CalledProcessError
 from tempfile import gettempdir
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.cloud import _DEFAULT_CLOUD_PART_SIZE_MB
 from mrjob.compat import jobconf_from_dict
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.fs.composite import CompositeFilesystem
@@ -139,6 +140,15 @@ class SparkMRJobRunner(MRJobBinRunner):
                             "step %d's %s runs a command, but spark"
                             " runner does not support commands" % (
                                 step_num, mrc))
+
+    def _default_opts(self):
+        return combine_dicts(
+            super(SparkMRJobRunner, self)._default_opts(),
+            dict(
+                cloud_part_size_mb=_DEFAULT_CLOUD_PART_SIZE_MB,
+            ),
+        )
+
 
     def _run(self):
         self.get_spark_submit_bin()  # find spark-submit up front

@@ -267,13 +267,14 @@ class S3Filesystem(Filesystem):
         """Uploads a local file to a specific destination."""
         s3_key = self._get_s3_key(path)
 
-        s3_key.upload_file(
-            src,
-            Config=boto3.s3.transfer.TransferConfig(
+        transfer_config = None
+        if self._part_size:
+            transfer_config = boto3.s3.transfer.TransferConfig(
                 multipart_chunksize=self._part_size,
                 multipart_threshold=self._part_size,
-            ),
-        )
+            )
+
+        s3_key.upload_file(src, Config=transfer_config)
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""

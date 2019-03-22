@@ -2297,7 +2297,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-D', 'mapreduce.job.reduces=0',
                 '-input', 'input', '-output', 'output',
                 '-mapper',
@@ -2313,7 +2314,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-input', 'input', '-output', 'output',
                 '-mapper', 'cat',
                 '-reducer',
@@ -2338,7 +2340,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-input', 'input', '-output', 'output',
                 '-mapper',
                 "/bin/sh -x -c 'set -e; grep anything | %s"
@@ -2363,7 +2366,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-D', 'mapreduce.job.reduces=0',
                 '-input', 'input', '-output', 'output',
                 '-mapper',
@@ -2391,7 +2395,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
             step['HadoopJarStep']['Args'], [
                 'streaming', '-v',
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-D', 'mapreduce.job.reduces=0',
                 '-input', 'input', '-output', 'output',
                 '-mapper',
@@ -2412,7 +2417,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-D', 'mapreduce.job.reduces=0',
                 '-libjars', '/home/hadoop/dora.jar',
                 '-D', 'foo=bar',
@@ -2740,7 +2746,9 @@ class SparkStepTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            script_uri = runner._upload_mgr.uri(runner._script_path)
+            script_uri = runner._dest_in_wd_mirror(
+                runner._script_path,
+                runner._working_dir_mgr.name('file', runner._script_path))
             input1_uri = runner._upload_mgr.uri(input1)
             input2_uri = runner._upload_mgr.uri(input2)
 

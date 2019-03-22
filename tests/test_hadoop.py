@@ -684,7 +684,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             # to PYTHONPATH
             self.assertTrue(os.path.exists(runner._setup_wrapper_script_path))
             self.assertIn(runner._setup_wrapper_script_path,
-                          runner._upload_mgr.path_to_uri())
+                          runner._working_dir_mgr.paths())
             mrjob_zip_name = runner._working_dir_mgr.name(
                 'file', runner._mrjob_zip_path)
             with open(runner._setup_wrapper_script_path) as wrapper:

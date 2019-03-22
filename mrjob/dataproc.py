@@ -510,9 +510,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._working_dir_mgr.paths():
-            self._upload_mgr.add(path)
-
         if self._opts['hadoop_streaming_jar']:
             self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 

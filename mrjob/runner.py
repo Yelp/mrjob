@@ -249,6 +249,10 @@ class MRJobRunner(object):
 
         # set this to an :py:class:`~mrjob.setup.UploadDirManager` in
         # runners that upload files to HDFS, S3, etc.
+        #
+        # this manager should not handle files belonging to
+        # self._working_dir_mgr,
+        # which, if they are uploaded, will go into self._wd_upload_dir()
         self._upload_mgr = None
 
         self._script_path = mr_job_script
@@ -1102,7 +1106,7 @@ class MRJobRunner(object):
                 if self._upload_mgr:
                     uris.append(self._upload_mgr.uri(path))
                 else:
-                    # just make sure job can find files from it's working dir
+                    # just make sure job can find files from its working dir
                     uris.append(os.path.abspath(path))
 
         log.info('found %d input files' % len(uris))
@@ -1150,10 +1154,91 @@ class MRJobRunner(object):
 
         self.fs.mkdir(self._upload_mgr.prefix)
 
-        log.info('Copying local files to %s' % self._upload_mgr.prefix)
+        self._upload_files_to_wd_mirror()
+
+        log.info('Copying other local files to %s' % self._upload_mgr.prefix)
         for src_path, uri in self._upload_mgr.path_to_uri().items():
             log.debug('  %s -> %s' % (src_path, uri))
             self.fs.put(src_path, uri)
+
+    def _wd_mirror(self):
+        """A directory to upload files belonging to
+        :py:attr:`_working_dir_mgr`. This will be a subdir of
+        ``self._upload_mgr.prefix`, if it exists, and otherwise will
+        be ``None``."""
+        if not (self._upload_mgr and self._upload_mgr.prefix):
+            return None
+
+        return posixpath.join(self._upload_mgr.prefix, 'wd')
+
+    def _wd_filenames_must_match(self):
+        """When we tell Hadoop/Spark to put files in the working directory,
+        must they have the same names as the files in the working dir?
+
+        This basically only happens with Spark on non-YARN masters. YARN/Hadoop
+        allows you to specify a name for each file (``path#name_in_wd``).
+        """
+        return self._has_spark_steps() and self._spark_master() != 'yarn'
+
+    def _dest_in_wd_mirror(self, path, name):
+        """Return the URI of where to upload *path* so it can appear in the
+        working dir as *name*, or ``None`` if it doesn't need to be uploaded.
+        """
+        # the only reason to re-upload a URI is if it has the wrong name
+        if is_uri(path) and (
+                posixpath.basename(path) == name or
+                not self._wd_filenames_must_match()):
+            return None
+
+        dest_dir = self._wd_mirror()
+        if not dest_dir:
+            return None
+
+        return posixpath.join(dest_dir, name)
+
+    def _upload_file_to_wd_mirror(self, path, name):
+        """Upload *path* to the appropriate place in the working dir
+        mirror, if necessary.
+
+        We don't track whether something has already been uploaded.
+        """
+        dest = self._dest_in_wd_mirror(path, name)
+        if not dest:
+            return
+
+        if is_uri(path):
+            # file is visible to non-YARN Spark, but has the wrong name, so
+            # download and re-upload it
+            wd_tmp = os.path.join(self._get_local_tmp_dir, 'wd-mirror')
+            self.fs.mkdir(wd_tmp)
+
+            tmp_path = os.path.join(wd_tmp, name)
+
+            log.debug('  %s <- %s' % (tmp_path, path))
+            try:
+                with open(tmp_path, 'wb') as tmp_f:
+                    for chunk in self.fs.cat(path):
+                        tmp_f.write(chunk)
+
+                log.debug('  %s -> %s' % (tmp_path, dest))
+                self.fs.put(tmp_path, dest)
+            finally:
+                os.remove(tmp_path)
+        else:
+            # upload it
+            log.debug('  %s -> %s' % (path, dest))
+            self.fs.put(path, dest)
+
+    def _upload_files_to_wd_mirror(self):
+        """Upload working archives/files (determined by *type*) to the
+        working dir mirror, if necessary."""
+        wd_mirror = self._wd_mirror()
+        if not wd_mirror:
+            return
+
+        log.info('uploading working dir files to %s...' % wd_mirror)
+        for name, path in sorted(self._working_dir_mgr.name_to_path().items()):
+            self._upload_file_to_wd_mirror(path, name)
 
     def _upload_part_size(self):
         """Part size for uploads, in bytes, or ``None``,
@@ -1287,10 +1372,7 @@ class MRJobRunner(object):
             if not name:
                 name = self._working_dir_mgr.name(type, path)
 
-            if self._upload_mgr:
-                uri = self._upload_mgr.uri(path)
-            else:
-                uri = path
+            uri = self._dest_in_wd_mirror(path, name) or path
 
             if not always_use_hash and _basename(uri) == name:
                 yield uri

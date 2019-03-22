@@ -1236,7 +1236,7 @@ class MRJobRunner(object):
         if not wd_mirror:
             return
 
-        log.info('uploading working dir %ss to %s...' % (type, wd_mirror))
+        log.info('uploading working dir files to %s...' % wd_mirror)
         for name, path in sorted(self._working_dir_mgr.name_to_path().items()):
             self._upload_file_to_wd_mirror(path, name)
 

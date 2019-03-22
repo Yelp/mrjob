@@ -23,6 +23,7 @@ from tempfile import gettempdir
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.cloud import _DEFAULT_CLOUD_PART_SIZE_MB
+from mrjob.conf import combine_dicts
 from mrjob.compat import jobconf_from_dict
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.fs.composite import CompositeFilesystem
@@ -265,9 +266,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         """Group streaming steps together."""
         # a list of dicts with:
         #
-        # type: shared type of steps
-        # steps: list of steps in group
-        # step_num: (0-indexed) number of first step
+        # type -- shared type of steps
+        # steps -- list of steps in group
+        # step_num -- (0-indexed) number of first step
         groups = []
 
         for step_num, step in enumerate(steps):

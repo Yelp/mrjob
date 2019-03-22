@@ -93,6 +93,7 @@ setup(
         'mrjob.examples.mr_travelling_salesman',
         'mrjob.fs',
         'mrjob.logs',
+        'mrjob.spark',
         'mrjob.tools',
         'mrjob.tools.emr',
     ],

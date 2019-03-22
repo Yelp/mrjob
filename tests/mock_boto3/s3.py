@@ -322,6 +322,16 @@ class MockS3Object(object):
                     path, self.bucket_name, self.key,
                     str(_no_such_bucket_error('PutObject'))))
 
+        # verify that config doesn't have empty part size (see #2033)
+        #
+        # config is a boto3.s3.transfer.TransferConfig (we don't mock it),
+        # which is actually part of s3transfer. Very old versions of s3transfer
+        # (e.g. 0.10.0) disallow initializing TransferConfig with part sizes
+        # that are zero or None
+        if Config and not (Config.multipart_chunksize and
+                           Config.multipart_threshold):
+            raise TypeError('part size may not be 0 or None')
+
         mock_keys = self._mock_bucket_keys('PutObject')
         with open(path, 'rb') as f:
             mock_keys[self.key] = dict(

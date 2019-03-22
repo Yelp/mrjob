@@ -51,6 +51,8 @@ _EXT_TO_UNARCHIVE_CMD = {
 # issue a warning if max_mins_idle is set to less than this
 _DEFAULT_MAX_MINS_IDLE = 10.0
 
+# default part size (so we can share with Spark runner)
+_DEFAULT_CLOUD_PART_SIZE_MB = 100
 
 class HadoopInTheCloudJobRunner(MRJobBinRunner):
     """Abstract base class for all Hadoop-in-the-cloud services."""
@@ -130,7 +132,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         return combine_dicts(
             super(HadoopInTheCloudJobRunner, self)._default_opts(),
             dict(
-                cloud_part_size_mb=100,  # 100 MB
+                cloud_part_size_mb=_DEFAULT_CLOUD_PART_SIZE_MB,
                 max_mins_idle=_DEFAULT_MAX_MINS_IDLE,
                 # don't use a list because it makes it hard to read option
                 # values when running in verbose mode. See #1284

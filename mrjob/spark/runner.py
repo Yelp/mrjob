@@ -22,6 +22,8 @@ from subprocess import CalledProcessError
 from tempfile import gettempdir
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.cloud import _DEFAULT_CLOUD_PART_SIZE_MB
+from mrjob.conf import combine_dicts
 from mrjob.compat import jobconf_from_dict
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.fs.composite import CompositeFilesystem
@@ -140,6 +142,15 @@ class SparkMRJobRunner(MRJobBinRunner):
                             " runner does not support commands" % (
                                 step_num, mrc))
 
+    def _default_opts(self):
+        return combine_dicts(
+            super(SparkMRJobRunner, self)._default_opts(),
+            dict(
+                cloud_part_size_mb=_DEFAULT_CLOUD_PART_SIZE_MB,
+            ),
+        )
+
+
     def _run(self):
         self.get_spark_submit_bin()  # find spark-submit up front
         self._create_setup_wrapper_scripts()
@@ -255,9 +266,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         """Group streaming steps together."""
         # a list of dicts with:
         #
-        # type: shared type of steps
-        # steps: list of steps in group
-        # step_num: (0-indexed) number of first step
+        # type -- shared type of steps
+        # steps -- list of steps in group
+        # step_num -- (0-indexed) number of first step
         groups = []
 
         for step_num, step in enumerate(steps):

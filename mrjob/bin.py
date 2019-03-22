@@ -931,15 +931,6 @@ class MRJobBinRunner(MRJobRunner):
 
         args = []
 
-        # add --class (JAR steps)
-        if step.get('main_class'):
-            args.extend(['--class', step['main_class']])
-
-        # add --jars, if any
-        libjar_paths = self._libjar_paths()
-        if libjar_paths:
-            args.extend(['--jars', ','.join(libjar_paths)])
-
         # --conf arguments include python bin, cmdenv, jobconf. Make sure
         # that we can always override these manually
         jobconf = {}
@@ -952,6 +943,15 @@ class MRJobBinRunner(MRJobRunner):
 
         for key, value in sorted(jobconf.items()):
             args.extend(['--conf', '%s=%s' % (key, value)])
+
+        # add --class (JAR steps)
+        if step.get('main_class'):
+            args.extend(['--class', step['main_class']])
+
+        # add --jars, if any
+        libjar_paths = self._libjar_paths()
+        if libjar_paths:
+            args.extend(['--jars', ','.join(libjar_paths)])
 
         # spark-submit treats --master and --deploy-mode as aliases for
         # --conf spark.master=... and --conf spark.deploy-mode=... (see #2032).

@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test the Spark runner."""
 from io import BytesIO
+from os import listdir
 from os.path import exists
 from os.path import join
 from unittest import skipIf
@@ -214,7 +215,6 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
         with job.make_runner() as runner:
             runner.run()
-
             output = dict(job.parse_output(runner.cat_output()))
 
             self.assertEqual(output, dict(blue=1, fish=4, one=1, red=1, two=1))
@@ -240,6 +240,20 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
             self.assertEqual(dict(job.parse_output(runner.cat_output())),
                              dict(fa=1, la=8))
+
+    def test_num_reducers(self):
+        jobconf_args = [
+            '--jobconf' , 'mapreduce.job.reduces=1'
+        ]
+
+        job = MRWordFreqCount(['-r', 'spark'] + jobconf_args)
+        job.sandbox(stdin=BytesIO(b'one two one\n two three\n'))
+        with job.make_runner() as runner:
+            runner.run()
+            num_output_files = sum(
+                1 for f in listdir(runner.get_output_dir())
+                if f.startswith('part'))
+        self.assertEqual(num_output_files, 1)
 
     def test_sort_values(self):
         job = MRSortAndGroup(['-r', 'spark'])

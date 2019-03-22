@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """A runner that can run jobs on Spark, with or without Hadoop."""
+import json
 import logging
 import os.path
 import posixpath
 import re
-from shutil import copy2
+from copy import deepcopy
 from subprocess import CalledProcessError
 from tempfile import gettempdir
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.compat import jobconf_from_dict
-from mrjob.conf import combine_dicts
-from mrjob.conf import combine_local_envs
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
@@ -35,8 +34,10 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import boto3 as boto3_installed
 from mrjob.fs.s3 import _is_permanent_boto3_error
 from mrjob.hadoop import fully_qualify_hdfs_path
+from mrjob.logs.counters import _format_counters
 from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
+from mrjob.py2 import to_unicode
 from mrjob.setup import UploadDirManager
 from mrjob.spark import mrjob_spark_harness
 from mrjob.step import StepFailedException
@@ -101,7 +102,7 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         # where to put job output (if not set explicitly)
         if not self._output_dir:
-            self._output_dir = posixpath.join(self._spark_tmp_dir, 'output')
+            self._output_dir = self.fs.join(self._spark_tmp_dir, 'output')
 
         # keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
@@ -109,6 +110,13 @@ class SparkMRJobRunner(MRJobBinRunner):
         # where to store a .zip file containing the MRJob, with a unique
         # module name
         self._job_script_zip_path = None
+
+        # counters, one per job step. (Counters will be {} for non-streaming
+        # steps because Spark doesn't have counters).
+        self._counters = []
+
+        # TODO: we may eventually want log interpretation, but it shouldn't
+        # include counters, as they are not found in logs.
 
     def _check_step(self, step, step_num):
         """Don't try to run steps that include commands or use manifests."""
@@ -154,7 +162,14 @@ class SparkMRJobRunner(MRJobBinRunner):
                     fully_qualify_hdfs_path('tmp/mrjob'), self._job_key)
 
     def _default_step_output_dir(self):
-        return posixpath.join(self._spark_tmp_dir, 'step-output')
+        return self.fs.join(self._spark_tmp_dir, 'step-output')
+
+    def _counter_output_dir(self, step_num):
+        return self.fs.join(
+            self._spark_tmp_dir, 'counter-output-step-%d' % step_num)
+
+    def counters(self):
+        return deepcopy(self._counters)
 
     @property
     def fs(self):
@@ -274,6 +289,31 @@ class SparkMRJobRunner(MRJobBinRunner):
         returncode = self._run_spark_submit(spark_submit_args, env,
                                             record_callback=_log_log4j_record)
 
+        counters = None
+        if step['type'] == 'streaming':
+            counter_file = self.fs.join(
+                self._counter_output_dir(step_num), 'part-*')
+            counter_json = b''.join(self.fs.cat(counter_file))
+            if counter_json.strip():
+                # json.loads() on Python 3.4/3.5 can't take bytes
+                counters = json.loads(to_unicode(counter_json))
+
+        if isinstance(counters, list):
+            self._counters.extend(counters)
+
+            # desc_num is 1-indexed user-readable step num
+            for desc_num, counter_dict in enumerate(
+                    counters, start=(step_num + 1)):
+                if counter_dict:
+                    log.info(_format_counters(
+                        counter_dict,
+                        desc=('Counters for step %d' % desc_num)))
+
+        # for non-streaming steps, there are no counters.
+        # pad self._counters to match number of steps
+        while len(self._counters) < (last_step_num or step_num) + 1:
+            self._counters.append({})
+
         if returncode:
             reason = str(CalledProcessError(returncode, spark_submit_args))
             raise StepFailedException(
@@ -317,6 +357,10 @@ class SparkMRJobRunner(MRJobBinRunner):
         # note that we use the output dir for the *last* step
         args.append(
             self._step_output_uri(last_step_num))
+
+        # --counter-output-dir, to simulate counters
+        args.extend(['--counter-output-dir',
+                     self._counter_output_dir(step_num)])
 
         # --first-step-num, --last-step-num (step range)
         args.extend(['--first-step-num', str(step_num),

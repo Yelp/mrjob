@@ -19,6 +19,7 @@ import os
 import shutil
 import stat
 import platform
+from copy import deepcopy
 from functools import partial
 from multiprocessing import cpu_count
 from os.path import dirname
@@ -230,7 +231,7 @@ class SimMRJobRunner(MRJobRunner):
                 parse_mr_job_stderr(stderr, counters=self._counters[step_num])
 
     def counters(self):
-        return self._counters
+        return deepcopy(self._counters)
 
     def get_hadoop_version(self):
         return self._opts['hadoop_version']

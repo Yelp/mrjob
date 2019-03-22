@@ -29,6 +29,7 @@ from mrjob.conf import combine_envs
 from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.job import _im_func
+from mrjob.options import _RUNNER_ALIASES
 from mrjob.options import _RUNNER_OPTS
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import BytesValueProtocol
@@ -1288,6 +1289,10 @@ class PrintHelpTestCase(SandboxedTestCase):
 
         # deprecated options
         self.assertIn('--max-hours-idle', output)
+
+    def test_runner_help_works_for_all_runners(self):
+        for alias in _RUNNER_ALIASES:
+            MRJob(['--help', '-r', alias])
 
     def test_steps_help(self):
         MRJob(['--help', '--steps'])

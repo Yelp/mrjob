@@ -59,9 +59,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         'aws_session_token',
         'cloud_fs_sync_secs',
         'cloud_part_size_mb',
-        'google_project_id',  # used by GCS filesystem
-        'google_region',  # used when creating buckets on GCS
+        'gcs_region',  # used when creating buckets on GCS
         'hadoop_bin',
+        'project_id',  # used by GCS filesystem
         's3_endpoint',
         's3_region',  # only used along with s3_endpoint
         'spark_deploy_mode',
@@ -184,8 +184,8 @@ class SparkMRJobRunner(MRJobBinRunner):
 
             if google_libs_installed:
                 self._fs.add_fs('gcs', GCSFilesystem(
-                    project_id=self._opts['google_project_id'],
-                    location=self._opts['google_region'],
+                    project_id=self._opts['project_id'],
+                    location=self._opts['gcs_region'],
                     object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS,
                 ), disable_if=_is_permanent_google_error)
 

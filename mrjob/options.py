@@ -701,6 +701,14 @@ _RUNNER_OPTS = dict(
             (['--gcloud-bin'], dict(help='path to gcloud binary')),
         ],
     ),
+    gcs_region=dict(
+        cloud_role='connect',
+        switches=[
+            (['--gcs-region'], dict(
+                help='region to create Google Cloud Storage buckets in',
+            )),
+        ],
+    ),
     hadoop_bin=dict(
         combiner=combine_cmds,
         switches=[
@@ -1037,7 +1045,8 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--project-id'], dict(
                 deprecated_aliases=['--gcp-project'],
-                help='Project to run Dataproc jobs in'
+                help=('Project to use when connecting to Google Cloud Services'
+                      ' and to run Cloud Dataproc jobs in')
             )),
         ],
     ),
@@ -1104,6 +1113,14 @@ _RUNNER_OPTS = dict(
                       " s3-us-west-1.amazonaws.com). You usually shouldn't"
                       " set this; by default mrjob will choose the correct"
                       " endpoint for each S3 bucket based on its location."),
+            )),
+        ],
+    ),
+    s3_region=dict(
+        cloud_role='connect',
+        switches=[
+            (['--s3-region'], dict(
+                help='AWS region to create s3 buckets in',
             )),
         ],
     ),
@@ -1198,6 +1215,16 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--spark-submit-bin'], dict(
                 help='spark-submit binary. You may include arguments.'
+            )),
+        ],
+    ),
+    spark_tmp_dir=dict(
+        cloud_role='launch',
+        combiner=combine_paths,
+        switches=[
+            (['--spark-tmp-dir'], dict(
+                help=('optional URI visible to Spark executors to use as our'
+                      ' temp directory.'),
             )),
         ],
     ),

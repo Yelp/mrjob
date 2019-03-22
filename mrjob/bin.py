@@ -931,14 +931,6 @@ class MRJobBinRunner(MRJobRunner):
 
         args = []
 
-        # add --master
-        if self._spark_master():
-            args.extend(['--master', self._spark_master()])
-
-        # add --deploy-mode
-        if self._spark_deploy_mode():
-            args.extend(['--deploy-mode', self._spark_deploy_mode()])
-
         # add --class (JAR steps)
         if step.get('main_class'):
             args.extend(['--class', step['main_class']])
@@ -960,6 +952,20 @@ class MRJobBinRunner(MRJobRunner):
 
         for key, value in sorted(jobconf.items()):
             args.extend(['--conf', '%s=%s' % (key, value)])
+
+        # spark-submit treats --master and --deploy-mode as aliases for
+        # --conf spark.master=... and --conf spark.deploy-mode=... (see #2032).
+        #
+        # we never want jobconf to override spark master or deploy mode, so put
+        # these switches after --conf
+
+        # add --master
+        if self._spark_master():
+            args.extend(['--master', self._spark_master()])
+
+        # add --deploy-mode
+        if self._spark_deploy_mode():
+            args.extend(['--deploy-mode', self._spark_deploy_mode()])
 
         # --files and --archives
         args.extend(self._spark_upload_args())

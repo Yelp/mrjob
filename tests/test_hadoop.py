@@ -1201,11 +1201,10 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
 
 @skipIf(not (pty and hasattr(pty, 'fork')), 'no pty.fork()')
 class BadHadoopBinAfterFork(MockHadoopTestCase):
-    # test what happens if os.execvpe() fails
+    # test what happens if os.execvpe() fails (see #2024)
 
     # can't just set --hadoop-bin because this would break checking
     # Hadoop version and uploading files. Instead, patch _args_for_step()
-
     def patch_args_for_step(self, runner, bad_hadoop_bin):
         real_args_for_step = runner._args_for_step
 
@@ -1233,6 +1232,15 @@ class BadHadoopBinAfterFork(MockHadoopTestCase):
 
         with job.make_runner() as runner:
             self.patch_args_for_step(runner, nonexecutable_hadoop_bin)
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_non_oserror_exception(self):
+        self.start(patch('os.execvpe', side_effect=KeyboardInterrupt))
+
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
             self.assertRaises(StepFailedException, runner.run)
 
 

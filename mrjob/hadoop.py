@@ -405,7 +405,16 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             else:
                 # we have PTYs
                 if pid == 0:  # we are the child process
-                    os.execvpe(step_args[0], step_args, env)
+                    try:
+                        os.execvpe(step_args[0], step_args, env)
+                        # now we are no longer Python
+                    except OSError as ex:
+                        # use _exit() so we don't do cleanup, etc. that's
+                        # the parent process's job
+                        os._exit(ex.errno)
+                    finally:
+                        # if we get some other exception, also exit hard
+                        os._exit(-1)
                 else:
                     log.debug('Invoking Hadoop via PTY')
 

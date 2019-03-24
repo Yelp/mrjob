@@ -32,7 +32,6 @@ try:
 except ImportError:
     pty = None
 
-
 try:
     import pyspark
     pyspark  # quiet "redefinition of unused ..." warning from pyflakes
@@ -867,8 +866,16 @@ class MRJobBinRunner(MRJobRunner):
         else:
             # we have PTYs
             if pid == 0:  # we are the child process
-                os.execvpe(spark_submit_args[0], spark_submit_args, env)
-                # now this process is no longer Python
+                try:
+                    os.execvpe(spark_submit_args[0], spark_submit_args, env)
+                    # now this process is no longer Python
+                except OSError as ex:
+                    # use _exit() so we don't do cleanup, etc. that's
+                    # the parent process's job
+                    os._exit(ex.errno)
+                finally:
+                    # if we get some other exception, still exit hard
+                    os._exit(-1)
             else:
                 log.debug('Invoking spark-submit via PTY')
 

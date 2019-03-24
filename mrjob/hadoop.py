@@ -413,7 +413,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
                         # the parent process's job
                         os._exit(ex.errno)
                     finally:
-                        # if we get some other exception, also exit hard
+                        # if we got some other exception, still exit hard
                         os._exit(-1)
                 else:
                     log.debug('Invoking Hadoop via PTY')

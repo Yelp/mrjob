@@ -1170,6 +1170,9 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
         self.mock_execvpe = self.start(patch(
             'os.execvpe', side_effect=StopIteration))
 
+        # don't actually hard-exit the child, since we're not actually forking
+        self.mock_exit = self.start(patch('os._exit'))
+
     def test_with_pty(self):
         job = MRNullSpark(['-r', 'hadoop'])
         job.sandbox()

@@ -165,7 +165,7 @@ class MRJobLauncher(object):
             return self._stdout
         else:
             # should always write bytes, not unicode
-            return getattr(sys.stdout, 'buffer', sys.stdin)
+            return getattr(sys.stdout, 'buffer', sys.stdout)
 
     @property
     def stderr(self):
@@ -176,7 +176,7 @@ class MRJobLauncher(object):
             return self._stderr
         else:
             # should always write bytes, not unicode
-            return getattr(sys.stderr, 'buffer', sys.stdin)
+            return getattr(sys.stderr, 'buffer', sys.stderr)
 
     @classmethod
     def _usage(cls):

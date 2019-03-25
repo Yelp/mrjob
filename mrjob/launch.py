@@ -656,6 +656,14 @@ class MRJobLauncher(object):
 
             self.assertEqual(mrjob.stdout.getvalue(), ...)
             self.assertEqual(parse_mr_job_stderr(mr_job.stderr), ...)
+
+        .. note::
+
+           If you are using Spark, it's recommended you only pass in
+           :py:class:`io.BytesIO` or other serializable alternatives to file
+           objects. *stdin*, *stdout*, and *stderr* get stored as job
+           attributes, which means if they aren't serializable, neither
+           is the job instance or its methods.
         """
         self._stdin = stdin or BytesIO()
         self._stdout = stdout or BytesIO()

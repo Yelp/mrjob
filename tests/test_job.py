@@ -1761,6 +1761,9 @@ class SparkJobMethodsTestCase(SandboxedTestCase, SingleSparkContextTestCase):
     def setUp(self):
         super(SparkJobMethodsTestCase, self).setUp()
 
+        import warnings
+        warnings.filterwarnings('error')
+
         # ensure that we aren't sandboxing the job. This used to be
         # the way we made Spark jobs serializable; see #2039
         self.job_sandbox = self.start(

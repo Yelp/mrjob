@@ -58,7 +58,6 @@ from tests.py2 import patch
 from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
-from tests.sandbox import SingleSparkContextTestCase
 from tests.sandbox import mrjob_conf_patcher
 
 

@@ -44,12 +44,15 @@ from mrjob.py2 import StringIO
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import SparkStep
+from mrjob.util import safeeval
+from mrjob.util import to_lines
 
 from tests.job import run_job
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_rot13lib import MRRot13Lib
 from tests.mr_sort_values import MRSortValues
+from tests.mr_spark_method_wordcount import MRSparkMethodWordcount
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_upload_attrs_job import MRUploadAttrsJob
@@ -59,6 +62,13 @@ from tests.py2 import patch
 from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.sandbox import SingleSparkContextTestCase
+
+try:
+    import pyspark
+    pyspark
+except ImportError:
+    pyspark = None
 
 
 # These can't be invoked as a separate script, but they don't need to be
@@ -1742,3 +1752,44 @@ class UploadAttrsTestCase(SandboxedTestCase):
             job._runner_kwargs()['upload_dirs'], ['foo'])
         self.assertEqual(
             job._runner_kwargs()['upload_files'], ['foo/bar.txt'])
+
+
+# SingleSparkContextTestCase is skipped if there's no pyspark
+class SparkJobMethodsTestCase(SandboxedTestCase, SingleSparkContextTestCase):
+    # regression test for #2039
+
+    def setUp(self):
+        super(SparkJobMethodsTestCase, self).setUp()
+
+        # ensure that we aren't sandboxing the job. This used to be
+        # the way we made Spark jobs serializable; see #2039
+        self.job_sandbox = self.start(
+            patch('mrjob.launch.MRJobLauncher.sandbox'))
+
+    def test_job_can_be_pickled_and_unpicked(self):
+        job = MRJob()
+
+        pickled_job = pyspark.cloudpickle.dumps(job)
+        pyspark.cloudpickle.loads(pickled_job)
+
+    def test_spark_can_serialize_job_methods(self):
+        input_path = self.makefile(
+            'input', b'one fish\ntwo fish\nred fish\nblue fish\n')
+
+        job = MRSparkMethodWordcount(['-r', 'inline', input_path])
+        # don't sandbox; we want to see if Spark can handle an un-sandboxed job
+
+        counts = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                k, v = safeeval(line)
+                counts[k] = v
+
+        self.assertEqual(counts, dict(
+            blue=1, fish=4, one=1, red=1, two=1))
+
+        # check that we didn't alter the job to make it serializable
+        self.assertFalse(self.job_sandbox.called)

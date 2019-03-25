@@ -203,6 +203,7 @@ class SingleSparkContextTestCase(BasicTestCase):
     def tearDownClass(cls):
         cls.spark_context.stop()
 
+        super(SingleSparkContextTestCase, cls).tearDownClass()
 
     def setUp(self):
         super(SingleSparkContextTestCase, self).setUp()

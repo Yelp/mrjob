@@ -137,17 +137,46 @@ class MRJobLauncher(object):
             self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
-        # See sandbox(), below.
-        #
-        # These should always read/write bytes, not unicode. Generally,
-        # on Python 2, sys.std* can read and write bytes, whereas on Python 3,
-        # you need to use sys.std*.buffer (which doesn't exist on Python 2).
-        #
-        # However, certain Python 3 environments, such as Jupyter notebook,
-        # act more like Python 2. See #1441.
-        self.stdin = getattr(sys.stdin, 'buffer', sys.stdin)
-        self.stdout = getattr(sys.stdout, 'buffer', sys.stdout)
-        self.stderr = getattr(sys.stderr, 'buffer', sys.stderr)
+        # See stdin, stdout, stderr properties and sandbox(), below.
+        self._stdin = None
+        self._stdout = None
+        self._stderr = None
+
+    @property
+    def stdin(self):
+        if self._stdin:
+            # allow sandboxing a path, which becomes a filehandle once
+            # *self* is serialized
+            if isinstance(self._stdin, str):
+                self._stdin = open(self._stdin, 'rb')
+            return self._stdin
+        else:
+            # should always read bytes, not unicode. sys.stdin.buffer
+            # is a Python 3 thing, though it's not present in all
+            # environments (e.g. Jupyter notebook). See #1441
+            return getattr(sys.stdin, 'buffer', sys.stdin)
+
+    @property
+    def stdout(self):
+        if self._stdout:
+            # allow sandboxing a path
+            if isinstance(self._stdout, str):
+                self._stdout = open(self._stdout, 'wb')
+            return self._stdout
+        else:
+            # should always write bytes, not unicode
+            return getattr(sys.stdout, 'buffer', sys.stdin)
+
+    @property
+    def stderr(self):
+        if self._stderr:
+            # allow sandboxing a path
+            if isinstance(self._stderr, str):
+                self._stderr = open(self._stderr, 'wb')
+            return self._stderr
+        else:
+            # should always write bytes, not unicode
+            return getattr(sys.stderr, 'buffer', sys.stdin)
 
     @classmethod
     def _usage(cls):
@@ -644,9 +673,9 @@ class MRJobLauncher(object):
             self.assertEqual(mrjob.stdout.getvalue(), ...)
             self.assertEqual(parse_mr_job_stderr(mr_job.stderr), ...)
         """
-        self.stdin = stdin or BytesIO()
-        self.stdout = stdout or BytesIO()
-        self.stderr = stderr or BytesIO()
+        self._stdin = stdin or BytesIO()
+        self._stdout = stdout or BytesIO()
+        self._stderr = stderr or BytesIO()
 
         return self
 

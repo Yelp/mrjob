@@ -142,41 +142,25 @@ class MRJobLauncher(object):
         self._stdout = None
         self._stderr = None
 
+
+    # by default, self.stdin, self.stdout, and self.stderr are sys.std*.buffer
+    # if it exists, and otherwise sys.std* otherwise (they should always deal
+    # with bytes, not Unicode).
+    #
+    # *buffer* is pretty much a Python 3 thing, though some platforms
+    # (notably Jupyterhub) don't have it. See #1441
+
     @property
     def stdin(self):
-        if self._stdin:
-            # allow sandboxing a path, which becomes a filehandle once
-            # *self* is serialized
-            if isinstance(self._stdin, str):
-                self._stdin = open(self._stdin, 'rb')
-            return self._stdin
-        else:
-            # should always read bytes, not unicode. sys.stdin.buffer
-            # is a Python 3 thing, though it's not present in all
-            # environments (e.g. Jupyter notebook). See #1441
-            return getattr(sys.stdin, 'buffer', sys.stdin)
+        return self._stdin or getattr(sys.stdin, 'buffer', sys.stdin)
 
     @property
     def stdout(self):
-        if self._stdout:
-            # allow sandboxing a path
-            if isinstance(self._stdout, str):
-                self._stdout = open(self._stdout, 'wb')
-            return self._stdout
-        else:
-            # should always write bytes, not unicode
-            return getattr(sys.stdout, 'buffer', sys.stdout)
+        return self._stdout or getattr(sys.stdout, 'buffer', sys.stdout)
 
     @property
     def stderr(self):
-        if self._stderr:
-            # allow sandboxing a path
-            if isinstance(self._stderr, str):
-                self._stderr = open(self._stderr, 'wb')
-            return self._stderr
-        else:
-            # should always write bytes, not unicode
-            return getattr(sys.stderr, 'buffer', sys.stderr)
+        return self._stderr or getattr(sys.stderr, 'buffer', sys.stderr)
 
     @classmethod
     def _usage(cls):

@@ -135,7 +135,6 @@ def main(cmd_line_args=None):
         j = job_class(job_args + [
             '--%s' % mrc, '--step-num=%d' % step_num
         ])
-        j.sandbox()  # so Spark doesn't try to serialize stdin
 
         # patch increment_counter() to update the accumulator for this step
         j.increment_counter = make_increment_counter(step_num)

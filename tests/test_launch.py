@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2012-2013 Yelp
 # Copyright 2014 Yelp and Contributors
-# Copyright 2015-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2015-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -448,9 +448,9 @@ class StdStreamTestCase(BasicTestCase):
                             stdout=mock_stdout, stderr=mock_stderr):
             launcher = MRJobLauncher(args=['/path/to/script'])
 
-        self.assertEqual(launcher.stdin, mock_stdin.buffer)
-        self.assertEqual(launcher.stdout, mock_stdout)
-        self.assertEqual(launcher.stderr, mock_stderr)
+            self.assertEqual(launcher.stdin, mock_stdin.buffer)
+            self.assertEqual(launcher.stdout, mock_stdout)
+            self.assertEqual(launcher.stderr, mock_stderr)
 
 
 class DeprecatedOptionHooksTestCase(SandboxedTestCase):

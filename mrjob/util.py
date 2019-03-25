@@ -338,6 +338,7 @@ def save_cwd():
     finally:
         os.chdir(original_cwd)
 
+
 @contextmanager
 def save_sys_std():
     """Context manager that saves the current values of `sys.stdin`,
@@ -352,9 +353,14 @@ def save_sys_std():
 
         yield
 
+        # at this point, sys.stdout/stderr may have been patched. Don't
+        # raise an exception if flush() fails
         try:
-            # at this point, sys.stdout/stderr may have been patched
             sys.stdout.flush()
+        except:
+            pass
+
+        try:
             sys.stderr.flush()
         except:
             pass

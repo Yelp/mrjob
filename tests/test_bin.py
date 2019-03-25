@@ -24,12 +24,17 @@ from os.path import exists
 from os.path import getsize
 from os.path import join
 from shutil import make_archive
+from unittest import skipIf
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.bin import pty
+from mrjob.bin import pyspark
+from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
+from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import which
 
@@ -2078,3 +2083,37 @@ class FindSparkSubmitBinTestCase(SandboxedTestCase):
 
         self.assertEqual(self.runner._find_spark_submit_bin(),
                          [spark_submit_bin])
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+@skipIf(not (pty and hasattr(pty, 'fork')), 'no pty.fork()')
+class BadSparkSubmitAfterFork(SandboxedTestCase):
+
+    def test_no_such_file(self):
+        missing_spark_submit = os.path.join(self.tmp_dir, 'dont-spark-submit')
+
+        job = MRSparkWordcount([
+            '-r', 'local', '--spark-submit-bin', missing_spark_submit])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_permissions_error(self):
+        nonexecutable_spark_submit = os.path.join(self.tmp_dir,
+                                                  'cant-spark-submit')
+        job = MRSparkWordcount([
+            '-r', 'local', '--spark-submit-bin', nonexecutable_spark_submit])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_non_oserror_exception(self):
+        self.start(patch('os.execvpe', side_effect=KeyboardInterrupt))
+
+        job = MRSparkWordcount(['-r', 'local'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)

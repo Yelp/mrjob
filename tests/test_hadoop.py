@@ -23,12 +23,15 @@ import os.path
 from io import BytesIO
 from subprocess import check_call
 from subprocess import PIPE
+from unittest import skipIf
 
 import mrjob.step
 from mrjob.conf import combine_dicts
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
+from mrjob.hadoop import pty
+from mrjob.step import StepFailedException
 from mrjob.util import which
 
 from tests.mockhadoop import add_mock_hadoop_counters
@@ -1167,6 +1170,9 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
         self.mock_execvpe = self.start(patch(
             'os.execvpe', side_effect=StopIteration))
 
+        # don't actually hard-exit the child, since we're not actually forking
+        self.mock_exit = self.start(patch('os._exit'))
+
     def test_with_pty(self):
         job = MRNullSpark(['-r', 'hadoop'])
         job.sandbox()
@@ -1193,6 +1199,52 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
                 stdout=PIPE, stderr=PIPE, env=dict(FOO='bar', BAZ='qux'))
 
             self.assertFalse(self.mock_execvpe.called)
+
+
+
+@skipIf(not (pty and hasattr(pty, 'fork')), 'no pty.fork()')
+class BadHadoopBinAfterFork(MockHadoopTestCase):
+    # test what happens if os.execvpe() fails (see #2024)
+
+    # can't just set --hadoop-bin because this would break checking
+    # Hadoop version and uploading files. Instead, patch _args_for_step()
+    def patch_args_for_step(self, runner, bad_hadoop_bin):
+        real_args_for_step = runner._args_for_step
+
+        def args_for_step(*args, **kwargs):
+            args = real_args_for_step(*args, **kwargs)
+            return [bad_hadoop_bin] + args[1:]
+
+        self.start(patch.object(runner, '_args_for_step', args_for_step))
+
+    def test_no_such_file(self):
+        missing_hadoop_bin = os.path.join(self.tmp_dir, 'no-hadoop-here')
+
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.patch_args_for_step(runner, missing_hadoop_bin)
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_permissions_error(self):
+        nonexecutable_hadoop_bin = self.makefile('not-really-hadoop')
+
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.patch_args_for_step(runner, nonexecutable_hadoop_bin)
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_non_oserror_exception(self):
+        self.start(patch('os.execvpe', side_effect=KeyboardInterrupt))
+
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
 
 
 class SparkPyFilesTestCase(MockHadoopTestCase):

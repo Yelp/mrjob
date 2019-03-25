@@ -1,6 +1,7 @@
 # Copyright 2009-2016 Yelp and Contributors
 # Copyright 2017 Yelp
 # Copyright 2018 Yelp and Google, Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -404,7 +405,16 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             else:
                 # we have PTYs
                 if pid == 0:  # we are the child process
-                    os.execvpe(step_args[0], step_args, env)
+                    try:
+                        os.execvpe(step_args[0], step_args, env)
+                        # now we are no longer Python
+                    except OSError as ex:
+                        # use _exit() so we don't do cleanup, etc. that's
+                        # the parent process's job
+                        os._exit(ex.errno)
+                    finally:
+                        # if we got some other exception, still exit hard
+                        os._exit(-1)
                 else:
                     log.debug('Invoking Hadoop via PTY')
 

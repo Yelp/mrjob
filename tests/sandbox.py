@@ -24,6 +24,7 @@ from tempfile import mkdtemp
 from shutil import rmtree
 from unittest import TestCase
 from unittest import skipIf
+from warnings import filterwarnings
 
 try:
     import pyspark
@@ -189,6 +190,9 @@ class SingleSparkContextTestCase(BasicTestCase):
     def setUpClass(cls):
         super(SingleSparkContextTestCase, cls).setUpClass()
 
+        # don't warn about running processes or unclosed filehandles
+        filterwarnings('ignore', category=ResourceWarning)
+
         from pyspark import SparkContext
         cls.spark_context = SparkContext()
 
@@ -201,8 +205,12 @@ class SingleSparkContextTestCase(BasicTestCase):
 
     @classmethod
     def tearDownClass(cls):
+        # don't warn about running processes or unclosed filehandles
+        filterwarnings('ignore', category=ResourceWarning)
+
         cls.spark_context.stop()
 
+        super(SingleSparkContextTestCase, cls).tearDownClass()
 
     def setUp(self):
         super(SingleSparkContextTestCase, self).setUp()

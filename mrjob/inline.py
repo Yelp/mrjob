@@ -27,6 +27,7 @@ from mrjob.sim import SimMRJobRunner
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 from mrjob.util import save_sys_path
+from mrjob.util import save_sys_std
 
 log = logging.getLogger(__name__)
 
@@ -98,11 +99,17 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         # Don't care about pickleability since this runs in the same process
         def invoke_task(stdin, stdout, stderr, wd, env):
-            with save_current_environment(), save_cwd(), save_sys_path():
+            with save_current_environment(), save_cwd(), save_sys_path(), \
+                    save_sys_std():
                 # pretend we're running the script in the working dir
                 os.environ.update(env)
                 os.chdir(wd)
                 sys.path = [os.getcwd()] + sys.path
+
+                # pretend we've redirected stdin/stdout/stderr
+                sys.stdin = stdin
+                sys.stdout = stdout
+                sys.stderr = stderr
 
                 input_uri = None
                 try:
@@ -117,8 +124,6 @@ class InlineMRJobRunner(SimMRJobRunner):
                         args = list(args) + [input_uri, input_uri]
 
                     task = self._mrjob_cls(args)
-                    task.sandbox(stdin=stdin, stdout=stdout, stderr=stderr)
-
                     task.execute()
                 except:
                     # so users can figure out where the exception came from;
@@ -158,15 +163,19 @@ class InlineMRJobRunner(SimMRJobRunner):
         # use abspath() on input URIs before changing working dir
         task_args = self._spark_script_args(step_num)
 
-        with save_current_environment(), save_cwd(), save_sys_path():
-            os.environ.update(_fix_env(self._opts['cmdenv']))
-            os.chdir(wd)
-            sys.path = [os.getcwd()] + sys.path
+        with open(stdout_path, 'wb') as stdout, \
+              open(stderr_path, 'wb') as stderr:
+            with save_current_environment(), save_cwd(), save_sys_path(), \
+                    save_sys_std():
+                os.environ.update(_fix_env(self._opts['cmdenv']))
+                os.chdir(wd)
+                sys.path = [os.getcwd()] + sys.path
 
-            task = self._mrjob_cls(task_args)
-            task.sandbox(stdout=stdout_path, stderr=stderr_path)
+                # pretend we redirected stdout and stderr
+                sys.stdout, sys.stderr = stdout, stderr
 
-            task.execute()
+                task = self._mrjob_cls(task_args)
+                task.execute()
 
     def _log_cause_of_error(self, ex):
         """Just tell what file we were reading from (since they'll see

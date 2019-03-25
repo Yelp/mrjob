@@ -137,17 +137,30 @@ class MRJobLauncher(object):
             self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
-        # See sandbox(), below.
-        #
-        # These should always read/write bytes, not unicode. Generally,
-        # on Python 2, sys.std* can read and write bytes, whereas on Python 3,
-        # you need to use sys.std*.buffer (which doesn't exist on Python 2).
-        #
-        # However, certain Python 3 environments, such as Jupyter notebook,
-        # act more like Python 2. See #1441.
-        self.stdin = getattr(sys.stdin, 'buffer', sys.stdin)
-        self.stdout = getattr(sys.stdout, 'buffer', sys.stdout)
-        self.stderr = getattr(sys.stderr, 'buffer', sys.stderr)
+        # See stdin, stdout, stderr properties and sandbox(), below.
+        self._stdin = None
+        self._stdout = None
+        self._stderr = None
+
+
+    # by default, self.stdin, self.stdout, and self.stderr are sys.std*.buffer
+    # if it exists, and otherwise sys.std* otherwise (they should always deal
+    # with bytes, not Unicode).
+    #
+    # *buffer* is pretty much a Python 3 thing, though some platforms
+    # (notably Jupyterhub) don't have it. See #1441
+
+    @property
+    def stdin(self):
+        return self._stdin or getattr(sys.stdin, 'buffer', sys.stdin)
+
+    @property
+    def stdout(self):
+        return self._stdout or getattr(sys.stdout, 'buffer', sys.stdout)
+
+    @property
+    def stderr(self):
+        return self._stderr or getattr(sys.stderr, 'buffer', sys.stderr)
 
     @classmethod
     def _usage(cls):
@@ -643,10 +656,18 @@ class MRJobLauncher(object):
 
             self.assertEqual(mrjob.stdout.getvalue(), ...)
             self.assertEqual(parse_mr_job_stderr(mr_job.stderr), ...)
+
+        .. note::
+
+           If you are using Spark, it's recommended you only pass in
+           :py:class:`io.BytesIO` or other serializable alternatives to file
+           objects. *stdin*, *stdout*, and *stderr* get stored as job
+           attributes, which means if they aren't serializable, neither
+           is the job instance or its methods.
         """
-        self.stdin = stdin or BytesIO()
-        self.stdout = stdout or BytesIO()
-        self.stderr = stderr or BytesIO()
+        self._stdin = stdin or BytesIO()
+        self._stdout = stdout or BytesIO()
+        self._stderr = stderr or BytesIO()
 
         return self
 

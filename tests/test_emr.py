@@ -5348,7 +5348,7 @@ class SparkMasterAndDeployModeTestCase(MockBoto3TestCase):
                              return_value='2'))
 
             self.assertEqual(
-                runner._spark_submit_args(0)[:4],
+                runner._spark_submit_args(0)[-4:],
                 ['--master', 'yarn', '--deploy-mode', 'cluster']
             )
 

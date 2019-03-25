@@ -32,7 +32,6 @@ try:
 except ImportError:
     pty = None
 
-
 try:
     import pyspark
     pyspark  # quiet "redefinition of unused ..." warning from pyflakes
@@ -867,8 +866,16 @@ class MRJobBinRunner(MRJobRunner):
         else:
             # we have PTYs
             if pid == 0:  # we are the child process
-                os.execvpe(spark_submit_args[0], spark_submit_args, env)
-                # now this process is no longer Python
+                try:
+                    os.execvpe(spark_submit_args[0], spark_submit_args, env)
+                    # now this process is no longer Python
+                except OSError as ex:
+                    # use _exit() so we don't do cleanup, etc. that's
+                    # the parent process's job
+                    os._exit(ex.errno)
+                finally:
+                    # if we get some other exception, still exit hard
+                    os._exit(-1)
             else:
                 log.debug('Invoking spark-submit via PTY')
 
@@ -931,23 +938,6 @@ class MRJobBinRunner(MRJobRunner):
 
         args = []
 
-        # add --master
-        if self._spark_master():
-            args.extend(['--master', self._spark_master()])
-
-        # add --deploy-mode
-        if self._spark_deploy_mode():
-            args.extend(['--deploy-mode', self._spark_deploy_mode()])
-
-        # add --class (JAR steps)
-        if step.get('main_class'):
-            args.extend(['--class', step['main_class']])
-
-        # add --jars, if any
-        libjar_paths = self._libjar_paths()
-        if libjar_paths:
-            args.extend(['--jars', ','.join(libjar_paths)])
-
         # --conf arguments include python bin, cmdenv, jobconf. Make sure
         # that we can always override these manually
         jobconf = {}
@@ -960,6 +950,29 @@ class MRJobBinRunner(MRJobRunner):
 
         for key, value in sorted(jobconf.items()):
             args.extend(['--conf', '%s=%s' % (key, value)])
+
+        # add --class (JAR steps)
+        if step.get('main_class'):
+            args.extend(['--class', step['main_class']])
+
+        # add --jars, if any
+        libjar_paths = self._libjar_paths()
+        if libjar_paths:
+            args.extend(['--jars', ','.join(libjar_paths)])
+
+        # spark-submit treats --master and --deploy-mode as aliases for
+        # --conf spark.master=... and --conf spark.deploy-mode=... (see #2032).
+        #
+        # we never want jobconf to override spark master or deploy mode, so put
+        # these switches after --conf
+
+        # add --master
+        if self._spark_master():
+            args.extend(['--master', self._spark_master()])
+
+        # add --deploy-mode
+        if self._spark_deploy_mode():
+            args.extend(['--deploy-mode', self._spark_deploy_mode()])
 
         # --files and --archives
         args.extend(self._spark_upload_args())

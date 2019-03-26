@@ -26,6 +26,7 @@ from os.path import exists
 from os.path import join
 from io import BytesIO
 from unittest import TestCase
+from unittest import skip
 from unittest import skipIf
 
 from warcio.warcwriter import WARCWriter
@@ -285,6 +286,8 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
             blue=1, fish=4, one=1, red=1, two=1))
 
     def test_spark_job_failure(self):
+        self.quiet_spark_context_logging()
+
         job = MRSparKaboom(['-r', 'inline'])
         job.sandbox(stdin=BytesIO(b'line\n'))
 
@@ -293,6 +296,7 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
         with job.make_runner() as runner:
             self.assertRaises(Py4JJavaError, runner.run)
 
+    @skip("JVM's current working dir can't be changed once it's started")
     def test_upload_files_with_rename(self):
         # see test_upload_files_with_rename() in test_local for comparison
 

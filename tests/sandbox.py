@@ -184,51 +184,37 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
 
 @skipIf(pyspark is None, 'no pyspark module')
 class SingleSparkContextTestCase(BasicTestCase):
-    """Only create a single SparkContext, to speed things up and prevent
-    errors from attempting to instantiate multiple contexts."""
-
-    @classmethod
-    def setUpClass(cls):
-        super(SingleSparkContextTestCase, cls).setUpClass()
-
-        if not PY2:
-            # ignore Python 3 warnings about unclosed filehandles
-            filterwarnings('ignore', category=ResourceWarning)
-
+    """Ensure that each test case gets a fresh SparkContext and JVM.
+    """
+    def stop_active_spark_context(self):
         from pyspark import SparkContext
-        cls.spark_context = SparkContext()
 
-        try:
-            cls.spark_context.setLogLevel('FATAL')
-        except:
-            # tearDownClass() won't be called if there's an exception
-            cls.spark_context.stop()
-            raise
+        with SparkContext._lock:
+            if SparkContext._active_spark_context:
+                SparkContext._active_spark_context.stop()
 
-    @classmethod
-    def tearDownClass(cls):
-        if not PY2:
-            # ignore Python 3 warnings about unclosed filehandles
-            filterwarnings('ignore', category=ResourceWarning)
+    def quiet_spark_context_logging(self):
+        from pyspark import SparkContext
 
-        cls.spark_context.stop()
+        def quiet_SparkContext(*args, **kwargs):
+            sc = SparkContext(*args, **kwargs)
+            sc.setLogLevel('FATAL')
 
-        super(SingleSparkContextTestCase, cls).tearDownClass()
+            return sc
+
+        self.start(patch('pyspark.SparkContext',
+                         side_effect=quiet_SparkContext))
 
     def setUp(self):
         super(SingleSparkContextTestCase, self).setUp()
 
-        cls = self.__class__
-        try:
-            cls.spark_context.attributeId
-        except AttributeError:
-            # spark context was destroyed due to an error
-            cls.spark_context.stop()
-            from pyspark import SparkContext
-            cls.spark_context = SparkContext()
+        if not PY2:
+            # ignore Python 3 warnings about unclosed filehandles
+            # (unittest resets warnings for every test)
+            filterwarnings('ignore', category=ResourceWarning)
 
-        self.start(patch('pyspark.SparkContext',
-                         return_value=self.spark_context))
+        self.addCleanup(self.stop_active_spark_context)
+        self.stop_active_spark_context()
 
 
 def mrjob_pythonpath():

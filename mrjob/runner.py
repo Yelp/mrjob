@@ -1148,28 +1148,30 @@ class MRJobRunner(object):
                 self._upload_mgr.add(path)
 
     def _upload_local_files(self):
-        # in local mode, nothing to upload
-        if not self._upload_mgr:
-            return
+        self._copy_files_to_wd_mirror()
 
-        self.fs.mkdir(self._upload_mgr.prefix)
+        if self._upload_mgr:
+            self.fs.mkdir(self._upload_mgr.prefix)
 
-        self._upload_files_to_wd_mirror()
-
-        log.info('Copying other local files to %s' % self._upload_mgr.prefix)
-        for src_path, uri in self._upload_mgr.path_to_uri().items():
-            log.debug('  %s -> %s' % (src_path, uri))
-            self.fs.put(src_path, uri)
+            log.info('Copying other local files to %s' %
+                     self._upload_mgr.prefix)
+            for src_path, uri in self._upload_mgr.path_to_uri().items():
+                log.debug('  %s -> %s' % (src_path, uri))
+                self.fs.put(src_path, uri)
 
     def _wd_mirror(self):
         """A directory to upload files belonging to
         :py:attr:`_working_dir_mgr`. This will be a subdir of
         ``self._upload_mgr.prefix`, if it exists, and otherwise will
         be ``None``."""
-        if not (self._upload_mgr and self._upload_mgr.prefix):
+        if self._upload_mgr and self._upload_mgr.prefix:
+            return posixpath.join(self._upload_mgr.prefix, 'wd')
+        elif (self._has_spark_steps() and hasattr(self, '_spark_master')):
+            # TODO: can skip this if Spark master is local, though it's okay
+            # to just punt and pass in --files for local master to ignore
+            return os.path.join(self._get_local_tmp_dir(), 'wd-mirror')
+        else:
             return None
-
-        return posixpath.join(self._upload_mgr.prefix, 'wd')
 
     def _wd_filenames_must_match(self):
         """When we tell Hadoop/Spark to put files in the working directory,
@@ -1184,20 +1186,23 @@ class MRJobRunner(object):
         """Return the URI of where to upload *path* so it can appear in the
         working dir as *name*, or ``None`` if it doesn't need to be uploaded.
         """
-        # the only reason to re-upload a URI is if it has the wrong name
-        if is_uri(path) and (
-                posixpath.basename(path) == name or
-                not self._wd_filenames_must_match()):
-            return None
-
         dest_dir = self._wd_mirror()
         if not dest_dir:
             return None
 
+        # the only reason to re-upload a URI is if it has the wrong name
+        #
+        # similarly, the only point of a local working dir mirror is
+        # to rename things
+        if (is_uri(path) or not is_uri(dest_dir)) and (
+                posixpath.basename(path) == name or
+                not self._wd_filenames_must_match()):
+            return None
+
         return posixpath.join(dest_dir, name)
 
-    def _upload_file_to_wd_mirror(self, path, name):
-        """Upload *path* to the appropriate place in the working dir
+    def _copy_file_to_wd_mirror(self, path, name):
+        """Upload/copy *path* to the appropriate place in the working dir
         mirror, if necessary.
 
         We don't track whether something has already been uploaded.
@@ -1229,16 +1234,19 @@ class MRJobRunner(object):
             log.debug('  %s -> %s' % (path, dest))
             self.fs.put(path, dest)
 
-    def _upload_files_to_wd_mirror(self):
+    def _copy_files_to_wd_mirror(self):
         """Upload working archives/files (determined by *type*) to the
         working dir mirror, if necessary."""
         wd_mirror = self._wd_mirror()
         if not wd_mirror:
             return
 
-        log.info('uploading working dir files to %s...' % wd_mirror)
+        self.fs.mkdir(wd_mirror)
+
+        log.info('%s working dir files to %s...' %
+                 ('uploading' if is_uri(wd_mirror) else 'copying', wd_mirror))
         for name, path in sorted(self._working_dir_mgr.name_to_path().items()):
-            self._upload_file_to_wd_mirror(path, name)
+            self._copy_file_to_wd_mirror(path, name)
 
     def _upload_part_size(self):
         """Part size for uploads, in bytes, or ``None``,

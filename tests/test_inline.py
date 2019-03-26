@@ -286,6 +286,7 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
             blue=1, fish=4, one=1, red=1, two=1))
 
     def test_spark_job_failure(self):
+        # this is rather noisy, as it creates an error
         self.quiet_spark_context_logging()
 
         job = MRSparKaboom(['-r', 'inline'])
@@ -296,14 +297,18 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
         with job.make_runner() as runner:
             self.assertRaises(Py4JJavaError, runner.run)
 
-    @skip("JVM's current working dir can't be changed once it's started")
     def test_upload_files_with_rename(self):
         # see test_upload_files_with_rename() in test_local for comparison
 
         fish_path = self.makefile('fish', b'salmon')
         fowl_path = self.makefile('fowl', b'goose')
 
+        # --use-executor-cwd: Spark drivers may be using whatever working
+        # directory the JVM picked when it was started by some other test.
+        # get around this by passing the working directory of the executor
+        # (i.e. this Python process) through to the driver.
         job = MRSparkOSWalk(['-r', 'inline',
+                             '--use-executor-cwd',
                              '--file', fish_path + '#ghoti',
                              '--file', fowl_path])
         job.sandbox()
@@ -323,11 +328,11 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
                 file_sizes[path] = size
 
         # check that files were uploaded to working dir
-        self.assertIn('./fowl', file_sizes)
-        self.assertEqual(file_sizes['./fowl'], 5)
+        self.assertIn('fowl', file_sizes)
+        self.assertEqual(file_sizes['fowl'], 5)
 
-        self.assertIn('./ghoti', file_sizes)
-        self.assertEqual(file_sizes['./ghoti'], 6)
+        self.assertIn('ghoti', file_sizes)
+        self.assertEqual(file_sizes['ghoti'], 6)
 
         # fish was uploaded as "ghoti"
-        self.assertNotIn('./fish', file_sizes)
+        self.assertNotIn('fish', file_sizes)

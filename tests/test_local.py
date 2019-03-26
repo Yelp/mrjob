@@ -1177,14 +1177,14 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
                 file_sizes[path] = size
 
         # check that files were uploaded to working dir
-        self.assertIn('./fowl', file_sizes)
-        self.assertEqual(file_sizes['./fowl'], 5)
+        self.assertIn('fowl', file_sizes)
+        self.assertEqual(file_sizes['fowl'], 5)
 
-        self.assertIn('./ghoti', file_sizes)
-        self.assertEqual(file_sizes['./ghoti'], 6)
+        self.assertIn('ghoti', file_sizes)
+        self.assertEqual(file_sizes['ghoti'], 6)
 
         # fish was uploaded as "ghoti"
-        self.assertNotIn('./fish', file_sizes)
+        self.assertNotIn('fish', file_sizes)
 
 
     # TODO: add a Spark JAR to the repo, so we can test it

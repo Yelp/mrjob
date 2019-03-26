@@ -1146,10 +1146,10 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
         self.assertEqual(counts, dict(
             blue=1, fish=4, one=1, red=1, two=1))
 
-    def test_upload_file(self):
-        fish_path = self.makefile('fish', b'ghoti')
+    def test_upload_and_rename_file(self):
+        fish_path = self.makefile('fish', b'salmon')
 
-        job = MRSparkOSWalk(['-r', 'local', '--file', fish_path])
+        job = MRSparkOSWalk(['-r', 'local', '--file', fish_path + '#ghoti'])
         job.sandbox()
 
         file_sizes = {}
@@ -1161,7 +1161,7 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
                 path, size = safeeval(line)
                 file_sizes[path] = size
 
-        self.assertIn('./fish', file_sizes)
-        self.assertEqual(file_sizes['./fish'], 5)
+        self.assertIn('./ghoti', file_sizes)
+        self.assertEqual(file_sizes['./ghoti'], 6)
 
     # TODO: add a Spark JAR to the repo, so we can test it

@@ -25,17 +25,16 @@ class MRSparkOSWalk(MRJob):
         sc = SparkContext()
 
         rdd = sc.parallelize(['.'])
-        rdd = rdd.flatMap(walk_dir)
+        rdd = rdd.flatMap(self.walk_dir)
 
         rdd.saveAsTextFile(output_path)
 
-
-def walk_dir(dirname):
-    for dirpath, _, filenames in walk(dirname, followlinks=True):
-        for filename in filenames:
-            path = join(dirpath, filename)
-            size = getsize(path)
-            yield path, size
+    def walk_dir(self, dirname):
+        for dirpath, _, filenames in walk(dirname, followlinks=True):
+            for filename in filenames:
+                path = join(dirpath, filename)
+                size = getsize(path)
+                yield path, size
 
 
 if __name__ == '__main__':

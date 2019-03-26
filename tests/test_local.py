@@ -60,6 +60,7 @@ from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
@@ -1144,5 +1145,23 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
 
         self.assertEqual(counts, dict(
             blue=1, fish=4, one=1, red=1, two=1))
+
+    def test_upload_file(self):
+        fish_path = self.makefile('fish', b'ghoti')
+
+        job = MRSparkOSWalk(['-r', 'local', '--file', fish_path])
+        job.sandbox()
+
+        file_sizes = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                path, size = safeeval(line)
+                file_sizes[path] = size
+
+        self.assertIn('./fish', file_sizes)
+        self.assertEqual(file_sizes['./fish'], 5)
 
     # TODO: add a Spark JAR to the repo, so we can test it

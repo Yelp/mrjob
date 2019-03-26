@@ -340,6 +340,35 @@ def save_cwd():
 
 
 @contextmanager
+def save_sys_std():
+    """Context manager that saves the current values of `sys.stdin`,
+    `sys.stdout`, and `sys.stderr`, and flushes these filehandles before
+    and after switching them out."""
+
+    stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
+
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+        yield
+
+        # at this point, sys.stdout/stderr may have been patched. Don't
+        # raise an exception if flush() fails
+        try:
+            sys.stdout.flush()
+        except:
+            pass
+
+        try:
+            sys.stderr.flush()
+        except:
+            pass
+    finally:
+        sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
+
+
+@contextmanager
 def save_sys_path():
     """Context manager that saves sys.path and restores it after execution."""
     original_sys_path = list(sys.path)

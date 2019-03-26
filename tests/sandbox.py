@@ -33,6 +33,7 @@ except ImportError:
 
 import mrjob
 from mrjob import runner
+from mrjob.py2 import PY2
 from mrjob.util import NullHandler
 
 from tests.py2 import patch
@@ -190,8 +191,9 @@ class SingleSparkContextTestCase(BasicTestCase):
     def setUpClass(cls):
         super(SingleSparkContextTestCase, cls).setUpClass()
 
-        # don't warn about running processes or unclosed filehandles
-        filterwarnings('ignore', category=ResourceWarning)
+        if not PY2:
+            # ignore Python 3 warnings about unclosed filehandles
+            filterwarnings('ignore', category=ResourceWarning)
 
         from pyspark import SparkContext
         cls.spark_context = SparkContext()
@@ -205,8 +207,9 @@ class SingleSparkContextTestCase(BasicTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # don't warn about running processes or unclosed filehandles
-        filterwarnings('ignore', category=ResourceWarning)
+        if not PY2:
+            # ignore Python 3 warnings about unclosed filehandles
+            filterwarnings('ignore', category=ResourceWarning)
 
         cls.spark_context.stop()
 

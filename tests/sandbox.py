@@ -218,6 +218,15 @@ class SingleSparkContextTestCase(BasicTestCase):
     def setUp(self):
         super(SingleSparkContextTestCase, self).setUp()
 
+        cls = self.__class__
+        try:
+            cls.spark_context.attributeId
+        except AttributeError:
+            # spark context was destroyed due to an error
+            cls.spark_context.stop()
+            from pyspark import SparkContext
+            cls.spark_context = SparkContext()
+
         self.start(patch('pyspark.SparkContext',
                          return_value=self.spark_context))
 

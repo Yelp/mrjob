@@ -173,7 +173,7 @@ class MRJobLauncher(object):
         or basic help. Override to allow other kinds of help."""
         if options.runner:
             _print_help_for_runner(
-                self._runner_opt_names(), options.deprecated)
+                self._runner_opt_names_for_help(), options.deprecated)
         else:
             _print_basic_help(self.arg_parser,
                               self._usage(),
@@ -500,7 +500,7 @@ class MRJobLauncher(object):
             self._job_kwargs(),
         )
 
-    def _runner_opt_names(self):
+    def _runner_opt_names_for_help(self):
         opts = set(self._runner_class().OPT_NAMES)
 
         if self.options.runner == 'spark':

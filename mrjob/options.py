@@ -956,7 +956,7 @@ _RUNNER_OPTS = dict(
             (['--max-output-files'], dict(
                 help=('Maximum number of output files when running a'
                       ' streaming job on Spark; just runs rdd.coalesce()'
-                      ' before outputting files. Set to 0 to disable.'),
+                      ' before outputting files'),
                 type=int,
             )),
         ],

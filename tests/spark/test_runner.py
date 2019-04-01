@@ -273,6 +273,8 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
         self.start(mrjob_conf_patcher(
             dict(runners=dict(spark=dict(max_output_files=1)))))
 
+        log = self.start(patch('mrjob.runner.log'))
+
         job = MRWordFreqCount(['-r', 'spark'])
         job.sandbox(stdin=BytesIO(b'one two one\n two three\n'))
 
@@ -281,6 +283,8 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
             # by default there should be at least 2 output files
             self.assertNotEqual(self._num_output_files(runner), 1)
+
+        self.assertTrue(log.warning.called)
 
     def test_sort_values(self):
         job = MRSortAndGroup(['-r', 'spark'])

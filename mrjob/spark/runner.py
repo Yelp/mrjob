@@ -56,6 +56,9 @@ class SparkMRJobRunner(MRJobBinRunner):
     alias = 'spark'
 
     # other than ``spark_*``, these options are only used for filesystems
+    #
+    # max_output_files doesn't appear here because it can only be read from
+    # the command line, not mrjob.conf (see #2040)
     OPT_NAMES = MRJobBinRunner.OPT_NAMES | {
         'aws_access_key_id',
         'aws_secret_access_key',
@@ -64,7 +67,6 @@ class SparkMRJobRunner(MRJobBinRunner):
         'cloud_part_size_mb',
         'gcs_region',  # used when creating buckets on GCS
         'hadoop_bin',
-        'max_output_files',  # goes into self._max_output_files, not self._opts
         'project_id',  # used by GCS filesystem
         's3_endpoint',
         's3_region',  # only used along with s3_endpoint

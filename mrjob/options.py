@@ -951,6 +951,7 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    # Spark runner only, only passed in on the command line (see #2040)
     max_output_files=dict(
         switches=[
             (['--max-output-files'], dict(

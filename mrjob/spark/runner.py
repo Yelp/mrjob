@@ -64,7 +64,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         'cloud_part_size_mb',
         'gcs_region',  # used when creating buckets on GCS
         'hadoop_bin',
-        'max_output_files',
+        'max_output_files',  # goes into self._max_output_files, not self._opts
         'project_id',  # used by GCS filesystem
         's3_endpoint',
         's3_region',  # only used along with s3_endpoint
@@ -98,6 +98,8 @@ class SparkMRJobRunner(MRJobBinRunner):
         self._mrjob_cls = mrjob_cls
 
         super(SparkMRJobRunner, self).__init__(**kwargs)
+
+        self._max_output_files = max_output_files
 
         self._spark_tmp_dir = self._pick_spark_tmp_dir()
 
@@ -401,6 +403,11 @@ class SparkMRJobRunner(MRJobBinRunner):
         num_reducers = jobconf_from_dict(jobconf, 'mapreduce.job.reduces')
         if num_reducers and int(num_reducers) > 0:
             args.extend(['--num-reducers', str(num_reducers)])
+
+        # --max-output-files
+        if self._max_output_files:
+            args.extend(['--max-output-files',
+                         str(self._max_output_files)])
 
         return args
 

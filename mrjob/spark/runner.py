@@ -64,6 +64,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         'cloud_part_size_mb',
         'gcs_region',  # used when creating buckets on GCS
         'hadoop_bin',
+        'max_output_files',
         'project_id',  # used by GCS filesystem
         's3_endpoint',
         's3_region',  # only used along with s3_endpoint
@@ -78,9 +79,12 @@ class SparkMRJobRunner(MRJobBinRunner):
         'spark', 'spark_jar', 'spark_script', 'streaming',
     }
 
-    def __init__(self, mrjob_cls=None, **kwargs):
+    def __init__(self, max_output_files=None, mrjob_cls=None, **kwargs):
         """Create a spark runner
 
+        :param max_output_files: limit on number of output files when
+                                 running streaming jobs. Can only be
+                                 set on command line (not config file)
         :param mrjob_cls: class of the job you want to run. Used for
                           running streaming steps in Spark
 

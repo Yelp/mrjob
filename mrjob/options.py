@@ -951,6 +951,16 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    max_output_files=dict(
+        switches=[
+            (['--max-output-files'], dict(
+                help=('Maximum number of output files when running a'
+                      ' streaming job on Spark; just runs rdd.coalesce()'
+                      ' before outputting files. Set to 0 to disable.'),
+                type=int,
+            )),
+        ],
+    ),
     mins_to_end_of_hour=dict(
         cloud_role='launch',
         deprecated=True,

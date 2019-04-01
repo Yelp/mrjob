@@ -162,6 +162,14 @@ class SparkHarnessOutputComparisonBaseTestCase(
 
         return harness_job
 
+    def _count_output_files(self, runner):
+        return sum(
+            1
+            for f in listdir(runner.get_output_dir())
+            if f.startswith('part-')
+        )
+
+
 
 class SparkHarnessOutputComparisonTestCase(
         SparkHarnessOutputComparisonBaseTestCase):
@@ -401,25 +409,18 @@ class SparkHarnessOutputComparisonTestCase(
 
 class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
 
-    def _count_partitions_files(self, runner):
-        return sum(
-            1
-            for f in listdir(runner.get_output_dir())
-            if f.startswith('part')
-        )
-
     def _assert_partition_count_different(self, cls, num_reducers):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
         unlimited_job = self._harness_job(cls, input_bytes=input_bytes)
         with unlimited_job.make_runner() as runner:
             runner.run()
-            default_partitions = self._count_partitions_files(runner)
+            default_partitions = self._count_output_files(runner)
 
         job = self._harness_job(
             cls, input_bytes=input_bytes, num_reducers=num_reducers)
         with job.make_runner() as runner:
             runner.run()
-            part_files = self._count_partitions_files(runner)
+            part_files = self._count_output_files(runner)
 
         assert part_files != default_partitions
         assert part_files == num_reducers

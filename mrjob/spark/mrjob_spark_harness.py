@@ -64,12 +64,6 @@ _PASSTHRU_OPTIONS = [
         type=int,
         help=('Set number of reducers (and thus number of output files)')
     )),
-    (['--max-output-files'], dict(
-        default=None,
-        dest='max_output_files',
-        type=int,
-        help=('Directly limit number of output files, using coalesce()'),
-    )),
 ]
 
 
@@ -472,6 +466,14 @@ def _make_arg_parser():
     parser.add_argument(
         dest='output_path',
         help=('An empty directory to write output to. Can be a path or URI.'))
+
+    # can't put this in _PASSTHRU_OPTIONS because it's also a runner opt
+    parser.add_argument(
+        '--max-output-files',
+        dest='max_output_files',
+        type=int,
+        help='Directly limit number of output files, using coalesce()',
+    )
 
     for args, kwargs in _PASSTHRU_OPTIONS:
         parser.add_argument(*args, **kwargs)

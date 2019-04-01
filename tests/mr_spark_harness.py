@@ -37,6 +37,9 @@ class MRSparkHarness(MRJob):
         for args, kwargs in _PASSTHRU_OPTIONS:
             self.add_passthru_arg(*args, **kwargs)
 
+        # this is both a runner and harness switch
+        self.pass_arg_through('--max-output-files')
+
     def spark(self, input_path, output_path):
         harness_args = [
             self.options.job_class,input_path, output_path,

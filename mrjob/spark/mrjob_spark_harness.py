@@ -62,7 +62,13 @@ _PASSTHRU_OPTIONS = [
         default=None,
         dest='num_reducers',
         type=int,
-        help=('limit number of reducers and also number of final output files')
+        help=('Set number of reducers (and thus number of output files)')
+    )),
+    (['--max-output-files'], dict(
+        default=None,
+        dest='max_output_files',
+        type=int,
+        help=('Directly limit number of output files, using coalesce()'),
     )),
 ]
 
@@ -159,6 +165,10 @@ def main(cmd_line_args=None):
         # run steps
         for step_num, step in steps_to_run:
             rdd = _run_step(step, step_num, rdd, make_job, args.num_reducers)
+
+        # max_output_files: limit number of partitions
+        if args.max_output_files:
+            rdd = rdd.coalesce(args.max_output_files)
 
         # write the results
         if job.hadoop_output_format() is not None:

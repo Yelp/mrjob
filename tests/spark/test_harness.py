@@ -25,16 +25,16 @@ from os.path import join
 from tempfile import gettempdir
 from shutil import rmtree
 
+import mrjob.spark.harness
 from mrjob.examples.mr_nick_nack import MRNickNack
 from mrjob.examples.mr_nick_nack_input_format import \
     MRNickNackWithHadoopInputFormat
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
 from mrjob.protocol import TextProtocol
-from mrjob.spark import mrjob_spark_harness
-from mrjob.spark.mrjob_spark_harness import _run_combiner
-from mrjob.spark.mrjob_spark_harness import _run_reducer
-from mrjob.spark.mrjob_spark_harness import _shuffle_and_sort
+from mrjob.spark.harness import _run_combiner
+from mrjob.spark.harness import _run_reducer
+from mrjob.spark.harness import _shuffle_and_sort
 from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
@@ -112,7 +112,7 @@ class SparkHarnessOutputComparisonBaseTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
 
     def _spark_harness_path(self):
-        path = mrjob_spark_harness.__file__
+        path = mrjob.spark.harness.__file__
         if path.endswith('.pyc'):
             path = path[:-1]
         return path
@@ -327,7 +327,7 @@ class SparkHarnessOutputComparisonTestCase(
                                 input_bytes=input_bytes)
 
         # Given that the combiner for this job yields the count and 1000 for
-        # each word and the mrjob_spark_harness combiner_helper stops running
+        # each word and the Spark harness' combiner helper stops running
         # jobs' combiners if they do not reduce the mapper's output to a single
         # value per key, we expect the combiner to run once per word, resulting
         # in an extra 1000 being added to each word's count.

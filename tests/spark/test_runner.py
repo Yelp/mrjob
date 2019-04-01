@@ -206,7 +206,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
     # test that the spark harness works as expected.
     #
     # this runs tests similar to those in SparkHarnessOutputComparisonTestCase
-    # in tests/spark/test_mrjob_spark_harness.py.
+    # in tests/spark/test_harness.py.
 
     def test_basic_job(self):
         job = MRWordFreqCount(['-r', 'spark'])

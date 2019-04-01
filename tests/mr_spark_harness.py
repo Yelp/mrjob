@@ -11,12 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""A wrapper for mrjob_spark_harness.py, so we can test the harness with
+"""A wrapper for mrjob/spark/harness.py, so we can test the harness with
 the inline runner."""
 from mrjob.job import MRJob
 from mrjob.options import _parse_raw_args
-from mrjob.spark.mrjob_spark_harness import _PASSTHRU_OPTIONS
-from mrjob.spark.mrjob_spark_harness import main as harness_main
+from mrjob.spark.harness import _PASSTHRU_OPTIONS
+from mrjob.spark.harness import main as harness_main
 
 
 _PASSTHRU_OPTION_STRINGS = {

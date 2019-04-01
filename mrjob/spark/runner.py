@@ -21,6 +21,7 @@ from copy import deepcopy
 from subprocess import CalledProcessError
 from tempfile import gettempdir
 
+import mrjob.spark.harness
 from mrjob.bin import MRJobBinRunner
 from mrjob.cloud import _DEFAULT_CLOUD_PART_SIZE_MB
 from mrjob.conf import combine_dicts
@@ -41,7 +42,6 @@ from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
 from mrjob.py2 import to_unicode
 from mrjob.setup import UploadDirManager
-from mrjob.spark import mrjob_spark_harness
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import _create_zip_file
@@ -74,7 +74,7 @@ class SparkMRJobRunner(MRJobBinRunner):
     }
 
     # everything except Hadoop JARs
-    # streaming jobs will be run using mrjob_spark_harness.py (see #1972)
+    # streaming jobs will be run using mrjob/spark/harness.py (see #1972)
     _STEP_TYPES = {
         'spark', 'spark_jar', 'spark_script', 'streaming',
     }
@@ -406,7 +406,7 @@ class SparkMRJobRunner(MRJobBinRunner):
 
     def _spark_harness_path(self):
         """Where to find the Spark harness."""
-        path = mrjob_spark_harness.__file__
+        path = mrjob.spark.harness.__file__
         if path.endswith('.pyc'):
             path = path[:-1]
         return path

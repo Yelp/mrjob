@@ -1,3 +1,6 @@
+v0.6.8, 2019-04-?? -- Spark runner
+ * Spark harness renamed to mrjob/spark/harness.py
+
 v0.6.7, 2019-01-16 -- mrjob spark-submit
  * tools:
    * added mrjob spark-submit subcommand (#1382)

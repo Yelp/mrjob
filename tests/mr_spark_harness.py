@@ -21,6 +21,8 @@ from mrjob.spark.harness import main as harness_main
 
 _PASSTHRU_OPTION_STRINGS = {
     arg for args, kwargs in _PASSTHRU_OPTIONS for arg in args}
+# handled separately because this is also a runner option
+_PASSTHRU_OPTION_STRINGS.add('--max-output-files')
 
 
 class MRSparkHarness(MRJob):

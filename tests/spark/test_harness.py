@@ -131,7 +131,7 @@ class SparkHarnessOutputComparisonBaseTestCase(
                      runner_alias='inline', compression_codec=None,
                      job_args=None, spark_conf=None, first_step_num=None,
                      last_step_num=None, counter_output_dir=None,
-                     num_reducers=None):
+                     num_reducers=None, max_output_files=None):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -155,6 +155,10 @@ class SparkHarnessOutputComparisonBaseTestCase(
             harness_job_args.extend(
                 ['--num-reducers', str(num_reducers)])
 
+        if max_output_files is not None:
+            harness_job_args.extend(
+                ['--max-output-files', str(max_output_files)])
+
         harness_job_args.extend(input_paths)
 
         harness_job = MRSparkHarness(harness_job_args)
@@ -169,13 +173,9 @@ class SparkHarnessOutputComparisonBaseTestCase(
             if f.startswith('part-')
         )
 
-
-
-class SparkHarnessOutputComparisonTestCase(
-        SparkHarnessOutputComparisonBaseTestCase):
-
     def _assert_output_matches(
-            self, job_class, input_bytes=b'', input_paths=(), job_args=[]):
+            self, job_class, input_bytes=b'', input_paths=(), job_args=[],
+            num_reducers=None, max_output_files=None):
 
         # run classes defined in this module in inline mode, classes
         # with their own script files in local mode. used by
@@ -199,7 +199,9 @@ class SparkHarnessOutputComparisonTestCase(
         harness_job = self._harness_job(
             job_class, input_bytes=input_bytes,
             input_paths=input_paths,
-            job_args=job_args)
+            job_args=job_args,
+            max_output_files=max_output_files,
+            num_reducers=num_reducers)
 
         with harness_job.make_runner() as runner:
             runner.run()
@@ -208,6 +210,9 @@ class SparkHarnessOutputComparisonTestCase(
 
         self.assertEqual(harness_output, reference_output)
 
+
+class SparkHarnessOutputComparisonTestCase(
+        SparkHarnessOutputComparisonBaseTestCase):
 
     def test_basic_job(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
@@ -445,6 +450,64 @@ class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
     def test_combiner_more_reducer(self):
         self._assert_partition_count_different(
             MRWordFreqCountWithCombinerCmd, num_reducers=10)
+
+
+class MaxOutputFilesTestCase(SparkHarnessOutputComparisonBaseTestCase):
+
+    def test_single_output_file(self):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = self._harness_job(
+            MRWordFreqCount,
+            input_bytes=input_bytes,
+            max_output_files=1)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(self._count_output_files(runner), 1)
+
+    def test_can_reduce_number_of_output_files(self):
+        # use num_reducers to ratchet up number of output files
+
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = self._harness_job(
+            MRWordFreqCount,
+            input_bytes=input_bytes,
+            num_reducers=5,
+            max_output_files=3)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(self._count_output_files(runner), 3)
+
+    def test_cant_increase_number_of_output_files(self):
+        # use num_reducers to ratchet up number of output files
+
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        job = self._harness_job(
+            MRWordFreqCount,
+            input_bytes=input_bytes,
+            num_reducers=5,
+            max_output_files=10)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(self._count_output_files(runner), 5)
+
+    def test_does_not_perturb_job_output(self):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        self._assert_output_matches(
+            MRWordFreqCount, input_bytes=input_bytes, max_output_files=1)
+
+        self._assert_output_matches(
+            MRWordFreqCount, input_bytes=input_bytes,
+            num_reducers=5, max_output_files=3)
 
 
 class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):

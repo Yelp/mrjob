@@ -48,6 +48,7 @@ from tests.py2 import ANY
 from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
+from tests.sandbox import mrjob_conf_patcher
 
 
 class MockFilesystemsTestCase(
@@ -206,7 +207,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
     # test that the spark harness works as expected.
     #
     # this runs tests similar to those in SparkHarnessOutputComparisonTestCase
-    # in tests/spark/test_mrjob_spark_harness.py.
+    # in tests/spark/test_harness.py.
 
     def test_basic_job(self):
         job = MRWordFreqCount(['-r', 'spark'])
@@ -241,6 +242,11 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             self.assertEqual(dict(job.parse_output(runner.cat_output())),
                              dict(fa=1, la=8))
 
+    def _num_output_files(self, runner):
+        return sum(
+            1 for f in listdir(runner.get_output_dir())
+            if f.startswith('part-'))
+
     def test_num_reducers(self):
         jobconf_args = [
             '--jobconf' , 'mapreduce.job.reduces=1'
@@ -248,12 +254,37 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
         job = MRWordFreqCount(['-r', 'spark'] + jobconf_args)
         job.sandbox(stdin=BytesIO(b'one two one\n two three\n'))
+
         with job.make_runner() as runner:
             runner.run()
-            num_output_files = sum(
-                1 for f in listdir(runner.get_output_dir())
-                if f.startswith('part'))
-        self.assertEqual(num_output_files, 1)
+
+            self.assertEqual(self._num_output_files(runner), 1)
+
+    def test_max_output_files(self):
+        job = MRWordFreqCount(['-r', 'spark', '--max-output-files', '1'])
+        job.sandbox(stdin=BytesIO(b'one two one\n two three\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(self._num_output_files(runner), 1)
+
+    def test_max_output_files_is_cmd_line_only(self):
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(spark=dict(max_output_files=1)))))
+
+        log = self.start(patch('mrjob.runner.log'))
+
+        job = MRWordFreqCount(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(b'one two one\n two three\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # by default there should be at least 2 output files
+            self.assertNotEqual(self._num_output_files(runner), 1)
+
+        self.assertTrue(log.warning.called)
 
     def test_sort_values(self):
         job = MRSortAndGroup(['-r', 'spark'])

@@ -173,7 +173,7 @@ class MRJobLauncher(object):
         or basic help. Override to allow other kinds of help."""
         if options.runner:
             _print_help_for_runner(
-                self._runner_opt_names(), options.deprecated)
+                self._runner_opt_names_for_help(), options.deprecated)
         else:
             _print_basic_help(self.arg_parser,
                               self._usage(),
@@ -500,8 +500,15 @@ class MRJobLauncher(object):
             self._job_kwargs(),
         )
 
-    def _runner_opt_names(self):
-        return self._runner_class().OPT_NAMES
+    def _runner_opt_names_for_help(self):
+        opts = set(self._runner_class().OPT_NAMES)
+
+        if self.options.runner == 'spark':
+            # specific to Spark runner, but command-line only, so it doesn't
+            # appear in SparkMRJobRunner.OPT_NAMES (see #2040)
+            opts.add('max_output_files')
+
+        return opts
 
     def _non_option_kwargs(self):
         """Keyword arguments to runner constructor that can't be set
@@ -529,12 +536,15 @@ class MRJobLauncher(object):
                         extra_args.append(option_string)
                     extra_args.extend(args)
 
+        # max_output_files is added by _add_runner_args() but can only
+        # be set from the command line, so we add it here (see #2040)
         return dict(
             conf_paths=self.options.conf_paths,
             extra_args=extra_args,
             hadoop_input_format=self.hadoop_input_format(),
             hadoop_output_format=self.hadoop_output_format(),
             input_paths=self.options.args,
+            max_output_files=self.options.max_output_files,
             mr_job_script=self._script_path,
             output_dir=self.options.output_dir,
             partitioner=self.partitioner(),

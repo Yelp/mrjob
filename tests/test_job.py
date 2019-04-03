@@ -1304,6 +1304,14 @@ class PrintHelpTestCase(SandboxedTestCase):
         for alias in _RUNNER_ALIASES:
             MRJob(['--help', '-r', alias])
 
+    def test_spark_runner_help_includes_max_output_files(self):
+        MRJob(['--help', '-r', 'spark'])
+        self.exit.assert_called_once_with(0)
+
+        output = self.stdout.getvalue()
+        # not a proper opt, but should appear with spark runner switches
+        self.assertIn('--max-output-files', output)
+
     def test_steps_help(self):
         MRJob(['--help', '--steps'])
         self.exit.assert_called_once_with(0)

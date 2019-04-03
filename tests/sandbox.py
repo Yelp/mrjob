@@ -184,37 +184,42 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
 
 @skipIf(pyspark is None, 'no pyspark module')
 class SingleSparkContextTestCase(BasicTestCase):
-    """Ensure that each test case gets a fresh SparkContext and JVM.
-    """
-    def stop_active_spark_context(self):
+    """Only create a single SparkContext, to speed things up and prevent
+    errors from attempting to instantiate multiple contexts."""
+
+    @classmethod
+    def setUpClass(cls):
+        super(SingleSparkContextTestCase, cls).setUpClass()
+
+        if not PY2:
+            # ignore Python 3 warnings about unclosed filehandles
+            filterwarnings('ignore', category=ResourceWarning)
+
         from pyspark import SparkContext
+        cls.spark_context = SparkContext()
 
-        with SparkContext._lock:
-            if SparkContext._active_spark_context:
-                SparkContext._active_spark_context.stop()
+        try:
+            cls.spark_context.setLogLevel('FATAL')
+        except:
+            # tearDownClass() won't be called if there's an exception
+            cls.spark_context.stop()
+            raise
 
-    def quiet_spark_context_logging(self):
-        from pyspark import SparkContext
+    @classmethod
+    def tearDownClass(cls):
+        if not PY2:
+            # ignore Python 3 warnings about unclosed filehandles
+            filterwarnings('ignore', category=ResourceWarning)
 
-        def quiet_SparkContext(*args, **kwargs):
-            sc = SparkContext(*args, **kwargs)
-            sc.setLogLevel('FATAL')
+        cls.spark_context.stop()
 
-            return sc
-
-        self.start(patch('pyspark.SparkContext',
-                         side_effect=quiet_SparkContext))
+        super(SingleSparkContextTestCase, cls).tearDownClass()
 
     def setUp(self):
         super(SingleSparkContextTestCase, self).setUp()
 
-        if not PY2:
-            # ignore Python 3 warnings about unclosed filehandles
-            # (unittest resets warnings for every test)
-            filterwarnings('ignore', category=ResourceWarning)
-
-        self.addCleanup(self.stop_active_spark_context)
-        self.stop_active_spark_context()
+        self.start(patch('pyspark.SparkContext',
+                         return_value=self.spark_context))
 
 
 def mrjob_pythonpath():

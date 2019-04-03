@@ -62,7 +62,7 @@ _PASSTHRU_OPTIONS = [
         default=None,
         dest='num_reducers',
         type=int,
-        help=('limit number of reducers and also number of final output files')
+        help=('Set number of reducers (and thus number of output files)')
     )),
 ]
 
@@ -159,6 +159,10 @@ def main(cmd_line_args=None):
         # run steps
         for step_num, step in steps_to_run:
             rdd = _run_step(step, step_num, rdd, make_job, args.num_reducers)
+
+        # max_output_files: limit number of partitions
+        if args.max_output_files:
+            rdd = rdd.coalesce(args.max_output_files)
 
         # write the results
         if job.hadoop_output_format() is not None:
@@ -462,6 +466,14 @@ def _make_arg_parser():
     parser.add_argument(
         dest='output_path',
         help=('An empty directory to write output to. Can be a path or URI.'))
+
+    # can't put this in _PASSTHRU_OPTIONS because it's also a runner opt
+    parser.add_argument(
+        '--max-output-files',
+        dest='max_output_files',
+        type=int,
+        help='Directly limit number of output files, using coalesce()',
+    )
 
     for args, kwargs in _PASSTHRU_OPTIONS:
         parser.add_argument(*args, **kwargs)

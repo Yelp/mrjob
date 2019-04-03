@@ -11,16 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""A wrapper for mrjob_spark_harness.py, so we can test the harness with
+"""A wrapper for mrjob/spark/harness.py, so we can test the harness with
 the inline runner."""
 from mrjob.job import MRJob
 from mrjob.options import _parse_raw_args
-from mrjob.spark.mrjob_spark_harness import _PASSTHRU_OPTIONS
-from mrjob.spark.mrjob_spark_harness import main as harness_main
+from mrjob.spark.harness import _PASSTHRU_OPTIONS
+from mrjob.spark.harness import main as harness_main
 
 
 _PASSTHRU_OPTION_STRINGS = {
     arg for args, kwargs in _PASSTHRU_OPTIONS for arg in args}
+# handled separately because this is also a runner option
+_PASSTHRU_OPTION_STRINGS.add('--max-output-files')
 
 
 class MRSparkHarness(MRJob):
@@ -36,6 +38,9 @@ class MRSparkHarness(MRJob):
 
         for args, kwargs in _PASSTHRU_OPTIONS:
             self.add_passthru_arg(*args, **kwargs)
+
+        # this is both a runner and harness switch
+        self.pass_arg_through('--max-output-files')
 
     def spark(self, input_path, output_path):
         harness_args = [

@@ -98,6 +98,7 @@ class MRJobRunner(object):
         'label',
         'libjars',
         'local_tmp_dir',
+        # no max_output_files because it doesn't go in self._opts
         'owner',
         'py_files',
         'read_logs',

@@ -21,6 +21,7 @@ from copy import deepcopy
 from subprocess import CalledProcessError
 from tempfile import gettempdir
 
+import mrjob.spark.harness
 from mrjob.bin import MRJobBinRunner
 from mrjob.cloud import _DEFAULT_CLOUD_PART_SIZE_MB
 from mrjob.conf import combine_dicts
@@ -41,7 +42,6 @@ from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
 from mrjob.py2 import to_unicode
 from mrjob.setup import UploadDirManager
-from mrjob.spark import mrjob_spark_harness
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import _create_zip_file
@@ -56,6 +56,9 @@ class SparkMRJobRunner(MRJobBinRunner):
     alias = 'spark'
 
     # other than ``spark_*``, these options are only used for filesystems
+    #
+    # max_output_files doesn't appear here because it can only be read from
+    # the command line, not mrjob.conf (see #2040)
     OPT_NAMES = MRJobBinRunner.OPT_NAMES | {
         'aws_access_key_id',
         'aws_secret_access_key',
@@ -73,14 +76,17 @@ class SparkMRJobRunner(MRJobBinRunner):
     }
 
     # everything except Hadoop JARs
-    # streaming jobs will be run using mrjob_spark_harness.py (see #1972)
+    # streaming jobs will be run using mrjob/spark/harness.py (see #1972)
     _STEP_TYPES = {
         'spark', 'spark_jar', 'spark_script', 'streaming',
     }
 
-    def __init__(self, mrjob_cls=None, **kwargs):
+    def __init__(self, max_output_files=None, mrjob_cls=None, **kwargs):
         """Create a spark runner
 
+        :param max_output_files: limit on number of output files when
+                                 running streaming jobs. Can only be
+                                 set on command line (not config file)
         :param mrjob_cls: class of the job you want to run. Used for
                           running streaming steps in Spark
 
@@ -94,6 +100,8 @@ class SparkMRJobRunner(MRJobBinRunner):
         self._mrjob_cls = mrjob_cls
 
         super(SparkMRJobRunner, self).__init__(**kwargs)
+
+        self._max_output_files = max_output_files
 
         self._spark_tmp_dir = self._pick_spark_tmp_dir()
 
@@ -398,11 +406,16 @@ class SparkMRJobRunner(MRJobBinRunner):
         if num_reducers and int(num_reducers) > 0:
             args.extend(['--num-reducers', str(num_reducers)])
 
+        # --max-output-files
+        if self._max_output_files:
+            args.extend(['--max-output-files',
+                         str(self._max_output_files)])
+
         return args
 
     def _spark_harness_path(self):
         """Where to find the Spark harness."""
-        path = mrjob_spark_harness.__file__
+        path = mrjob.spark.harness.__file__
         if path.endswith('.pyc'):
             path = path[:-1]
         return path

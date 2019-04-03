@@ -43,6 +43,7 @@ from mrjob.examples.mr_sparkaboom import MRSparKaboom
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.local import _sort_lines_in_memory
+from mrjob.parse import is_uri
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import safeeval
@@ -60,6 +61,7 @@ from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
@@ -1144,5 +1146,45 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
 
         self.assertEqual(counts, dict(
             blue=1, fish=4, one=1, red=1, two=1))
+
+    def test_upload_files_with_rename(self):
+        fish_path = self.makefile('fish', b'salmon')
+        fowl_path = self.makefile('fowl', b'goose')
+
+        job = MRSparkOSWalk(['-r', 'local',
+                             '--file', fish_path + '#ghoti',
+                             '--file', fowl_path])
+        job.sandbox()
+
+        file_sizes = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # check working dir mirror
+            wd_mirror = runner._wd_mirror()
+            self.assertIsNotNone(wd_mirror)
+            self.assertFalse(is_uri(wd_mirror))
+
+            self.assertTrue(os.path.exists(wd_mirror))
+            # only files which needed to be renamed should be in wd_mirror
+            self.assertTrue(os.path.exists(os.path.join(wd_mirror, 'ghoti')))
+            self.assertFalse(os.path.exists(os.path.join(wd_mirror, 'fish')))
+            self.assertFalse(os.path.exists(os.path.join(wd_mirror, 'fowl')))
+
+            for line in to_lines(runner.cat_output()):
+                path, size = safeeval(line)
+                file_sizes[path] = size
+
+        # check that files were uploaded to working dir
+        self.assertIn('fowl', file_sizes)
+        self.assertEqual(file_sizes['fowl'], 5)
+
+        self.assertIn('ghoti', file_sizes)
+        self.assertEqual(file_sizes['ghoti'], 6)
+
+        # fish was uploaded as "ghoti"
+        self.assertNotIn('fish', file_sizes)
+
 
     # TODO: add a Spark JAR to the repo, so we can test it

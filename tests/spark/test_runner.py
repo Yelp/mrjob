@@ -40,6 +40,7 @@ from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
@@ -49,6 +50,10 @@ from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
+
+# a --spark-master that has a working directory and is available from pyspark
+# (the local runner uses a local-cluster master to run spark steps)
+_LOCAL_CLUSTER_MASTER = 'local-cluster[2,1,4096]'
 
 
 class MockFilesystemsTestCase(
@@ -200,6 +205,54 @@ class SparkRunnerSparkStepsTestCase(MockFilesystemsTestCase):
             blue=1, fish=4, one=1, red=1, two=1))
 
     # TODO: add a Spark JAR to the repo, so we can test it
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class SparkWorkingDirTestCase(MockFilesystemsTestCase):
+
+    def test_upload_files_with_rename(self):
+        # see test_upload_files_with_rename() in test_local for comparison
+
+        fish_path = self.makefile('fish', b'salmon')
+        fowl_path = self.makefile('fowl', b'goose')
+
+        # use _LOCAL_CLUSTER_MASTER because the default master (local[*])
+        # doesn't have a working directory
+        job = MRSparkOSWalk(['-r', 'spark',
+                             '--spark-master', _LOCAL_CLUSTER_MASTER,
+                             '--file', fish_path + '#ghoti',
+                             '--file', fowl_path])
+        job.sandbox()
+
+        file_sizes = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # check working dir mirror
+            wd_mirror = runner._wd_mirror()
+            self.assertIsNotNone(wd_mirror)
+            self.assertFalse(is_uri(wd_mirror))
+
+            self.assertTrue(exists(wd_mirror))
+            # only files which needed to be renamed should be in wd_mirror
+            self.assertTrue(exists(join(wd_mirror, 'ghoti')))
+            self.assertFalse(exists(join(wd_mirror, 'fish')))
+            self.assertFalse(exists(join(wd_mirror, 'fowl')))
+
+            for line in to_lines(runner.cat_output()):
+                path, size = safeeval(line)
+                file_sizes[path] = size
+
+        # check that files were uploaded to working dir
+        self.assertIn('fowl', file_sizes)
+        self.assertEqual(file_sizes['fowl'], 5)
+
+        self.assertIn('ghoti', file_sizes)
+        self.assertEqual(file_sizes['ghoti'], 6)
+
+        # fish was uploaded as "ghoti"
+        self.assertNotIn('fish', file_sizes)
 
 
 @skipIf(pyspark is None, 'no pyspark module')
@@ -432,9 +485,6 @@ class GroupStepsTestCase(MockFilesystemsTestCase):
             call(ANY, 1, 2),
             call(ANY, 3, 3),
         ])
-
-
-# TODO: test uploading files and setting up working dir once we fix #1922
 
 
 class SparkCounterSimulationTestCase(MockFilesystemsTestCase):

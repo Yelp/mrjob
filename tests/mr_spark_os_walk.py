@@ -26,7 +26,7 @@ class MRSparkOSWalk(MRJob):
         super(MRSparkOSWalk, self).configure_args()
 
         self.add_passthru_arg(
-            '--use-executor-cwd', dest='use_executor_cwd',
+            '--use-driver-cwd', dest='use_driver_cwd',
             default=False, action='store_true')
 
     def spark(self, input_paths, output_path):
@@ -35,9 +35,10 @@ class MRSparkOSWalk(MRJob):
 
         # we'd like to walk the executor's directory. However, when running
         # directly through pyspark (inline runner), there's no way to restart
-        # the JVM with a new CWD, so instead we walk the executor's directory
-        # (which drivers are *supposed* to match, if they have a fresh JVM)
-        if self.options.use_executor_cwd:
+        # the JVM with a new CWD, so instead we walk the driver's directory
+        # (which executors *would* match on local master if we had a fresh
+        # JVM)
+        if self.options.use_driver_cwd:
             cwd = getcwd()
         else:
             cwd = '.'

@@ -303,12 +303,10 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
         fish_path = self.makefile('fish', b'salmon')
         fowl_path = self.makefile('fowl', b'goose')
 
-        # --use-executor-cwd: Spark drivers may be using whatever working
-        # directory the JVM picked when it was started by some other test.
-        # get around this by passing the working directory of the executor
-        # (i.e. this Python process) through to the driver.
+        # --use-driver-cwd gets around issues with the shared JVM not changing
+        # executors' working directory to match the driver on local master
         job = MRSparkOSWalk(['-r', 'inline',
-                             '--use-executor-cwd',
+                             '--use-driver-cwd',
                              '--file', fish_path + '#ghoti',
                              '--file', fowl_path])
         job.sandbox()

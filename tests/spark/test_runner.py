@@ -487,9 +487,6 @@ class GroupStepsTestCase(MockFilesystemsTestCase):
         ])
 
 
-# TODO: test uploading files and setting up working dir once we fix #1922
-
-
 class SparkCounterSimulationTestCase(MockFilesystemsTestCase):
     # trying to keep number of tests small, since they run actual Spark jobs
 

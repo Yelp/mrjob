@@ -286,9 +286,6 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
             blue=1, fish=4, one=1, red=1, two=1))
 
     def test_spark_job_failure(self):
-        # this is rather noisy, as it creates an error
-        self.quiet_spark_context_logging()
-
         job = MRSparKaboom(['-r', 'inline'])
         job.sandbox(stdin=BytesIO(b'line\n'))
 

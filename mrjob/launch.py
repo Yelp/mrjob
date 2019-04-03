@@ -335,11 +335,22 @@ class MRJobLauncher(object):
         option, but with the local name of the file in the script's working
         directory.
 
-        We suggest against sending Berkeley DBs to your job, as
-        Berkeley DB is not forwards-compatible (so a Berkeley DB that you
-        construct on your computer may not be readable from within
-        Hadoop). Use SQLite databases instead. If all you need is an on-disk
-        hash table, try out the :py:mod:`sqlite3dbm` module.
+        .. note::
+
+           If you pass a file to a job, best practice is to lazy-load its
+           contents (e.g. make a method that opens the file the first time
+           you call it) rather than loading it in your job's constructor or
+           :py:meth:`load_args`. Not only is this more efficient, it's
+           necessary if you want to run your job in a Spark executor
+           (because the file may not be in the same place in a Spark driver).
+
+        .. note::
+
+           We suggest against sending Berkeley DBs to your job, as
+           Berkeley DB is not forwards-compatible (so a Berkeley DB that you
+           construct on your computer may not be readable from within
+           Hadoop). Use SQLite databases instead. If all you need is an on-disk
+           hash table, try out the :py:mod:`sqlite3dbm` module.
 
         .. versionchanged:: 0.6.6
 

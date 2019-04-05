@@ -128,7 +128,7 @@ class MRJobFileOptionsTestCase(SandboxedTestCase):
 
     def test_with_input_file_option(self):
         mr_job = MRCustomFileOptionJob(
-            ['-r', 'inline', '--platform_file', self.input_file_path])
+            ['-r', 'inline', '--platform-file', self.input_file_path])
         mr_job.sandbox(stdin=BytesIO(b'1\n'))
 
         with mr_job.make_runner() as runner:
@@ -165,7 +165,7 @@ class MRCustomFileOptionJob(MRJob):
 
     def configure_args(self):
         super(MRCustomFileOptionJob, self).configure_args()
-        self.add_file_arg('--platform_file')
+        self.add_file_arg('--platform-file')
 
     def mapper_init(self):
         with open(self.options.platform_file) as f:

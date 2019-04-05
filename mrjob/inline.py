@@ -188,3 +188,12 @@ class InlineMRJobRunner(SimMRJobRunner):
         """Get step descriptions without calling a subprocess."""
         job_args = ['--steps'] + self._mr_job_extra_args(local=True)
         return self._mrjob_cls(args=job_args)._steps_desc()
+
+    def _spark_executors_have_own_wd(self):
+        return True  # because we fake it
+
+    def _spark_driver_has_own_wd(self):
+        return True  # because we fake it
+
+    def _wd_mirror(self):
+        return None  # no need for this, we set up the working dir (Spark too)

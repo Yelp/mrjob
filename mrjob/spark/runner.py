@@ -387,11 +387,10 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         # --job-args (passthrough args)
 
-        # on local (but not local-cluster) Spark master, just use the actual
-        # path of the file, since they don't support a working directory
-        master_is_local = (self._spark_master().split('[')[0] == 'local')
+        # if on local[*] master, keep file upload args as-is (see #2031)
+        local = not self._spark_executors_have_own_wd()
+        job_args = self._mr_job_extra_args(local=local)
 
-        job_args = self._mr_job_extra_args(local=master_is_local)
         if job_args:
             args.extend(['--job-args', cmd_line(job_args)])
 

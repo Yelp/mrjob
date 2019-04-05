@@ -913,6 +913,30 @@ class MRJobRunner(object):
         return any(_is_pyspark_step_type(step['type'])
                    for step in self._get_steps())
 
+    def _spark_master(self):
+        return self._opts.get('spark_master') or 'local[*]'
+
+    def _spark_deploy_mode(self):
+        return self._opts.get('spark_deploy_mode') or 'client'
+
+    def _spark_driver_has_own_wd(self):
+        """Does the spark driver have a working directory different
+        from the one *spark-submit* was run in?
+
+        (Only true in cluster mode.)
+        """
+        return (self._spark_deploy_mode() == 'cluster' and
+                self._spark_executors_have_own_wd())
+
+    def _spark_executors_have_own_wd(self):
+        """Do spark executors have a working directory different
+        from the one *spark-submit* was run in?
+
+        (True on everything but local.)
+        """
+        # note: local-cluster[...] master does in fact have working dirs
+        self._spark_master().split('[')[0] == 'local'
+
     def _args_for_task(self, step_num, mrc):
         return [
             '--step-num=%d' % step_num,
@@ -948,11 +972,14 @@ class MRJobRunner(object):
         step = self._get_step(step_num)
 
         if step['type'] == 'spark':
+            # if on local[*] master, keep file upload args as-is (see #2031)
+            local = not self._spark_executors_have_own_wd()
+
             args = (
                 [
                     '--step-num=%d' % step_num,
                     '--spark',
-                ] + self._mr_job_extra_args() + [
+                ] + self._mr_job_extra_args(local=local) + [
                     INPUT,
                     OUTPUT,
                 ]
@@ -1167,9 +1194,7 @@ class MRJobRunner(object):
         be ``None``."""
         if self._upload_mgr and self._upload_mgr.prefix:
             return posixpath.join(self._upload_mgr.prefix, 'wd')
-        elif (self._has_spark_steps() and hasattr(self, '_spark_master')):
-            # TODO: can skip this if Spark master is local, though it's okay
-            # to just punt and pass in --files for local master to ignore
+        elif (self._has_spark_steps() and self._spark_executors_have_own_wd()):
             return os.path.join(self._get_local_tmp_dir(), 'wd-mirror')
         else:
             return None

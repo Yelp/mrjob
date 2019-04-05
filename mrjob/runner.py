@@ -935,7 +935,7 @@ class MRJobRunner(object):
         (True on everything but local.)
         """
         # note: local-cluster[...] master does in fact have working dirs
-        self._spark_master().split('[')[0] == 'local'
+        return self._spark_master().split('[')[0] != 'local'
 
     def _args_for_task(self, step_num, mrc):
         return [

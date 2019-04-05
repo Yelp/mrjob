@@ -23,6 +23,7 @@ try:
 except ImportError:
     pyspark = None
 
+from mrjob.examples.mr_most_used_word import MRMostUsedWord
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
 from mrjob.examples.mr_sparkaboom import MRSparKaboom
@@ -394,7 +395,29 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
                 ]
             )
 
-    # TODO: add test of file upload args once we fix #1922
+    def test_file_args(self):
+        input_bytes = (b'Market Song:\n'
+                       b'To market, to market, to buy a fat pig.\n'
+                       b'Home again, home again, jiggety-jig')
+
+        # deliberately collide with FILES = ['stop_words.txt']
+        #
+        # Make "market" a stop word too, so that "home" is most common
+        stop_words_file = self.makefile(
+            'stop_words.txt',
+            b'again\nmarket\nto\n')
+
+        job = MRMostUsedWord(['-r', 'spark',
+                              '--spark-master', _LOCAL_CLUSTER_MASTER,
+                              '--stop-words-file', stop_words_file])
+        job.sandbox(stdin=BytesIO(input_bytes))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = b''.join(runner.cat_output()).strip()
+
+            self.assertEqual(output, b'"home"')
 
 
 class RunnerIgnoresJobKwargsTestCase(MockFilesystemsTestCase):

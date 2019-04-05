@@ -386,7 +386,12 @@ class SparkMRJobRunner(MRJobBinRunner):
                      '--last-step-num', str(last_step_num)])
 
         # --job-args (passthrough args)
-        job_args = self._mr_job_extra_args()
+
+        # on local (but not local-cluster) Spark master, just use the actual
+        # path of the file, since they don't support a working directory
+        master_is_local = (self._spark_master().split('[')[0] == 'local')
+
+        job_args = self._mr_job_extra_args(local=master_is_local)
         if job_args:
             args.extend(['--job-args', cmd_line(job_args)])
 

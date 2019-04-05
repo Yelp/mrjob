@@ -395,7 +395,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
                 ]
             )
 
-    def test_file_args(self):
+    def _test_file_args(self, spark_master):
         input_bytes = (b'Market Song:\n'
                        b'To market, to market, to buy a fat pig.\n'
                        b'Home again, home again, jiggety-jig')
@@ -408,7 +408,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             b'again\nmarket\nto\n')
 
         job = MRMostUsedWord(['-r', 'spark',
-                              '--spark-master', _LOCAL_CLUSTER_MASTER,
+                              '--spark-master', spark_master,
                               '--stop-words-file', stop_words_file])
         job.sandbox(stdin=BytesIO(input_bytes))
 
@@ -418,6 +418,13 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             output = b''.join(runner.cat_output()).strip()
 
             self.assertEqual(output, b'"home"')
+
+
+    def test_file_args_with_working_dir(self):
+        self._test_file_args(_LOCAL_CLUSTER_MASTER)
+
+    def test_file_args_without_working_dir(self):
+        self._test_file_args('local[*]')
 
 
 class RunnerIgnoresJobKwargsTestCase(MockFilesystemsTestCase):

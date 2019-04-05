@@ -419,3 +419,13 @@ class SparkMRJobRunner(MRJobBinRunner):
         if path.endswith('.pyc'):
             path = path[:-1]
         return path
+
+    def _has_spark_steps(self):
+        """Treat streaming steps as Spark steps."""
+        return (super(SparkMRJobRunner, self)._has_spark_steps() or
+                self._has_streaming_steps())
+
+    def _has_pyspark_steps(self):
+        """Treat streaming steps as Spark steps that use Python."""
+        return (super(SparkMRJobRunner, self)._has_pyspark_steps() or
+                self._has_streaming_steps())

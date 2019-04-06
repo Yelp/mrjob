@@ -2,6 +2,7 @@
 # Copyright 2009-2010 Yelp
 # Copyright 2013 David Marin
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,10 +20,11 @@
 Shows how to do a multi-step job, and how to load a support file
 from the same directory.
 """
+import re
+
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 from mrjob.step import MRStep
-import re
 
 WORD_RE = re.compile(r"[\w']+")
 
@@ -32,8 +34,21 @@ class MRMostUsedWord(MRJob):
 
     OUTPUT_PROTOCOL = JSONValueProtocol
 
+    def configure_args(self):
+        super(MRMostUsedWord, self).configure_args()
+
+        # allow for alternate stop words file
+        self.add_file_arg(
+            '--stop-words-file',
+            dest='stop_words_file',
+            default=None,
+            help='alternate stop words file. lowercase words, one per line',
+        )
+
     def mapper_init(self):
-        with open('stop_words.txt') as f:
+        stop_words_path = self.options.stop_words_file or 'stop_words.txt'
+
+        with open(stop_words_path) as f:
             self.stop_words = set(line.strip() for line in f)
 
     def mapper_get_words(self, _, line):
@@ -41,7 +56,7 @@ class MRMostUsedWord(MRJob):
         for word in WORD_RE.findall(line):
             word = word.lower()
             if word not in self.stop_words:
-                yield (word.lower(), 1)
+                yield (word, 1)
 
     def combiner_count_words(self, word, counts):
         # sum the words we've seen so far

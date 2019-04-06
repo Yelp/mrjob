@@ -51,10 +51,7 @@ from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
-
-# a --spark-master that has a working directory and is available from pyspark
-# (the local runner uses a local-cluster master to run spark steps)
-_LOCAL_CLUSTER_MASTER = 'local-cluster[2,1,4096]'
+from tests.test_bin import _LOCAL_CLUSTER_MASTER
 
 
 class MockFilesystemsTestCase(

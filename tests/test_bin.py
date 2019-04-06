@@ -60,12 +60,14 @@ from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 
-
 # used to match command lines
 if PY2:
     PYTHON_BIN = 'python'
 else:
     PYTHON_BIN = 'python3'
+
+# a --spark-master that has a working directory and is available from pyspark
+_LOCAL_CLUSTER_MASTER = 'local-cluster[2,1,4096]'
 
 
 def _mock_upload_mgr():
@@ -1551,6 +1553,7 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
 
         job = MRNullSpark([
             '-r', 'spark',
+            '--spark-master', _LOCAL_CLUSTER_MASTER,
             '--extra-file', qux_path,  # file upload arg
         ])
         job.sandbox()
@@ -1561,12 +1564,33 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--master', _LOCAL_CLUSTER_MASTER,
                     '--deploy-mode', 'client',
                     '--files',
                     runner._dest_in_wd_mirror(qux_path, 'qux'),
                 ]
             )
+
+    def test_no_file_args_when_no_working_dir(self):
+        qux_path = self.makefile('qux')
+
+        job = MRNullSpark([
+            '-r', 'spark',
+            '--extra-file', qux_path,  # file upload arg
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
+                ]
+            )
+
+            # no working directory, so no need for a mirror
+            self.assertIsNone(runner._wd_mirror())
 
     def test_override_spark_upload_args_method(self):
         # just confirm that _spark_submit_args() uses _spark_upload_args()

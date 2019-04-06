@@ -1192,7 +1192,7 @@ class MRJobRunner(object):
         :py:attr:`_working_dir_mgr`. This will be a subdir of
         ``self._upload_mgr.prefix`, if it exists, and otherwise will
         be ``None``."""
-        if self._upload_mgr and self._upload_mgr.prefix:
+        if self._upload_mgr and is_uri(self._upload_mgr.prefix):
             return posixpath.join(self._upload_mgr.prefix, 'wd')
         elif (self._has_spark_steps() and self._spark_executors_have_own_wd()):
             return os.path.join(self._get_local_tmp_dir(), 'wd-mirror')

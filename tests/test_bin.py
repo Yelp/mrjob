@@ -1548,12 +1548,12 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
                 ]
             )
 
-    def test_file_upload_args(self):
+    def test_file_upload_args_in_cloud(self):
         qux_path = self.makefile('qux')
 
         job = MRNullSpark([
             '-r', 'spark',
-            '--spark-master', _LOCAL_CLUSTER_MASTER,
+            '--spark-master', 'mock',
             '--extra-file', qux_path,  # file upload arg
         ])
         job.sandbox()
@@ -1564,10 +1564,32 @@ class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', _LOCAL_CLUSTER_MASTER,
+                    '--master', 'mock',
                     '--deploy-mode', 'client',
                     '--files',
-                    runner._dest_in_wd_mirror(qux_path, 'qux'),
+                    runner._dest_in_wd_mirror(qux_path, 'qux')
+                ]
+            )
+
+    def test_file_upload_args_on_local_cluster(self):
+        qux_path = self.makefile('qux')
+
+        job = MRNullSpark([
+            '-r', 'spark',
+            '--spark-master', _LOCAL_CLUSTER_MASTER,
+            '--extra-file', qux_path,  # file upload arg
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._copy_files_to_wd_mirror()
+
+            self.assertEqual(
+                runner._spark_submit_args(0), [
+                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--master', _LOCAL_CLUSTER_MASTER,
+                    '--deploy-mode', 'client',
+                    '--files', qux_path,
                 ]
             )
 

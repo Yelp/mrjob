@@ -28,6 +28,14 @@ from pyspark.accumulators import AccumulatorParam
 # in this directory but has since been moved to tests/. Totally fine to
 # inline this stuff and reduplicate it in mr_spark_harness.py
 _PASSTHRU_OPTIONS = [
+    (['--steps-desc'], dict(
+        default=None,
+        dest='steps_desc',
+        help=("Description of job's steps, in JSON format. Optional, but "
+              " may be necessary for jobs that read from file upload args"
+              " in their constructor (since the driver won't be able to "
+              " see the files)")
+    )),
     (['--job-args'], dict(
         default=None,
         dest='job_args',
@@ -107,13 +115,17 @@ def main(cmd_line_args=None):
         job_args = []
 
     # get job steps. don't pass --steps, which is deprecated
-    job = job_class(job_args)
-    steps = job.steps()
+    if args.steps_desc:
+        steps_desc = json.loads(args.steps_desc)
+    else:
+        job = job_class(job_args)
+        steps = job.steps()
+        steps_desc = [step.description() for step in steps]
 
     # pick steps
     start = args.first_step_num or 0
     end = None if args.last_step_num is None else args.last_step_num + 1
-    steps_to_run = list(enumerate(steps))[start:end]
+    steps_to_run = list(enumerate(steps_desc))[start:end]
 
     sc = SparkContext()
 
@@ -157,8 +169,9 @@ def main(cmd_line_args=None):
             rdd = sc.textFile(args.input_path, use_unicode=False)
 
         # run steps
-        for step_num, step in steps_to_run:
-            rdd = _run_step(step, step_num, rdd, make_job, args.num_reducers)
+        for step_num, step_desc in steps_to_run:
+            rdd = _run_step(step_desc, step_num, rdd,
+                            make_job, args.num_reducers)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
@@ -189,9 +202,8 @@ def main(cmd_line_args=None):
             )
 
 
-def _run_step(step, step_num, rdd, make_job, num_reducers=None):
+def _run_step(step_desc, step_num, rdd, make_job, num_reducers=None):
     """Run the given step on the RDD and return the transformed RDD."""
-    step_desc = step.description(step_num)
     _check_step(step_desc, step_num)
 
     # create a separate job instance for each substep. This contains

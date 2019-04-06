@@ -126,7 +126,7 @@ def main(cmd_line_args=None):
     else:
         job_args = []
 
-    # determine hadoop_*_format, steps_desc
+    # determine hadoop_*_format, steps
     # try to avoid instantiating a job in the driver; see #2044
     job = None
 
@@ -144,14 +144,14 @@ def main(cmd_line_args=None):
 
     if args.steps_desc is None:
         job = job or job_class(job_args)
-        steps_desc = [step.description() for step in job.steps()]
+        steps = [step.description() for step in job.steps()]
     else:
-        steps_desc = json.loads(args.steps_desc)
+        steps = json.loads(args.steps_desc)
 
     # pick steps
     start = args.first_step_num or 0
     end = None if args.last_step_num is None else args.last_step_num + 1
-    steps_to_run = list(enumerate(steps_desc))[start:end]
+    steps_to_run = list(enumerate(steps))[start:end]
 
     sc = SparkContext()
 
@@ -195,8 +195,8 @@ def main(cmd_line_args=None):
             rdd = sc.textFile(args.input_path, use_unicode=False)
 
         # run steps
-        for step_num, step_desc in steps_to_run:
-            rdd = _run_step(step_desc, step_num, rdd,
+        for step_num, step in steps_to_run:
+            rdd = _run_step(step, step_num, rdd,
                             make_mrc_job, args.num_reducers)
 
         # max_output_files: limit number of partitions
@@ -228,15 +228,15 @@ def main(cmd_line_args=None):
             )
 
 
-def _run_step(step_desc, step_num, rdd, make_mrc_job, num_reducers=None):
+def _run_step(step, step_num, rdd, make_mrc_job, num_reducers=None):
     """Run the given step on the RDD and return the transformed RDD."""
-    _check_step(step_desc, step_num)
+    _check_step(step, step_num)
 
     # create a separate job instance for each substep. This contains
     # *step_num* (in ``job.options.step_num``) and ensures that
     # ``job.is_task()`` is set to true
     mapper_job, reducer_job, combiner_job = (
-        make_mrc_job(mrc, step_num) if step_desc.get(mrc) else None
+        make_mrc_job(mrc, step_num) if step.get(mrc) else None
         for mrc in ('mapper', 'reducer', 'combiner')
     )
 
@@ -244,7 +244,7 @@ def _run_step(step_desc, step_num, rdd, make_mrc_job, num_reducers=None):
     # already screens out mappers and reducers that do, but combiners
     # are optional)
     try:
-        _check_substep(step_desc, step_num, 'combiner')
+        _check_substep(step, step_num, 'combiner')
     except NotImplementedError:
         combiner_job = None
 
@@ -454,35 +454,35 @@ def _discard_key_and_flatten_values(rdd, sort_values=False):
     return rdd.flatMap(map_f, preservesPartitioning=True)
 
 
-def _check_step(step_desc, step_num):
+def _check_step(step, step_num):
     """Check that the given step description is for a MRStep
     with no input manifest"""
-    if step_desc.get('type') != 'streaming':
+    if step.get('type') != 'streaming':
         raise ValueError(
             'step %d has unexpected type: %r' % (
-                step_num, step_desc.get('type')))
+                step_num, step.get('type')))
 
-    if step_desc.get('input_manifest'):
+    if step.get('input_manifest'):
         raise NotImplementedError(
             'step %d uses an input manifest, which is unsupported')
 
     for mrc in ('mapper', 'reducer'):
-        _check_substep(step_desc, step_num, mrc)
+        _check_substep(step, step_num, mrc)
 
 
-def _check_substep(step_desc, step_num, mrc):
+def _check_substep(step, step_num, mrc):
     """Raise :py:class:`NotImplementedError` if the given substep
     (e.g. ``'mapper'``) runs subprocesses."""
-    substep_desc = step_desc.get(mrc)
-    if not substep_desc:
+    substep = step.get(mrc)
+    if not substep:
         return
 
-    if substep_desc.get('type') != 'script':
+    if substep.get('type') != 'script':
         raise NotImplementedError(
             "step %d's %s has unexpected type: %r" % (
-                step_num, mrc, substep_desc.get('type')))
+                step_num, mrc, substep.get('type')))
 
-    if substep_desc.get('pre_filter'):
+    if substep.get('pre_filter'):
         raise NotImplementedError(
             "step %d's %s has pre-filter, which is unsupported" % (
                 step_num, mrc))

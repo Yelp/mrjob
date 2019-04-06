@@ -1091,7 +1091,7 @@ class SparkScriptPathTestCase(GenericLocalRunnerTestCase):
                 runner._spark_script_path, 0)
 
 
-class SparkSubmitArgsTestCase(GenericLocalRunnerTestCase):
+class SparkSubmitArgsTestCase(SandboxedTestCase):
     # mostly testing on the spark runner because it doesn't override
     # _spark_submit_args(), _spark_master(), or _spark_deploy_mode()
 

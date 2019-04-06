@@ -386,7 +386,11 @@ class SparkMRJobRunner(MRJobBinRunner):
                      '--last-step-num', str(last_step_num)])
 
         # --job-args (passthrough args)
-        job_args = self._mr_job_extra_args()
+
+        # if on local[*] master, keep file upload args as-is (see #2031)
+        local = not self._spark_executors_have_own_wd()
+        job_args = self._mr_job_extra_args(local=local)
+
         if job_args:
             args.extend(['--job-args', cmd_line(job_args)])
 
@@ -419,3 +423,13 @@ class SparkMRJobRunner(MRJobBinRunner):
         if path.endswith('.pyc'):
             path = path[:-1]
         return path
+
+    def _has_spark_steps(self):
+        """Treat streaming steps as Spark steps."""
+        return (super(SparkMRJobRunner, self)._has_spark_steps() or
+                self._has_streaming_steps())
+
+    def _has_pyspark_steps(self):
+        """Treat streaming steps as Spark steps that use Python."""
+        return (super(SparkMRJobRunner, self)._has_pyspark_steps() or
+                self._has_streaming_steps())

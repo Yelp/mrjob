@@ -23,6 +23,8 @@ try:
 except ImportError:
     pyspark = None
 
+from mrjob.examples.mr_most_used_word import MRMostUsedWord
+from mrjob.examples.mr_spark_most_used_word import MRSparkMostUsedWord
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
 from mrjob.examples.mr_sparkaboom import MRSparKaboom
@@ -50,10 +52,7 @@ from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
-
-# a --spark-master that has a working directory and is available from pyspark
-# (the local runner uses a local-cluster master to run spark steps)
-_LOCAL_CLUSTER_MASTER = 'local-cluster[2,1,4096]'
+from tests.test_bin import _LOCAL_CLUSTER_MASTER
 
 
 class MockFilesystemsTestCase(
@@ -394,7 +393,42 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
                 ]
             )
 
-    # TODO: add test of file upload args once we fix #1922
+    def _test_file_upload_args(self, job_class, spark_master):
+        input_bytes = (b'Market Song:\n'
+                       b'To market, to market, to buy a fat pig.\n'
+                       b'Home again, home again, jiggety-jig')
+
+        # deliberately collide with FILES = ['stop_words.txt']
+        #
+        # Make "market" a stop word too, so that "home" is most common
+        stop_words_file = self.makefile(
+            'stop_words.txt',
+            b'again\nmarket\nto\n')
+
+        job = job_class(['-r', 'spark',
+                         '--spark-master', spark_master,
+                         '--stop-words-file', stop_words_file])
+        job.sandbox(stdin=BytesIO(input_bytes))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = b''.join(runner.cat_output()).strip()
+
+            self.assertEqual(output, b'"home"')
+
+
+    def test_streaming_step_file_upload_args_with_working_dir(self):
+        self._test_file_upload_args(MRMostUsedWord, _LOCAL_CLUSTER_MASTER)
+
+    def test_streaming_step_file_upload_args_without_working_dir(self):
+        self._test_file_upload_args(MRMostUsedWord, 'local[*]')
+
+    def test_spark_step_file_upload_args_with_working_dir(self):
+        self._test_file_upload_args(MRSparkMostUsedWord, _LOCAL_CLUSTER_MASTER)
+
+    def test_spark_step_file_upload_args_without_working_dir(self):
+        self._test_file_upload_args(MRSparkMostUsedWord, 'local[*]')
 
 
 class RunnerIgnoresJobKwargsTestCase(MockFilesystemsTestCase):

@@ -28,14 +28,6 @@ from pyspark.accumulators import AccumulatorParam
 # in this directory but has since been moved to tests/. Totally fine to
 # inline this stuff and reduplicate it in mr_spark_harness.py
 _PASSTHRU_OPTIONS = [
-    (['--steps-desc'], dict(
-        default=None,
-        dest='steps_desc',
-        help=("Description of job's steps, in JSON format. Optional, but "
-              " may be necessary for jobs that read from file upload args"
-              " in their constructor (since the driver won't be able to "
-              " see the files)")
-    )),
     (['--job-args'], dict(
         default=None,
         dest='job_args',
@@ -71,6 +63,26 @@ _PASSTHRU_OPTIONS = [
         dest='num_reducers',
         type=int,
         help=('Set number of reducers (and thus number of output files)')
+    )),
+    # switches to deal with jobs that can't be instantiated in the Spark
+    # driver (e.g. because of problems with file upload args). See #2044
+    (['--steps-desc'], dict(
+        default=None,
+        dest='steps_desc',
+        help=("Description of job's steps, in JSON format (otherwise,"
+              " we'll instantiate a job and ask it"),
+    )),
+    (['--hadoop-input-format'], dict(
+        default=None,
+        dest='hadoop_input_format',
+        help=("Hadoop input format class. Set to '' to indicate no"
+              " format (otherwise we'll instantiate a job and ask it"),
+    )),
+    (['--hadoop-output-format'], dict(
+        default=None,
+        dest='hadoop_output_format',
+        help=("Hadoop output format class. Set to '' to indicate no"
+              " format (otherwise we'll instantiate a job and ask it"),
     )),
 ]
 
@@ -114,13 +126,27 @@ def main(cmd_line_args=None):
     else:
         job_args = []
 
-    # get job steps. don't pass --steps, which is deprecated
-    if args.steps_desc:
-        steps_desc = json.loads(args.steps_desc)
+    # determine hadoop_*_format, steps_desc
+    # try to avoid instantiating a job in the driver; see #2044
+    job = None
+
+    if args.hadoop_input_format is None:
+        job = job or job_class(job_args)
+        hadoop_input_format = job.hadoop_input_format()
     else:
-        job = job_class(job_args)
-        steps = job.steps()
-        steps_desc = [step.description() for step in steps]
+        hadoop_input_format = args.hadoop_input_format or None
+
+    if args.hadoop_output_format is None:
+        job = job or job_class(job_args)
+        hadoop_output_format = job.hadoop_output_format()
+    else:
+        hadoop_output_format = args.hadoop_output_format or None
+
+    if args.steps_desc is None:
+        job = job or job_class(job_args)
+        steps_desc = [step.description() for step in job.steps()]
+    else:
+        steps_desc = json.loads(args.steps_desc)
 
     # pick steps
     start = args.first_step_num or 0
@@ -143,7 +169,7 @@ def main(cmd_line_args=None):
 
         return increment_counter
 
-    def make_job(mrc, step_num):
+    def make_mrc_job(mrc, step_num):
         j = job_class(job_args + [
             '--%s' % mrc, '--step-num=%d' % step_num
         ])
@@ -154,16 +180,16 @@ def main(cmd_line_args=None):
         return j
 
     try:
-        if job.hadoop_input_format() is not None:
+        if hadoop_input_format:
             rdd = sc.hadoopFile(
                 args.input_path,
                 inputFormatClass=job.hadoop_input_format(),
                 keyClass='org.apache.hadoop.io.Text',
                 valueClass='org.apache.hadoop.io.Text')
 
-            # hadoopFile loads each line as a key-value pair in which the contents
-            # of the line are the key and the value is an empty string. Convert to
-            # an rdd of just lines, encoded as bytes.
+            # hadoopFile loads each line as a key-value pair in which the
+            # contents of the line are the key and the value is an empty
+            # string. Convert to an rdd of just lines, encoded as bytes.
             rdd = rdd.map(lambda kv: kv[0].encode('utf-8'))
         else:
             rdd = sc.textFile(args.input_path, use_unicode=False)
@@ -171,16 +197,16 @@ def main(cmd_line_args=None):
         # run steps
         for step_num, step_desc in steps_to_run:
             rdd = _run_step(step_desc, step_num, rdd,
-                            make_job, args.num_reducers)
+                            make_mrc_job, args.num_reducers)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
             rdd = rdd.coalesce(args.max_output_files)
 
         # write the results
-        if job.hadoop_output_format() is not None:
-            # saveAsHadoopFile takes an rdd of key-value pairs, so convert to that
-            # format
+        if hadoop_output_format:
+            # saveAsHadoopFile takes an rdd of key-value pairs, so convert to
+            # that format
             rdd = rdd.map(lambda line: tuple(
                 x.decode('utf-8') for x in line.split(b'\t', 1)))
             rdd.saveAsHadoopFile(
@@ -202,7 +228,7 @@ def main(cmd_line_args=None):
             )
 
 
-def _run_step(step_desc, step_num, rdd, make_job, num_reducers=None):
+def _run_step(step_desc, step_num, rdd, make_mrc_job, num_reducers=None):
     """Run the given step on the RDD and return the transformed RDD."""
     _check_step(step_desc, step_num)
 
@@ -210,7 +236,7 @@ def _run_step(step_desc, step_num, rdd, make_job, num_reducers=None):
     # *step_num* (in ``job.options.step_num``) and ensures that
     # ``job.is_task()`` is set to true
     mapper_job, reducer_job, combiner_job = (
-        make_job(mrc, step_num) if step_desc.get(mrc) else None
+        make_mrc_job(mrc, step_num) if step_desc.get(mrc) else None
         for mrc in ('mapper', 'reducer', 'combiner')
     )
 

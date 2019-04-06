@@ -37,6 +37,7 @@ from mrjob.py2 import PY2
 from mrjob.util import NullHandler
 
 from tests.py2 import patch
+from tests.py2 import MagicMock
 
 
 # simple config that also silences 'no config options for runner' logging
@@ -198,11 +199,15 @@ class SingleSparkContextTestCase(BasicTestCase):
         from pyspark import SparkContext
         cls.spark_context = SparkContext()
 
+        # move stop() so that scripts can't call it
+        cls.spark_context.really_stop = cls.spark_context.stop
+        cls.spark_context.stop = MagicMock()
+
         try:
             cls.spark_context.setLogLevel('FATAL')
         except:
             # tearDownClass() won't be called if there's an exception
-            cls.spark_context.stop()
+            cls.spark_context.really_stop()
             raise
 
     @classmethod
@@ -211,7 +216,7 @@ class SingleSparkContextTestCase(BasicTestCase):
             # ignore Python 3 warnings about unclosed filehandles
             filterwarnings('ignore', category=ResourceWarning)
 
-        cls.spark_context.stop()
+        cls.spark_context.really_stop()
 
         super(SingleSparkContextTestCase, cls).tearDownClass()
 

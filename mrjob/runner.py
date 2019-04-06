@@ -913,6 +913,30 @@ class MRJobRunner(object):
         return any(_is_pyspark_step_type(step['type'])
                    for step in self._get_steps())
 
+    def _spark_master(self):
+        return self._opts.get('spark_master') or 'local[*]'
+
+    def _spark_deploy_mode(self):
+        return self._opts.get('spark_deploy_mode') or 'client'
+
+    def _spark_driver_has_own_wd(self):
+        """Does the spark driver have a working directory different
+        from the one *spark-submit* was run in?
+
+        (Only true in cluster mode.)
+        """
+        return (self._spark_deploy_mode() == 'cluster' and
+                self._spark_executors_have_own_wd())
+
+    def _spark_executors_have_own_wd(self):
+        """Do spark executors have a working directory different
+        from the one *spark-submit* was run in?
+
+        (True on everything but local.)
+        """
+        # note: local-cluster[...] master does in fact have working dirs
+        return self._spark_master().split('[')[0] != 'local'
+
     def _args_for_task(self, step_num, mrc):
         return [
             '--step-num=%d' % step_num,
@@ -948,11 +972,14 @@ class MRJobRunner(object):
         step = self._get_step(step_num)
 
         if step['type'] == 'spark':
+            # if on local[*] master, keep file upload args as-is (see #2031)
+            local = not self._spark_executors_have_own_wd()
+
             args = (
                 [
                     '--step-num=%d' % step_num,
                     '--spark',
-                ] + self._mr_job_extra_args() + [
+                ] + self._mr_job_extra_args(local=local) + [
                     INPUT,
                     OUTPUT,
                 ]
@@ -1149,28 +1176,28 @@ class MRJobRunner(object):
                 self._upload_mgr.add(path)
 
     def _upload_local_files(self):
-        # in local mode, nothing to upload
-        if not self._upload_mgr:
-            return
+        self._copy_files_to_wd_mirror()
 
-        self.fs.mkdir(self._upload_mgr.prefix)
+        if self._upload_mgr:
+            self.fs.mkdir(self._upload_mgr.prefix)
 
-        self._upload_files_to_wd_mirror()
-
-        log.info('Copying other local files to %s' % self._upload_mgr.prefix)
-        for src_path, uri in self._upload_mgr.path_to_uri().items():
-            log.debug('  %s -> %s' % (src_path, uri))
-            self.fs.put(src_path, uri)
+            log.info('Copying other local files to %s' %
+                     self._upload_mgr.prefix)
+            for src_path, uri in self._upload_mgr.path_to_uri().items():
+                log.debug('  %s -> %s' % (src_path, uri))
+                self.fs.put(src_path, uri)
 
     def _wd_mirror(self):
         """A directory to upload files belonging to
         :py:attr:`_working_dir_mgr`. This will be a subdir of
         ``self._upload_mgr.prefix`, if it exists, and otherwise will
         be ``None``."""
-        if not (self._upload_mgr and self._upload_mgr.prefix):
+        if self._upload_mgr and is_uri(self._upload_mgr.prefix):
+            return posixpath.join(self._upload_mgr.prefix, 'wd')
+        elif (self._has_spark_steps() and self._spark_executors_have_own_wd()):
+            return os.path.join(self._get_local_tmp_dir(), 'wd-mirror')
+        else:
             return None
-
-        return posixpath.join(self._upload_mgr.prefix, 'wd')
 
     def _wd_filenames_must_match(self):
         """When we tell Hadoop/Spark to put files in the working directory,
@@ -1185,20 +1212,23 @@ class MRJobRunner(object):
         """Return the URI of where to upload *path* so it can appear in the
         working dir as *name*, or ``None`` if it doesn't need to be uploaded.
         """
-        # the only reason to re-upload a URI is if it has the wrong name
-        if is_uri(path) and (
-                posixpath.basename(path) == name or
-                not self._wd_filenames_must_match()):
-            return None
-
         dest_dir = self._wd_mirror()
         if not dest_dir:
             return None
 
+        # the only reason to re-upload a URI is if it has the wrong name
+        #
+        # similarly, the only point of a local working dir mirror is
+        # to rename things
+        if (is_uri(path) or not is_uri(dest_dir)) and (
+                posixpath.basename(path) == name or
+                not self._wd_filenames_must_match()):
+            return None
+
         return posixpath.join(dest_dir, name)
 
-    def _upload_file_to_wd_mirror(self, path, name):
-        """Upload *path* to the appropriate place in the working dir
+    def _copy_file_to_wd_mirror(self, path, name):
+        """Upload/copy *path* to the appropriate place in the working dir
         mirror, if necessary.
 
         We don't track whether something has already been uploaded.
@@ -1230,16 +1260,19 @@ class MRJobRunner(object):
             log.debug('  %s -> %s' % (path, dest))
             self.fs.put(path, dest)
 
-    def _upload_files_to_wd_mirror(self):
+    def _copy_files_to_wd_mirror(self):
         """Upload working archives/files (determined by *type*) to the
         working dir mirror, if necessary."""
         wd_mirror = self._wd_mirror()
         if not wd_mirror:
             return
 
-        log.info('uploading working dir files to %s...' % wd_mirror)
+        self.fs.mkdir(wd_mirror)
+
+        log.info('%s working dir files to %s...' %
+                 ('uploading' if is_uri(wd_mirror) else 'copying', wd_mirror))
         for name, path in sorted(self._working_dir_mgr.name_to_path().items()):
-            self._upload_file_to_wd_mirror(path, name)
+            self._copy_file_to_wd_mirror(path, name)
 
     def _upload_part_size(self):
         """Part size for uploads, in bytes, or ``None``,

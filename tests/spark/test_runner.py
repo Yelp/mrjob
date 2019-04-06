@@ -23,6 +23,8 @@ try:
 except ImportError:
     pyspark = None
 
+from mrjob.examples.mr_most_used_word import MRMostUsedWord
+from mrjob.examples.mr_spark_most_used_word import MRSparkMostUsedWord
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
 from mrjob.examples.mr_sparkaboom import MRSparKaboom
@@ -40,6 +42,7 @@ from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
@@ -49,6 +52,7 @@ from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
+from tests.test_bin import _LOCAL_CLUSTER_MASTER
 
 
 class MockFilesystemsTestCase(
@@ -203,6 +207,54 @@ class SparkRunnerSparkStepsTestCase(MockFilesystemsTestCase):
 
 
 @skipIf(pyspark is None, 'no pyspark module')
+class SparkWorkingDirTestCase(MockFilesystemsTestCase):
+
+    def test_upload_files_with_rename(self):
+        # see test_upload_files_with_rename() in test_local for comparison
+
+        fish_path = self.makefile('fish', b'salmon')
+        fowl_path = self.makefile('fowl', b'goose')
+
+        # use _LOCAL_CLUSTER_MASTER because the default master (local[*])
+        # doesn't have a working directory
+        job = MRSparkOSWalk(['-r', 'spark',
+                             '--spark-master', _LOCAL_CLUSTER_MASTER,
+                             '--file', fish_path + '#ghoti',
+                             '--file', fowl_path])
+        job.sandbox()
+
+        file_sizes = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # check working dir mirror
+            wd_mirror = runner._wd_mirror()
+            self.assertIsNotNone(wd_mirror)
+            self.assertFalse(is_uri(wd_mirror))
+
+            self.assertTrue(exists(wd_mirror))
+            # only files which needed to be renamed should be in wd_mirror
+            self.assertTrue(exists(join(wd_mirror, 'ghoti')))
+            self.assertFalse(exists(join(wd_mirror, 'fish')))
+            self.assertFalse(exists(join(wd_mirror, 'fowl')))
+
+            for line in to_lines(runner.cat_output()):
+                path, size = safeeval(line)
+                file_sizes[path] = size
+
+        # check that files were uploaded to working dir
+        self.assertIn('fowl', file_sizes)
+        self.assertEqual(file_sizes['fowl'], 5)
+
+        self.assertIn('ghoti', file_sizes)
+        self.assertEqual(file_sizes['ghoti'], 6)
+
+        # fish was uploaded as "ghoti"
+        self.assertNotIn('fish', file_sizes)
+
+
+@skipIf(pyspark is None, 'no pyspark module')
 class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
     # test that the spark harness works as expected.
     #
@@ -341,7 +393,42 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
                 ]
             )
 
-    # TODO: add test of file upload args once we fix #1922
+    def _test_file_upload_args(self, job_class, spark_master):
+        input_bytes = (b'Market Song:\n'
+                       b'To market, to market, to buy a fat pig.\n'
+                       b'Home again, home again, jiggety-jig')
+
+        # deliberately collide with FILES = ['stop_words.txt']
+        #
+        # Make "market" a stop word too, so that "home" is most common
+        stop_words_file = self.makefile(
+            'stop_words.txt',
+            b'again\nmarket\nto\n')
+
+        job = job_class(['-r', 'spark',
+                         '--spark-master', spark_master,
+                         '--stop-words-file', stop_words_file])
+        job.sandbox(stdin=BytesIO(input_bytes))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = b''.join(runner.cat_output()).strip()
+
+            self.assertEqual(output, b'"home"')
+
+
+    def test_streaming_step_file_upload_args_with_working_dir(self):
+        self._test_file_upload_args(MRMostUsedWord, _LOCAL_CLUSTER_MASTER)
+
+    def test_streaming_step_file_upload_args_without_working_dir(self):
+        self._test_file_upload_args(MRMostUsedWord, 'local[*]')
+
+    def test_spark_step_file_upload_args_with_working_dir(self):
+        self._test_file_upload_args(MRSparkMostUsedWord, _LOCAL_CLUSTER_MASTER)
+
+    def test_spark_step_file_upload_args_without_working_dir(self):
+        self._test_file_upload_args(MRSparkMostUsedWord, 'local[*]')
 
 
 class RunnerIgnoresJobKwargsTestCase(MockFilesystemsTestCase):
@@ -432,9 +519,6 @@ class GroupStepsTestCase(MockFilesystemsTestCase):
             call(ANY, 1, 2),
             call(ANY, 3, 3),
         ])
-
-
-# TODO: test uploading files and setting up working dir once we fix #1922
 
 
 class SparkCounterSimulationTestCase(MockFilesystemsTestCase):

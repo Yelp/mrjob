@@ -1833,7 +1833,7 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
             ['-r', 'hadoop',
              '--setup', 'make -f Makefile#',
              '--file', 'foo',
-             '--spark-master', 'local',
+             '--spark-master', _LOCAL_CLUSTER_MASTER,
              ])
         job.sandbox()
 

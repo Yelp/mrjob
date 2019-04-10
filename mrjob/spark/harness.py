@@ -252,8 +252,8 @@ def _run_step(step, step_num, rdd, make_mrc_job, num_reducers=None):
     # is SORT_VALUES enabled?
     sort_values = reducer_job.sort_values() if reducer_job else False
 
-    if mapper_job:
-        rdd = _run_mapper(mapper_job, rdd)
+    if step.get('mapper'):
+        rdd = _run_mapper(make_mrc_job, step_num, rdd)
 
     if combiner_job:
         # _run_combiner() includes shuffle-and-sort
@@ -271,7 +271,7 @@ def _run_step(step, step_num, rdd, make_mrc_job, num_reducers=None):
     return rdd
 
 
-def _run_mapper(mapper_job, rdd):
+def _run_mapper(make_mrc_job, step_num, rdd):
     """Run our job's mapper.
 
     :param mapper_job: an instance of our job, instantiated to be the mapper
@@ -279,27 +279,28 @@ def _run_mapper(mapper_job, rdd):
     :param rdd: an RDD containing lines representing encoded key-value pairs
     :return: an RDD containing lines representing encoded key-value pairs
     """
-    step_num = mapper_job.options.step_num
+    # initialize job class inside mapPartitions(). this deals with jobs that
+    # can't be initialized in the Spark driver (see #2044)
+    def map_lines(lines):
+        job = make_mrc_job('mapper', step_num)
 
-    m_read, m_write = mapper_job.pick_protocols(step_num, 'mapper')
+        m_read, m_write = job.pick_protocols(step_num, 'mapper')
 
-    # decode lines into key-value pairs
-    #
-    # line -> (k, v)
-    rdd = rdd.map(m_read)
+        def read_pairs():
+            # decode lines into key-value pairs
+            #
+            # line -> (k, v)
+            for line in lines:
+                yield m_read(line)
 
-    # run each partition through map_pairs()
-    #
-    # (k, v), ... -> (k, v), ...
-    rdd = rdd.mapPartitions(
-        lambda pairs: mapper_job.map_pairs(pairs, step_num))
+        for k, v in job.map_pairs(read_pairs(), step_num):
+            # encode key-value pairs back into lines
+            #
+            # (k, v) -> line
+            out_line = m_write(k, v)
+            yield out_line
 
-    # encode key-value pairs back into lines
-    #
-    # (k, v) -> line
-    rdd = rdd.map(lambda k_v: m_write(*k_v))
-
-    return rdd
+    return rdd.mapPartitions(map_lines)
 
 
 def _run_combiner(combiner_job, rdd, sort_values=False, num_reducers=None):

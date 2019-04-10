@@ -200,7 +200,7 @@ def main(cmd_line_args=None):
         if hadoop_input_format:
             rdd = sc.hadoopFile(
                 args.input_path,
-                inputFormatClass=job.hadoop_input_format(),
+                inputFormatClass=hadoop_input_format,
                 keyClass='org.apache.hadoop.io.Text',
                 valueClass='org.apache.hadoop.io.Text')
 
@@ -228,7 +228,7 @@ def main(cmd_line_args=None):
                 x.decode('utf-8') for x in line.split(b'\t', 1)))
             rdd.saveAsHadoopFile(
                 args.output_path,
-                outputFormatClass=job.hadoop_output_format(),
+                outputFormatClass=hadoop_output_format,
                 compressionCodecClass=args.compression_codec)
         else:
             rdd.saveAsTextFile(

@@ -24,6 +24,7 @@ except ImportError:
     pyspark = None
 
 from mrjob.examples.mr_most_used_word import MRMostUsedWord
+from mrjob.examples.mr_nick_nack import MRNickNack
 from mrjob.examples.mr_spark_most_used_word import MRSparkMostUsedWord
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
@@ -295,6 +296,27 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             self.assertEqual(dict(job.parse_output(runner.cat_output())),
                              dict(fa=1, la=8))
 
+    def test_hadoop_output_format(self):
+        input_bytes = b'ee eye ee eye oh'
+
+        job = MRNickNack(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(input_bytes))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # nicknack.MultipleValueOutputFormat should put output in subdirs
+            self.assertTrue(runner.fs.exists(
+                runner.fs.join(runner.get_output_dir(), 'e')))
+
+            self.assertTrue(runner.fs.exists(
+                runner.fs.join(runner.get_output_dir(), 'o')))
+
+            # check for expected output
+            self.assertEqual(
+                sorted(to_lines(runner.cat_output())),
+                [b'"ee"\t2\n', b'"eye"\t2\n', b'"oh"\t1\n'])
+
     def _num_output_files(self, runner):
         return sum(
             1 for f in listdir(runner.get_output_dir())
@@ -467,34 +489,6 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
         # doesn't. if there's no working dir, the job just gets n_file's
         # actual path
         self._test_file_upload_args_loaded_at_init('local[*]')
-
-
-class RunnerIgnoresJobKwargsTestCase(MockFilesystemsTestCase):
-
-    # TODO: this is no longer true, test formats and sort_values
-    def _test_ignore_format_and_sort_kwargs(self):
-        # hadoop formats and SORT_VALUES are read directly from the job,
-        # so the runner's constructor ignores the corresponding kwargs
-        #
-        # see #2022
-
-        # same set up as test_sort_values(), above
-        runner = SparkMRJobRunner(
-            mr_job_script=MRSortAndGroup.mr_job_script(),
-            mrjob_cls=MRSortAndGroup,
-            stdin=BytesIO(
-                b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n'),
-            hadoop_input_format='TerribleInputFormat',
-            hadoop_output_format='AwfulOutputFormat',
-            sort_values=False)
-
-        runner.run()
-
-        self.assertEqual(
-            dict(MRSortAndGroup().parse_output(runner.cat_output())),
-            dict(a=['actuary', 'alligator', 'artichoke'],
-                 b=['baby', 'balloon', 'bowling']))
-
 
 
 class GroupStepsTestCase(MockFilesystemsTestCase):

@@ -597,8 +597,8 @@ class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):
                 join(runner.get_output_dir(), 'o')))
 
             output_counts = dict(
-                line.strip().split(b'\t')
-                for line in to_lines(runner.cat_output()))
+                (line.strip().split(b'\t')
+                 for line in to_lines(runner.cat_output())))
 
         expected_output_counts = {
             b'"ee"': b'2', b'"eye"': b'2', b'"oh"': b'1'}

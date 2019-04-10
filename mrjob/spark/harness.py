@@ -275,12 +275,13 @@ def _run_step(step, step_num, rdd, make_mrc_job,
             combiner_job, rdd,
             sort_values=sort_values,
             num_reducers=num_reducers)
-    elif reducer_job:
+    elif step.get('reducer'):
         rdd = _shuffle_and_sort(
             rdd, sort_values=sort_values, num_reducers=num_reducers)
 
-    if reducer_job:
-        rdd = _run_reducer(reducer_job, rdd, num_reducers=num_reducers)
+    if step.get('reducer'):
+        rdd = _run_reducer(
+            make_mrc_job, step_num, rdd, num_reducers=num_reducers)
 
     return rdd
 
@@ -298,21 +299,21 @@ def _run_mapper(make_mrc_job, step_num, rdd):
     def map_lines(lines):
         job = make_mrc_job('mapper', step_num)
 
-        m_read, m_write = job.pick_protocols(step_num, 'mapper')
+        read, write = job.pick_protocols(step_num, 'mapper')
 
-        def read_pairs():
-            # decode lines into key-value pairs
-            #
-            # line -> (k, v)
-            for line in lines:
-                yield m_read(line)
+        # decode lines into key-value pairs (as a generator, not a list)
+        #
+        # line -> (k, v)
+        pairs = (read(line) for line in lines)
 
-        for k, v in job.map_pairs(read_pairs(), step_num):
+        # reduce_pairs() runs key-value pairs through mapper
+        #
+        # (k, v), ... -> (k, v), ...
+        for k, v in job.map_pairs(pairs, step_num):
             # encode key-value pairs back into lines
             #
             # (k, v) -> line
-            out_line = m_write(k, v)
-            yield out_line
+            yield write(k, v)
 
     return rdd.mapPartitions(map_lines)
 
@@ -410,7 +411,7 @@ def _shuffle_and_sort(rdd, sort_values=False, num_reducers=None):
     return rdd
 
 
-def _run_reducer(reducer_job, rdd, num_reducers=None):
+def _run_reducer(make_mrc_job, step_num, rdd, num_reducers=None):
     """Run our job's combiner, and group lines with the same key together.
 
     :param reducer_job: an instance of our job, instantiated to be the mapper
@@ -422,33 +423,30 @@ def _run_reducer(reducer_job, rdd, num_reducers=None):
                          is similar to mrjob's limit on number of reducers.
     :return: an RDD containing encoded key-value pairs
     """
-    step_num = reducer_job.options.step_num
-    should_preserve_final_partitions = bool(num_reducers)
+    # initialize job class inside mapPartitions(). this deals with jobs that
+    # can't be initialized in the Spark driver (see #2044)
+    def reduce_lines(lines):
+        job = make_mrc_job('reducer', step_num)
 
-    r_read, r_write = reducer_job.pick_protocols(step_num, 'reducer')
+        read, write = job.pick_protocols(step_num, 'reducer')
 
-    # decode lines into key-value pairs (keeping partitions the same)
-    #
-    # line -> (k, v)
-    rdd = rdd.map(r_read, preservesPartitioning=True)
+        # decode lines into key-value pairs (as a generator, not a list)
+        #
+        # line -> (k, v)
+        pairs = (read(line) for line in lines)
 
-    # run each partition through reducer_pairs(). because we carefully
-    # preserved partitioning, all values belonging to the same key will
-    # be fed to the same call of reducer_pairs()
-    #
-    # (k, v), ... -> (k, v), ...
-    rdd = rdd.mapPartitions(
-        lambda pairs: reducer_job.reduce_pairs(pairs, step_num),
-        preservesPartitioning=should_preserve_final_partitions)
+        # reduce_pairs() runs key-value pairs through reducer
+        #
+        # (k, v), ... -> (k, v), ...
+        for k, v in job.reduce_pairs(pairs, step_num):
+            # encode key-value pairs back into lines
+            #
+            # (k, v) -> line
+            yield write(k, v)
 
-    # encode key-value pairs back into lines
-    #
-    # (k, v) -> line
-    rdd = rdd.map(
-        lambda k_v: r_write(*k_v),
-        preservesPartitioning=should_preserve_final_partitions)
-
-    return rdd
+    # if *num_reducers* is set, don't re-partition. otherwise, doesn't matter
+    return rdd.mapPartitions(reduce_lines,
+                             preservesPartitioning=bool(num_reducers))
 
 
 def _discard_key_and_flatten_values(rdd, sort_values=False):

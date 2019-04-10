@@ -725,28 +725,34 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
     def _test_run_reducer(self, num_reducers=None):
         rdd = self.mock_rdd()
 
-        reducer_job = Mock()
-        reducer_job.pick_protocols.return_value = (Mock(), Mock())
+        def make_mock_mrc_job(mrc, step_num):
+            job = Mock()
+            job.pick_protocols.return_value = (Mock(), Mock())
 
-        final_rdd = _run_reducer(reducer_job, rdd, num_reducers=num_reducers)
+            return job
+
+        final_rdd = _run_reducer(
+            make_mock_mrc_job, 0, rdd, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         called_mapPartitions = False
 
-        before_map_partition = True
+        before_mapPartitions = True
         for name, args, kwargs in rdd.method_calls:
             if name == 'mapPartitions':
                 called_mapPartitions = True
-                before_map_partition = False
+                before_mapPartitions = False
 
             # We want to make sure we keep the original partition before
-            # reaching to map_partition
-            if before_map_partition:
+            # reaching mapPartitions()
+            #
+            # (currently there aren't any method calls before mapPartitions(),
+            # but there were when this test was created)
+            if before_mapPartitions:
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
 
-            # Once we finished from map_paratition, we don't care about if
-            # we keep the same partition unless we want to fixed on number
-            # of partitions
+            # Once we've run mapPartitions(), we only need to preserve
+            # partitions if the user explicitly requested a certain number
             else:
                 self.assertEqual(
                     kwargs.get('preservesPartitioning'), bool(num_reducers))

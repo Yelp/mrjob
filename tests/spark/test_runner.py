@@ -43,6 +43,7 @@ from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_spark_os_walk import MRSparkOSWalk
+from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
@@ -417,7 +418,6 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
             self.assertEqual(output, b'"home"')
 
-
     def test_streaming_step_file_upload_args_with_working_dir(self):
         self._test_file_upload_args(MRMostUsedWord, _LOCAL_CLUSTER_MASTER)
 
@@ -429,6 +429,40 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
     def test_spark_step_file_upload_args_without_working_dir(self):
         self._test_file_upload_args(MRSparkMostUsedWord, 'local[*]')
+
+    def _test_file_upload_args_loaded_at_init(self, spark_master):
+        # can we simulate a MRJob that expects to load files in its
+        # constructor? (see #2044 for why this is tricky)
+
+        n_file_path = self.makefile('n_file', b'3')
+        input_bytes = b'0\n1\n2\n'
+
+        # this file would be named n_file in the job's working dir, but
+        # we're not there yet
+        self.assertFalse(exists('n_file'))
+        self.assertRaises(IOError, MRTowerOfPowers, ['--n-file', 'n_file'])
+
+        # this should work because we can see n_file_path
+        job = MRTowerOfPowers(['-r', 'spark',
+                               '--spark-master', spark_master,
+                               '--n-file', n_file_path])
+        job.sandbox(stdin=BytesIO(input_bytes))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = {n for _, n in job.parse_output(runner.cat_output())}
+            self.assertEqual(output,
+                             {0, 1, (((2 ** 3) ** 3) ** 3)})
+
+    def test_file_upload_args_loaded_at_init_with_working_dir(self):
+        # check that the Spark harness doesn't init the job in the driver
+        self._test_file_upload_args_loaded_at_init(_LOCAL_CLUSTER_MASTER)
+
+    def test_file_upload_args_loaded_at_init_without_working_dir(self):
+        # should work regardless of where the Spark harness inits the job,
+        # since we pass the job n_file's full path when there's no working dir
+        self._test_file_upload_args_loaded_at_init('local[*]')
 
 
 class RunnerIgnoresJobKwargsTestCase(MockFilesystemsTestCase):

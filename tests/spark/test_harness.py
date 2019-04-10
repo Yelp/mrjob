@@ -40,6 +40,7 @@ from mrjob.util import to_lines
 
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_doubler import MRDoubler
+from tests.mr_no_mapper import MRNoMapper
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
@@ -410,6 +411,12 @@ class SparkHarnessOutputComparisonTestCase(
                     ).collect()[0])
 
         self.assertEqual(harness_counters, reference_counters)
+
+    def test_job_with_no_mapper_in_second_step(self):
+        # mini-regression test for not passing step_num to step.description()
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        self._assert_output_matches(MRNoMapper, input_bytes=input_bytes)
 
 
 class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):

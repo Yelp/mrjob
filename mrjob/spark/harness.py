@@ -250,24 +250,28 @@ def _run_step(step, step_num, rdd, make_mrc_job,
     """Run the given step on the RDD and return the transformed RDD."""
     _check_step(step, step_num)
 
-    # create a separate job instance for each substep. This contains
-    # *step_num* (in ``job.options.step_num``) and ensures that
-    # ``job.is_task()`` is set to true
-    mapper_job, reducer_job, combiner_job = (
-        make_mrc_job(mrc, step_num) if step.get(mrc) else None
-        for mrc in ('mapper', 'reducer', 'combiner')
-    )
+    # we try to avoid initializing job instances here in the driver (see #2044
+    # for why). However, while we can get away with initializing one instance
+    # per partition in the mapper and reducer, that would be too inefficient
+    # for combiners, which run on *two* key-value pairs at a time.
+    #
+    # but combiners are optional! if we can't initialize a combiner job
+    # instance, we can just skip it!
 
-    # if combiner runs subprocesses, skip it. (:py:func:`_check_step`
-    # already screens out mappers and reducers that do, but combiners
-    # are optional)
-    try:
-        _check_substep(step, step_num, 'combiner')
-    except NotImplementedError:
-        combiner_job = None
-
+    # mapper
     if step.get('mapper'):
         rdd = _run_mapper(make_mrc_job, step_num, rdd)
+
+    # combiner/shuffle-and-sort
+    combiner_job = None
+    if step.get('combiner'):
+        try:
+            _check_substep(step, step_num, 'combiner')
+            combiner_job = make_mrc_job('combiner', step_num)
+        except:
+            # if combiner needs to run subprocesses, or we can't
+            # initialize a job instance, just skip combiners
+            pass
 
     if combiner_job:
         # _run_combiner() includes shuffle-and-sort
@@ -279,6 +283,7 @@ def _run_step(step, step_num, rdd, make_mrc_job,
         rdd = _shuffle_and_sort(
             rdd, sort_values=sort_values, num_reducers=num_reducers)
 
+    # reducer
     if step.get('reducer'):
         rdd = _run_reducer(
             make_mrc_job, step_num, rdd, num_reducers=num_reducers)
@@ -289,8 +294,8 @@ def _run_step(step, step_num, rdd, make_mrc_job,
 def _run_mapper(make_mrc_job, step_num, rdd):
     """Run our job's mapper.
 
-    :param mapper_job: an instance of our job, instantiated to be the mapper
-                       for the step we wish to run
+    :param make_mrc_job: an instance of our job, instantiated to be the mapper
+                         for the step we wish to run
     :param rdd: an RDD containing lines representing encoded key-value pairs
     :return: an RDD containing lines representing encoded key-value pairs
     """

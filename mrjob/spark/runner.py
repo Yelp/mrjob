@@ -353,14 +353,14 @@ class SparkMRJobRunner(MRJobBinRunner):
         """Generate spark harness args for streaming steps (and handle
         other spark step types the usual way).
         """
-        step = self._get_step(step_num)
-
-        if step['type'] != 'streaming':
-            return super(SparkMRJobRunner, self)._spark_script_args(
-                step_num, last_step_num)
-
         if last_step_num is None:
             last_step_num = step_num
+
+        steps = self._get_steps()[step_num:last_step_num + 1]
+
+        if steps[0]['type'] != 'streaming':
+            return super(SparkMRJobRunner, self)._spark_script_args(
+                step_num, last_step_num)
 
         args = []
 
@@ -390,9 +390,7 @@ class SparkMRJobRunner(MRJobBinRunner):
                      job.hadoop_output_format() or ''])
 
         # --steps-desc
-        steps_desc = [step.description(step_num)
-                      for step_num, step in enumerate(job.steps())]
-        args.extend(['--steps-desc', json.dumps(steps_desc)])
+        args.extend(['--steps-desc', json.dumps(steps)])
 
         # --counter-output-dir, to simulate counters
         args.extend(['--counter-output-dir',

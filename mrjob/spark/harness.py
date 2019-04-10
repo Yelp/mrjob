@@ -84,6 +84,16 @@ _PASSTHRU_OPTIONS = [
         help=("Hadoop output format class. Set to '' to indicate no"
               " format (otherwise we'll instantiate a job and ask it"),
     )),
+    (['--sort-values'], dict(
+        action='store_true',
+        default=None,
+        dest='sort_values',
+    )),
+    (['--no-sort-values'], dict(
+        action='store_false',
+        default=None,
+        dest='sort_values',
+    )),
 ]
 
 
@@ -142,6 +152,12 @@ def main(cmd_line_args=None):
     else:
         hadoop_output_format = args.hadoop_output_format or None
 
+    if args.sort_values is None:
+        job = job or job_class(job_args)
+        sort_values = job.sort_values()
+    else:
+        sort_values = args.sort_values
+
     if args.steps_desc is None:
         job = job or job_class(job_args)
         steps = [step.description(step_num)
@@ -198,7 +214,7 @@ def main(cmd_line_args=None):
         # run steps
         for step_num, step in steps_to_run:
             rdd = _run_step(step, step_num, rdd,
-                            make_mrc_job, args.num_reducers)
+                            make_mrc_job, args.num_reducers, sort_values)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
@@ -229,7 +245,8 @@ def main(cmd_line_args=None):
             )
 
 
-def _run_step(step, step_num, rdd, make_mrc_job, num_reducers=None):
+def _run_step(step, step_num, rdd, make_mrc_job,
+              num_reducers=None, sort_values=None):
     """Run the given step on the RDD and return the transformed RDD."""
     _check_step(step, step_num)
 
@@ -248,9 +265,6 @@ def _run_step(step, step_num, rdd, make_mrc_job, num_reducers=None):
         _check_substep(step, step_num, 'combiner')
     except NotImplementedError:
         combiner_job = None
-
-    # is SORT_VALUES enabled?
-    sort_values = reducer_job.sort_values() if reducer_job else False
 
     if step.get('mapper'):
         rdd = _run_mapper(make_mrc_job, step_num, rdd)

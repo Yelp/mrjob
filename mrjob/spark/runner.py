@@ -385,6 +385,12 @@ class SparkMRJobRunner(MRJobBinRunner):
         args.extend(['--hadoop-output-format',
                      self._hadoop_output_format or ''])
 
+        # --sort-values
+        if self._sort_values:
+            args.append('--sort-values')
+        else:
+            args.append('--no-sort-values')
+
         # --steps-desc
         args.extend(['--steps-desc', json.dumps(steps)])
 

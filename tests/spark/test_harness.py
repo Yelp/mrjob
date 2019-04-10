@@ -97,6 +97,8 @@ class MRWordFreqCountFailingCombiner(MRWordFreqCount):
 
 
 class MRSumValuesByWord(MRJob):
+    # if combiner is run, keys with values that sum to 0
+    # will be eliminated
 
     def mapper(self, _, line):
         word, value_str = line.split('\t', 1)
@@ -107,7 +109,25 @@ class MRSumValuesByWord(MRJob):
         if values_sum != 0:
             yield word, values_sum
 
-    reducer = combiner
+    def reducer(self, word, values):
+        yield word, sum(values)
+
+
+class MRSumValuesByWordWithCombinerPreFilter(MRSumValuesByWord):
+
+    def combiner_pre_filter(self):
+        return 'cat'
+
+
+class MRSumValuesByWordWithNoCombinerJobs(MRSumValuesByWord):
+
+    def __init__(self, *args, **kwargs):
+        super(MRSumValuesByWordWithNoCombinerJobs, self).__init__(
+            *args, **kwargs)
+
+        if self.options.run_combiner:
+            raise NotImplementedError("Can't init combiner jobs")
+
 
 class SparkHarnessOutputComparisonBaseTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
@@ -363,16 +383,47 @@ class SparkHarnessOutputComparisonTestCase(
             )
 
     def test_combiner_that_sometimes_yields_zero_values(self):
-        # a more plausible test of a combiner that sometimes doesn't yield a
-        # value that we can compare to the reference job
-        input_bytes = b'\n'.join([
-            b'happy\t5',
-            b'sad\t3',
-            b'happy\t2',
-            b'sad\t-3',
-        ])
+        # another test that the combiner actually runs
+        #
+        # would like to test this against a reference job, but whether
+        # the combiner can see and eliminate the "sad" values that sum
+        # to zero depends on the reference runner's partitioning
 
-        self._assert_output_matches(MRSumValuesByWord, input_bytes=input_bytes)
+        # note that "sad" values sum to zero
+        input_bytes = b'happy\t5\nsad\t3\nhappy\t2\nsad\t-3\n'
+
+        job = self._harness_job(MRSumValuesByWord, input_bytes=input_bytes)
+        with job.make_runner() as runner:
+            runner.run()
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(happy=7),  # combiner should eliminate sad=0
+            )
+
+    def test_skip_combiner_if_runs_subprocesses(self):
+        # same as above, but we have to skip combiner because of its pre-filter
+        input_bytes = b'happy\t5\nsad\t3\nhappy\t2\nsad\t-3\n'
+
+        job = self._harness_job(MRSumValuesByWordWithCombinerPreFilter,
+                                input_bytes=input_bytes)
+        with job.make_runner() as runner:
+            runner.run()
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(happy=7, sad=0),
+            )
+
+    def test_skip_combiner_if_cant_init_job(self):
+        input_bytes = b'happy\t5\nsad\t3\nhappy\t2\nsad\t-3\n'
+
+        job = self._harness_job(MRSumValuesByWordWithNoCombinerJobs,
+                                input_bytes=input_bytes)
+        with job.make_runner() as runner:
+            runner.run()
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(happy=7, sad=0),
+            )
 
     def test_skip_combiner_that_runs_cmd(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'

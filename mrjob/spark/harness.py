@@ -144,7 +144,8 @@ def main(cmd_line_args=None):
 
     if args.steps_desc is None:
         job = job or job_class(job_args)
-        steps = [step.description() for step in job.steps()]
+        steps = [step.description(step_num)
+                 for step_num, step in enumerate(job.steps())]
     else:
         steps = json.loads(args.steps_desc)
 

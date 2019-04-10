@@ -390,7 +390,8 @@ class SparkMRJobRunner(MRJobBinRunner):
                      job.hadoop_output_format() or ''])
 
         # --steps-desc
-        steps_desc = [step.description() for step in job.steps()]
+        steps_desc = [step.description(step_num)
+                      for step_num, step in enumerate(job.steps())]
         args.extend(['--steps-desc', json.dumps(steps_desc)])
 
         # --counter-output-dir, to simulate counters

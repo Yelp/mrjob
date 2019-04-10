@@ -377,17 +377,13 @@ class SparkMRJobRunner(MRJobBinRunner):
         args.append(
             self._step_output_uri(last_step_num))
 
-        # instantiate a job we can get steps and hadoop formats from, so we
-        # don't have to in the Spark driver (see #2044)
-        job = self._mrjob_cls(self._mr_job_extra_args(local=True))
-
         # --hadoop-input-format. Pass '' to indicate we know there is none
         args.extend(['--hadoop-input-format',
-                     job.hadoop_input_format() or ''])
+                     self._hadoop_input_format or ''])
 
         # --hadoop-output-format. Pass '' to indicate we know there is none
         args.extend(['--hadoop-output-format',
-                     job.hadoop_output_format() or ''])
+                     self._hadoop_output_format or ''])
 
         # --steps-desc
         args.extend(['--steps-desc', json.dumps(steps)])

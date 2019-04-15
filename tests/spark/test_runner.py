@@ -43,6 +43,7 @@ from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
@@ -619,3 +620,21 @@ class SparkCounterSimulationTestCase(MockFilesystemsTestCase):
 
         # should blank out counters from failed step
         self.assertEqual(runner.counters(), [{}, {}])
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class SparkSetupScriptTestCase(MockFilesystemsTestCase):
+
+    def test_setup_command(self):
+        job = MROSWalkJob(
+            ['-r', 'spark',
+             '--spark-master', _LOCAL_CLUSTER_MASTER,
+             '--setup', 'touch bar'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        self.assertIn('./bar', path_to_size)

@@ -456,7 +456,7 @@ class MRJobBinRunner(MRJobRunner):
         If *local* is true, use local line endings (e.g. Windows). Otherwise,
         use UNIX line endings (see #1071).
         """
-        if self._has_streaming_steps():
+        if self._has_hadoop_streaming_steps():
             streaming_setup = self._py_files_setup() + self._setup
 
             if streaming_setup and not self._setup_wrapper_script_path:

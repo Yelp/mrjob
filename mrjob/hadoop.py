@@ -336,7 +336,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         # this triggers looking for Hadoop binary
         self.get_hadoop_version()
 
-        if self._has_streaming_steps():
+        if self._has_hadoop_streaming_steps():
             self.get_hadoop_streaming_jar()
 
         if self._has_spark_steps():

@@ -440,6 +440,16 @@ class SparkMRJobRunner(MRJobBinRunner):
         return (super(SparkMRJobRunner, self)._has_spark_steps() or
                 self._has_streaming_steps())
 
+    def _has_hadoop_streaming_steps(self):
+        # the Spark runner doesn't run "streaming" steps on Hadoop
+        return False
+
+    def _has_streaming_steps(self):
+        """Are any of our steps "streaming" steps that would normally run
+        on Hadoop Streaming?"""
+        return any(step['type'] == 'streaming'
+                   for step in self._get_steps())
+
     def _has_pyspark_steps(self):
         """Treat streaming steps as Spark steps that use Python."""
         return (super(SparkMRJobRunner, self)._has_pyspark_steps() or

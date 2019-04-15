@@ -103,13 +103,18 @@ class MRJobBinRunner(MRJobRunner):
 
                     self._working_dir_mgr.add(**token)
 
+        # warning: no setup scripts on Spark when no working dir
+        if self._setup and self._has_pyspark_steps() and not(
+                self._spark_executors_have_own_wd()):
+            log.warning("setup commands aren't supported on Spark master %r" %
+                        self._spark_master())
+
         # --py-files on Spark doesn't allow '#' (see #1375)
         if any('#' in path for path in self._opts['py_files']):
             raise ValueError("py_files cannot contain '#'")
 
         # Keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
-
 
     def _default_opts(self):
         return combine_dicts(

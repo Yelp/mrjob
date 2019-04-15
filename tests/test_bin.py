@@ -1777,7 +1777,7 @@ class PySparkPythonTestCase(MockHadoopTestCase):
         self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
         self.assertEqual(env['PYSPARK_PYTHON'], './python-wrapper.sh')
 
-    def test_setup_wrapper_requires_yarn(self):
+    def test_no_setup_scripts_on_local_master(self):
         env, runner = self._env_and_runner(
             '--setup', 'true', '--spark-master', 'local')
 

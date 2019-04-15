@@ -243,11 +243,6 @@ class MRJobRunner(object):
         # set of dir_archives that have actually been created
         self._dir_archives_created = set()
 
-        # track (name, path) of files and archives to upload to spark
-        # if not using a setup script.
-        self._spark_files = []
-        self._spark_archives = []
-
         # set this to an :py:class:`~mrjob.setup.UploadDirManager` in
         # runners that upload files to HDFS, S3, etc.
         #
@@ -270,8 +265,6 @@ class MRJobRunner(object):
                 if extra_arg.get('type') != 'file':
                     raise NotImplementedError
                 self._working_dir_mgr.add(**extra_arg)
-                self._spark_files.append(
-                    (extra_arg['name'], extra_arg['path']))
 
         # extra file arguments to our job
         if file_upload_args:
@@ -281,20 +274,17 @@ class MRJobRunner(object):
                 arg_file = parse_legacy_hash_path('file', path)
                 self._working_dir_mgr.add(**arg_file)
                 self._extra_args.extend([arg, arg_file])
-                self._spark_files.append((arg_file['name'], arg_file['path']))
 
         # set up uploading
         for hash_path in self._opts['upload_files']:
             uf = parse_legacy_hash_path('file', hash_path,
                                         must_name='upload_files')
             self._working_dir_mgr.add(**uf)
-            self._spark_files.append((uf['name'], uf['path']))
 
         for hash_path in self._opts['upload_archives']:
             ua = parse_legacy_hash_path('archive', hash_path,
                                         must_name='upload_archives')
             self._working_dir_mgr.add(**ua)
-            self._spark_archives.append((ua['name'], ua['path']))
 
         for hash_path in self._opts['upload_dirs']:
             # pick name based on directory path
@@ -304,7 +294,6 @@ class MRJobRunner(object):
             archive_path = self._dir_archive_path(ud['path'])
             self._working_dir_mgr.add(
                 'archive', archive_path, name=ud['name'])
-            self._spark_archives.append((ud['name'], archive_path))
 
         # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin

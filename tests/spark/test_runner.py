@@ -24,6 +24,7 @@ except ImportError:
     pyspark = None
 
 from mrjob.examples.mr_most_used_word import MRMostUsedWord
+from mrjob.examples.mr_nick_nack import MRNickNack
 from mrjob.examples.mr_spark_most_used_word import MRSparkMostUsedWord
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
@@ -43,6 +44,7 @@ from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_spark_os_walk import MRSparkOSWalk
+from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
@@ -294,6 +296,27 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             self.assertEqual(dict(job.parse_output(runner.cat_output())),
                              dict(fa=1, la=8))
 
+    def test_hadoop_output_format(self):
+        input_bytes = b'ee eye ee eye oh'
+
+        job = MRNickNack(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(input_bytes))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # nicknack.MultipleValueOutputFormat should put output in subdirs
+            self.assertTrue(runner.fs.exists(
+                runner.fs.join(runner.get_output_dir(), 'e')))
+
+            self.assertTrue(runner.fs.exists(
+                runner.fs.join(runner.get_output_dir(), 'o')))
+
+            # check for expected output
+            self.assertEqual(
+                sorted(to_lines(runner.cat_output())),
+                [b'"ee"\t2\n', b'"eye"\t2\n', b'"oh"\t1\n'])
+
     def _num_output_files(self, runner):
         return sum(
             1 for f in listdir(runner.get_output_dir())
@@ -417,7 +440,6 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
             self.assertEqual(output, b'"home"')
 
-
     def test_streaming_step_file_upload_args_with_working_dir(self):
         self._test_file_upload_args(MRMostUsedWord, _LOCAL_CLUSTER_MASTER)
 
@@ -430,32 +452,43 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
     def test_spark_step_file_upload_args_without_working_dir(self):
         self._test_file_upload_args(MRSparkMostUsedWord, 'local[*]')
 
+    def _test_file_upload_args_loaded_at_init(self, spark_master):
+        # can we simulate a MRJob that expects to load files in its
+        # constructor?
 
-class RunnerIgnoresJobKwargsTestCase(MockFilesystemsTestCase):
+        # sanity-check that our test; if MRTowerOfPowers can initialize
+        # without its --n-file, we're not testing anything
+        self.assertFalse(exists('n_file'))
+        self.assertRaises(IOError, MRTowerOfPowers, ['--n-file', 'n_file'])
 
-    def test_ignore_format_and_sort_kwargs(self):
-        # hadoop formats and SORT_VALUES are read directly from the job,
-        # so the runner's constructor ignores the corresponding kwargs
-        #
-        # see #2022
+        n_file_path = self.makefile('n_file', b'3')
+        input_bytes = b'0\n1\n2\n'
 
-        # same set up as test_sort_values(), above
-        runner = SparkMRJobRunner(
-            mr_job_script=MRSortAndGroup.mr_job_script(),
-            mrjob_cls=MRSortAndGroup,
-            stdin=BytesIO(
-                b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n'),
-            hadoop_input_format='TerribleInputFormat',
-            hadoop_output_format='AwfulOutputFormat',
-            sort_values=False)
+        # this should work because we can see n_file_path
+        job = MRTowerOfPowers(['-r', 'spark',
+                               '--spark-master', spark_master,
+                               '--n-file', n_file_path])
+        job.sandbox(stdin=BytesIO(input_bytes))
 
-        runner.run()
+        with job.make_runner() as runner:
+            runner.run()
 
-        self.assertEqual(
-            dict(MRSortAndGroup().parse_output(runner.cat_output())),
-            dict(a=['actuary', 'alligator', 'artichoke'],
-                 b=['baby', 'balloon', 'bowling']))
+            output = {n for _, n in job.parse_output(runner.cat_output())}
+            self.assertEqual(output,
+                             {0, 1, (((2 ** 3) ** 3) ** 3)})
 
+    def test_file_upload_args_loaded_at_init_with_working_dir(self):
+        # regression test for #2044. The Spark driver can't see n_file,
+        # but it doesn't need to because it'll only ever construct
+        # job instances in the executor
+        self._test_file_upload_args_loaded_at_init(_LOCAL_CLUSTER_MASTER)
+
+    def test_file_upload_args_loaded_at_init_without_working_dir(self):
+        # this should work even if
+        # test_file_upload_args_loaded_at_init_with_working_dir()
+        # doesn't. if there's no working dir, the job just gets n_file's
+        # actual path
+        self._test_file_upload_args_loaded_at_init('local[*]')
 
 
 class GroupStepsTestCase(MockFilesystemsTestCase):

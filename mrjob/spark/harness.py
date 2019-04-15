@@ -64,6 +64,36 @@ _PASSTHRU_OPTIONS = [
         type=int,
         help=('Set number of reducers (and thus number of output files)')
     )),
+    # switches to deal with jobs that can't be instantiated in the Spark
+    # driver (e.g. because of problems with file upload args). See #2044
+    (['--steps-desc'], dict(
+        default=None,
+        dest='steps_desc',
+        help=("Description of job's steps, in JSON format (otherwise,"
+              " we'll instantiate a job and ask it"),
+    )),
+    (['--hadoop-input-format'], dict(
+        default=None,
+        dest='hadoop_input_format',
+        help=("Hadoop input format class. Set to '' to indicate no"
+              " format (otherwise we'll instantiate a job and ask it"),
+    )),
+    (['--hadoop-output-format'], dict(
+        default=None,
+        dest='hadoop_output_format',
+        help=("Hadoop output format class. Set to '' to indicate no"
+              " format (otherwise we'll instantiate a job and ask it"),
+    )),
+    (['--sort-values'], dict(
+        action='store_true',
+        default=None,
+        dest='sort_values',
+    )),
+    (['--no-sort-values'], dict(
+        action='store_false',
+        default=None,
+        dest='sort_values',
+    )),
 ]
 
 
@@ -106,9 +136,34 @@ def main(cmd_line_args=None):
     else:
         job_args = []
 
-    # get job steps. don't pass --steps, which is deprecated
-    job = job_class(job_args)
-    steps = job.steps()
+    # determine hadoop_*_format, steps
+    # try to avoid instantiating a job in the driver; see #2044
+    job = None
+
+    if args.hadoop_input_format is None:
+        job = job or job_class(job_args)
+        hadoop_input_format = job.hadoop_input_format()
+    else:
+        hadoop_input_format = args.hadoop_input_format or None
+
+    if args.hadoop_output_format is None:
+        job = job or job_class(job_args)
+        hadoop_output_format = job.hadoop_output_format()
+    else:
+        hadoop_output_format = args.hadoop_output_format or None
+
+    if args.sort_values is None:
+        job = job or job_class(job_args)
+        sort_values = job.sort_values()
+    else:
+        sort_values = args.sort_values
+
+    if args.steps_desc is None:
+        job = job or job_class(job_args)
+        steps = [step.description(step_num)
+                 for step_num, step in enumerate(job.steps())]
+    else:
+        steps = json.loads(args.steps_desc)
 
     # pick steps
     start = args.first_step_num or 0
@@ -131,7 +186,7 @@ def main(cmd_line_args=None):
 
         return increment_counter
 
-    def make_job(mrc, step_num):
+    def make_mrc_job(mrc, step_num):
         j = job_class(job_args + [
             '--%s' % mrc, '--step-num=%d' % step_num
         ])
@@ -142,37 +197,38 @@ def main(cmd_line_args=None):
         return j
 
     try:
-        if job.hadoop_input_format() is not None:
+        if hadoop_input_format:
             rdd = sc.hadoopFile(
                 args.input_path,
-                inputFormatClass=job.hadoop_input_format(),
+                inputFormatClass=hadoop_input_format,
                 keyClass='org.apache.hadoop.io.Text',
                 valueClass='org.apache.hadoop.io.Text')
 
-            # hadoopFile loads each line as a key-value pair in which the contents
-            # of the line are the key and the value is an empty string. Convert to
-            # an rdd of just lines, encoded as bytes.
+            # hadoopFile loads each line as a key-value pair in which the
+            # contents of the line are the key and the value is an empty
+            # string. Convert to an rdd of just lines, encoded as bytes.
             rdd = rdd.map(lambda kv: kv[0].encode('utf-8'))
         else:
             rdd = sc.textFile(args.input_path, use_unicode=False)
 
         # run steps
         for step_num, step in steps_to_run:
-            rdd = _run_step(step, step_num, rdd, make_job, args.num_reducers)
+            rdd = _run_step(step, step_num, rdd,
+                            make_mrc_job, args.num_reducers, sort_values)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
             rdd = rdd.coalesce(args.max_output_files)
 
         # write the results
-        if job.hadoop_output_format() is not None:
-            # saveAsHadoopFile takes an rdd of key-value pairs, so convert to that
-            # format
+        if hadoop_output_format:
+            # saveAsHadoopFile takes an rdd of key-value pairs, so convert to
+            # that format
             rdd = rdd.map(lambda line: tuple(
                 x.decode('utf-8') for x in line.split(b'\t', 1)))
             rdd.saveAsHadoopFile(
                 args.output_path,
-                outputFormatClass=job.hadoop_output_format(),
+                outputFormatClass=hadoop_output_format,
                 compressionCodecClass=args.compression_codec)
         else:
             rdd.saveAsTextFile(
@@ -189,32 +245,33 @@ def main(cmd_line_args=None):
             )
 
 
-def _run_step(step, step_num, rdd, make_job, num_reducers=None):
+def _run_step(step, step_num, rdd, make_mrc_job,
+              num_reducers=None, sort_values=None):
     """Run the given step on the RDD and return the transformed RDD."""
-    step_desc = step.description(step_num)
-    _check_step(step_desc, step_num)
+    _check_step(step, step_num)
 
-    # create a separate job instance for each substep. This contains
-    # *step_num* (in ``job.options.step_num``) and ensures that
-    # ``job.is_task()`` is set to true
-    mapper_job, reducer_job, combiner_job = (
-        make_job(mrc, step_num) if step_desc.get(mrc) else None
-        for mrc in ('mapper', 'reducer', 'combiner')
-    )
+    # we try to avoid initializing job instances here in the driver (see #2044
+    # for why). However, while we can get away with initializing one instance
+    # per partition in the mapper and reducer, that would be too inefficient
+    # for combiners, which run on *two* key-value pairs at a time.
+    #
+    # but combiners are optional! if we can't initialize a combiner job
+    # instance, we can just skip it!
 
-    # if combiner runs subprocesses, skip it. (:py:func:`_check_step`
-    # already screens out mappers and reducers that do, but combiners
-    # are optional)
-    try:
-        _check_substep(step_desc, step_num, 'combiner')
-    except NotImplementedError:
-        combiner_job = None
+    # mapper
+    if step.get('mapper'):
+        rdd = _run_mapper(make_mrc_job, step_num, rdd)
 
-    # is SORT_VALUES enabled?
-    sort_values = reducer_job.sort_values() if reducer_job else False
-
-    if mapper_job:
-        rdd = _run_mapper(mapper_job, rdd)
+    # combiner/shuffle-and-sort
+    combiner_job = None
+    if step.get('combiner'):
+        try:
+            _check_substep(step, step_num, 'combiner')
+            combiner_job = make_mrc_job('combiner', step_num)
+        except:
+            # if combiner needs to run subprocesses, or we can't
+            # initialize a job instance, just skip combiners
+            pass
 
     if combiner_job:
         # _run_combiner() includes shuffle-and-sort
@@ -222,45 +279,48 @@ def _run_step(step, step_num, rdd, make_job, num_reducers=None):
             combiner_job, rdd,
             sort_values=sort_values,
             num_reducers=num_reducers)
-    elif reducer_job:
+    elif step.get('reducer'):
         rdd = _shuffle_and_sort(
             rdd, sort_values=sort_values, num_reducers=num_reducers)
 
-    if reducer_job:
-        rdd = _run_reducer(reducer_job, rdd, num_reducers=num_reducers)
+    # reducer
+    if step.get('reducer'):
+        rdd = _run_reducer(
+            make_mrc_job, step_num, rdd, num_reducers=num_reducers)
 
     return rdd
 
 
-def _run_mapper(mapper_job, rdd):
+def _run_mapper(make_mrc_job, step_num, rdd):
     """Run our job's mapper.
 
-    :param mapper_job: an instance of our job, instantiated to be the mapper
-                       for the step we wish to run
+    :param make_mrc_job: an instance of our job, instantiated to be the mapper
+                         for the step we wish to run
     :param rdd: an RDD containing lines representing encoded key-value pairs
     :return: an RDD containing lines representing encoded key-value pairs
     """
-    step_num = mapper_job.options.step_num
+    # initialize job class inside mapPartitions(). this deals with jobs that
+    # can't be initialized in the Spark driver (see #2044)
+    def map_lines(lines):
+        job = make_mrc_job('mapper', step_num)
 
-    m_read, m_write = mapper_job.pick_protocols(step_num, 'mapper')
+        read, write = job.pick_protocols(step_num, 'mapper')
 
-    # decode lines into key-value pairs
-    #
-    # line -> (k, v)
-    rdd = rdd.map(m_read)
+        # decode lines into key-value pairs (as a generator, not a list)
+        #
+        # line -> (k, v)
+        pairs = (read(line) for line in lines)
 
-    # run each partition through map_pairs()
-    #
-    # (k, v), ... -> (k, v), ...
-    rdd = rdd.mapPartitions(
-        lambda pairs: mapper_job.map_pairs(pairs, step_num))
+        # reduce_pairs() runs key-value pairs through mapper
+        #
+        # (k, v), ... -> (k, v), ...
+        for k, v in job.map_pairs(pairs, step_num):
+            # encode key-value pairs back into lines
+            #
+            # (k, v) -> line
+            yield write(k, v)
 
-    # encode key-value pairs back into lines
-    #
-    # (k, v) -> line
-    rdd = rdd.map(lambda k_v: m_write(*k_v))
-
-    return rdd
+    return rdd.mapPartitions(map_lines)
 
 
 def _run_combiner(combiner_job, rdd, sort_values=False, num_reducers=None):
@@ -356,7 +416,7 @@ def _shuffle_and_sort(rdd, sort_values=False, num_reducers=None):
     return rdd
 
 
-def _run_reducer(reducer_job, rdd, num_reducers=None):
+def _run_reducer(make_mrc_job, step_num, rdd, num_reducers=None):
     """Run our job's combiner, and group lines with the same key together.
 
     :param reducer_job: an instance of our job, instantiated to be the mapper
@@ -368,33 +428,30 @@ def _run_reducer(reducer_job, rdd, num_reducers=None):
                          is similar to mrjob's limit on number of reducers.
     :return: an RDD containing encoded key-value pairs
     """
-    step_num = reducer_job.options.step_num
-    should_preserve_final_partitions = bool(num_reducers)
+    # initialize job class inside mapPartitions(). this deals with jobs that
+    # can't be initialized in the Spark driver (see #2044)
+    def reduce_lines(lines):
+        job = make_mrc_job('reducer', step_num)
 
-    r_read, r_write = reducer_job.pick_protocols(step_num, 'reducer')
+        read, write = job.pick_protocols(step_num, 'reducer')
 
-    # decode lines into key-value pairs (keeping partitions the same)
-    #
-    # line -> (k, v)
-    rdd = rdd.map(r_read, preservesPartitioning=True)
+        # decode lines into key-value pairs (as a generator, not a list)
+        #
+        # line -> (k, v)
+        pairs = (read(line) for line in lines)
 
-    # run each partition through reducer_pairs(). because we carefully
-    # preserved partitioning, all values belonging to the same key will
-    # be fed to the same call of reducer_pairs()
-    #
-    # (k, v), ... -> (k, v), ...
-    rdd = rdd.mapPartitions(
-        lambda pairs: reducer_job.reduce_pairs(pairs, step_num),
-        preservesPartitioning=should_preserve_final_partitions)
+        # reduce_pairs() runs key-value pairs through reducer
+        #
+        # (k, v), ... -> (k, v), ...
+        for k, v in job.reduce_pairs(pairs, step_num):
+            # encode key-value pairs back into lines
+            #
+            # (k, v) -> line
+            yield write(k, v)
 
-    # encode key-value pairs back into lines
-    #
-    # (k, v) -> line
-    rdd = rdd.map(
-        lambda k_v: r_write(*k_v),
-        preservesPartitioning=should_preserve_final_partitions)
-
-    return rdd
+    # if *num_reducers* is set, don't re-partition. otherwise, doesn't matter
+    return rdd.mapPartitions(reduce_lines,
+                             preservesPartitioning=bool(num_reducers))
 
 
 def _discard_key_and_flatten_values(rdd, sort_values=False):
@@ -416,35 +473,35 @@ def _discard_key_and_flatten_values(rdd, sort_values=False):
     return rdd.flatMap(map_f, preservesPartitioning=True)
 
 
-def _check_step(step_desc, step_num):
+def _check_step(step, step_num):
     """Check that the given step description is for a MRStep
     with no input manifest"""
-    if step_desc.get('type') != 'streaming':
+    if step.get('type') != 'streaming':
         raise ValueError(
             'step %d has unexpected type: %r' % (
-                step_num, step_desc.get('type')))
+                step_num, step.get('type')))
 
-    if step_desc.get('input_manifest'):
+    if step.get('input_manifest'):
         raise NotImplementedError(
             'step %d uses an input manifest, which is unsupported')
 
     for mrc in ('mapper', 'reducer'):
-        _check_substep(step_desc, step_num, mrc)
+        _check_substep(step, step_num, mrc)
 
 
-def _check_substep(step_desc, step_num, mrc):
+def _check_substep(step, step_num, mrc):
     """Raise :py:class:`NotImplementedError` if the given substep
     (e.g. ``'mapper'``) runs subprocesses."""
-    substep_desc = step_desc.get(mrc)
-    if not substep_desc:
+    substep = step.get(mrc)
+    if not substep:
         return
 
-    if substep_desc.get('type') != 'script':
+    if substep.get('type') != 'script':
         raise NotImplementedError(
             "step %d's %s has unexpected type: %r" % (
-                step_num, mrc, substep_desc.get('type')))
+                step_num, mrc, substep.get('type')))
 
-    if substep_desc.get('pre_filter'):
+    if substep.get('pre_filter'):
         raise NotImplementedError(
             "step %d's %s has pre-filter, which is unsupported" % (
                 step_num, mrc))

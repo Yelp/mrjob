@@ -40,6 +40,7 @@ from mrjob.util import to_lines
 
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_doubler import MRDoubler
+from tests.mr_no_mapper import MRNoMapper
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
@@ -96,6 +97,8 @@ class MRWordFreqCountFailingCombiner(MRWordFreqCount):
 
 
 class MRSumValuesByWord(MRJob):
+    # if combiner is run, keys with values that sum to 0
+    # will be eliminated
 
     def mapper(self, _, line):
         word, value_str = line.split('\t', 1)
@@ -106,7 +109,25 @@ class MRSumValuesByWord(MRJob):
         if values_sum != 0:
             yield word, values_sum
 
-    reducer = combiner
+    def reducer(self, word, values):
+        yield word, sum(values)
+
+
+class MRSumValuesByWordWithCombinerPreFilter(MRSumValuesByWord):
+
+    def combiner_pre_filter(self):
+        return 'cat'
+
+
+class MRSumValuesByWordWithNoCombinerJobs(MRSumValuesByWord):
+
+    def __init__(self, *args, **kwargs):
+        super(MRSumValuesByWordWithNoCombinerJobs, self).__init__(
+            *args, **kwargs)
+
+        if self.options.run_combiner:
+            raise NotImplementedError("Can't init combiner jobs")
+
 
 class SparkHarnessOutputComparisonBaseTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
@@ -362,16 +383,47 @@ class SparkHarnessOutputComparisonTestCase(
             )
 
     def test_combiner_that_sometimes_yields_zero_values(self):
-        # a more plausible test of a combiner that sometimes doesn't yield a
-        # value that we can compare to the reference job
-        input_bytes = b'\n'.join([
-            b'happy\t5',
-            b'sad\t3',
-            b'happy\t2',
-            b'sad\t-3',
-        ])
+        # another test that the combiner actually runs
+        #
+        # would like to test this against a reference job, but whether
+        # the combiner can see and eliminate the "sad" values that sum
+        # to zero depends on the reference runner's partitioning
 
-        self._assert_output_matches(MRSumValuesByWord, input_bytes=input_bytes)
+        # note that "sad" values sum to zero
+        input_bytes = b'happy\t5\nsad\t3\nhappy\t2\nsad\t-3\n'
+
+        job = self._harness_job(MRSumValuesByWord, input_bytes=input_bytes)
+        with job.make_runner() as runner:
+            runner.run()
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(happy=7),  # combiner should eliminate sad=0
+            )
+
+    def test_skip_combiner_if_runs_subprocesses(self):
+        # same as above, but we have to skip combiner because of its pre-filter
+        input_bytes = b'happy\t5\nsad\t3\nhappy\t2\nsad\t-3\n'
+
+        job = self._harness_job(MRSumValuesByWordWithCombinerPreFilter,
+                                input_bytes=input_bytes)
+        with job.make_runner() as runner:
+            runner.run()
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(happy=7, sad=0),
+            )
+
+    def test_skip_combiner_if_cant_init_job(self):
+        input_bytes = b'happy\t5\nsad\t3\nhappy\t2\nsad\t-3\n'
+
+        job = self._harness_job(MRSumValuesByWordWithNoCombinerJobs,
+                                input_bytes=input_bytes)
+        with job.make_runner() as runner:
+            runner.run()
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(happy=7, sad=0),
+            )
 
     def test_skip_combiner_that_runs_cmd(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
@@ -410,6 +462,12 @@ class SparkHarnessOutputComparisonTestCase(
                     ).collect()[0])
 
         self.assertEqual(harness_counters, reference_counters)
+
+    def test_job_with_no_mapper_in_second_step(self):
+        # mini-regression test for not passing step_num to step.description()
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        self._assert_output_matches(MRNoMapper, input_bytes=input_bytes)
 
 
 class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
@@ -539,8 +597,8 @@ class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):
                 join(runner.get_output_dir(), 'o')))
 
             output_counts = dict(
-                line.strip().split(b'\t')
-                for line in to_lines(runner.cat_output()))
+                (line.strip().split(b'\t')
+                 for line in to_lines(runner.cat_output())))
 
         expected_output_counts = {
             b'"ee"': b'2', b'"eye"': b'2', b'"oh"': b'1'}
@@ -718,28 +776,34 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
     def _test_run_reducer(self, num_reducers=None):
         rdd = self.mock_rdd()
 
-        reducer_job = Mock()
-        reducer_job.pick_protocols.return_value = (Mock(), Mock())
+        def make_mock_mrc_job(mrc, step_num):
+            job = Mock()
+            job.pick_protocols.return_value = (Mock(), Mock())
 
-        final_rdd = _run_reducer(reducer_job, rdd, num_reducers=num_reducers)
+            return job
+
+        final_rdd = _run_reducer(
+            make_mock_mrc_job, 0, rdd, num_reducers=num_reducers)
         self.assertEqual(final_rdd, rdd)  # mock RDD's methods return it
 
         called_mapPartitions = False
 
-        before_map_partition = True
+        before_mapPartitions = True
         for name, args, kwargs in rdd.method_calls:
             if name == 'mapPartitions':
                 called_mapPartitions = True
-                before_map_partition = False
+                before_mapPartitions = False
 
             # We want to make sure we keep the original partition before
-            # reaching to map_partition
-            if before_map_partition:
+            # reaching mapPartitions()
+            #
+            # (currently there aren't any method calls before mapPartitions(),
+            # but there were when this test was created)
+            if before_mapPartitions:
                 self.assertEqual(kwargs.get('preservesPartitioning'), True)
 
-            # Once we finished from map_paratition, we don't care about if
-            # we keep the same partition unless we want to fixed on number
-            # of partitions
+            # Once we've run mapPartitions(), we only need to preserve
+            # partitions if the user explicitly requested a certain number
             else:
                 self.assertEqual(
                     kwargs.get('preservesPartitioning'), bool(num_reducers))

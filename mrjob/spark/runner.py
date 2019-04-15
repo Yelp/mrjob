@@ -353,14 +353,14 @@ class SparkMRJobRunner(MRJobBinRunner):
         """Generate spark harness args for streaming steps (and handle
         other spark step types the usual way).
         """
-        step = self._get_step(step_num)
-
-        if step['type'] != 'streaming':
-            return super(SparkMRJobRunner, self)._spark_script_args(
-                step_num, last_step_num)
-
         if last_step_num is None:
             last_step_num = step_num
+
+        steps = self._get_steps()[step_num:last_step_num + 1]
+
+        if steps[0]['type'] != 'streaming':
+            return super(SparkMRJobRunner, self)._spark_script_args(
+                step_num, last_step_num)
 
         args = []
 
@@ -377,6 +377,23 @@ class SparkMRJobRunner(MRJobBinRunner):
         args.append(
             self._step_output_uri(last_step_num))
 
+        # --hadoop-input-format. Pass '' to indicate we know there is none
+        args.extend(['--hadoop-input-format',
+                     self._hadoop_input_format or ''])
+
+        # --hadoop-output-format. Pass '' to indicate we know there is none
+        args.extend(['--hadoop-output-format',
+                     self._hadoop_output_format or ''])
+
+        # --sort-values
+        if self._sort_values:
+            args.append('--sort-values')
+        else:
+            args.append('--no-sort-values')
+
+        # --steps-desc
+        args.extend(['--steps-desc', json.dumps(steps)])
+
         # --counter-output-dir, to simulate counters
         args.extend(['--counter-output-dir',
                      self._counter_output_dir(step_num)])
@@ -388,8 +405,8 @@ class SparkMRJobRunner(MRJobBinRunner):
         # --job-args (passthrough args)
 
         # if on local[*] master, keep file upload args as-is (see #2031)
-        local = not self._spark_executors_have_own_wd()
-        job_args = self._mr_job_extra_args(local=local)
+        job_args = self._mr_job_extra_args(
+            local=not self._spark_executors_have_own_wd())
 
         if job_args:
             args.extend(['--job-args', cmd_line(job_args)])

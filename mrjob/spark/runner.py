@@ -82,19 +82,13 @@ class SparkMRJobRunner(MRJobBinRunner):
     }
 
     def __init__(self, max_output_files=None, mrjob_cls=None, **kwargs):
-        """Create a spark runner
+        """Create a Spark runner.
 
         :param max_output_files: limit on number of output files when
                                  running streaming jobs. Can only be
                                  set on command line (not config file)
         :param mrjob_cls: class of the job you want to run. Used for
                           running streaming steps in Spark
-
-        SparkMRJobRunner ignores the keyword arguments *hadoop_input_format*,
-        *hadoop_output_format*, and *sort_values* (see
-        :py:meth:`MRJobRunner.__init__`). These are only set by the job as a
-        way to communicate certain attributes to the runner, and the Spark
-        runner instead inspects the job directly.
         """
         # need to set this before checking steps in superclass __init__()
         self._mrjob_cls = mrjob_cls

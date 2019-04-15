@@ -990,7 +990,6 @@ class DeprecatedFileUploadArgsTestCase(SandboxedTestCase):
                 path='/tmp/.fooconf', name='dot-fooconf', type='file')])
 
         self.assertEqual(old_runner._extra_args, new_runner._extra_args)
-        self.assertEqual(old_runner._spark_files, new_runner._spark_files)
         self.assertEqual(old_runner._working_dir_mgr._name_to_typed_path,
                          new_runner._working_dir_mgr._name_to_typed_path)
 

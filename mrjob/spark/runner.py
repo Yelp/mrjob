@@ -435,6 +435,8 @@ class SparkMRJobRunner(MRJobBinRunner):
             path = path[:-1]
         return path
 
+    # "streaming" steps run on Spark too
+
     def _has_spark_steps(self):
         """Treat streaming steps as Spark steps."""
         return (super(SparkMRJobRunner, self)._has_spark_steps() or
@@ -450,7 +452,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         return any(step['type'] == 'streaming'
                    for step in self._get_steps())
 
-    def _has_pyspark_steps(self):
+    def _is_pyspark_step(self, step):
         """Treat streaming steps as Spark steps that use Python."""
-        return (super(SparkMRJobRunner, self)._has_pyspark_steps() or
-                self._has_streaming_steps())
+        return (super(SparkMRJobRunner, self)._is_pyspark_step(step) or
+                step['type'] == 'streaming')

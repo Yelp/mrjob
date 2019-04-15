@@ -1028,7 +1028,7 @@ class MRJobBinRunner(MRJobRunner):
 
         cmdenv = {}
 
-        if step['type'] in ('spark', 'spark_script'):  # not spark_jar
+        if self._is_pyspark_step(step):
             driver_python = cmd_line(self._python_bin())
 
             if self._spark_python_wrapper_path:

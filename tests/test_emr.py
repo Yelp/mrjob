@@ -5347,9 +5347,9 @@ class SparkMasterAndDeployModeTestCase(MockBoto3TestCase):
             self.start(patch('mrjob.emr.EMRJobRunner.get_hadoop_version',
                              return_value='2'))
 
-            self.assertEqual(
-                runner._spark_submit_args(0)[-4:],
-                ['--master', 'yarn', '--deploy-mode', 'cluster']
+            self.assertIn(
+                cmd_line(['--master', 'yarn', '--deploy-mode', 'cluster']),
+                cmd_line(runner._spark_submit_args(0))
             )
 
     def test_spark_master_and_deploy_mode_are_hard_coded(self):

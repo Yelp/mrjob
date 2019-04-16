@@ -82,19 +82,13 @@ class SparkMRJobRunner(MRJobBinRunner):
     }
 
     def __init__(self, max_output_files=None, mrjob_cls=None, **kwargs):
-        """Create a spark runner
+        """Create a Spark runner.
 
         :param max_output_files: limit on number of output files when
                                  running streaming jobs. Can only be
                                  set on command line (not config file)
         :param mrjob_cls: class of the job you want to run. Used for
                           running streaming steps in Spark
-
-        SparkMRJobRunner ignores the keyword arguments *hadoop_input_format*,
-        *hadoop_output_format*, and *sort_values* (see
-        :py:meth:`MRJobRunner.__init__`). These are only set by the job as a
-        way to communicate certain attributes to the runner, and the Spark
-        runner instead inspects the job directly.
         """
         # need to set this before checking steps in superclass __init__()
         self._mrjob_cls = mrjob_cls
@@ -441,12 +435,24 @@ class SparkMRJobRunner(MRJobBinRunner):
             path = path[:-1]
         return path
 
+    # "streaming" steps run on Spark too
+
     def _has_spark_steps(self):
         """Treat streaming steps as Spark steps."""
         return (super(SparkMRJobRunner, self)._has_spark_steps() or
                 self._has_streaming_steps())
 
-    def _has_pyspark_steps(self):
+    def _has_hadoop_streaming_steps(self):
+        # the Spark runner doesn't run "streaming" steps on Hadoop
+        return False
+
+    def _has_streaming_steps(self):
+        """Are any of our steps "streaming" steps that would normally run
+        on Hadoop Streaming?"""
+        return any(step['type'] == 'streaming'
+                   for step in self._get_steps())
+
+    def _is_pyspark_step(self, step):
         """Treat streaming steps as Spark steps that use Python."""
-        return (super(SparkMRJobRunner, self)._has_pyspark_steps() or
-                self._has_streaming_steps())
+        return (super(SparkMRJobRunner, self)._is_pyspark_step(step) or
+                step['type'] == 'streaming')

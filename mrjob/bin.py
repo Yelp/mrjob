@@ -92,11 +92,6 @@ class MRJobBinRunner(MRJobRunner):
         # interleaved; see mrjob.setup.parse_setup_cmd() for details
         self._setup = [parse_setup_cmd(cmd) for cmd in self._opts['setup']]
 
-        if self._setup and self._has_pyspark_steps() and not (
-                self._spark_setup_is_supported()):
-            log.warning("setup commands aren't supported on Spark master %r" %
-                        self._spark_master())
-
         for cmd in self._setup:
             for token in cmd:
                 if isinstance(token, dict):
@@ -108,13 +103,18 @@ class MRJobBinRunner(MRJobRunner):
 
                     self._working_dir_mgr.add(**token)
 
+        # warning: no setup scripts on Spark when no working dir
+        if self._setup and self._has_pyspark_steps() and not(
+                self._spark_executors_have_own_wd()):
+            log.warning("setup commands aren't supported on Spark master %r" %
+                        self._spark_master())
+
         # --py-files on Spark doesn't allow '#' (see #1375)
         if any('#' in path for path in self._opts['py_files']):
             raise ValueError("py_files cannot contain '#'")
 
         # Keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
-
 
     def _default_opts(self):
         return combine_dicts(
@@ -456,7 +456,7 @@ class MRJobBinRunner(MRJobRunner):
         If *local* is true, use local line endings (e.g. Windows). Otherwise,
         use UNIX line endings (see #1071).
         """
-        if self._has_streaming_steps():
+        if self._has_hadoop_streaming_steps():
             streaming_setup = self._py_files_setup() + self._setup
 
             if streaming_setup and not self._setup_wrapper_script_path:
@@ -482,21 +482,9 @@ class MRJobBinRunner(MRJobRunner):
                 wrap_python=True)
 
     def _uses_spark_setup_script(self):
-        if not self._has_pyspark_steps():
-            return False
-
-        if not self._setup:
-            return False  # nothing to do
-
-        if not self._spark_setup_is_supported():
-            return False
-
-        return True
-
-    def _spark_setup_is_supported(self):
-        """Can we run setup scripts on Spark?"""
-        # for now, we only support setup scripts on YARN (see #1376)
-        return self._spark_master() == 'yarn'
+        return (self._setup and
+                self._has_pyspark_steps() and
+                self._spark_executors_have_own_wd())
 
     def _py_files_setup(self):
         """A list of additional setup commands to emulate Spark's
@@ -1002,22 +990,14 @@ class MRJobBinRunner(MRJobRunner):
         return args
 
     def _spark_upload_args(self):
-        # don't bother if there isn't a working directory to upload to
-        if not self._spark_executors_have_own_wd():
-            return []
-
-        # if using a setup script, upload all files to working dir
-        if self._spark_python_wrapper_path:
+        if self._spark_executors_have_own_wd():
             return self._upload_args_helper(
                 '--files', None,
                 '--archives', None,
                 always_use_hash=False)
         else:
-            # otherwise, just pass through --files and --archives
-            return self._upload_args_helper(
-                '--files', self._spark_files,
-                '--archives', self._spark_archives,
-                always_use_hash=False)
+            # don't bother, there's no working dir to upload to
+            return []
 
     def _spark_script_path(self, step_num):
         """The path of the spark script or JAR, used by
@@ -1048,7 +1028,7 @@ class MRJobBinRunner(MRJobRunner):
 
         cmdenv = {}
 
-        if step['type'] in ('spark', 'spark_script'):  # not spark_jar
+        if self._is_pyspark_step(step):
             driver_python = cmd_line(self._python_bin())
 
             if self._spark_python_wrapper_path:

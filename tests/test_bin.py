@@ -1135,6 +1135,9 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'yoda',
                     '--deploy-mode', 'the-force',
+                    '--files',
+                    runner._dest_in_wd_mirror(runner._script_path,
+                                              'mr_null_spark.py'),
                 ]
             )
 
@@ -1297,6 +1300,9 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'yarn',
                     '--deploy-mode', 'client',
+                    '--files',
+                    runner._dest_in_wd_mirror(runner._script_path,
+                                              'mr_null_spark.py'),
                 ]
             )
 
@@ -1317,6 +1323,9 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'yarn',
                     '--deploy-mode', 'client',
+                    '--files',
+                    runner._dest_in_wd_mirror(runner._script_path,
+                                              'mr_null_spark.py')
                 ]
             )
 
@@ -1497,17 +1506,20 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--master', 'yarn',
                     '--deploy-mode', 'client',
                     '--files',
-                    (runner._dest_in_wd_mirror(foo1_path, 'foo1') +
-                     ',' +
-                     runner._dest_in_wd_mirror(foo2_path, 'bar') +
+                    (runner._dest_in_wd_mirror(foo2_path, 'bar') +
                      ',' +
                      # we're in YARN, so we can just add #baz to rename foo3
-                     'hdfs:///path/to/foo3#baz'),
-                     '--archives',
+                     'hdfs:///path/to/foo3#baz' +
+                     ',' +
+                     runner._dest_in_wd_mirror(foo1_path, 'foo1') +
+                     ',' +
+                     runner._dest_in_wd_mirror(runner._script_path,
+                                               'mr_null_spark.py')),
+                    '--archives',
                     (runner._dest_in_wd_mirror(baz_path, 'baz.tar.gz') +
                      ',' +
                      runner._dest_in_wd_mirror(
-                         runner._dir_archive_path(qux_path), 'qux'))
+                         runner._dir_archive_path(qux_path), 'qux')),
                 ]
             )
 
@@ -1535,16 +1547,19 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--master', 'mesos://host:12345',
                     '--deploy-mode', 'client',
                     '--files',
-                    (runner._dest_in_wd_mirror(foo1_path, 'foo1') +
+                    (runner._dest_in_wd_mirror(foo2_path, 'bar') +
                      ',' +
-                     runner._dest_in_wd_mirror(foo2_path, 'bar') +
+                     # but URIs with different name have to be re-uploaded
+                     runner._dest_in_wd_mirror(foo4_uri, 'baz') +
+                     ',' +
+                     runner._dest_in_wd_mirror(foo1_path, 'foo1') +
                      ',' +
                      # can use URIs with same name as-is
                      foo3_uri +
                      ',' +
-                     # but URIs with different name have to be re-uploaded
-                     runner._dest_in_wd_mirror(foo4_uri, 'baz')
-                     ),
+                     runner._dest_in_wd_mirror(runner._script_path,
+                                               'mr_null_spark.py')
+                    ),
                 ]
             )
 
@@ -1567,7 +1582,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--master', 'mock',
                     '--deploy-mode', 'client',
                     '--files',
-                    runner._dest_in_wd_mirror(qux_path, 'qux')
+                    'uri-of://files/wd/mr_null_spark.py,uri-of://files/wd/qux',
                 ]
             )
 
@@ -1589,7 +1604,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', _LOCAL_CLUSTER_MASTER,
                     '--deploy-mode', 'client',
-                    '--files', qux_path,
+                    '--files', ('%s,%s' % (runner._script_path, qux_path)),
                 ]
             )
 
@@ -1777,7 +1792,7 @@ class PySparkPythonTestCase(MockHadoopTestCase):
         self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
         self.assertEqual(env['PYSPARK_PYTHON'], './python-wrapper.sh')
 
-    def test_setup_wrapper_requires_yarn(self):
+    def test_no_setup_scripts_on_local_master(self):
         env, runner = self._env_and_runner(
             '--setup', 'true', '--spark-master', 'local')
 
@@ -1833,7 +1848,7 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
             ['-r', 'hadoop',
              '--setup', 'make -f Makefile#',
              '--file', 'foo',
-             '--spark-master', _LOCAL_CLUSTER_MASTER,
+             '--spark-master', 'local[*]',
              ])
         job.sandbox()
 
@@ -1843,7 +1858,8 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
 
             upload_args = cmd_line(runner._spark_upload_args())
 
-            self.assertIn('foo', upload_args)
+            # nothing is uploaded in local[*] mode
+            self.assertNotIn('foo', upload_args)
 
             self.assertNotIn('Makefile', upload_args)
             self.assertNotIn('python-wrapper.sh', upload_args)

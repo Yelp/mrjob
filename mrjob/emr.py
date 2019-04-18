@@ -2454,9 +2454,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         return instance_sort_key
 
     def _check_cluster_state(self, emr_client, cluster, num_steps):
-        """Check if the given cluster's state is in a state we can join. This is
-        unlike :py:meth:`~mrjob.emr.EMRJobRunner._compare_cluster_setup` which
-        only checks for preconfigured fields.
+        """Check if the given cluster's state is in a state we can join. This
+        is unlike :py:meth:`~mrjob.emr.EMRJobRunner._compare_cluster_setup`
+        which only checks for preconfigured fields.
 
         These checks include
 
@@ -2548,7 +2548,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cluster = emr_client.describe_cluster(
                     ClusterId=cluster_id)['Cluster']
                 instance_sort_key = self._compare_cluster_setup(
-                        emr_client, cluster, req_pool_hash)
+                    emr_client, cluster, req_pool_hash)
                 if not instance_sort_key:
                     invalid_clusters.add(cluster_id)
                     continue

@@ -281,8 +281,7 @@ def _pickle_safe(func):
         raise Exception(repr(ex))  # we know this is pickleable
 
 
-        # other utilities
-
+# other utilities
 
 def _sort_lines_with_sort_bin(input_paths, output_path, sort_bin,
                               sort_values=False, tmp_dir=None):

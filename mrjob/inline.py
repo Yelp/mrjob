@@ -164,7 +164,7 @@ class InlineMRJobRunner(SimMRJobRunner):
         task_args = self._spark_script_args(step_num)
 
         with open(stdout_path, 'wb') as stdout, \
-              open(stderr_path, 'wb') as stderr:
+                open(stderr_path, 'wb') as stderr:
             with save_current_environment(), save_cwd(), save_sys_path(), \
                     save_sys_std():
                 os.environ.update(_fix_env(self._opts['cmdenv']))

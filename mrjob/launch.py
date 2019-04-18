@@ -142,7 +142,6 @@ class MRJobLauncher(object):
         self._stdout = None
         self._stderr = None
 
-
     # by default, self.stdin, self.stdout, and self.stderr are sys.std*.buffer
     # if it exists, and otherwise sys.std* otherwise (they should always deal
     # with bytes, not Unicode).

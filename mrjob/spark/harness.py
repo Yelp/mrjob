@@ -182,7 +182,7 @@ def main(cmd_line_args=None):
         counter_accumulator = counter_accumulators[step_num - start]
 
         def increment_counter(group, name, amount=1):
-            counter_accumulator.add({group: {name:  amount}})
+            counter_accumulator.add({group: {name: amount}})
 
         return increment_counter
 

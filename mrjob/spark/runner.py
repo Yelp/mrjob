@@ -152,7 +152,6 @@ class SparkMRJobRunner(MRJobBinRunner):
             ),
         )
 
-
     def _run(self):
         self.get_spark_submit_bin()  # find spark-submit up front
         self._create_setup_wrapper_scripts()

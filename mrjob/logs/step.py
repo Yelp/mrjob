@@ -218,6 +218,7 @@ def _yield_lines_from_pty_or_pipe(stderr):
         else:
             raise
 
+
 # TODO: could factor out _yield_lines_from_pty_or_pipe() and just have
 # this method take a sequence of lines
 def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):

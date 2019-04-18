@@ -826,7 +826,7 @@ class MRJobRunner(object):
                 '%s cannot run steps!' % self.__class__.__name__)
 
         for step_num, step in enumerate(steps):
-           self._check_step(step, step_num)
+            self._check_step(step, step_num)
 
     def _check_step(self, step, step_num):
         """Raise an exception if the given step is invalid

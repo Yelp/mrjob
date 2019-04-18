@@ -54,6 +54,7 @@ _DEFAULT_MAX_MINS_IDLE = 10.0
 # default part size (so we can share with Spark runner)
 _DEFAULT_CLOUD_PART_SIZE_MB = 100
 
+
 class HadoopInTheCloudJobRunner(MRJobBinRunner):
     """Abstract base class for all Hadoop-in-the-cloud services."""
 

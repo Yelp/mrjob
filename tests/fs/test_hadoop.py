@@ -173,7 +173,6 @@ class HadoopFSTestCase(MockSubprocessTestCase):
 
     def test_no_put_to_dir(self):
         local_path = self.makefile('foo', contents=b'bar')
-        dest = 'hdfs:///bar'
 
         self.assertRaises(ValueError, self.fs.put, local_path, 'hdfs:///')
 

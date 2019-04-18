@@ -27,7 +27,6 @@ from mrjob.fs.s3 import _HUGE_PART_SIZE
 
 from tests.compress import gzip_compress
 from tests.mock_boto3 import MockBoto3TestCase
-from tests.mock_boto3.s3 import MockS3Object
 from tests.py2 import patch
 
 

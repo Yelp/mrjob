@@ -38,7 +38,6 @@ from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import is_gcs_uri
-from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error

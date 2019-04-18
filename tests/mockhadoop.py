@@ -693,11 +693,11 @@ def hadoop_fs_touchz(stdout, stderr, environ, *args):
                 "touchz: `%s': Not a zero-length file" % uri, file=stderr)
             return 1
     else:
-        try:
+        if os.path.exists(os.path.dirname(path)):
             with open(path, 'w'):
                 pass
             return 0
-        except FileNotFoundError:
+        else:
             print(
                 "touchz: `%s': No such file or directory: `%s'" % (
                     uri, uri), file=stderr)

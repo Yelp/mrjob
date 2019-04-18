@@ -38,6 +38,7 @@ from mrjob.util import NullHandler
 
 from tests.py2 import patch
 from tests.py2 import MagicMock
+from tests.py2 import ResourceWarning
 
 
 # simple config that also silences 'no config options for runner' logging

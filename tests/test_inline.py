@@ -21,12 +21,9 @@
 import gzip
 import os
 import os.path
-import sys
 from os.path import exists
 from os.path import join
 from io import BytesIO
-from unittest import TestCase
-from unittest import skip
 from unittest import skipIf
 
 from warcio.warcwriter import WARCWriter

@@ -152,6 +152,8 @@ else:
     from urllib.request import urlopen
     from urllib.parse import urlparse
 ParseResult
+pathname2url
+urljoin
 urlopen
 urlparse
 

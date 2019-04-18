@@ -45,6 +45,11 @@ call
 patch = mock.patch
 patch
 
+if PY2:
+    ResourceWarning = Warning
+else:
+    ResourceWarning = ResourceWarning
+
 
 def mock_stdout_or_stderr():
     """Use this to make a mock stdout/stderr (e.g. for a method

@@ -53,7 +53,6 @@ from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.py2 import ANY
 from tests.py2 import call
 from tests.py2 import patch
-from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_bin import _LOCAL_CLUSTER_MASTER
 

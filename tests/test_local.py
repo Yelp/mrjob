@@ -59,7 +59,6 @@ from tests.mr_filter_job import MRFilterJob
 from tests.mr_group import MRGroup
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_just_a_jar import MRJustAJar
-from tests.mr_null_spark import MRNullSpark
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.mr_two_step_job import MRTwoStepJob

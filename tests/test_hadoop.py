@@ -32,7 +32,6 @@ from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.hadoop import pty
 from mrjob.step import StepFailedException
-from mrjob.util import which
 
 from tests.mockhadoop import add_mock_hadoop_counters
 from tests.mockhadoop import add_mock_hadoop_output
@@ -56,11 +55,8 @@ from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.test_bin import PYTHON_BIN
 
-# pty isn't available on Windows
-try:
-    import pty
-    pty
-except ImportError:
+if pty is None:
+    # some tests should run even if pty is missing
     pty = Mock()
 
 

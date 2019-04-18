@@ -44,8 +44,7 @@ class MRSparkHarness(MRJob):
 
     def spark(self, input_path, output_path):
         harness_args = [
-            self.options.job_class,input_path, output_path,
-        ]
+            self.options.job_class, input_path, output_path]
 
         # find arguments to pass through to the Spark harness
         raw_args = _parse_raw_args(self.arg_parser, self._cl_args)

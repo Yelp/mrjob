@@ -278,8 +278,8 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
         # deliberately mix Hadoop 1 and 2 config properties
         jobconf_args = [
             '--jobconf',
-            'mapred.output.compression.codec='\
-            'org.apache.hadoop.io.compress.GzipCodec',
+            ('mapred.output.compression.codec='
+             'org.apache.hadoop.io.compress.GzipCodec'),
             '--jobconf',
             'mapreduce.output.fileoutputformat.compress=true',
         ]
@@ -324,7 +324,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
     def test_num_reducers(self):
         jobconf_args = [
-            '--jobconf' , 'mapreduce.job.reduces=1'
+            '--jobconf', 'mapreduce.job.reduces=1'
         ]
 
         job = MRWordFreqCount(['-r', 'spark'] + jobconf_args)

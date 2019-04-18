@@ -475,7 +475,6 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
             self.assertEqual(output_uri_2, to_uri(output_dir))
 
 
-
 class DirArchivePathTestCase(SandboxedTestCase):
 
     def test_dir(self):

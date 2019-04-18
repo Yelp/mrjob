@@ -1197,7 +1197,6 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
             self.assertFalse(self.mock_execvpe.called)
 
 
-
 @skipIf(not (pty and hasattr(pty, 'fork')), 'no pty.fork()')
 class BadHadoopBinAfterFork(MockHadoopTestCase):
     # test what happens if os.execvpe() fails (see #2024)

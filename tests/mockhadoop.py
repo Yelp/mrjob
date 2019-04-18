@@ -141,7 +141,7 @@ def add_mock_hadoop_output(parts):
     for i, part in enumerate(parts):
         part_path = os.path.join(output_subdir, 'part-%05d' % i)
         with open(part_path, 'wb') as part_file:
-                part_file.write(part)
+            part_file.write(part)
 
 
 def get_mock_hadoop_output():

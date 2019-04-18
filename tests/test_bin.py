@@ -94,8 +94,10 @@ class GenericLocalRunnerTestCase(SandboxedTestCase):
 
         # couldn't figure out how to delete a method with mock
         _spark_master_method = LocalMRJobRunner._spark_master
+
         def restore_spark_master_method():
             LocalMRJobRunner._spark_master = _spark_master_method
+
         self.addCleanup(restore_spark_master_method)
 
         delattr(LocalMRJobRunner, '_spark_master')
@@ -1221,9 +1223,9 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                   '--conf', 'spark.executorEnv.FOO=bar',
-                   '--master', 'local[*]',
-                   '--deploy-mode', 'client',
+                    '--conf', 'spark.executorEnv.FOO=bar',
+                    '--master', 'local[*]',
+                    '--deploy-mode', 'client',
                 ]
             )
 
@@ -1547,18 +1549,19 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--master', 'mesos://host:12345',
                     '--deploy-mode', 'client',
                     '--files',
-                    (runner._dest_in_wd_mirror(foo2_path, 'bar') +
-                     ',' +
-                     # but URIs with different name have to be re-uploaded
-                     runner._dest_in_wd_mirror(foo4_uri, 'baz') +
-                     ',' +
-                     runner._dest_in_wd_mirror(foo1_path, 'foo1') +
-                     ',' +
-                     # can use URIs with same name as-is
-                     foo3_uri +
-                     ',' +
-                     runner._dest_in_wd_mirror(runner._script_path,
-                                               'mr_null_spark.py')
+                    (
+                        runner._dest_in_wd_mirror(foo2_path, 'bar') +
+                        ',' +
+                        # URIs with different name have to be re-uploaded
+                        runner._dest_in_wd_mirror(foo4_uri, 'baz') +
+                        ',' +
+                        runner._dest_in_wd_mirror(foo1_path, 'foo1') +
+                        ',' +
+                        # can use URIs with same name as-is
+                        foo3_uri +
+                        ',' +
+                        runner._dest_in_wd_mirror(runner._script_path,
+                                                  'mr_null_spark.py')
                     ),
                 ]
             )
@@ -1702,6 +1705,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--deploy-mode', 'client',
                 ]
             )
+
 
 class CreateMrjobZipTestCase(SandboxedTestCase):
 

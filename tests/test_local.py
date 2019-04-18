@@ -1185,5 +1185,4 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
         # fish was uploaded as "ghoti"
         self.assertNotIn('fish', file_sizes)
 
-
-    # TODO: add a Spark JAR to the repo, so we can test it
+        # TODO: add a Spark JAR to the repo, so we can test it

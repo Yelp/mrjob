@@ -47,7 +47,7 @@ from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_spark_harness import MRSparkHarness
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_freq_count_with_combiner_cmd import \
-     MRWordFreqCountWithCombinerCmd
+    MRWordFreqCountWithCombinerCmd
 from tests.py2 import Mock
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
@@ -807,7 +807,6 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
             else:
                 self.assertEqual(
                     kwargs.get('preservesPartitioning'), bool(num_reducers))
-
 
         # sanity-check that mapPartitions() was actually called
         self.assertTrue(called_mapPartitions)

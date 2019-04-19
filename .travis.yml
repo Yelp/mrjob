@@ -23,5 +23,6 @@ install:
 env:
   global:
     - JAVA_HOME=/usr/lib/jvm/java-11-oracle/
-script: python -m unittest discover -v
+#script: python -m unittest discover -v
+script: python -m unittest -v tests.spark.test_harness.HadoopFormatsTestCase
 sudo: false

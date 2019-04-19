@@ -15,5 +15,6 @@ install:
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
   - "pip install pyspark || true"
+  - "echo $JAVA_HOME"
 script: python -m unittest discover -v
 sudo: false

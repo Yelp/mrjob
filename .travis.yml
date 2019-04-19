@@ -8,21 +8,12 @@ python:
   - "pypy2.7-6.0"
   - "pypy3.5-6.0"
 dist: xenial
-before_install:
-  - sudo -E apt-add-repository -y "ppa:linuxuprising/java"
-  - sudo apt-get update
-  - echo oracle-java11-installer shared/accepted-oracle-license-v1-2 select true | sudo /usr/bin/debconf-set-selections
-  - sudo apt-get install oracle-java11-installer
-  - sudo apt-get install oracle-java11-set-default
 install:
   - "pip install ."
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
-  - "pip install 'pyspark>=2.4.1' || true"
+  - "pip install pyspark || true"
   - "pip install 'py4j>=0.10.8.1' || true"
-env:
-  global:
-    - JAVA_HOME=/usr/lib/jvm/java-11-oracle/
 #script: python -m unittest discover -v
-script: python -m unittest -v tests.spark.test_harness.HadoopFormatsTestCase
+script: python -m unittest -v tests.spark.test_harness
 sudo: false

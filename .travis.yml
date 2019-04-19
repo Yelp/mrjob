@@ -18,7 +18,8 @@ install:
   - "pip install ."
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
-  - "pip install pyspark || true"
+  - "pip install 'pyspark>=2.4.1' || true"
+  - "pip install 'py4j>=0.10.8.1' || true"
 env:
   global:
     - JAVA_HOME=/usr/lib/jvm/java-11-oracle/

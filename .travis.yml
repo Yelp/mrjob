@@ -8,13 +8,12 @@ python:
   - "pypy2.7-6.0"
   - "pypy3.5-6.0"
 dist: xenial
-before_install:
-  - sudo apt-get-install default-jdk
 install:
   - "pip install ."
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
   - "pip install pyspark || true"
   - "echo $JAVA_HOME"
-script: python -m unittest discover -v
+#script: python -m unittest discover -v
+script: python -m unittest -v tests.spark.test_harness
 sudo: false

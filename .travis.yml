@@ -9,7 +9,7 @@ python:
   - "pypy3.5-6.0"
 dist: xenial
 before_install:
-  - sudo apt-get install openjdk-8-jdk
+  - sudo apt-get install openjdk-9-jdk
 install:
   - "pip install ."
   - "pip install ujson warcio"

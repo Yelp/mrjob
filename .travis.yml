@@ -10,6 +10,7 @@ python:
 dist: xenial
 before_install:
   - sudo apt-get install openjdk-8-jdk
+  - sudo update-java-alternatives --set java-1.8.0-openjdk-amd64
 install:
   - "pip install ."
   - "pip install ujson warcio"
@@ -17,7 +18,7 @@ install:
   - "pip install pyspark || true"
   - "echo $JAVA_HOME"
   - "java -version"
-  - "update-java-alternatives --list"
+  - "update-java-alternatives --list || true"
 #script: python -m unittest discover -v
 script: false  # fail fast
 sudo: false

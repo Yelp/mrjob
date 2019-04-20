@@ -10,7 +10,6 @@ python:
 dist: xenial
 before_install:
   - sudo apt-get install openjdk-8-jdk
-  - sudo update-java-alternatives --set java-1.8.0-openjdk-amd64
 install:
   - "pip install ."
   - "pip install ujson warcio"
@@ -19,6 +18,9 @@ install:
   - "echo $JAVA_HOME"
   - "java -version"
   - "update-java-alternatives --list || true"
+env:
+  global:
+    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 #script: python -m unittest discover -v
-script: false  # fail fast
+script: "false"  # fail fast
 sudo: false

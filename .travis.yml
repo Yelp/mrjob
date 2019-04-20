@@ -15,13 +15,11 @@ install:
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
   - "pip install pyspark || true"
-  - "export PATH=/usr/lib/jvm/java-8-openjdk-amd64/bin:$PATH"
-  - "echo $JAVA_HOME"
+  - "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64"
+  - "export PATH=$JAVA_HOME/bin:$PATH"
   - "java -version"
-  - "update-java-alternatives --list || true"
 env:
   global:
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-#script: python -m unittest discover -v
-script: "false"  # fail fast
+    - JAVA_HOME=
+script: python -m unittest discover -v
 sudo: false

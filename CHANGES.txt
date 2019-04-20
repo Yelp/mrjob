@@ -1,5 +1,66 @@
 v0.6.8, 2019-04-?? -- Spark runner
- * Spark harness renamed to mrjob/spark/harness.py
+ * updated library dependencies (#2019, #2025)
+   * google-cloud-dataproc>=0.3.0
+   * google-cloud-logging>=1.9.0
+   * google-cloud-storage>=1.13.1
+   * PyYAML>=3.10
+ * jobs:
+   * un-sandboxed MRJobs are now Spark-serializable
+     * spark() can pass job methods to rdd.map() etc. (#2039)
+ * all runners:
+   * inline runner runs Spark jobs through PySpark (#1965)
+   * local runner runs Spark jobs on local-cluster master (#1361)
+   * cat_output() now ignores filenames starting with "." too (#1337)
+   * empty *_bin options mean use the default, not a no-args command (#1926)
+   * improved Spark support
+     * full support for setup scripts (was just YARN) (#2048)
+     * fully supports uploading files to Spark working dir (#1922)
+       * including renaming files (#2017)
+       * uploading archives/dirs is still unsupported except on YARN
+     * spark.yarn.appMasterEnv.* now only set on YARN (#1919)
+     * add_file_args() works on Spark
+       * even on local[*] master (#2031)
+     * uses file:// as appropriate when running locally (#1985)
+     * won't hang if Hadoop or Spark binary can't be run (#2024)
+     * spark master/deploy mode can't be overridden by jobconf (#2032)
+     * can search for spark binary in pyspark installation (#1984)
+     * (Dataproc runner does not yet support Spark)
+ * EMR runner:
+   * fixed fs bug that prevented running with non-default temp bucket (#2015)
+   * less API calls when job retries joining a pooled cluster (#1990)
+   * extra_cluster_params can set nested sub-params (#1934)
+     * e.g. Instances.EmrManagedMasterSecurityGroup
+   * --subnet '' un-sets subnet set in mrjob.conf (#1931)
+ * added Spark runner (#1940)
+   * runs jobs entirely on Spark, uses `hadoop fs` for HDFS only
+   * can use any fs mrjob supports (HDFS, EMR, Dataproc, local)
+   * can run "classic" MRJobs normally run on Hadoop streaming (#1972)
+     * supports mappers, combiners, reducers, including _init() and _final()
+     * makes efficient use of combiners, if available (#1946)
+     * supports Hadoop input/output format set in job (#1944)
+     * can run consecutive MRSteps in a single Spark step (#1950)
+     * respects SORT_VALUES (#1945)
+     * emulates Hadoop output compression (#1943)
+       * set the same jobconf variables you would in Hadoop
+     * can control number of output files
+       * set Hadoop jobconf variables to control # of reducers (#1953)
+       * or use --max-output-files (#2040)
+     * can simulate counters with accumulators (#1955)
+     * can handle jobs that load file args in their constructor (#2044)
+     * does not support commands (e.g. mapper_cmd(), mapper_pre_filter())
+     * (Spark runner does not yet parse logs for probable cause of error)
+   * Spark harness renamed to mrjob/spark/harness.py, no need to run directly
+ * `mrjob spark-submit` now defaults to spark runner
+   * works on emr, hadoop, and local runners as well (#1975)
+ * runner filesystems:
+   * added put() method to all FSes (#1977)
+     * part size for uploads is now set at fs init time
+   * CompositeFilesystem can can give up on an un-configured filesystem (#1974)
+     * used by the Spark runner when GCS/S3 aren't set up
+   * mkdir() can now create buckets (#2014)
+   * fs-specific methods now accessed through fs.<name>
+     * e.g. runner.fs.s3.make_s3_client()
+   * deprecated useless local_tmp_dir arg to GCSFilesystem (#1961)
 
 v0.6.7, 2019-01-16 -- mrjob spark-submit
  * tools:

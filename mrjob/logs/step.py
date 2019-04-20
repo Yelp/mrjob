@@ -416,5 +416,3 @@ def _log_log4j_record(record):
     """Log a log4j message at the appropriate logging level"""
     level = getattr(logging, record.get('level') or '', None)
     _log_line_from_driver(record['message'], level=level)
-    from sys import stderr
-    stderr.write(record['message'] + '\n')

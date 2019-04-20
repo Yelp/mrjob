@@ -17,5 +17,7 @@ install:
   - "pip install pyspark || true"
   - "echo $JAVA_HOME"
   - "java -version"
-script: python -m unittest discover -v
+  - "update-java-alternatives --list"
+#script: python -m unittest discover -v
+script: false  # fail fast
 sudo: false

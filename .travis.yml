@@ -14,6 +14,6 @@ install:
   - "pip install rapidjson || true"
   - "pip install pyspark || true"
   - "echo $JAVA_HOME"
-#script: python -m unittest discover -v
-script: python -m unittest -v tests.spark.test_harness
+  - "java -version"
+script: python -m unittest discover -v
 sudo: false

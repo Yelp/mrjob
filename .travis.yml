@@ -9,13 +9,13 @@ python:
   - "pypy3.5-6.0"
 dist: xenial
 before_install:
-  - sudo apt-get autoremove openjdk-11-jre
   - sudo apt-get install openjdk-8-jdk
 install:
   - "pip install ."
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
   - "pip install pyspark || true"
+  - "export PATH=/usr/lib/jvm/java-8-openjdk-amd64/bin:$PATH"
   - "echo $JAVA_HOME"
   - "java -version"
   - "update-java-alternatives --list || true"

@@ -1232,7 +1232,7 @@ class MRJobRunner(object):
         if is_uri(path):
             # file is visible to non-YARN Spark, but has the wrong name, so
             # download and re-upload it
-            wd_tmp = os.path.join(self._get_local_tmp_dir, 'wd-mirror')
+            wd_tmp = os.path.join(self._get_local_tmp_dir(), 'wd-mirror')
             self.fs.mkdir(wd_tmp)
 
             tmp_path = os.path.join(wd_tmp, name)

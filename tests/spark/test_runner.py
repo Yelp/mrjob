@@ -210,8 +210,9 @@ class SparkRunnerSparkStepsTestCase(MockFilesystemsTestCase):
 
 @skipIf(pyspark is None, 'no pyspark module')
 class SparkWorkingDirTestCase(MockFilesystemsTestCase):
+    # regression tests for #1922
 
-    def test_upload_files_with_rename(self):
+    def test_copy_files_with_rename_to_local_wd_mirror(self):
         # see test_upload_files_with_rename() in test_local for comparison
 
         fish_path = self.makefile('fish', b'salmon')
@@ -254,6 +255,50 @@ class SparkWorkingDirTestCase(MockFilesystemsTestCase):
 
         # fish was uploaded as "ghoti"
         self.assertNotIn('fish', file_sizes)
+
+    def test_copy_files_with_rename_to_remote_wd_mirror(self):
+        self.add_mock_s3_data({'walrus': {'fish': b'salmon',
+                                          'fowl': b'goose'}})
+
+        foe_path = self.makefile('foe', b'giant')
+
+        run_spark_submit = self.start(patch(
+            'mrjob.bin.MRJobBinRunner._run_spark_submit',
+            return_value=0))
+
+        job = MRSparkOSWalk(['-r', 'spark',
+                             '--spark-master', 'mesos://host:9999',
+                             '--spark-tmp-dir', 's3://walrus/tmp',
+                             '--file', 's3://walrus/fish#ghoti',
+                             '--file', 's3://walrus/fowl',
+                             '--file', foe_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # check working dir mirror
+            wd_mirror = runner._wd_mirror()
+            fs = runner.fs
+
+            self.assertIsNotNone(wd_mirror)
+            self.assertTrue(is_uri(wd_mirror))
+
+            self.assertTrue(fs.exists(wd_mirror))
+            # uploaded for rename
+            self.assertTrue(fs.exists(fs.join(wd_mirror, 'ghoti')))
+            # wrong name
+            self.assertFalse(fs.exists(fs.join(wd_mirror, 'fish')))
+            # no need to upload, already visible
+            self.assertFalse(fs.exists(fs.join(wd_mirror, 'fowl')))
+            # need to upload from local to remote
+            self.assertTrue(fs.exists(fs.join(wd_mirror, 'foe')))
+
+            # TODO: look at spark submit args
+
+
+
+
 
 
 @skipIf(pyspark is None, 'no pyspark module')

@@ -294,11 +294,21 @@ class SparkWorkingDirTestCase(MockFilesystemsTestCase):
             # need to upload from local to remote
             self.assertTrue(fs.exists(fs.join(wd_mirror, 'foe')))
 
-            # TODO: look at spark submit args
+            run_spark_submit.assert_called_once_with(
+                ANY, ANY, record_callback=ANY)
 
+            spark_submit_args = run_spark_submit.call_args[0][0]
+            self.assertIn('--files', spark_submit_args)
+            files_arg = spark_submit_args[
+                spark_submit_args.index('--files') + 1]
 
-
-
+            self.assertEqual(
+                files_arg, ','.join([
+                    fs.join(wd_mirror, 'foe'),
+                    's3://walrus/fowl',
+                    fs.join(wd_mirror, 'ghoti'),
+                    fs.join(wd_mirror, 'mr_spark_os_walk.py'),
+                ]))
 
 
 @skipIf(pyspark is None, 'no pyspark module')

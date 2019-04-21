@@ -99,6 +99,7 @@ setup(
     ],
     package_data={
         'mrjob': ['bootstrap/*.sh'],
+        'mrjob.examples': ['*.txt', '*.jar', '*.rb'],
         'mrjob.examples.mr_postfix_bounce': ['*.json'],
         'mrjob.examples.mr_travelling_salesman': ['example_graphs/*.json'],
     },

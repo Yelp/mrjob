@@ -69,7 +69,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         'hadoop_bin',
         'project_id',  # used by GCS filesystem
         's3_endpoint',
-        's3_region',  # only used along with s3_endpoint
+        's3_region',  # used when creating buckets on S3
         'spark_deploy_mode',
         'spark_master',
         'spark_tmp_dir',  # where to put temp files in Spark

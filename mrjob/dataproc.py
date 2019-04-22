@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Google Inc. and Yelp
 # Copyright 2017 Yelp
-# Copyright 2018 Google Inc.
+# Copyright 2018 Google Inc. and Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

@@ -298,6 +298,7 @@ Options available to hadoop runner only
 
     * ``$SPARK_HOME/bin``
     * ``$PATH``
+    * your :mod:`pyspark` installation's ``bin/`` directory
     * ``/usr/lib/spark/bin``
     * ``/usr/local/spark/bin``
     * ``/usr/local/lib/spark/bin``
@@ -305,3 +306,7 @@ Options available to hadoop runner only
     If all else fails, we just use ``spark-submit`` and hope for the best.
 
     .. versionadded:: 0.5.7
+
+    .. versionchanged:: 0.6.8
+
+       Searches for :command:`spark-submit` in :mod:`pyspark` installation.

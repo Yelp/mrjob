@@ -44,6 +44,9 @@ Job placement
 
     Geographic region to run jobs in (e.g.  ``us-central-1``).
 
+    If mrjob create a temporary bucket, it will be created in this region as
+    well.
+
     If you set region, you do not need to set :mrjob-opt:`zone`; a zone
     will be chosen for you automatically.
 

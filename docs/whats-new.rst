@@ -4,6 +4,13 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.8:
+
+0.6.8
+-----
+
+
+
 .. _v0.6.7:
 
 0.6.7

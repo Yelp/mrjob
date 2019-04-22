@@ -61,6 +61,7 @@ v0.6.8, 2019-04-?? -- Spark runner
    * fs-specific methods now accessed through fs.<name>
      * e.g. runner.fs.s3.make_s3_client()
    * deprecated useless local_tmp_dir arg to GCSFilesystem (#1961)
+ * missing mrjob.examples support files now installed
 
 v0.6.7, 2019-01-16 -- mrjob spark-submit
  * tools:

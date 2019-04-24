@@ -96,6 +96,8 @@ code, so there's nothing stopping you from using *SparkSession* instead of
 *SparkContext* in Spark 2, or writing a streaming-mode job rather than a
 batch one.
 
+.. _running-on-your-spark-cluster:
+
 Running on your Spark cluster
 =============================
 
@@ -121,7 +123,7 @@ by defining :py:meth:`~mrjob.job.MRJob.mapper` etc. or with
 off Hadoop without rewriting your jobs. See
 :ref:`below <classic-mrjobs-on-spark>` for details.
 
-.. note ::
+.. warning::
 
    If you don't set :mrjob-opt:`spark_master`, your job will run on Spark's
    default ``local[*]`` master, which can't handle :mrjob-opt:`setup` scripts
@@ -147,6 +149,8 @@ temp directory not on HDFS (e.g. ``--spark-tmp-dir s3a://bucket/path``).
 For more information on accessing S3 or GCS, see :ref:`amazon-setup` (S3)
 or :ref:`google-credentials-setup` (GCS).
 
+.. _other-ways-to-run-on-spark:
+
 Other ways to run on Spark
 ==========================
 
@@ -161,6 +165,11 @@ bubble up directly to your Python process.
 The inline runner also builds a simulated working directory for your job,
 making it possible to test scripts that rely on certain files being in the
 working directory (it doesn't run :mrjob-opt:`setup` scripts).
+
+.. note::
+
+   If you don't have a local Spark installation, the pyspark library
+   on PyPI is a pretty quick way to get one (``pip install pyspark``).
 
 Local runner
 ------------

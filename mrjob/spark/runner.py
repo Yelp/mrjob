@@ -52,6 +52,11 @@ log = logging.getLogger(__name__)
 class SparkMRJobRunner(MRJobBinRunner):
     """Runs a :py:class:`~mrjob.job.MRJob` on your Spark cluster (with or
     without Hadoop). Invoked when you run your job with ``-r spark``.
+
+    See :ref:`running-on-your-spark-cluster` for more information.
+
+    The Spark runner can also run "classic" MRJobs directly on Spark, without
+    using Hadoop streaming. See :ref:`classic-mrjobs-on-spark`.
     """
     alias = 'spark'
 

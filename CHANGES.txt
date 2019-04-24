@@ -23,7 +23,7 @@ v0.6.8, 2019-04-?? -- Spark runner
      * uses file:// as appropriate when running locally (#1985)
      * won't hang if Hadoop or Spark binary can't be run (#2024)
      * spark master/deploy mode can't be overridden by jobconf (#2032)
-     * can search for spark binary in pyspark installation (#1984)
+     * can search for spark-submit binary in pyspark installation (#1984)
      * (Dataproc runner does not yet support Spark)
  * EMR runner:
    * fixed fs bug that prevented running with non-default temp bucket (#2015)

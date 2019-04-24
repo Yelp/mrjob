@@ -15,7 +15,7 @@ with the following features familiar to users of mrjob:
   and :mrjob-opt:`py_files`)
 * run :command:`make` and other command before running Spark
   tasks (see :mrjob-opt:`setup`).
-* passthrough and file options (see :ref:`writing-cl-opts`)
+* passthrough and file arguments (see :ref:`writing-cl-opts`)
 * automatically parse logs to explain errors and other Spark job failures
 * easily pass through environment variables (see :mrjob-opt:`cmdenv`)
 * support for :mrjob-opt:`libjars`
@@ -110,22 +110,10 @@ If you want to run your job on your own Spark cluster, run it with
 Use ``--spark-master`` (see :mrjob-opt:`spark_master`) to control where your
 job runs.
 
-.. note ::
-
-   If you don't set :mrjob-opt:`spark_master`, your job will run on Spark's
-   default ``local[*]`` master, which can't handle :mrjob-opt:`setup` scripts
-   or ``--files`` because it doesn't give tasks their own working directory.
-
 You can pass in spark options with ``-D`` (see :mrjob-opt:`jobconf`) and
 set deploy mode (client or cluster) with ``--spark-deploy-mode``. If you need
 to pass other arguments to :command:`spark-submit`, use
 :mrjob-opt:`spark_args`.
-
-.. note::
-
-   mrjob needs to know what master and deploy mode you're using, so it will
-   override attempts to set spark master or deploy mode through
-   :mrjob-opt:`jobconf` (e.g. ``-D spark.master=...``).
 
 The Spark runner can also run "classic" MRJobs (i.e. those made
 by defining :py:meth:`~mrjob.job.MRJob.mapper` etc. or with
@@ -133,10 +121,22 @@ by defining :py:meth:`~mrjob.job.MRJob.mapper` etc. or with
 off Hadoop without rewriting your jobs. See
 :ref:`below <classic-mrjobs-on-spark>` for details.
 
+.. note ::
+
+   If you don't set :mrjob-opt:`spark_master`, your job will run on Spark's
+   default ``local[*]`` master, which can't handle :mrjob-opt:`setup` scripts
+   or ``--files`` because it doesn't give tasks their own working directory.
+
+.. note::
+
+   mrjob needs to know what master and deploy mode you're using, so it will
+   override attempts to set spark master or deploy mode through
+   :mrjob-opt:`jobconf` (e.g. ``-D spark.master=...``).
+
 Using remote filesystems other than HDFS
 ========================================
 
-By default, if you use a non-local Spark master (i.e. not ``local`` or
+By default, if you use a remote Spark master (i.e. not ``local`` or
 ``local-cluster``), Spark will assume you want to use HDFS for your job's
 temp space, and that you will want to access it through :command:`hadoop fs`.
 
@@ -144,8 +144,8 @@ Some Spark installations don't use HDFS at all. Fortunately, the Spark runner
 also supports S3 and GCS. Use :mrjob-opt:`spark_tmp_dir` to specify a remote
 temp directory not on HDFS (e.g. ``--spark-tmp-dir s3a://bucket/path``).
 
-(For more information on setting up credentials, see :ref:`amazon-setup`
-and :ref:`google-credentials-setup`.)
+For more information on accessing S3 or GCS, see :ref:`amazon-setup` (S3)
+or :ref:`google-credentials-setup` (GCS).
 
 Other ways to run on Spark
 ==========================
@@ -153,14 +153,14 @@ Other ways to run on Spark
 Inline runner
 -------------
 
-Running your Spark job with ``-r inline`` will launch it directly through the
-:mod:`pyspark` library, effectively running it on the ``local[*]`` master.
-This is convenient for debugging because exceptions will bubble up directly to
-your Python process.
+Running your Spark job with ``-r inline`` (the default) will launch it
+directly through the :mod:`pyspark` library, effectively running it on the
+``local[*]`` master. This is convenient for debugging because exceptions will
+bubble up directly to your Python process.
 
-The inline runner also creates a simulated working directory for your job,
+The inline runner also builds a simulated working directory for your job,
 making it possible to test scripts that rely on certain files being in the
-working directory (it can't run :mrjob-opt:`setup` scripts).
+working directory (it doesn't run :mrjob-opt:`setup` scripts).
 
 Local runner
 ------------
@@ -252,10 +252,10 @@ This is accomplished by overriding your job's :py:meth:`~mrjob.job.MRJob.steps`
 method and using the :py:class:`~mrjob.step.SparkStep` class::
 
   def steps():
-    return [
-      MRStep(mapper=self.preprocessing_mapper),
-      SparkStep(spark=self.spark),
-    ]
+      return [
+          MRStep(mapper=self.preprocessing_mapper),
+          SparkStep(spark=self.spark),
+      ]
 
 External Spark scripts
 ======================
@@ -270,12 +270,13 @@ and output paths using :py:data:`~mrjob.step.INPUT` and
 :py:meth:`~mrjob.job.MRJob.steps` method up like this::
 
   def steps():
-    return [
-      SparkScriptStep(
-        script=os.path.join(os.path.dirname(__file__), 'my_spark_script.py'),
-        args=[INPUT, '-o', OUTPUT, '--other-switch'],
-      ),
-    ]
+      return [
+          SparkScriptStep(
+             script=os.path.join(
+                 os.path.dirname(__file__), 'my_spark_script.py'),
+             args=[INPUT, '-o', OUTPUT, '--other-switch'],
+          ),
+      ]
 
 Custom input and output formats
 ===============================
@@ -329,11 +330,13 @@ directly on any Spark installation, even
 though these jobs were originally designed to run on Hadoop Streaming.
 Support includes:
 
- * ``*_init()`` and ``*_final()`` methods
- * Hadoop input and output formats
+ * :py:meth:`*_init() <mrjob.job.MRJob.mapper_init>` and
+   :py:meth:`*_final() <mrjob.job.MRJob.mapper_final>` methods
+ * :py:attr:`~mrjob.job.MRJob.HADOOP_INPUT_FORMAT` and
+   :py:attr:`~mrjob.job.MRJob.HADOOP_OUTPUT_FORMAT`
  * :py:attr:`~mrjob.job.MRJob.SORT_VALUES`
- * passthrough arguments
- * :py:meth:`~mrjob.job.MRJob.increment_counters`
+ * :ref:`passthrough arguments <writing-cl-opts>`
+ * :py:meth:`~mrjob.job.MRJob.increment_counter`
 
 Jobs will often run more quickly on Spark than Hadoop Streaming, so it's worth
 trying even if you don't plan to move off Hadoop in the forseeable future.
@@ -341,10 +344,11 @@ trying even if you don't plan to move off Hadoop in the forseeable future.
 Multiple steps are run as a single job
 --------------------------------------
 
-If you have a multi-(MR)step job, the Spark runner will run them all as a
-single Spark job. This is usually what you want (more efficient), but
-it can make debugging slightly more challenging: step failure exceptions
-give a range of steps, no way to access intermediate data.
+If you have a job with multiple consecutive :py:class:`~mrjob.step.MRStep`\s,
+the Spark runner will run them all as a single Spark job. This is usually what
+you want (more efficient), but it can make debugging slightly more
+challenging (step failure exceptions
+give a range of steps, no way to access intermediate data).
 
 To force the Spark runner to run steps separately, you can initialize
 each :py:class:`~mrjob.step.MRStep` with a different ``jobconf``
@@ -360,7 +364,7 @@ supported because they require launching subprocesses.
 It wouldn't be *impossible* to emulate this inside Spark, but then we'd
 essentially be turning Spark *into* Hadoop Streaming. (If you have a use case
 for this seemingly implausible feature, let us know
-`through GitHub <https://github.com/Yelp/mrjob/issues>`.)
+`through GitHub <https://github.com/Yelp/mrjob/issues>`_.)
 
 Spark loves combiners
 ---------------------
@@ -376,15 +380,15 @@ knows how to translate something like::
   def combiner(self, key, values):
       yield key, sum(values)
 
-into Spark's reduce paradigm -- basically it'll pass your combiner two values
+into Spark's reduce paradigm--basically it'll pass your combiner two values
 at a time, and hope it emits one. If your combiner does *not* behave like a
-Spark reducer function (e.g. it emits multiple values), the Spark runner can
-still handle it.
+Spark reducer function (emitting multiple or zero values), the Spark runner
+handles that gracefully as well.
 
-Counter emulation is almost perfect
------------------------------------
+Counter emulation is *almost* perfect
+-------------------------------------
 
-Counters (see :py:meth:`~mrjob.job.MRJob.increment_counters`) are a feature
+Counters (see :py:meth:`~mrjob.job.MRJob.increment_counter`) are a feature
 specific to Hadoop. mrjob emulates them on Spark anyway. If you have a
 multi-step job, mrjob will dutifully print out counters for each step and
 make them available through :py:meth:`~mrjob.runner.MRJobRunner.counters`.
@@ -401,7 +405,7 @@ While Hadoop streaming (as its name implies) passes a stream of data to your
 job, Spark instead operates on *partitions*, which are loaded into memory.
 
 A reducer like this can't run out of memory on Hadoop streaming, no matter
-how many values there are:
+how many values there are for *key*::
 
   def reducer(self, key, values):
       yield key, sum(values)
@@ -426,8 +430,8 @@ configuration properties, for example:
 This works with ``-r spark`` too; the Spark runner knows how to recognize these
 properties and pass the codec specified to Spark when it writes output.
 
-Spark won't split .gz files
----------------------------
+Spark won't split .gz files either
+----------------------------------
 
 A common trick on Hadoop to ensure that segments of your data don't get split
 between mappers is to gzip each segment (since .gz is not a seekable
@@ -442,14 +446,29 @@ By default, Spark will write one output file per partition. This may give more
 output files than you expect, since Hadoop and Spark are tuned differently.
 
 The Spark runner knows how to emulate the Hadoop configuration property that
-sets number of reducers on Hadoop (e.g. ``-D mapreduce.job.reduces=100`), which
-will control the number of output files (assuming your last step has a
+sets number of reducers on Hadoop (e.g. ``-D mapreduce.job.reduces=100``),
+which will control the number of output files (assuming your last step has a
 reducer).
 
 However, this is a somewhat heavyweight solution; once Spark runs a step's
 reducer, mrjob has to forbid Spark from re-partitioning until the end
 of the step.
 
-``--max-output-values`` allows you to limit (but not increase) the number of
-output files by adding running ``coalesce()`` just before writing output. For
-example, ``--max-output-values=100``.
+A lighter weight solution is ``--max-output-files``, allows you to limit
+the number of output files by running ``coalesce()`` just before
+writing output. Running your job with ``--max-output-files=100`` would ensure
+it produces no more than 100 output files (but it could output less).
+
+Running classic MRJobs on Spark on EMR
+--------------------------------------
+
+It's often faster to run classic MRJobs on Spark than Hadoop Streaming. It's
+also convenient to be able to run on EMR rather than setting up your own
+Spark cluster (or SSH'ing in).
+
+Can you do both? Yes! Just run the job with the Spark runner, but tell it
+to use :command:`mrjob spark-submit` to launch Spark jobs on EMR:
+
+.. code-block:: sh
+
+   python mr_your_job.py -r spark --spark-submit-bin 'mrjob spark-submit -r emr' ...

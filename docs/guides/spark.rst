@@ -1,6 +1,6 @@
-=======
- Spark
-=======
+=====
+Spark
+=====
 
 .. _why-mrjob-with-spark:
 
@@ -324,7 +324,7 @@ Running "classic" MRJobs on Spark
 
 The Spark runner provides near-total support for running "classic"
 :py:class:`~mrjob.job.MRJob`\s (the sort described in
-:ref:`writing_your_first_job` and :ref:`writing_your_second_job`)
+:ref:`writing-your-first-job` and :ref:`writing-your-second-job`)
 directly on any Spark installation, even
 though these jobs were originally designed to run on Hadoop Streaming.
 Support includes:

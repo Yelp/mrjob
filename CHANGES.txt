@@ -53,7 +53,7 @@ v0.6.8, 2019-04-?? -- Spark runner
  * `mrjob spark-submit` now defaults to spark runner
    * works on emr, hadoop, and local runners as well (#1975)
  * runner filesystems:
-   * added put() method to all FSes (#1977)
+   * added put() method to all filesystems (#1977)
      * part size for uploads is now set at fs init time
    * CompositeFilesystem can can give up on an un-configured filesystem (#1974)
      * used by the Spark runner when GCS/S3 aren't set up

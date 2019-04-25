@@ -87,7 +87,7 @@ options related to file uploading.
 
     .. versionchanged:: 0.5.7
 
-       This works with Spark as well.
+       This works with Spark on YARN as well.
 
     .. versionchanged:: 0.6.7
 
@@ -108,7 +108,7 @@ options related to file uploading.
     we copy by appending
     ``#nameinworkingdir`` to the path; otherwise we just use its name.
 
-    This works with Spark as well.
+    This works with Spark on YARN only.
 
     .. versionadded:: 0.5.8
 
@@ -146,6 +146,11 @@ options related to file uploading.
     .. versionchanged:: 0.6.7
 
        Deprecated :option:`--file` in favor of :option:`--files`
+
+    .. versionchanged:: 0.6.8
+
+       In Spark, can use ``#nameinworkingdir`` even when not on YARN.
+
 
 Temp files and cleanup
 ======================
@@ -374,6 +379,11 @@ Job execution context
     where it doesn't make sense). The setup
     script is run before every executor, but only run before the driver in
     cluster mode.
+
+    .. note::
+
+       Uploading archives and directories (e.g. ``src-tree/#``) to Spark's
+       working directory still only works on YARN.
 
     .. versionadded:: 0.5.8 support for directories (above)
 

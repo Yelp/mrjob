@@ -5,7 +5,7 @@ v0.6.8, 2019-04-25 -- Spark runner
    * google-cloud-storage>=1.13.1
    * PyYAML>=3.10
  * jobs:
-   * un-sandboxed MRJobs are now Spark-serializable
+   * MRJobs are now Spark-serializable (without calling sandbox())
      * spark() can pass job methods to rdd.map() etc. (#2039)
  * all runners:
    * inline runner runs Spark jobs through PySpark (#1965)

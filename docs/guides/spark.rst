@@ -96,6 +96,13 @@ code, so there's nothing stopping you from using *SparkSession* instead of
 *SparkContext* in Spark 2, or writing a streaming-mode job rather than a
 batch one.
 
+.. warning::
+
+   Prior to v0.6.8, to pass job methods into Spark
+   (e.g. ``rdd.flatMap(self.get_words)``), you first had to call
+   :py:meth:`self.sandbox() <mrjob.job.MRJob.sandbox>`; otherwise
+   Spark would error because *self* was not serializable.
+
 .. _running-on-your-spark-cluster:
 
 Running on your Spark cluster

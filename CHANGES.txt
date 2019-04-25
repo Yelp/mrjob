@@ -1,4 +1,4 @@
-v0.6.8, 2019-04-?? -- Spark runner
+v0.6.8, 2019-04-25 -- Spark runner
  * updated library dependencies (#2019, #2025)
    * google-cloud-dataproc>=0.3.0
    * google-cloud-logging>=1.9.0

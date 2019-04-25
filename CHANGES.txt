@@ -10,7 +10,8 @@ v0.6.8, 2019-04-25 -- Spark runner
  * all runners:
    * inline runner runs Spark jobs through PySpark (#1965)
    * local runner runs Spark jobs on local-cluster master (#1361)
-   * cat_output() now ignores filenames starting with "." too (#1337)
+   * cat_output() now ignores files and subdirs starting with "." too (#1337)
+     * this includes Spark checksum files (e.g. .part-00000.crc)
    * empty *_bin options mean use the default, not a no-args command (#1926)
    * improved Spark support
      * full support for setup scripts (was just YARN) (#2048)

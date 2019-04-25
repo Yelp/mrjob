@@ -519,8 +519,9 @@ class MRJobRunner(object):
         multiple output files, there will be an empty bytestring
         (``b''``) between them.
 
-        Like Hadoop input formats, we ignore files whose names start
-        with ``"_"`` or ``"."``.
+        Like Hadoop input formats, we ignore files and subdirectories whose
+        names start with ``"_"`` or ``"."`` (e.g. ``_SUCCESS``, ``_logs/``,
+        ``.part-00000.crc``.
 
         .. versionadded:: 0.6.0
 
@@ -528,8 +529,7 @@ class MRJobRunner(object):
 
         .. versionchanged:: 0.6.8
 
-           Ignore files starting with ``"."`` as well as ``"_"`` (important
-           for Spark checksum files).
+           Ignore file/dirnames starting with ``"."`` as well as ``"_"``.
         """
         output_dir = self.get_output_dir()
         if output_dir is None:

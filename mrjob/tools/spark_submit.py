@@ -21,6 +21,11 @@ This also adds a few mrjob features that are not standard with
 
 .. versionadded:: 0.6.7
 
+.. versionchanged:: 0.6.8
+
+   added ``local``, ``spark`` runners, made ``spark`` the default (was
+   ``hadoop``)
+
 Usage::
 
     mrjob spark-submit [-r <runner>] [options] <python file | app jar>
@@ -142,10 +147,6 @@ Options::
 
 This also supports the same runner-specific switches as
 :py:class:`~mrjob.job.MRJob`\\s (e.g. ``--hadoop-bin``, ``--region``).
-
-.. versionchanged:: 0.6.8
-
-   added ``local``, ``spark`` runners, made ``spark`` the default.
 
 """
 from __future__ import print_function

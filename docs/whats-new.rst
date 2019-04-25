@@ -12,9 +12,10 @@ For a complete list of changes, see `CHANGES.txt
 Nearly full support for Spark
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This release adds nearly full support for Spark. See
-:ref:`why-mrjob-with-spark` for details about all the features mrjob offers
-on Spark.
+This release adds nearly full support for Spark, including mrjob-speific
+features like :mrjob-opt:`setup` scripts and
+:ref:`passthrough options <writing-cl-opts>`. See
+:ref:`why-mrjob-with-spark` for everything mrjob can do with Spark.
 
 This release adds a
 :py:class:`Spark runner <mrjob.spark.runner.SparkMRJobRunner>`, which
@@ -38,7 +39,7 @@ non-Hadoop Spark cluster, you can take all your old
 for details.
 
 The "experimental harness script" mentioned in :ref:`v0.6.7` is now fully
-integrated into the Spark runner and no longer supported as a separate
+integrated into the Spark runner and is no longer supported as a separate
 feature.
 
 Local runner support for Spark

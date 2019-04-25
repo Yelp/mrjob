@@ -354,6 +354,10 @@ class MRJobLauncher(object):
         .. versionchanged:: 0.6.6
 
            now accepts explicit ``type=str``
+
+        .. versionchanged:: 0.6.8
+
+           fully supported on Spark, including ``local[*]`` master
         """
         if kwargs.get('type') not in (None, str):
             raise ArgumentTypeError(

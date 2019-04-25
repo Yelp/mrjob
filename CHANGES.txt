@@ -21,7 +21,7 @@ v0.6.8, 2019-04-25 -- Spark runner
        * including renaming files (#2017)
        * uploading archives/dirs is still unsupported except on YARN
      * spark.yarn.appMasterEnv.* now only set on YARN (#1919)
-     * add_file_args() works on Spark
+     * add_file_arg() works on Spark
        * even on local[*] master (#2031)
      * uses file:// as appropriate when running locally (#1985)
      * won't hang if Hadoop or Spark binary can't be run (#2024)

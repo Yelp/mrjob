@@ -515,13 +515,21 @@ class MRJobRunner(object):
             log.info('job output is in %s' % self._output_dir)
 
     def cat_output(self):
-        """Stream the jobs output, as a stream of ``bytes``. If there are
+        """Stream the job's output, as a stream of ``bytes``. If there are
         multiple output files, there will be an empty bytestring
         (``b''``) between them.
+
+        Like Hadoop input formats, we ignore files whose names start
+        with ``"_"`` or ``"."``.
 
         .. versionadded:: 0.6.0
 
            In previous versions, you'd use :py:meth:`stream_output`.
+
+        .. versionchanged:: 0.6.8
+
+           Ignore files starting with ``"."`` as well as ``"_"`` (important
+           for Spark checksum files).
         """
         output_dir = self.get_output_dir()
         if output_dir is None:

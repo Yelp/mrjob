@@ -17,8 +17,8 @@ features like :mrjob-opt:`setup` scripts and
 :ref:`passthrough options <writing-cl-opts>`. See
 :ref:`why-mrjob-with-spark` for everything mrjob can do with Spark.
 
-This release adds a
-:py:class:`Spark runner <mrjob.spark.runner.SparkMRJobRunner>`, which
+This release adds a :py:class:`~mrjob.spark.runner.SparkMRJobRunner`
+(``-r spark``), which
 works with any Spark installation, does not require Hadoop, and can access any
 filesystem supported by both mrjob and Spark (HDFS, S3, GCS). The Spark runner
 is now the default for :ref:`mrjob spark-submit <spark-submit>`.

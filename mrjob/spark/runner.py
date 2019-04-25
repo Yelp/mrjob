@@ -57,6 +57,8 @@ class SparkMRJobRunner(MRJobBinRunner):
 
     The Spark runner can also run "classic" MRJobs directly on Spark, without
     using Hadoop streaming. See :ref:`classic-mrjobs-on-spark`.
+
+    .. versionadded:: 0.6.8
     """
     alias = 'spark'
 

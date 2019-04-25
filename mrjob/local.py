@@ -75,6 +75,9 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
     It's rare to need to instantiate this class directly (see
     :py:meth:`~LocalMRJobRunner.__init__` for details).
 
+    .. versionadded:: 0.6.8
+
+       can run Spark steps as well, on the ``local-cluster`` Spark master.
     """
     alias = 'local'
 

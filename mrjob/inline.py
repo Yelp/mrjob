@@ -46,6 +46,11 @@ class InlineMRJobRunner(SimMRJobRunner):
     To more accurately simulate your environment prior to running on
     Hadoop/EMR, use ``-r local`` (see
     :py:class:`~mrjob.local.LocalMRJobRunner`).
+
+    .. versionadded:: 0.6.8
+
+       can run :py:class:`~mrjob.step.SparkStep`\s via the
+       :py:mod:`pyspark` library.
     """
     alias = 'inline'
 

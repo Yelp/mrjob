@@ -72,6 +72,12 @@ working directory (e.g. ``--file foo#bar``) on all Spark masters.
 When running on a local Spark cluster, uses ``file://...`` rather than just
 the path of the file when necessary (e.g. with ``--py-files``).
 
+:py:meth:`~mrjob.runner.MRJobRunner.cat_output` now ignores files and
+subdirectories starting with ``"."`` (used to only be ``"_"``). This allows
+mrjob to ignore Spark's checksum files (e.g. ``.part-00000.crc``), and also
+brings mrjob in closer compliance to the way Hadoop input formats
+read directories.
+
 ``spark.yarn.appMasterEnv.*`` config properties are only set if you're
 actually running on YARN.
 

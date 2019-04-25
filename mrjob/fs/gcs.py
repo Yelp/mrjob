@@ -65,6 +65,11 @@ class GCSFilesystem(Filesystem):
     :param part_size: Part size for multi-part uploading, in bytes, or ``None``
     :param location: Default location to use when creating a bucket
     :param object_ttl_days: Default object expiry for newly created buckets
+
+    .. versionchanged:: 0.6.8
+
+       deprecated *local_tmp_dir*, added *part_size*, *location*,
+       *object_ttl_days*
     """
     def __init__(self, local_tmp_dir=None, credentials=None, project_id=None,
                  part_size=None, location=None, object_ttl_days=None):
@@ -215,8 +220,10 @@ class GCSFilesystem(Filesystem):
     def put(self, src_path, dest_uri, chunk_size=None):
         """Uploads a local file to a specific destination.
 
-        *chunk_size* is a deprecated alias for *part_size* and will
-        be removed in v0.7.0.
+        *chunk_size* is a deprecated alias for *part_size*
+        (in the constructor) and will be removed in v0.7.0.
+
+        .. versionchanged:: 0.6.8 deprecated *chunk_size*
         """
         part_size = self._part_size
 

@@ -106,9 +106,12 @@ class Filesystem(object):
 
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already
-        exist).
+        exist). On cloud filesystems (e.g. S3), also create the corresponding
+        bucket as needed
 
         Corresponds roughly to: ``hadoop fs -mkdir -p path``
+
+        .. versionadded:: 0.6.8 creates buckets on cloud filesystems
         """
         raise NotImplementedError
 
@@ -118,6 +121,8 @@ class Filesystem(object):
         of the new file, not a directory which should contain it.
 
         Corresponds roughly to ``hadoop fs -put src path``.
+
+        .. versionadded:: 0.6.8
         """
         raise NotImplementedError
 

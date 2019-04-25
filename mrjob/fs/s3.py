@@ -136,22 +136,22 @@ class S3Filesystem(Filesystem):
     ``EMRJobRunner().fs``, composed with
     :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
-    """
 
+    :param aws_access_key_id: Your AWS access key ID
+    :param aws_secret_access_key: Your AWS secret access key
+    :param aws_session_token: session token for use with temporary
+                              AWS credentials
+    :param s3_endpoint: If set, always use this endpoint
+    :param s3_region: Default region for connections to the S3 API and
+                      newly created buckets.
+    :param part_size: Part size for multi-part uploading, in bytes, or
+                      ``None``
+
+    .. versionchanged:: 0.6.8 added *part_size*
+    """
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
                  aws_session_token=None, s3_endpoint=None, s3_region=None,
                  part_size=None):
-        """
-        :param aws_access_key_id: Your AWS access key ID
-        :param aws_secret_access_key: Your AWS secret access key
-        :param aws_session_token: session token for use with temporary
-                                   AWS credentials
-        :param s3_endpoint: If set, always use this endpoint
-        :param s3_region: Default region for connections to the S3 API and
-                          newly created buckets.
-        :param part_size: Part size for multi-part uploading, in bytes, or
-                          ``None``
-        """
         super(S3Filesystem, self).__init__()
         self._s3_endpoint_url = _endpoint_url(s3_endpoint)
         self._s3_region = s3_region

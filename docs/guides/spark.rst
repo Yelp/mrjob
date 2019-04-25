@@ -467,17 +467,3 @@ A lighter weight solution is ``--max-output-files``, allows you to limit
 the number of output files by running ``coalesce()`` just before
 writing output. Running your job with ``--max-output-files=100`` would ensure
 it produces no more than 100 output files (but it could output less).
-
-Running classic MRJobs on Spark on EMR
---------------------------------------
-
-It's often faster to run classic MRJobs on Spark than Hadoop Streaming. It's
-also convenient to be able to run on EMR rather than setting up your own
-Spark cluster (or SSH'ing in).
-
-Can you do both? Yes! Just run the job with the Spark runner, but tell it
-to use :command:`mrjob spark-submit` to launch Spark jobs on EMR:
-
-.. code-block:: sh
-
-   python mr_your_job.py -r spark --spark-submit-bin 'mrjob spark-submit -r emr' ...

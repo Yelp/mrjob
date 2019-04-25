@@ -370,13 +370,16 @@ Job execution context
     You may optionally put a ``/`` after *name* as well
     (e.g. ``cd src-tree/#/subdir``).
 
-    This works for Spark as well when running on YARN. The setup script
-    is run before every executor, but only run before the driver in
+    This works for Spark as well (except on the ``local[*]`` master,
+    where it doesn't make sense). The setup
+    script is run before every executor, but only run before the driver in
     cluster mode.
 
     .. versionadded:: 0.5.8 support for directories (above)
 
-    .. versionadded:: 0.6.7 support for Spark on YARN
+    .. versionadded:: 0.6.7 support for Spark on YARN only
+
+    .. versionadded:: 0.6.8 full support for Spark
 
     For more details of parsing, see
     :py:func:`~mrjob.setup.parse_setup_cmd`.

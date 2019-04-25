@@ -68,6 +68,10 @@ Job placement
    ensure that your cluster only has access to one specific geographic
    :mrjob-opt:`region`, rather than the entire VPC.
 
+   .. versionchanged:: 0.6.8
+
+      ``--subnet ''`` un-sets the subnet on EMR (used to be ignored).
+
    .. versionchanged:: 0.6.3
 
       Works on Google Cloud Dataproc as well as AWS Elastic MapReduce.

@@ -128,8 +128,8 @@ example, you can now do:
 without clobbering the zone or instance group/fleet configs
 specified in ``Instances``.
 
-Running your job with ``--subnet ''`` now un-sets a subnet specified in your
-config file (used to be ignored).
+Running your job with ``--subnet ''`` now un-sets a :mrjob-opt:`subnet`
+specified in your config file (used to be ignored).
 
 If you are using cluster pooling with retries (:mrjob-opt:`pool_wait_minutes`),
 mrjob now retains information about clusters that is immutable

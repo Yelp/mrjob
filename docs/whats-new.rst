@@ -167,11 +167,11 @@ Support files for ``mrjob.examples`` (e.g. ``stop_words.txt`` for
 :py:class:`~mrjob.examples.mr_most_used_word.MRMostUsedWord`) are now
 installed along with :py:mod:`mrjob`.
 
-It used to be that in some cases, setting a `*_bin` option
-(e.g. ``--hadoop-bin ''``) could cause mrjob to omit the binary entirely
-from the command line, leading to cryptic errors. Setting a
-`*_bin` option to empty string now instructs mrjob to
-use the default value.
+Setting a `*_bin` option to an empty value (e.g. ``--hadoop-bin``) now
+always instructs mrjob to use the default, rather than disabling core
+features or creating cryptic errors. This affects :mrjob-opt:`gcloud_bin`,
+:mrjob-opt:`hadoop_bin`, :mrjob-opt:`sh_bin`, and :mrjob-opt:`ssh_bin`;
+the various `*python_bin` options already worked this way.
 
 .. _v0.6.7:
 

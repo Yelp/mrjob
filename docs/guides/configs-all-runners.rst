@@ -413,6 +413,11 @@ Job execution context
 
        Used to be :command:`sh -ex` on local and Hadoop runners
 
+    .. versionchanged:: 0.6.8
+
+       Setting this to an empty value (``--sh-bin ''``) means to use the
+       default (used to cause an error).
+
 .. mrjob-opt::
     :config: steps_interpreter
     :switch: --steps-interpreter

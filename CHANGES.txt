@@ -13,6 +13,8 @@ v0.6.8, 2019-04-25 -- Spark runner
    * cat_output() now ignores files and subdirs starting with "." too (#1337)
      * this includes Spark checksum files (e.g. .part-00000.crc)
    * empty *_bin options mean use the default, not a no-args command (#1926)
+     * affected gcloud_bin, hadoop_bin, sh_bin, ssh_bin
+     * *python_bin options already worked this way
    * improved Spark support
      * full support for setup scripts (was just YARN) (#2048)
      * fully supports uploading files to Spark working dir (#1922)

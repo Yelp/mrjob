@@ -416,6 +416,8 @@ v0.6.0, 2017-11-01 -- wave of deprecation
        * removed deprecated JOB_FLOW and *SCRATCH cleanup types
    * mrjob.setup:
      * removed BootstrapWorkingDirManager
+   * mrjob.step:
+     * removed INPUT, OUTPUT attributes from JarStep
    * mrjob.ssh (removed entirely)
    * mrjob.util:
      * removed args_for_opt_dest_subset()

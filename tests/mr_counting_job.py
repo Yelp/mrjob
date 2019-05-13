@@ -25,7 +25,7 @@ class MRCountingJob(MRJob):
                 MRStep(mapper=self.mapper)]
 
     def mapper(self, _, value):
-        self.increment_counter('group', 'counter_name', 1)
+        self.increment_counter(group='group', counter='counter_name', amount=1)
         yield _, value
 
 

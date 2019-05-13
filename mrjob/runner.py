@@ -1261,6 +1261,7 @@ class MRJobRunner(object):
             log.debug('  %s -> %s' % (path, dest))
             self.fs.put(path, dest)
 
+    # TODO: this should be only for files, not archives
     def _copy_files_to_wd_mirror(self):
         """Upload working archives/files (determined by *type*) to the
         working dir mirror, if necessary."""
@@ -1387,6 +1388,7 @@ class MRJobRunner(object):
             args.append(files_opt_str)
             args.append(','.join(file_hash_paths))
 
+        # TODO: always use hash with archives
         archive_hash_paths = list(
             self._arg_hash_paths('archive', archives,
                                  always_use_hash=always_use_hash))

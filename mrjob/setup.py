@@ -453,12 +453,17 @@ class WorkingDirManager(object):
                     in self._name_to_typed_path.items()
                     if (type is None or typed_path[0] == type))
 
-    def paths(self):
+    def paths(self, type=None):
         """Get a set of all paths tracked by this WorkingDirManager."""
         paths = set()
 
-        paths.update(p for (t, p) in self._typed_path_to_auto_name)
-        paths.update(p for (t, p) in self._name_to_typed_path.values())
+        for path_type, path in self._typed_path_to_auto_name:
+            if type is None or path_type == type:
+                paths.add(path)
+
+        for path_type, path in self._name_to_typed_path.values():
+            if type is None or path_type == type:
+                paths.add(path)
 
         return paths
 

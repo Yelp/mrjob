@@ -1261,10 +1261,12 @@ class MRJobRunner(object):
             log.debug('  %s -> %s' % (path, dest))
             self.fs.put(path, dest)
 
-    # TODO: this should be only for files, not archives
     def _copy_files_to_wd_mirror(self):
-        """Upload working archives/files (determined by *type*) to the
-        working dir mirror, if necessary."""
+        """Upload working dir files to the working dir mirror, if necessary.
+
+        This does not handle archives, which we always rename with
+        hash paths anyhow (see #2059).
+        """
         wd_mirror = self._wd_mirror()
         if not wd_mirror:
             return
@@ -1273,7 +1275,8 @@ class MRJobRunner(object):
 
         log.info('%s working dir files to %s...' %
                  ('uploading' if is_uri(wd_mirror) else 'copying', wd_mirror))
-        for name, path in sorted(self._working_dir_mgr.name_to_path().items()):
+        for name, path in sorted(
+                self._working_dir_mgr.name_to_path('file').items()):
             self._copy_file_to_wd_mirror(path, name)
 
     def _upload_part_size(self):
@@ -1382,32 +1385,35 @@ class MRJobRunner(object):
         args = []
 
         file_hash_paths = list(
-            self._arg_hash_paths('file', files,
-                                 always_use_hash=always_use_hash))
+            self._file_arg_hash_paths(files,
+                                      always_use_hash=always_use_hash))
         if file_hash_paths:
             args.append(files_opt_str)
             args.append(','.join(file_hash_paths))
 
-        # TODO: always use hash with archives
-        archive_hash_paths = list(
-            self._arg_hash_paths('archive', archives,
-                                 always_use_hash=always_use_hash))
+        archive_hash_paths = list(self._archive_arg_hash_paths(archives))
+
         if archive_hash_paths:
             args.append(archives_opt_str)
             args.append(','.join(archive_hash_paths))
 
         return args
 
-    def _arg_hash_paths(self, type, named_paths=None, always_use_hash=True):
-        """Helper function for the *upload_args methods."""
+    def _file_arg_hash_paths(self, named_paths=None, always_use_hash=True):
+        """Helper function for the *upload_args methods. The names of all
+        arguments to ``-files`` (or ``--files`` on Spark).
+
+        If *always_use_hash* is false, only use ``path#name`` syntax
+        when the name is different.
+        """
         if named_paths is None:
-            # just return everything managed by _working_dir_mgr
+            # just return every file managed by _working_dir_mgr
             named_paths = sorted(
-                self._working_dir_mgr.name_to_path(type).items())
+                self._working_dir_mgr.name_to_path('file').items())
 
         for name, path in named_paths:
             if not name:
-                name = self._working_dir_mgr.name(type, path)
+                name = self._working_dir_mgr.name('file', path)
 
             uri = self._dest_in_wd_mirror(path, name) or path
 
@@ -1415,6 +1421,30 @@ class MRJobRunner(object):
                 yield uri
             else:
                 yield '%s#%s' % (uri, name)
+
+    def _archive_arg_hash_paths(self, named_paths=None):
+        """Helper function for the *upload_args methods. The names of all
+        arguments to ``-archives`` (or ``--archives`` on Spark).
+        """
+        # we always use path#name syntax, even on Spark, because unlike
+        # with --files, Spark will either accept that syntax with --archives
+        # (if we're on YARN) or ignore --archives completely (if we're on
+        # any other Spark master)
+        if named_paths is None:
+            # just return every archive managed by _working_dir_mgr
+            named_paths = sorted(
+                self._working_dir_mgr.name_to_path('archive').items())
+
+        for name, path in named_paths:
+            if not name:
+                name = self._working_dir_mgr.name('archive', path)
+
+            if self._upload_mgr:
+                uri = self._upload_mgr.uri(path)
+            else:
+                uri = path
+
+            yield '%s#%s' % (uri, name)
 
     def _write_script(self, lines, path, description):
         """Write text of a setup script, input manifest, etc. to the given

@@ -181,8 +181,8 @@ def main(cmd_line_args=None):
     def make_increment_counter(step_num):
         counter_accumulator = counter_accumulators[step_num - start]
 
-        def increment_counter(group, name, amount=1):
-            counter_accumulator.add({group: {name: amount}})
+        def increment_counter(group, counter, amount=1):
+            counter_accumulator.add({group: {counter: amount}})
 
         return increment_counter
 

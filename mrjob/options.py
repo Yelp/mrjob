@@ -1756,9 +1756,10 @@ def _optparse_kwargs_to_argparse(**kwargs):
 
     # translate type from string (optparse) to type (argparse)
     if kwargs.get('type') is not None:
-        if kwargs['type'] not in _OPTPARSE_TYPES:
-            raise ValueError('invalid option type: %r' % kwargs['type'])
-        kwargs['type'] = _OPTPARSE_TYPES[kwargs['type']]
+        if not isinstance(kwargs['type'], type):
+            if kwargs['type'] not in _OPTPARSE_TYPES:
+                raise ValueError('invalid option type: %r' % kwargs['type'])
+            kwargs['type'] = _OPTPARSE_TYPES[kwargs['type']]
 
     # opt_group was a mrjob-specific feature that we've abandoned
     if 'opt_group' in kwargs:

@@ -80,9 +80,14 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
     def configure_options(self):
         super(MRDeprecatedCustomJobLauncher, self).configure_options()
 
+        # type='int' should become type=int
         self.add_passthrough_option(
             '--foo-size', '-F', type='int', dest='foo_size', default=5,
             help='default is %default')
+        # don't need to translate *type* if it's already a type (see #2058)
+        self.add_passthrough_option(
+            '--bar-size', '-B', type=int, dest='bar_size', default=2)
+        # 'choice' isn't a type in argparse, do we translate it correctly?
         self.add_passthrough_option(
             '--pill-type', '-T', type='choice', choices=(['red', 'blue']),
             default='blue')
@@ -97,6 +102,10 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
 
         # regression test for #1858
         self.add_file_option('--foo-db', dest='foo_db', type='string')
+
+        # regression test for #2058
+        self.add_file_option('--bar-db', dest='bar_db', type=str)
+
 
     def load_options(self, args):
         super(MRDeprecatedCustomJobLauncher, self).load_options(args)
@@ -467,14 +476,15 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
 
     def test_add_passthrough_option(self):
         mr_job = MRDeprecatedCustomJobLauncher(
-            args=['', '-F', '6', '-T', 'red', '--word', 'bird'])
+            args=['', '-F', '6', '-B', '4', '-T', 'red', '--word', 'bird'])
 
         self.assertEqual(mr_job.options.foo_size, 6)
+        self.assertEqual(mr_job.options.bar_size, 4)
         self.assertEqual(mr_job.options.pill_type, 'red')
         self.assertEqual(mr_job.options.word, 'bird')
 
         self.assertEqual(mr_job._non_option_kwargs()['extra_args'],
-                         ['-F', '6', '-T', 'red', '--word', 'bird'])
+                         ['-F', '6', '-B', '4', '-T', 'red', '--word', 'bird'])
 
     def test_add_file_option(self):
         mr_job = MRDeprecatedCustomJobLauncher(
@@ -482,14 +492,16 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
                   '--accordian-file', 'WeirdAl.mp3',
                   '--accordian-file', '/home/dave/JohnLinnell.ogg',
                   '--foo-db', '/var/foo.db',
+                  '--bar-db', '/var/bar.db',
                   ])
 
         self.assertEqual(
             mr_job.options.accordian_files, [
                 'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
 
-        self.assertEqual(
-            mr_job.options.foo_db, '/var/foo.db')
+        self.assertEqual(mr_job.options.foo_db, '/var/foo.db')
+
+        self.assertEqual(mr_job.options.bar_db, '/var/bar.db')
 
         self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [
             '--accordian-file', dict(
@@ -498,6 +510,8 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
                 path='/home/dave/JohnLinnell.ogg', name=None, type='file'),
             '--foo-db', dict(
                 path='/var/foo.db', name=None, type='file'),
+            '--bar-db', dict(
+                path='/var/bar.db', name=None, type='file'),
         ])
 
     def test_pass_through_option_method(self):

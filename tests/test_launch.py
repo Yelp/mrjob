@@ -86,7 +86,7 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
             help='default is %default')
         # don't need to translate *type* if it's already a type (see #2058)
         self.add_passthrough_option(
-            '--bar-size', type=int, dest='bar_size', default=2)
+            '--bar-size', '-B', type=int, dest='bar_size', default=2)
         # 'choice' isn't a type in argparse, do we translate it correctly?
         self.add_passthrough_option(
             '--pill-type', '-T', type='choice', choices=(['red', 'blue']),

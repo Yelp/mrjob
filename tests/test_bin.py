@@ -1518,10 +1518,10 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                      runner._dest_in_wd_mirror(runner._script_path,
                                                'mr_null_spark.py')),
                     '--archives',
-                    (runner._dest_in_wd_mirror(baz_path, 'baz.tar.gz') +
+                    (runner._upload_mgr.uri(baz_path) + '#baz.tar.gz' +
                      ',' +
-                     runner._dest_in_wd_mirror(
-                         runner._dir_archive_path(qux_path), 'qux')),
+                     runner._upload_mgr.uri(
+                         runner._dir_archive_path(qux_path)) + '#qux')
                 ]
             )
 

@@ -49,7 +49,7 @@ class InlineMRJobRunner(SimMRJobRunner):
 
     .. versionadded:: 0.6.8
 
-       can run :py:class:`~mrjob.step.SparkStep`\s via the
+       can run :py:class:`~mrjob.step.SparkStep`\\s via the
        :py:mod:`pyspark` library.
     """
     alias = 'inline'

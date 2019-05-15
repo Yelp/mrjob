@@ -214,10 +214,10 @@ def main(cmd_line_args=None):
         elif args.emulate_map_input_file:
             spark = SparkSession(sc)
             rdd = spark.read.text(args.input_path).select([
-                F.input_file_name().alias('file_name'),
+                F.input_file_name().alias('input_file_name'),
                 F.col('value')
             ]).rdd.map(
-                lambda row: (row.file_name, row.value)
+                lambda row: (row.input_file_name, row.value)
             )
         else:
             rdd = sc.textFile(args.input_path, use_unicode=False)
@@ -325,11 +325,18 @@ def _run_mapper(make_mrc_job, step_num, rdd, emulate_map_input_file):
         # decode lines into key-value pairs (as a generator, not a list)
         #
         # line -> (k, v)
-        if emulate_map_input_file:
-            lines = list(lines)
-            input_file_name = lines[0][0]
-            os.environ['map_input_file'] =  input_file_name
-            pairs = (read(line[1]) for line in lines)
+        if emulate_map_input_file and step_num == 0:
+            # *lines* is actually pairs of (input_file_name, line)
+
+            def read_kv_pairs_from_path_line_pairs(path_line_pairs):
+                for input_path, line in path_line_pairs:
+                    # *input_path* is the same for every line in the
+                    # partition, but it doesn't hurt to set it
+                    os.environ['mapreduce_map_input_file'] = input_path
+                    yield read(line)
+
+            pairs = (read_kv_pairs_from_path_line_pairs(path_and_line)
+                     for path_and_line in lines)
         else:
             pairs = (read(line) for line in lines)
 

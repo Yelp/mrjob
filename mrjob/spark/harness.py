@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """A Spark script that can run a MRJob without Hadoop."""
+import os
 import sys
 import json
 from argparse import ArgumentParser
@@ -130,6 +131,8 @@ def main(cmd_line_args=None):
 
     # load initial data
     from pyspark import SparkContext
+    from pyspark.sql import SparkSession
+    from pyspark.sql import functions as F
 
     if args.job_args:
         job_args = shlex_split(args.job_args)
@@ -208,13 +211,23 @@ def main(cmd_line_args=None):
             # contents of the line are the key and the value is an empty
             # string. Convert to an rdd of just lines, encoded as bytes.
             rdd = rdd.map(lambda kv: kv[0].encode('utf-8'))
+        elif args.mapper_requires_file_name:
+            spark = SparkSession(sc)
+            rdd = spark.read.text(args.input_path).select([
+                F.input_file_name().alias('file_name'),
+                F.col('value')
+            ]).rdd.map(
+                lambda row: (row.file_name, row.value)
+            )
         else:
             rdd = sc.textFile(args.input_path, use_unicode=False)
 
         # run steps
         for step_num, step in steps_to_run:
             rdd = _run_step(step, step_num, rdd,
-                            make_mrc_job, args.num_reducers, sort_values)
+                            make_mrc_job,
+                            args.num_reducers, sort_values,
+                            args.mapper_requires_file_name)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
@@ -246,7 +259,8 @@ def main(cmd_line_args=None):
 
 
 def _run_step(step, step_num, rdd, make_mrc_job,
-              num_reducers=None, sort_values=None):
+              num_reducers=None, sort_values=None,
+              mapper_requires_file_name=False):
     """Run the given step on the RDD and return the transformed RDD."""
     _check_step(step, step_num)
 
@@ -260,7 +274,8 @@ def _run_step(step, step_num, rdd, make_mrc_job,
 
     # mapper
     if step.get('mapper'):
-        rdd = _run_mapper(make_mrc_job, step_num, rdd)
+        rdd = _run_mapper(
+            make_mrc_job, step_num, rdd, mapper_requires_file_name)
 
     # combiner/shuffle-and-sort
     combiner_job = None
@@ -291,7 +306,7 @@ def _run_step(step, step_num, rdd, make_mrc_job,
     return rdd
 
 
-def _run_mapper(make_mrc_job, step_num, rdd):
+def _run_mapper(make_mrc_job, step_num, rdd, mapper_requires_file_name):
     """Run our job's mapper.
 
     :param make_mrc_job: an instance of our job, instantiated to be the mapper
@@ -301,6 +316,7 @@ def _run_mapper(make_mrc_job, step_num, rdd):
     """
     # initialize job class inside mapPartitions(). this deals with jobs that
     # can't be initialized in the Spark driver (see #2044)
+
     def map_lines(lines):
         job = make_mrc_job('mapper', step_num)
 
@@ -309,7 +325,13 @@ def _run_mapper(make_mrc_job, step_num, rdd):
         # decode lines into key-value pairs (as a generator, not a list)
         #
         # line -> (k, v)
-        pairs = (read(line) for line in lines)
+        if mapper_requires_file_name:
+            lines = list(lines)
+            input_file_name = lines[0][0]
+            os.environ['map_input_file'] =  input_file_name
+            pairs = (read(line[1]) for line in lines)
+        else:
+            pairs = (read(line) for line in lines)
 
         # reduce_pairs() runs key-value pairs through mapper
         #
@@ -530,6 +552,13 @@ def _make_arg_parser():
         dest='max_output_files',
         type=int,
         help='Directly limit number of output files, using coalesce()',
+    )
+    parser.add_argument(
+        '--mapper-requires-file-name',
+        dest='mapper_requires_file_name',
+        action='store_true',
+        help=('set this to true if the job use jobconf_from_env to get '
+            'input file name from hadoop in the first mapper function'),
     )
 
     for args, kwargs in _PASSTHRU_OPTIONS:

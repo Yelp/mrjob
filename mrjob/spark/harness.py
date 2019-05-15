@@ -559,7 +559,8 @@ def _make_arg_parser():
         action='store_true',
         help=('set mapreduce_map_input_file to the input file path'
               ' in the first mapper function, so we can read it'
-              ' with mrjob.compat.jobconf_from_env()'),
+              ' with mrjob.compat.jobconf_from_env(). Ignored if'
+              ' job has a Hadoop input format'),
     )
 
     for args, kwargs in _PASSTHRU_OPTIONS:

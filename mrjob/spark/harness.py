@@ -211,7 +211,7 @@ def main(cmd_line_args=None):
             # contents of the line are the key and the value is an empty
             # string. Convert to an rdd of just lines, encoded as bytes.
             rdd = rdd.map(lambda kv: kv[0].encode('utf-8'))
-        elif args.mapper_requires_file_name:
+        elif args.emulate_map_input_file:
             spark = SparkSession(sc)
             rdd = spark.read.text(args.input_path).select([
                 F.input_file_name().alias('file_name'),
@@ -227,7 +227,7 @@ def main(cmd_line_args=None):
             rdd = _run_step(step, step_num, rdd,
                             make_mrc_job,
                             args.num_reducers, sort_values,
-                            args.mapper_requires_file_name)
+                            args.emulate_map_input_file)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
@@ -260,7 +260,7 @@ def main(cmd_line_args=None):
 
 def _run_step(step, step_num, rdd, make_mrc_job,
               num_reducers=None, sort_values=None,
-              mapper_requires_file_name=False):
+              emulate_map_input_file=False):
     """Run the given step on the RDD and return the transformed RDD."""
     _check_step(step, step_num)
 
@@ -275,7 +275,7 @@ def _run_step(step, step_num, rdd, make_mrc_job,
     # mapper
     if step.get('mapper'):
         rdd = _run_mapper(
-            make_mrc_job, step_num, rdd, mapper_requires_file_name)
+            make_mrc_job, step_num, rdd, emulate_map_input_file)
 
     # combiner/shuffle-and-sort
     combiner_job = None
@@ -306,7 +306,7 @@ def _run_step(step, step_num, rdd, make_mrc_job,
     return rdd
 
 
-def _run_mapper(make_mrc_job, step_num, rdd, mapper_requires_file_name):
+def _run_mapper(make_mrc_job, step_num, rdd, emulate_map_input_file):
     """Run our job's mapper.
 
     :param make_mrc_job: an instance of our job, instantiated to be the mapper
@@ -325,7 +325,7 @@ def _run_mapper(make_mrc_job, step_num, rdd, mapper_requires_file_name):
         # decode lines into key-value pairs (as a generator, not a list)
         #
         # line -> (k, v)
-        if mapper_requires_file_name:
+        if emulate_map_input_file:
             lines = list(lines)
             input_file_name = lines[0][0]
             os.environ['map_input_file'] =  input_file_name
@@ -554,11 +554,12 @@ def _make_arg_parser():
         help='Directly limit number of output files, using coalesce()',
     )
     parser.add_argument(
-        '--mapper-requires-file-name',
-        dest='mapper_requires_file_name',
+        '--emulate-map-input-file',
+        dest='emulate_map_input_file',
         action='store_true',
-        help=('set this to true if the job use jobconf_from_env to get '
-            'input file name from hadoop in the first mapper function'),
+        help=('set mapreduce_map_input_file to the input file path'
+              ' in the first mapper function, so we can read it'
+              ' with mrjob.compat.jobconf_from_env()'),
     )
 
     for args, kwargs in _PASSTHRU_OPTIONS:

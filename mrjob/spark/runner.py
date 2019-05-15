@@ -72,6 +72,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         'aws_session_token',
         'cloud_fs_sync_secs',
         'cloud_part_size_mb',
+        'emulate_map_input_file',
         'gcs_region',  # used when creating buckets on GCS
         'hadoop_bin',
         'project_id',  # used by GCS filesystem
@@ -431,6 +432,9 @@ class SparkMRJobRunner(MRJobBinRunner):
         if self._max_output_files:
             args.extend(['--max-output-files',
                          str(self._max_output_files)])
+
+        if self._opts['emulate_map_input_file']:
+            args.append('--emulate-map-input-file')
 
         return args
 

@@ -283,7 +283,6 @@ def _run_step(step, step_num, rdd, make_mrc_job,
         rdd = _run_mapper(
             make_mrc_job, step_num, rdd,
             emulate_map_input_file=(emulate_map_input_file and step_num == 0))
-    # TODO: unwind rdd if emulate_map_input_file and no mapper
 
     # combiner/shuffle-and-sort
     combiner_job = None
@@ -345,6 +344,11 @@ def _run_mapper(make_mrc_job, step_num, rdd, emulate_map_input_file):
                     # *input_path* is the same for every line in the
                     # partition, but it doesn't hurt to set it
                     os.environ['mapreduce_map_input_file'] = input_path
+
+                    # data frame reader converts input text to unicode
+                    if not isinstance(line, bytes):
+                        line = line.encode('utf_8')
+
                     yield read(line)
 
             pairs = read_kv_pairs_from_path_line_pairs(lines)

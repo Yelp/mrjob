@@ -23,6 +23,7 @@ try:
 except ImportError:
     pyspark = None
 
+from mrjob.examples.mr_count_lines_by_file import MRCountLinesByFile
 from mrjob.examples.mr_most_used_word import MRMostUsedWord
 from mrjob.examples.mr_nick_nack import MRNickNack
 from mrjob.examples.mr_spark_most_used_word import MRSparkMostUsedWord
@@ -53,6 +54,7 @@ from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.py2 import ANY
 from tests.py2 import call
 from tests.py2 import patch
+from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_bin import _LOCAL_CLUSTER_MASTER
 
@@ -674,6 +676,49 @@ class SparkCounterSimulationTestCase(MockFilesystemsTestCase):
 
         # should blank out counters from failed step
         self.assertEqual(runner.counters(), [{}, {}])
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class EmulateMapInputFileTestCase(SandboxedTestCase):
+
+    def test_one_file(self):
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+
+        job = MRCountLinesByFile(['-r', 'spark',
+                                  '--emulate-map-input-file', two_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'file://' + two_lines_path: 2})
+
+    def test_two_files(self):
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+        three_lines_path = self.makefile('three_lines', b'A\nBB\nCCC\n')
+
+        job = MRCountLinesByFile(['-r', 'spark',
+                                  '--emulate-map-input-file',
+                                  two_lines_path, three_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'file://' + two_lines_path: 2,
+                 'file://' + three_lines_path: 3})
+
+    # test an empty file
+
+    # test mapper_init()
+
+    # ensure that we don't run it on the second mapper
 
 
 @skipIf(pyspark is None, 'no pyspark module')

@@ -199,8 +199,21 @@ def main(cmd_line_args=None):
 
         return j
 
+    # --emulate-map-input-file doesn't work with hadoop_input_format
+    emulate_map_input_file = (
+        args.emulate_map_input_file and not hadoop_input_format)
+
     try:
-        if hadoop_input_format:
+        if emulate_map_input_file:
+            spark = SparkSession(sc)
+            rdd = spark.read.text(args.input_path).select([
+                F.input_file_name().alias('input_file_name'),
+                F.col('value')
+            ]).rdd.map(
+                lambda row: (row.input_file_name, row.value)
+            )
+
+        elif hadoop_input_format:
             rdd = sc.hadoopFile(
                 args.input_path,
                 inputFormatClass=hadoop_input_format,
@@ -211,14 +224,7 @@ def main(cmd_line_args=None):
             # contents of the line are the key and the value is an empty
             # string. Convert to an rdd of just lines, encoded as bytes.
             rdd = rdd.map(lambda kv: kv[0].encode('utf-8'))
-        elif args.emulate_map_input_file:
-            spark = SparkSession(sc)
-            rdd = spark.read.text(args.input_path).select([
-                F.input_file_name().alias('input_file_name'),
-                F.col('value')
-            ]).rdd.map(
-                lambda row: (row.input_file_name, row.value)
-            )
+
         else:
             rdd = sc.textFile(args.input_path, use_unicode=False)
 
@@ -227,7 +233,7 @@ def main(cmd_line_args=None):
             rdd = _run_step(step, step_num, rdd,
                             make_mrc_job,
                             args.num_reducers, sort_values,
-                            args.emulate_map_input_file)
+                            emulate_map_input_file)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
@@ -275,7 +281,9 @@ def _run_step(step, step_num, rdd, make_mrc_job,
     # mapper
     if step.get('mapper'):
         rdd = _run_mapper(
-            make_mrc_job, step_num, rdd, emulate_map_input_file)
+            make_mrc_job, step_num, rdd,
+            emulate_map_input_file=(emulate_map_input_file and step_num == 0))
+    # TODO: unwind rdd if emulate_map_input_file and no mapper
 
     # combiner/shuffle-and-sort
     combiner_job = None
@@ -312,6 +320,10 @@ def _run_mapper(make_mrc_job, step_num, rdd, emulate_map_input_file):
     :param make_mrc_job: an instance of our job, instantiated to be the mapper
                          for the step we wish to run
     :param rdd: an RDD containing lines representing encoded key-value pairs
+    :param emulate_map_input_file: if true and *step_num* is 0, assume rdd
+                                   contains pairs of (input_file_path, line)
+                                   and set $mapreduce_map_input_file in
+                                   the environment
     :return: an RDD containing lines representing encoded key-value pairs
     """
     # initialize job class inside mapPartitions(). this deals with jobs that
@@ -335,8 +347,7 @@ def _run_mapper(make_mrc_job, step_num, rdd, emulate_map_input_file):
                     os.environ['mapreduce_map_input_file'] = input_path
                     yield read(line)
 
-            pairs = (read_kv_pairs_from_path_line_pairs(path_and_line)
-                     for path_and_line in lines)
+            pairs = read_kv_pairs_from_path_line_pairs(lines)
         else:
             pairs = (read(line) for line in lines)
 

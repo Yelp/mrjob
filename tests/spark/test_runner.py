@@ -22,7 +22,6 @@ try:
     import pyspark
 except ImportError:
     pyspark = None
-
 from mrjob.examples.mr_count_lines_by_file import MRCountLinesByFile
 from mrjob.examples.mr_most_used_word import MRMostUsedWord
 from mrjob.examples.mr_nick_nack import MRNickNack
@@ -42,15 +41,17 @@ from mrjob.util import to_lines
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
+from tests.mr_count_lines_by_filename import MRCountLinesByFilename
 from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
-from tests.mr_spark_os_walk import MRSparkOSWalk
-from tests.mr_tower_of_powers import MRTowerOfPowers
-from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
+from tests.mr_test_jobconf import MRTestJobConf
+from tests.mr_tower_of_powers import MRTowerOfPowers
+from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import ANY
 from tests.py2 import call
 from tests.py2 import patch
@@ -714,11 +715,83 @@ class EmulateMapInputFileTestCase(SandboxedTestCase):
                 {'file://' + two_lines_path: 2,
                  'file://' + three_lines_path: 3})
 
-    # test an empty file
+    def test_input_dir(self):
+        input_dir = self.makedirs('input')
 
-    # test mapper_init()
+        two_lines_path = self.makefile('input/two_lines', b'line 1\nline 2\n')
+        three_lines_path = self.makefile('input/three_lines', b'A\nBB\nCCC\n')
 
-    # ensure that we don't run it on the second mapper
+        job = MRCountLinesByFile(['-r', 'spark',
+                                  '--emulate-map-input-file',
+                                  two_lines_path, three_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'file://' + two_lines_path: 2,
+                 'file://' + three_lines_path: 3})
+
+    def test_mapper_init(self):
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+
+        job = MRTestJobConf(['-r', 'spark',
+                             '--emulate-map-input-file',
+                             two_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output['mapreduce.map.input.file'],
+                'file://' + two_lines_path)
+
+    def test_empty_file(self):
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+        no_lines_path = self.makefile('no_lines', b'')
+
+        job = MRTestJobConf(['-r', 'spark',
+                             '--emulate-map-input-file',
+                             two_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            paths = [path for jobconf, path in
+                     job.parse_output(runner.cat_output())
+                     if jobconf == 'mapreduce.map.input.file']
+
+            # ideally, no_lines_path would appear too, but what we care
+            # about is that we don't get a crash from trying to read
+            # the "first" line of the file
+            self.assertEqual(paths, ['file://' + two_lines_path])
+
+    def test_second_mapper(self):
+        # we have to run the initial mapper somewhat differently in order
+        # to deal with extra info from --emulate-map-input-file (the
+        # input filename). ensure that we don't accidentally do this with
+        # the second mapper too
+
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+        three_lines_path = self.makefile('three_lines', b'A\nBB\nCCC\n')
+
+        job = MRCountLinesByFilename(['-r', 'spark',
+                                      '--emulate-map-input-file',
+                                      two_lines_path, three_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'two_lines': 2, 'three_lines': 3})
 
 
 @skipIf(pyspark is None, 'no pyspark module')

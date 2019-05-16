@@ -132,8 +132,6 @@ def main(cmd_line_args=None):
 
     # load initial data
     from pyspark import SparkContext
-    from pyspark.sql import SparkSession
-    from pyspark.sql import functions as F
 
     if args.job_args:
         job_args = shlex_split(args.job_args)
@@ -206,13 +204,10 @@ def main(cmd_line_args=None):
 
     try:
         if emulate_map_input_file:
-            spark = SparkSession(sc)
-            rdd = spark.read.text(args.input_path).select([
-                F.input_file_name().alias('input_file_name'),
-                F.col('value')
-            ]).rdd.map(
-                lambda row: (row.input_file_name, row.value)
-            )
+            # load an rdd with pairs of (input_path, line). *path* here
+            # has to be a single path, not a comma-separated list
+            rdd = sc.union([_text_file_with_path(sc, path)
+                            for path in args.input_path.split(',')])
 
         elif hadoop_input_format:
             rdd = sc.hadoopFile(
@@ -263,6 +258,28 @@ def main(cmd_line_args=None):
             ).saveAsTextFile(
                 args.counter_output_dir
             )
+
+
+def _text_file_with_path(sc, path):
+    """Return an RDD that yields (path, line) for each line in the file.
+
+    *path* must be a single path, not a comma-separated list of paths
+    """
+    from pyspark.sql import SparkSession
+    from pyspark.sql import functions as F
+
+    spark = SparkSession(sc)
+
+    df = spark.read.text(path).select([
+        F.input_file_name().alias('input_file_name'),
+        F.col('value')
+    ])
+
+    return df.rdd.map(
+        lambda row: (row.input_file_name,
+                     (row.value if isinstance(row.value, bytes)
+                      else row.value.encode('utf_8')))
+    )
 
 
 def _run_step(step, step_num, rdd, make_mrc_job,

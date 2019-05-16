@@ -366,9 +366,6 @@ def _run_mapper(make_mrc_job, step_num, rdd, rdd_includes_input_path):
 
             # reconstruct *lines* (without dumping to memory)
             lines = chain([first_line], (line for _, line in path_line_pairs))
-            # convert unicode back to bytes
-            lines = (line if isinstance(line, bytes) else line.encode('utf_8')
-                     for line in lines)
 
         # decode lines into key-value pairs (as a generator, not a list)
         #

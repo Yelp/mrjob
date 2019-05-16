@@ -18,6 +18,7 @@ import json
 from argparse import ArgumentParser
 from collections import defaultdict
 from importlib import import_module
+from itertools import chain
 
 from mrjob.util import shlex_split
 from pyspark.accumulators import AccumulatorParam
@@ -280,9 +281,10 @@ def _run_step(step, step_num, rdd, make_mrc_job,
 
     # mapper
     if step.get('mapper'):
+        rdd_includes_input_path = (emulate_map_input_file and step_num == 0)
+
         rdd = _run_mapper(
-            make_mrc_job, step_num, rdd,
-            emulate_map_input_file=(emulate_map_input_file and step_num == 0))
+            make_mrc_job, step_num, rdd, rdd_includes_input_path)
 
     # combiner/shuffle-and-sort
     combiner_job = None
@@ -313,16 +315,16 @@ def _run_step(step, step_num, rdd, make_mrc_job,
     return rdd
 
 
-def _run_mapper(make_mrc_job, step_num, rdd, emulate_map_input_file):
+def _run_mapper(make_mrc_job, step_num, rdd, rdd_includes_input_path):
     """Run our job's mapper.
 
     :param make_mrc_job: an instance of our job, instantiated to be the mapper
                          for the step we wish to run
     :param rdd: an RDD containing lines representing encoded key-value pairs
-    :param emulate_map_input_file: if true and *step_num* is 0, assume rdd
-                                   contains pairs of (input_file_path, line)
-                                   and set $mapreduce_map_input_file in
-                                   the environment
+    :param rdd_includes_input_path: if true, rdd contains pairs of
+                                    (input_file_path, line). set
+                                    $mapreduce_map_input_file to
+                                    *input_file_path*.
     :return: an RDD containing lines representing encoded key-value pairs
     """
     # initialize job class inside mapPartitions(). this deals with jobs that
@@ -333,27 +335,28 @@ def _run_mapper(make_mrc_job, step_num, rdd, emulate_map_input_file):
 
         read, write = job.pick_protocols(step_num, 'mapper')
 
+        if rdd_includes_input_path:
+            # rdd actually contains pairs of (input_path, line), convert
+            path_line_pairs = lines
+
+            # emulate the mapreduce.map.input.file config property
+            # set in Hadoop
+            #
+            # do this first so that mapper_init() etc. will work.
+            # we can assume *rdd* contains at least one record.
+            input_path, first_line = next(path_line_pairs)
+            os.environ['mapreduce_map_input_file'] = input_path
+
+            # reconstruct *lines* (without dumping to memory)
+            lines = chain([first_line], (line for _, line in path_line_pairs))
+            # convert unicode back to bytes
+            lines = (line if isinstance(line, bytes) else line.encode('utf_8')
+                     for line in lines)
+
         # decode lines into key-value pairs (as a generator, not a list)
         #
         # line -> (k, v)
-        if emulate_map_input_file and step_num == 0:
-            # *lines* is actually pairs of (input_file_name, line)
-
-            def read_kv_pairs_from_path_line_pairs(path_line_pairs):
-                for input_path, line in path_line_pairs:
-                    # *input_path* is the same for every line in the
-                    # partition, but it doesn't hurt to set it
-                    os.environ['mapreduce_map_input_file'] = input_path
-
-                    # data frame reader converts input text to unicode
-                    if not isinstance(line, bytes):
-                        line = line.encode('utf_8')
-
-                    yield read(line)
-
-            pairs = read_kv_pairs_from_path_line_pairs(lines)
-        else:
-            pairs = (read(line) for line in lines)
+        pairs = (read(line) for line in lines)
 
         # reduce_pairs() runs key-value pairs through mapper
         #

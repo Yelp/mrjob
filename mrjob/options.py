@@ -668,6 +668,22 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    emulate_map_input_file=dict(
+        switches=[
+            (['--emulate-map-input-file'], dict(
+                action='store_true',
+                help=("In the first mapper, set $mapreduce_map_input_file to"
+                      " the input file path, like Hadoop would, to support"
+                      " jobs that use"
+                      " jobconf_from_env('mapreduce.map.input.file')."
+                      " Ignored if job sets HADOOP_INPUT_FORMAT."),
+            )),
+            (['--no-emulate-map-input-file'], dict(
+                action='store_false',
+                help=("Disables setting $mapreduce_map_input_file"),
+            )),
+        ],
+    ),
     enable_emr_debugging=dict(
         cloud_role='launch',
         switches=[

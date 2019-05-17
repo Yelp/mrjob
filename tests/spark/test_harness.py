@@ -24,8 +24,10 @@ from os.path import dirname
 from os.path import join
 from tempfile import gettempdir
 from shutil import rmtree
+from unittest import skip
 
 import mrjob.spark.harness
+from mrjob.examples.mr_count_lines_by_file import MRCountLinesByFile
 from mrjob.examples.mr_nick_nack import MRNickNack
 from mrjob.examples.mr_nick_nack_input_format import \
     MRNickNackWithHadoopInputFormat
@@ -152,7 +154,8 @@ class SparkHarnessOutputComparisonBaseTestCase(
                      runner_alias='inline', compression_codec=None,
                      job_args=None, spark_conf=None, first_step_num=None,
                      last_step_num=None, counter_output_dir=None,
-                     num_reducers=None, max_output_files=None):
+                     num_reducers=None, max_output_files=None,
+                     emulate_map_input_file=False):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -180,6 +183,9 @@ class SparkHarnessOutputComparisonBaseTestCase(
             harness_job_args.extend(
                 ['--max-output-files', str(max_output_files)])
 
+        if emulate_map_input_file:
+            harness_job_args.append('--emulate-map-input-file')
+
         harness_job_args.extend(input_paths)
 
         harness_job = MRSparkHarness(harness_job_args)
@@ -196,33 +202,44 @@ class SparkHarnessOutputComparisonBaseTestCase(
 
     def _assert_output_matches(
             self, job_class, input_bytes=b'', input_paths=(), job_args=[],
-            num_reducers=None, max_output_files=None):
+            num_reducers=None, max_output_files=None,
+            emulate_map_input_file=False):
 
         # run classes defined in this module in inline mode, classes
         # with their own script files in local mode. used by
         # test_skip_combiner_that_runs_cmd()
         if job_class.__module__ == __name__:
-            runner_alias = 'inline'
+            ref_job_runner_alias = 'inline'
         else:
-            runner_alias = 'local'
+            ref_job_runner_alias = 'local'
 
         reference_job = self._reference_job(
             job_class, input_bytes=input_bytes,
             input_paths=input_paths,
             job_args=job_args,
-            runner_alias=runner_alias)
+            runner_alias=ref_job_runner_alias)
 
         with reference_job.make_runner() as runner:
             runner.run()
 
             reference_output = sorted(to_lines(runner.cat_output()))
 
+        if emulate_map_input_file:
+            # uses dataframes, which don't seem to work in inline mode:
+            #
+            # java.util.ArrayList cannot be cast to org.apache.spark.sql.Column
+            harness_job_runner_alias = 'local'
+        else:
+            harness_job_runner_alias = 'inline'
+
         harness_job = self._harness_job(
             job_class, input_bytes=input_bytes,
             input_paths=input_paths,
             job_args=job_args,
             max_output_files=max_output_files,
-            num_reducers=num_reducers)
+            num_reducers=num_reducers,
+            emulate_map_input_file=emulate_map_input_file,
+            runner_alias=harness_job_runner_alias)
 
         with harness_job.make_runner() as runner:
             runner.run()
@@ -659,6 +676,21 @@ class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):
 
         expected_output_counts = {b'"tomato"': b'2', b'"potato"': b'2'}
         self.assertEqual(expected_output_counts, output_counts)
+
+
+class EmulateMapInputFileTestCase(SparkHarnessOutputComparisonBaseTestCase):
+
+    # dataframes (which emulate_map_input_file uses) don't seem to work
+    # with the Spark harness in the inline runner. the local runner can
+    # do it, but it's super slow because it uses the local-cluster master
+    @skip('fails due to #2060, faster to test in Spark runner anyhow')
+    def test_one_file(self):
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+
+        self._assert_output_matches(
+            MRCountLinesByFile,
+            emulate_map_input_file=True,
+            input_paths=[two_lines_path])
 
 
 class PreservesPartitioningTestCase(SandboxedTestCase):

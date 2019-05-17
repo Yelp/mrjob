@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """A Spark script that can run a MRJob without Hadoop."""
+import os
 import sys
 import json
 from argparse import ArgumentParser
 from collections import defaultdict
 from importlib import import_module
+from itertools import chain
 
 from mrjob.util import shlex_split
 from pyspark.accumulators import AccumulatorParam
@@ -196,8 +198,18 @@ def main(cmd_line_args=None):
 
         return j
 
+    # --emulate-map-input-file doesn't work with hadoop_input_format
+    emulate_map_input_file = (
+        args.emulate_map_input_file and not hadoop_input_format)
+
     try:
-        if hadoop_input_format:
+        if emulate_map_input_file:
+            # load an rdd with pairs of (input_path, line). *path* here
+            # has to be a single path, not a comma-separated list
+            rdd = sc.union([_text_file_with_path(sc, path)
+                            for path in args.input_path.split(',')])
+
+        elif hadoop_input_format:
             rdd = sc.hadoopFile(
                 args.input_path,
                 inputFormatClass=hadoop_input_format,
@@ -208,13 +220,16 @@ def main(cmd_line_args=None):
             # contents of the line are the key and the value is an empty
             # string. Convert to an rdd of just lines, encoded as bytes.
             rdd = rdd.map(lambda kv: kv[0].encode('utf-8'))
+
         else:
             rdd = sc.textFile(args.input_path, use_unicode=False)
 
         # run steps
         for step_num, step in steps_to_run:
             rdd = _run_step(step, step_num, rdd,
-                            make_mrc_job, args.num_reducers, sort_values)
+                            make_mrc_job,
+                            args.num_reducers, sort_values,
+                            emulate_map_input_file)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
@@ -245,8 +260,31 @@ def main(cmd_line_args=None):
             )
 
 
+def _text_file_with_path(sc, path):
+    """Return an RDD that yields (path, line) for each line in the file.
+
+    *path* must be a single path, not a comma-separated list of paths
+    """
+    from pyspark.sql import SparkSession
+    from pyspark.sql import functions as F
+
+    spark = SparkSession(sc)
+
+    df = spark.read.text(path).select([
+        F.input_file_name().alias('input_file_name'),
+        F.col('value')
+    ])
+
+    return df.rdd.map(
+        lambda row: (row.input_file_name,
+                     (row.value if isinstance(row.value, bytes)
+                      else row.value.encode('utf_8')))
+    )
+
+
 def _run_step(step, step_num, rdd, make_mrc_job,
-              num_reducers=None, sort_values=None):
+              num_reducers=None, sort_values=None,
+              emulate_map_input_file=False):
     """Run the given step on the RDD and return the transformed RDD."""
     _check_step(step, step_num)
 
@@ -260,7 +298,10 @@ def _run_step(step, step_num, rdd, make_mrc_job,
 
     # mapper
     if step.get('mapper'):
-        rdd = _run_mapper(make_mrc_job, step_num, rdd)
+        rdd_includes_input_path = (emulate_map_input_file and step_num == 0)
+
+        rdd = _run_mapper(
+            make_mrc_job, step_num, rdd, rdd_includes_input_path)
 
     # combiner/shuffle-and-sort
     combiner_job = None
@@ -291,20 +332,40 @@ def _run_step(step, step_num, rdd, make_mrc_job,
     return rdd
 
 
-def _run_mapper(make_mrc_job, step_num, rdd):
+def _run_mapper(make_mrc_job, step_num, rdd, rdd_includes_input_path):
     """Run our job's mapper.
 
     :param make_mrc_job: an instance of our job, instantiated to be the mapper
                          for the step we wish to run
     :param rdd: an RDD containing lines representing encoded key-value pairs
+    :param rdd_includes_input_path: if true, rdd contains pairs of
+                                    (input_file_path, line). set
+                                    $mapreduce_map_input_file to
+                                    *input_file_path*.
     :return: an RDD containing lines representing encoded key-value pairs
     """
     # initialize job class inside mapPartitions(). this deals with jobs that
     # can't be initialized in the Spark driver (see #2044)
+
     def map_lines(lines):
         job = make_mrc_job('mapper', step_num)
 
         read, write = job.pick_protocols(step_num, 'mapper')
+
+        if rdd_includes_input_path:
+            # rdd actually contains pairs of (input_path, line), convert
+            path_line_pairs = lines
+
+            # emulate the mapreduce.map.input.file config property
+            # set in Hadoop
+            #
+            # do this first so that mapper_init() etc. will work.
+            # we can assume *rdd* contains at least one record.
+            input_path, first_line = next(path_line_pairs)
+            os.environ['mapreduce_map_input_file'] = input_path
+
+            # reconstruct *lines* (without dumping to memory)
+            lines = chain([first_line], (line for _, line in path_line_pairs))
 
         # decode lines into key-value pairs (as a generator, not a list)
         #
@@ -530,6 +591,15 @@ def _make_arg_parser():
         dest='max_output_files',
         type=int,
         help='Directly limit number of output files, using coalesce()',
+    )
+    parser.add_argument(
+        '--emulate-map-input-file',
+        dest='emulate_map_input_file',
+        action='store_true',
+        help=('set mapreduce_map_input_file to the input file path'
+              ' in the first mapper function, so we can read it'
+              ' with mrjob.compat.jobconf_from_env(). Ignored if'
+              ' job has a Hadoop input format'),
     )
 
     for args, kwargs in _PASSTHRU_OPTIONS:

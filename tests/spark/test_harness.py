@@ -226,6 +226,7 @@ class SparkHarnessOutputComparisonBaseTestCase(
 
         if emulate_map_input_file:
             # uses dataframes, which don't seem to work in inline mode:
+            #
             # java.util.ArrayList cannot be cast to org.apache.spark.sql.Column
             harness_job_runner_alias = 'local'
         else:
@@ -679,7 +680,10 @@ class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):
 
 class EmulateMapInputFileTestCase(SparkHarnessOutputComparisonBaseTestCase):
 
-    @skip('fails due to #2060, faster to just test in the spark runner')
+    # dataframes (which emulate_map_input_file uses) don't seem to work
+    # with the Spark harness in the inline runner. the local runner can
+    # do it, but it's super slow because it uses the local-cluster master
+    @skip('fails due to #2060, faster to test in Spark runner anyhow')
     def test_one_file(self):
         two_lines_path = self.makefile('two_lines', b'line\nother line\n')
 

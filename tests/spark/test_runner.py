@@ -794,6 +794,41 @@ class EmulateMapInputFileTestCase(SandboxedTestCase):
                 output,
                 {'two_lines': 2, 'three_lines': 3})
 
+    def test_emulate_map_input_file_in_conf(self):
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(spark=dict(emulate_map_input_file=True)))))
+
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+
+        job = MRCountLinesByFile(['-r', 'spark', two_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'file://' + two_lines_path: 2})
+
+    def test_override_emulate_map_input_file_in_conf(self):
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(spark=dict(emulate_map_input_file=True)))))
+
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+
+        job = MRCountLinesByFile(['-r', 'spark',
+                                  '--no-emulate-map-input-file',
+                                  two_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            # without emulate_map_input_file, there is no input file path
+            self.assertEqual(output, {None: 2})
+
 
 @skipIf(pyspark is None, 'no pyspark module')
 class SparkSetupScriptTestCase(MockFilesystemsTestCase):

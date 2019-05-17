@@ -678,7 +678,7 @@ _RUNNER_OPTS = dict(
                       ' job has a Hadoop input format'),
             )),
             (['--no-emulate-map-input-file'], dict(
-                action='store_true',
+                action='store_false',
                 help=("Don't set $mapreduce_map_input_file"),
             )),
         ],

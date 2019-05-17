@@ -26,6 +26,8 @@ except ImportError:
 from mrjob.examples.mr_count_lines_by_file import MRCountLinesByFile
 from mrjob.examples.mr_most_used_word import MRMostUsedWord
 from mrjob.examples.mr_nick_nack import MRNickNack
+from mrjob.examples.mr_nick_nack_input_format import \
+    MRNickNackWithHadoopInputFormat
 from mrjob.examples.mr_spark_most_used_word import MRSparkMostUsedWord
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
@@ -828,6 +830,29 @@ class EmulateMapInputFileTestCase(SandboxedTestCase):
 
             # without emulate_map_input_file, there is no input file path
             self.assertEqual(output, {None: 2})
+
+    def test_does_not_override_hadoop_input_format(self):
+        input1_path = self.makefile('input1', b'potato')
+        input2_path = self.makefile('input2', b'potato tomato')
+
+        manifest_path = self.makefile('manifest')
+        with open(manifest_path, 'w') as manifest:
+            manifest.write('%s\n%s\n' % (input1_path, input2_path))
+
+        job = MRNickNackWithHadoopInputFormat([
+            '-r', 'spark', manifest_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output_counts = dict(
+                line.strip().split(b'\t')
+                for line in to_lines(runner.cat_output()))
+
+        self.assertEqual(
+            output_counts,
+            {b'"tomato"': b'1', b'"potato"': b'2'})
 
 
 @skipIf(pyspark is None, 'no pyspark module')

@@ -21,8 +21,9 @@ from mrjob.spark.harness import main as harness_main
 
 _PASSTHRU_OPTION_STRINGS = {
     arg for args, kwargs in _PASSTHRU_OPTIONS for arg in args}
-# handled separately because this is also a runner option
-_PASSTHRU_OPTION_STRINGS.add('--max-output-files')
+# handled separately because these are also runner options
+_PASSTHRU_OPTION_STRINGS.update(
+    {'--max-output-files', '--emulate-map-input-file'})
 
 
 class MRSparkHarness(MRJob):
@@ -39,8 +40,9 @@ class MRSparkHarness(MRJob):
         for args, kwargs in _PASSTHRU_OPTIONS:
             self.add_passthru_arg(*args, **kwargs)
 
-        # this is both a runner and harness switch
+        # these are both runner and harness switches
         self.pass_arg_through('--max-output-files')
+        self.pass_arg_through('--emulate-map-input-file')
 
     def spark(self, input_path, output_path):
         harness_args = [

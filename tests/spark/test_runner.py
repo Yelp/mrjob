@@ -22,6 +22,7 @@ try:
     import pyspark
 except ImportError:
     pyspark = None
+
 from mrjob.examples.mr_count_lines_by_file import MRCountLinesByFile
 from mrjob.examples.mr_most_used_word import MRMostUsedWord
 from mrjob.examples.mr_nick_nack import MRNickNack

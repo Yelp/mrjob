@@ -203,7 +203,8 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             self.assertGreater(runner.counters()[0]['count']['combiners'], 2)
 
         self.assertEqual(sorted(results),
-                         [(input_path, 3), (input_gz_path, 1)])
+                         [('file://' + input_path, 3),
+                          ('file://' + input_gz_path, 1)])
 
     def _extra_expected_local_files(self, runner):
         """A list of additional local files expected, as tuples
@@ -276,7 +277,8 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             sorted(expected_local_files))
         self.assertEqual(results['mapreduce.job.id'], runner._job_key)
 
-        self.assertEqual(results['mapreduce.map.input.file'], input_gz_path)
+        self.assertEqual(results['mapreduce.map.input.file'],
+                         'file://' + input_gz_path)
         self.assertEqual(results['mapreduce.map.input.length'],
                          str(input_gz_size))
         self.assertEqual(results['mapreduce.map.input.start'], '0')

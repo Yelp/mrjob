@@ -20,6 +20,22 @@ runners:
 Options unique to the Spark runner:
 
 .. mrjob-opt::
+   :config: emulate_map_input_file
+   :switch: --emulate-map-input-file, --no-emulate-map-input-file
+   :type: boolean
+   :set: spark
+   :default: ``False``
+
+   Imitate Hadoop by setting :envvar:`$mapreduce_map_input_file`
+   to the path of the input file for the current partition. This
+   helps support jobs that rely on
+   :py:func:`jobconf_from_env('mapreduce.map.input.file') <mrjob.compat.jobconf_from_env>`.
+
+   This feature only applies to the mapper of the job's first step,
+   and is ignored by jobs that set
+   :py:attr:`~mrjob.job.MRJob.HADOOP_INPUT_FORMAT`.
+
+.. mrjob-opt::
     :config: gcs_region
     :switch: --gcs-region
     :type: :ref:`string <data-type-string>`

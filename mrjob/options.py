@@ -672,14 +672,15 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--emulate-map-input-file'], dict(
                 action='store_true',
-                help=('Set $mapreduce_map_input_file to the input file path'
-                      ' in the first mapper function, so we can read it'
-                      ' with mrjob.compat.jobconf_from_env(). Ignored if'
-                      ' job has a Hadoop input format'),
+                help=("In the first mapper, set $mapreduce_map_input_file to"
+                      " the input file path, like Hadoop would, to support"
+                      " jobs that use"
+                      " jobconf_from_env('mapreduce.map.input.file')."
+                      " Ignored if job sets HADOOP_INPUT_FORMAT."),
             )),
             (['--no-emulate-map-input-file'], dict(
                 action='store_false',
-                help=("Don't set $mapreduce_map_input_file"),
+                help=("Disables setting $mapreduce_map_input_file"),
             )),
         ],
     ),

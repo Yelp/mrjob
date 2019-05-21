@@ -378,13 +378,13 @@ class SparkMRJobRunner(MRJobBinRunner):
         args.append(
             self._step_output_uri(last_step_num))
 
-        # --hadoop-input-format. Pass '' to indicate we know there is none
-        args.extend(['--hadoop-input-format',
-                     self._hadoop_input_format or ''])
+        # --hadoop-input-format
+        if self._hadoop_input_format:
+            args.extend(['--hadoop-input-format', self._hadoop_input_format])
 
-        # --hadoop-output-format. Pass '' to indicate we know there is none
-        args.extend(['--hadoop-output-format',
-                     self._hadoop_output_format or ''])
+        # --hadoop-output-format
+        if self._hadoop_output_format:
+            args.extend(['--hadoop-output-format', self._hadoop_output_format])
 
         # --sort-values
         if self._sort_values:

@@ -40,6 +40,7 @@ from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
+from mrjob.parse import to_uri
 from mrjob.py2 import to_unicode
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
@@ -105,6 +106,9 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         self._max_output_files = max_output_files
 
+        if self._opts['spark_tmp_dir']:
+            self._check_spark_tmp_dir_opt()
+
         self._spark_tmp_dir = self._pick_spark_tmp_dir()
 
         # where local files are uploaded into Spark
@@ -129,6 +133,19 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         # TODO: we may eventually want log interpretation, but it shouldn't
         # include counters, as they are not found in logs.
+
+    def _check_spark_tmp_dir_opt(self):
+        # warn if spark_tmp_dir isn't actually visible to Spark executors
+        # (see #2062)
+        tmp_dir_is_local = to_uri(
+            self._opts['spark_tmp_dir']).startswith('file://')
+        spark_master_is_local = self._spark_master().startswith('local')
+
+        if tmp_dir_is_local != spark_master_is_local:
+            log.warning(
+                'Warning: executors on Spark master %s may not be able to'
+                ' access spark_tmp_dir %s' %
+                (self._spark_master(), self._opts['spark_tmp_dir']))
 
     def _check_step(self, step, step_num):
         """Don't try to run steps that include commands or use manifests."""

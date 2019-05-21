@@ -680,10 +680,14 @@ class HadoopFormatsTestCase(SparkHarnessOutputComparisonBaseTestCase):
 
 class EmulateMapInputFileTestCase(SparkHarnessOutputComparisonBaseTestCase):
 
-    # dataframes (which emulate_map_input_file uses) don't seem to work
-    # with the Spark harness in the inline runner. the local runner can
-    # do it, but it's super slow because it uses the local-cluster master
-    @skip('fails due to #2060, faster to test in Spark runner anyhow')
+    # this test is rather slow because emulate_map_input_file uses dataframes,
+    # which don't seem to work properly directly through the pyspark library,
+    # which is what the inline runner uses (see comment in
+    # _assert_output_matches(), above), so we have to use local mode, which
+    # uses local-cluster master.
+    #
+    # this feature is more fully tested in test_runner.py, which can run tests
+    # through spark-submit on the local[*] master.
     def test_one_file(self):
         two_lines_path = self.makefile('two_lines', b'line\nother line\n')
 

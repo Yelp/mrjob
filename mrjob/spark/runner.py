@@ -381,10 +381,14 @@ class SparkMRJobRunner(MRJobBinRunner):
         # --hadoop-input-format
         if self._hadoop_input_format:
             args.extend(['--hadoop-input-format', self._hadoop_input_format])
+        else:
+            args.append('--no-hadoop-input-format')
 
         # --hadoop-output-format
         if self._hadoop_output_format:
             args.extend(['--hadoop-output-format', self._hadoop_output_format])
+        else:
+            args.append('--no-hadoop-output-format')
 
         # --sort-values
         if self._sort_values:

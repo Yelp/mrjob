@@ -154,6 +154,7 @@ from __future__ import print_function
 import os
 import sys
 from argparse import ArgumentParser
+from argparse import REMAINDER
 from argparse import SUPPRESS
 from logging import getLogger
 
@@ -485,7 +486,7 @@ def _make_arg_parser():
 
     # add positional arguments
     parser.add_argument(dest='script_or_jar', nargs='?')
-    parser.add_argument(dest='args', nargs='*')
+    parser.add_argument(dest='args', nargs=REMAINDER)
 
     _add_basic_args(parser)
     _add_runner_alias_arg(parser)

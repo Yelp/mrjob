@@ -70,6 +70,11 @@ class MockFilesystemsTestCase(
 
 class SparkTmpDirTestCase(MockFilesystemsTestCase):
 
+    def setUp(self):
+        super(SparkTmpDirTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.spark.runner.log'))
+
     def test_default(self):
         runner = SparkMRJobRunner()
 
@@ -77,6 +82,8 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
         self.assertIsNone(runner._upload_mgr)
 
         self.assertEqual(runner._spark_tmp_dir[-6:], '-spark')
+
+        self.assertFalse(self.log.warning.called)
 
     def test_spark_master_local(self):
         runner = SparkMRJobRunner(spark_master='local[*]')
@@ -119,6 +126,17 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
         self.assertGreater(len(runner._spark_tmp_dir), len('/path/to/tmp/./'))
 
         self.assertIsNone(runner._upload_mgr)
+
+    def test_non_local_uri_with_local_runner(self):
+        runner = SparkMRJobRunner(spark_tmp_dir='s3://walrus/tmp')
+
+        self.assertTrue(self.log.warning.called)
+
+    def test_local_uri_with_non_local_runner(self):
+        runner = SparkMRJobRunner(spark_tmp_dir='/tmp',
+                                  spark_master='mesos://host:12345')
+
+        self.assertTrue(self.log.warning.called)
 
 
 class SparkPyFilesTestCase(MockFilesystemsTestCase):

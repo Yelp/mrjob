@@ -744,7 +744,7 @@ class EmulateMapInputFileTestCase(SandboxedTestCase):
 
         job = MRCountLinesByFile(['-r', 'spark',
                                   '--emulate-map-input-file',
-                                  two_lines_path, three_lines_path])
+                                  input_dir])
 
         with job.make_runner() as runner:
             runner.run()

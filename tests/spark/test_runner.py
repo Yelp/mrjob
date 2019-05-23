@@ -128,13 +128,13 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
         self.assertIsNone(runner._upload_mgr)
 
     def test_non_local_uri_with_local_runner(self):
-        runner = SparkMRJobRunner(spark_tmp_dir='s3://walrus/tmp')
+        SparkMRJobRunner(spark_tmp_dir='s3://walrus/tmp')
 
         self.assertTrue(self.log.warning.called)
 
     def test_local_uri_with_non_local_runner(self):
-        runner = SparkMRJobRunner(spark_tmp_dir='/tmp',
-                                  spark_master='mesos://host:12345')
+        SparkMRJobRunner(spark_tmp_dir='/tmp',
+                         spark_master='mesos://host:12345')
 
         self.assertTrue(self.log.warning.called)
 

@@ -24,7 +24,6 @@ from os.path import dirname
 from os.path import join
 from tempfile import gettempdir
 from shutil import rmtree
-from unittest import skip
 
 import mrjob.spark.harness
 from mrjob.examples.mr_count_lines_by_file import MRCountLinesByFile

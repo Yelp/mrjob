@@ -778,7 +778,7 @@ class EmulateMapInputFileTestCase(SandboxedTestCase):
 
         job = MRTestJobConf(['-r', 'spark',
                              '--emulate-map-input-file',
-                             two_lines_path])
+                             two_lines_path, no_lines_path])
 
         with job.make_runner() as runner:
             runner.run()

@@ -99,6 +99,7 @@ __credits__ = [
     'Spencer Nelson <s@spenczar.com>',
     'Dávid Nemeskey <david@cliqz.com>',
     'Daniel Nephin <dnephin@yelp.com>',
+    'Qui Nguyen <qui@yelp.com>',
     'Oliver Nicholas <bigo@wonlove.net>',
     'Tyler Nisonoff <tyler@asana.com>',
     'Santeri Paavolainen <santtu@iki.fi>',

@@ -33,7 +33,6 @@ try:
             'google-cloud-dataproc>=0.3.0',
             'google-cloud-logging>=1.9.0',
             'google-cloud-storage>=1.13.1',
-            'requests>=2.18.0',  # required for Google libs
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
@@ -72,9 +71,9 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: System :: Distributed Computing',
     ],
     description='Python MapReduce framework',

@@ -30,9 +30,9 @@ Spark script/JAR without explicitly separating them out with ``--``.
 The local and inline runners now more correctly emulate the
 `mapreduce.map.input.file` config property by making it a ``file://`` URL.
 
-.. add_*_option() methods
-
-
+Deprecated methods :py:meth:`~mrjob.job.MRJob.add_file_option` and
+:py:meth:`~mrjob.job.MRJob.add_passthrough_option` can now take a type
+(e.g. ``int``) as their ``type`` argument, to better emulate :mod:`optparse`.
 
 .. _v0.6.8:
 

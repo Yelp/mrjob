@@ -1,6 +1,6 @@
-v0.6.9, 2019-05-24 -- Spark runner fixes
+v0.6.9, 2019-05-24 -- Better emulation
  * jobs:
-   * deprecated add_*_option() methods now pass through type=int, etc. (#2058)
+   * deprecated add_*_option() methods can take types as their type arg (#2058)
  * all runners
    * archives no longer go into working dir mirror (#2059)
      * fixes bug in v0.6.8 that could break archives on Hadoop

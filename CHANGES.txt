@@ -8,7 +8,7 @@ v0.6.9, 2019-05-24 -- Better emulation
    * simulated mapreduce.map.input.file is now a file:// URL (#2066)
  * Spark runner
    * added emulate_map_input_file option (#2061)
-     * can optionally emulate mapreduce.map.input.file in first steps' mapper
+     * can optionally emulate mapreduce.map.input.file in first step's mapper
    * increment counter() emulation now uses correct arg names (#2060)
    * warns if spark_tmp_dir and master aren't both local/remote (#2062)
  * mrjob spark-submit can take switches to script without using "--" (#2055)

@@ -33,6 +33,7 @@ try:
             'google-cloud-dataproc>=0.3.0',
             'google-cloud-logging>=1.9.0',
             'google-cloud-storage>=1.13.1',
+            'requests>=2.18.0',  # required for Google libs
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',

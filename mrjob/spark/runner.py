@@ -382,12 +382,15 @@ class SparkMRJobRunner(MRJobBinRunner):
         if self._hadoop_input_format:
             args.extend(['--hadoop-input-format', self._hadoop_input_format])
         else:
+            # you can't pass --hadoop-input-format '' to EMR's script runner,
+            # so pass something that doesn't use an empty string (see #2055)
             args.append('--no-hadoop-input-format')
 
         # --hadoop-output-format
         if self._hadoop_output_format:
             args.extend(['--hadoop-output-format', self._hadoop_output_format])
         else:
+            # alternative to --hadoop-output-format '' (see #2055)
             args.append('--no-hadoop-output-format')
 
         # --sort-values

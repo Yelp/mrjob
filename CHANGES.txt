@@ -1,4 +1,4 @@
-v0.6.9, 2019-05-24 -- Better emulation
+v0.6.9, 2019-05-29 -- Better emulation
  * formally dropped support for Python 3.4
    * (still seems to work except for Google libraries)
  * jobs:

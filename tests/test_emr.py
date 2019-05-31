@@ -5874,3 +5874,58 @@ class EMRClientBackoffTest(MockBoto3TestCase):
     def test_small_check_cluster_every(self):
         # minimum backoff is always 20
         self._test_backoff(20, check_cluster_every=1)
+
+
+class LogAddressOfMasterTestCase(MockBoto3TestCase):
+    """Test that we log the address of the master node."""
+
+    def setUp(self):
+        super(LogAddressOfMasterTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+    def _num_times_address_of_master_logged(self):
+        return sum(1 for args, kwargs in self.log.info.call_args_list
+                   if args[0].strip().startswith('master node is '))
+
+    def test_basic(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self._num_times_address_of_master_logged(), 1)
+
+    def test_pooled_cluster(self):
+        job1 = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job1.sandbox()
+        with job1.make_runner() as runner:
+            runner.run()
+
+        self.log.info.reset_mock()
+
+        job2 = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job2.sandbox()
+        with job2.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self._num_times_address_of_master_logged(), 1)
+
+    def test_relaunch_pooled_cluster(self):
+        job1 = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job1.sandbox()
+        with job1.make_runner() as runner:
+            runner.run()
+            cluster_id = runner.get_cluster_id()
+
+        self.log.info.reset_mock()
+
+        self.mock_emr_self_termination.add(cluster_id)
+
+        job2 = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job2.sandbox()
+        with job2.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self._num_times_address_of_master_logged(), 2)

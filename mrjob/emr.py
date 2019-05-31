@@ -421,7 +421,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # - hadoop_version
         # - master_public_dns
         # - master_private_ip
+        #
+        # (we may do this for multiple cluster IDs if we join a pooled cluster
+        # that self-terminates)
         self._cluster_to_cache = defaultdict(dict)
+
+        # set of cluster IDs for which we logged the master node's public DNS
+        self._logged_address_of_master = set()
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task'. These will also always
@@ -1490,6 +1496,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
+            self._log_address_of_master_once()
 
         # now that we know which cluster it is, check for Spark support
         if self._has_spark_steps():
@@ -1590,6 +1597,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                       self._opts['check_cluster_every'])
             time.sleep(self._opts['check_cluster_every'])
 
+            # log address of the master node once if we have it
+            self._log_address_of_master_once()
+
             step = emr_client.describe_step(
                 ClusterId=self._cluster_id, StepId=step_id)['Step']
 
@@ -1687,6 +1697,23 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 # "Step 0 of ... failed" looks weird
                 step_desc=(
                     'Master node setup step' if step_num == -1 else None))
+
+    def _log_address_of_master_once(self):
+        """Log the master node's public DNS, if we haven't already"""
+        # Some users like to SSH in manually. See #2007
+        if not self._cluster_id:
+            return
+
+        if self._cluster_id in self._logged_address_of_master:
+            return
+
+        master_dns = self._address_of_master()
+
+        if not master_dns:
+            return
+
+        log.info('  master node is %s' % master_dns)
+        self._logged_address_of_master.add(self._cluster_id)
 
     def _log_step_progress(self):
         """Tunnel to the job tracker/resource manager and log the

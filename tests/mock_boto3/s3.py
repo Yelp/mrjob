@@ -1,5 +1,6 @@
 # Copyright 2009-2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -101,6 +102,11 @@ class MockS3Client(object):
         location_constraint = self.mock_s3_fs[Bucket].get('location') or None
 
         return dict(LocationConstraint=location_constraint)
+
+    def head_bucket(self, Bucket):
+        self._check_bucket_exists(Bucket, 'HeadBucket')
+
+        return dict()
 
     def list_buckets(self):
         buckets = [
@@ -316,6 +322,16 @@ class MockS3Object(object):
                 'Failed to upload %s to %s/%s: %s' % (
                     path, self.bucket_name, self.key,
                     str(_no_such_bucket_error('PutObject'))))
+
+        # verify that config doesn't have empty part size (see #2033)
+        #
+        # config is a boto3.s3.transfer.TransferConfig (we don't mock it),
+        # which is actually part of s3transfer. Very old versions of s3transfer
+        # (e.g. 0.10.0) disallow initializing TransferConfig with part sizes
+        # that are zero or None
+        if Config and not (Config.multipart_chunksize and
+                           Config.multipart_threshold):
+            raise TypeError('part size may not be 0 or None')
 
         mock_keys = self._mock_bucket_keys('PutObject')
         with open(path, 'rb') as f:

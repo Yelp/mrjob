@@ -4,6 +4,7 @@
 # Copyright 2015-2016 Yelp
 # Copyright 2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -141,7 +142,7 @@ def add_mock_hadoop_output(parts):
     for i, part in enumerate(parts):
         part_path = os.path.join(output_subdir, 'part-%05d' % i)
         with open(part_path, 'wb') as part_file:
-                part_file.write(part)
+            part_file.write(part)
 
 
 def get_mock_hadoop_output():
@@ -693,11 +694,11 @@ def hadoop_fs_touchz(stdout, stderr, environ, *args):
                 "touchz: `%s': Not a zero-length file" % uri, file=stderr)
             return 1
     else:
-        try:
+        if os.path.exists(os.path.dirname(path)):
             with open(path, 'w'):
                 pass
             return 0
-        except FileNotFoundError:
+        else:
             print(
                 "touchz: `%s': No such file or directory: `%s'" % (
                     uri, uri), file=stderr)

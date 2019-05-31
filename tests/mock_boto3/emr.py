@@ -1,5 +1,6 @@
 # Copyright 2009-2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -786,15 +787,15 @@ class MockEMRClient(object):
 
             try:
                 if not float(BidPrice) > 0:
-                        raise _error('The bid price is negative or zero.')
+                    raise _error('The bid price is negative or zero.')
             except (TypeError, ValueError):
                 raise _error(
                     'The bid price supplied for an instance fleet is'
                     ' invalid')
 
             if '.' in BidPrice and len(BidPrice.split('.', 1)[1]) > 3:
-                    raise _error('No more than 3 digits are allowed after'
-                                 ' decimal place in bid price')
+                raise _error('No more than 3 digits are allowed after'
+                             ' decimal place in bid price')
 
             spec['BidPrice'] = BidPrice
 

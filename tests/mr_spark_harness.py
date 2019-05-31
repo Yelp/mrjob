@@ -11,16 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""A wrapper for mrjob_spark_harness.py, so we can test the harness with
+"""A wrapper for mrjob/spark/harness.py, so we can test the harness with
 the inline runner."""
 from mrjob.job import MRJob
 from mrjob.options import _parse_raw_args
-from mrjob.spark.mrjob_spark_harness import _PASSTHRU_OPTIONS
-from mrjob.spark.mrjob_spark_harness import main as harness_main
+from mrjob.spark.harness import _PASSTHRU_OPTIONS
+from mrjob.spark.harness import main as harness_main
 
 
 _PASSTHRU_OPTION_STRINGS = {
     arg for args, kwargs in _PASSTHRU_OPTIONS for arg in args}
+# handled separately because these are also runner options
+_PASSTHRU_OPTION_STRINGS.update(
+    {'--max-output-files', '--emulate-map-input-file'})
 
 
 class MRSparkHarness(MRJob):
@@ -37,10 +40,13 @@ class MRSparkHarness(MRJob):
         for args, kwargs in _PASSTHRU_OPTIONS:
             self.add_passthru_arg(*args, **kwargs)
 
+        # these are both runner and harness switches
+        self.pass_arg_through('--max-output-files')
+        self.pass_arg_through('--emulate-map-input-file')
+
     def spark(self, input_path, output_path):
         harness_args = [
-            self.options.job_class,input_path, output_path,
-        ]
+            self.options.job_class, input_path, output_path]
 
         # find arguments to pass through to the Spark harness
         raw_args = _parse_raw_args(self.arg_parser, self._cl_args)

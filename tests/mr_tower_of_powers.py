@@ -1,6 +1,7 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
 # Copyright 2017 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,14 +42,16 @@ class MRTowerOfPowers(MRJob):
             self.n = int(f.read().strip())
 
     def mapper(self, _, value):
-        # mapper should always be reading from the "uploaded" file
-        assert self.options.n_file != os.environ['LOCAL_N_FILE_PATH']
+        # check mapper is reading from the "uploaded" file
+        if os.environ.get('LOCAL_N_FILE_PATH'):
+            assert self.options.n_file != os.environ['LOCAL_N_FILE_PATH']
 
         yield None, value ** self.n
 
     def reducer(self, key, values):
-        # reducer should always be reading from the "uploaded" file
-        assert self.options.n_file != os.environ['LOCAL_N_FILE_PATH']
+        # check reducer is reading from the "uploaded" file
+        if os.environ.get('LOCAL_N_FILE_PATH'):
+            assert self.options.n_file != os.environ['LOCAL_N_FILE_PATH']
 
         # just pass through values as-is
         for value in values:

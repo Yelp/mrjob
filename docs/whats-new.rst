@@ -4,6 +4,206 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.9:
+
+0.6.9
+-----
+
+This fixes a bug introduced in :ref:`v0.6.8` that could break archives or
+directories uploaded into Hadoop or Spark if the name of the unpacked archive
+didn't have an archive extension (e.g. ``.tar.gz``).
+
+The Spark runner can now optionally emulate Hadoop's
+``mapreduce.map.input.file`` configuration property when running the mapper of
+the first step of a streaming job if you enable
+:mrjob-opt:`emulate_map_input_file`. This means that jobs that depend on
+:py:func:`jobconf_from_env('mapreduce.map.input.file') <mrjob.compat.jobconf_from_env>`
+will still work.
+
+The Spark runner also now uses the correct argument names when emulating
+:py:meth:`~mrjob.job.MRJob.increment_counter`, and logs a warning if
+:mrjob-opt:`spark_tmp_dir` doesn't match :mrjob-opt:`spark_master`.
+
+:ref:`mrjob spark-submit <spark-submit>` can now pass switches to the
+Spark script/JAR without explicitly separating them out with ``--``.
+
+The local and inline runners now more correctly emulate the
+`mapreduce.map.input.file` config property by making it a ``file://`` URL.
+
+Deprecated methods :py:meth:`~mrjob.job.MRJob.add_file_option` and
+:py:meth:`~mrjob.job.MRJob.add_passthrough_option` can now take a type
+(e.g. ``int``) as their ``type`` argument, to better emulate :mod:`optparse`.
+
+.. _v0.6.8:
+
+0.6.8
+-----
+
+Nearly full support for Spark
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This release adds nearly full support for Spark, including mrjob-speific
+features like :mrjob-opt:`setup` scripts and
+:ref:`passthrough options <writing-cl-opts>`. See
+:ref:`why-mrjob-with-spark` for everything mrjob can do with Spark.
+
+This release adds a :py:class:`~mrjob.spark.runner.SparkMRJobRunner`
+(``-r spark``), which
+works with any Spark installation, does not require Hadoop, and can access any
+filesystem supported by both mrjob and Spark (HDFS, S3, GCS). The Spark runner
+is now the default for :ref:`mrjob spark-submit <spark-submit>`.
+
+What's *not* supported? mrjob does not yet support Spark on Google Cloud
+Dataproc. The Spark runner does not yet parse logs to determine probable
+cause of failure when your job fails (though it does give you the
+Spark driver output).
+
+Spark Hadoop Streaming emulation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Not only does the Spark runner not need Hadoop to run Spark jobs, it doesn't
+need Hadoop to run most *Hadoop Streaming* jobs, as it knows how to run them
+directly on Spark. This means if you want to migrate to a
+non-Hadoop Spark cluster, you can take all your old
+:py:class:`~mrjob.job.MRJob`\s with you. See :ref:`classic-mrjobs-on-spark`
+for details.
+
+The "experimental harness script" mentioned in :ref:`v0.6.7` is now fully
+integrated into the Spark runner and is no longer supported as a separate
+feature.
+
+Local runner support for Spark
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``local`` and ``inline`` runner can now run Spark scripts locally for
+testing, analogous to the way they've supported Hadoop streaming scripts
+(except that they *do* require a local Spark installation). See
+:ref:`other-ways-to-run-on-spark`.
+
+Other Spark improvements
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+:py:class:`~mrjob.job.MRJob`\s are now Spark-serializable without calling
+:py:meth:`~mrjob.job.MRJob.sandbox` (there used to be a problematic reference
+to ``sys.stdin``). This means you can always pass job methods to
+``rdd.flatMap()`` etc.
+
+:mrjob-opt:`setup` scripts are no longer a YARN-specific feature, working
+on all Spark masters (except
+``local[*]``, which doesn't give executors a separate working directory).
+
+Likewise, you can now specify a different name for files in the job's
+working directory (e.g. ``--file foo#bar``) on all Spark masters.
+
+.. note::
+
+   Uploading archives and directories still only works on YARN
+   for now; Spark considers ``--archives`` a YARN-specific feature.
+
+When running on a local Spark cluster, uses ``file://...`` rather than just
+the path of the file when necessary (e.g. with ``--py-files``).
+
+:py:meth:`~mrjob.runner.MRJobRunner.cat_output` now ignores files and
+subdirectories starting with ``"."`` (used to only be ``"_"``). This allows
+mrjob to ignore Spark's checksum files (e.g. ``.part-00000.crc``), and also
+brings mrjob in closer compliance to the way Hadoop input formats
+read directories.
+
+``spark.yarn.appMasterEnv.*`` config properties are only set if you're
+actually running on YARN.
+
+The values of :mrjob-opt:`spark_master` and :mrjob-opt:`spark_deploy_mode` can
+no longer be overridden with configuration properties
+(``-D spark.master=...``). While not exactly a "feature," this means that mrjob
+always knows what Spark platform it's running on.
+
+Filesystems
+^^^^^^^^^^^
+
+Every runner has an ``fs`` attribute that gives access to all the filesystems
+that runner supports.
+
+Added a :py:meth:`~mrjob.fs.base.Filesystem.put` method to all filesystems,
+which allows uploading a single file (it used to be that each runner had
+custom logic for uploads).
+
+It also used to be that if you wanted to create a bucket on S3 or GCS, you had
+to call ``create_bucket(...)`` explicitly. Now
+:py:meth:`~mrjob.fs.base.Filesystem.mkdir` will automatically create buckets
+as needed.
+
+If you still need to access methods specific to a filesystem, you should do so
+through ``fs.<name>``, where ``<name>`` is the (lowercase) name of the
+storage service. For example the Spark runner's filesystem offers both
+``runner.fs.s3.create_bucket()`` and ``runner.fs.gcs.create_bucket()``.
+The old style of implicitly passing through FS-specific methods
+(``runner.fs.create_bucket(...)``) is deprecated and going away in v0.7.0.
+
+:py:class:`~mrjob.fs.gcs.GCSFilesystem`\'s constructor had a useless
+``local_tmp_dir`` argument, which is now deprecated and going away in v0.7.0.
+
+EMR
+^^^
+
+Fixed a bad bug introduced in :ref:`v0.6.7` that could prevent mrjob from
+running on EMR with a non-default temp bucket.
+
+You can now set sub-parameters with :mrjob-opt:`extra_cluster_params`. For
+example, you can now do:
+
+.. code-block:: sh
+
+   --extra-cluster-param Instances.EmrManagedMasterSecurityGroup=...
+
+without clobbering the zone or instance group/fleet configs
+specified in ``Instances``.
+
+Running your job with ``--subnet ''`` now un-sets a :mrjob-opt:`subnet`
+specified in your config file (used to be ignored).
+
+If you are using cluster pooling with retries (:mrjob-opt:`pool_wait_minutes`),
+mrjob now retains information about clusters that is immutable
+(e.g. AMI version), saving API calls.
+
+Dependency upgrades
+^^^^^^^^^^^^^^^^^^^
+
+Bumped the required versions of several Google Cloud Python libraries to be
+more compatible with current versions of their sub-dependencies
+(Google libraries pin a fairly narrow range of dependencies). :py:mod:`mrjob`
+now requires:
+
+  * :py:mod:`google-cloud-dataproc` at least 0.3.0,
+  * :py:mod:`google-cloud-logging` at least 1.9.0, and
+  * :py:mod:`google-cloud-storage` at least 1.13.1.
+
+Also dropped support for :py:mod:`PyYAML` 3.08; now we require at least
+:py:mod:`PyYAML` 3.10 (which came out in 2011).
+
+.. note::
+
+  We are aware that the Google libraries' extensive dependencies can be a
+  nuisance for mrjob users who don't use Google Cloud. Our tentative
+  plan is to make dependencies specific to a third-party service (including
+  :py:mod:`google-cloud-*` and :py:mod:`boto3`) optional starting in v0.7.0.
+
+Other bugfixes
+^^^^^^^^^^^^^^
+
+Fixed a long-standing bug that would cause the Hadoop runner to hang or raise
+cryptic errors if :mrjob-opt:`hadoop_bin` or :mrjob-opt:`spark_submit_bin`
+is not executable.
+
+Support files for ``mrjob.examples`` (e.g. ``stop_words.txt`` for
+:py:class:`~mrjob.examples.mr_most_used_word.MRMostUsedWord`) are now
+installed along with :py:mod:`mrjob`.
+
+Setting a `*_bin` option to an empty value (e.g. ``--hadoop-bin``) now
+always instructs mrjob to use the default, rather than disabling core
+features or creating cryptic errors. This affects :mrjob-opt:`gcloud_bin`,
+:mrjob-opt:`hadoop_bin`, :mrjob-opt:`sh_bin`, and :mrjob-opt:`ssh_bin`;
+the various `*python_bin` options already worked this way.
+
 .. _v0.6.7:
 
 0.6.7

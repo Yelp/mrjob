@@ -1,6 +1,7 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2015 Yelp
 # Copyright 2017 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 #
@@ -56,7 +57,7 @@ class LocalFilesystem(Filesystem):
         if not os.path.isdir(path):
             os.makedirs(path)
 
-    def put(self, src, path, part_size_mb=None):
+    def put(self, src, path):
         """Copy a file from *src* to *path*"""
         shutil.copyfile(src, path)
 

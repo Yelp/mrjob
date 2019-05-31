@@ -1,6 +1,7 @@
 # Copyright 2009-2015 Yelp and Contributors
 # Copyright 2016-2017 Yelp
 # Copyright 2018 Google Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,10 +29,10 @@ try:
         'install_requires': [
             'boto3>=1.4.6',
             'botocore>=1.6.0',
-            'PyYAML>=3.08',
-            'google-cloud-dataproc>=0.2.0',
-            'google-cloud-logging>=1.5.0',
-            'google-cloud-storage>=1.9.0',
+            'PyYAML>=3.10',
+            'google-cloud-dataproc>=0.3.0',
+            'google-cloud-logging>=1.9.0',
+            'google-cloud-storage>=1.13.1',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
@@ -70,9 +71,9 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: System :: Distributed Computing',
     ],
     description='Python MapReduce framework',
@@ -93,11 +94,13 @@ setup(
         'mrjob.examples.mr_travelling_salesman',
         'mrjob.fs',
         'mrjob.logs',
+        'mrjob.spark',
         'mrjob.tools',
         'mrjob.tools.emr',
     ],
     package_data={
         'mrjob': ['bootstrap/*.sh'],
+        'mrjob.examples': ['*.txt', '*.jar', '*.rb'],
         'mrjob.examples.mr_postfix_bounce': ['*.json'],
         'mrjob.examples.mr_travelling_salesman': ['example_graphs/*.json'],
     },

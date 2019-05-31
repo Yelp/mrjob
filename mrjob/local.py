@@ -2,6 +2,7 @@
 # Copyright 2009-2013 Yelp and Contributors
 # Copyright 2015-2017 Yelp
 # Copyright 2018 Yelp and Contributors
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -74,6 +75,9 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
     It's rare to need to instantiate this class directly (see
     :py:meth:`~LocalMRJobRunner.__init__` for details).
 
+    .. versionadded:: 0.6.8
+
+       can run Spark steps as well, on the ``local-cluster`` Spark master.
     """
     alias = 'local'
 
@@ -281,8 +285,7 @@ def _pickle_safe(func):
         raise Exception(repr(ex))  # we know this is pickleable
 
 
-        # other utilities
-
+# other utilities
 
 def _sort_lines_with_sort_bin(input_paths, output_path, sort_bin,
                               sort_values=False, tmp_dir=None):

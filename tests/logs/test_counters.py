@@ -1,6 +1,6 @@
 # -*- encoding: utf-8 -*-
-# Copyright 2015-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2015-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,3 +73,13 @@ class FormatCountersTestCase(BasicTestCase):
             _parse_indented_counters(
                 _format_counters(self.COUNTERS).splitlines()),
             self.COUNTERS)
+
+    def test_custom_desc(self):
+        self.assertEqual(
+            _format_counters(self.COUNTERS, desc='Counters for step 1'),
+            ('Counters for step 1: 3\n'
+             '\tFile System Counters\n'
+             '\t\tFILE: Number of bytes read=8\n'
+             '\t\tFILE: Number of bytes written=359982\n'
+             '\tJob Counters\n'
+             '\t\tLaunched map tasks=2'))

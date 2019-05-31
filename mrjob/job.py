@@ -1,5 +1,6 @@
 # Copyright 2009-2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -305,6 +306,13 @@ class MRJob(MRJobLauncher):
     def spark(self, input_path, output_path):
         """Re-define this with Spark code to run. You can read input
         with *input_path* and output with *output_path*.
+
+        .. warning::
+
+           Prior to v0.6.8, to pass job methods into Spark
+           (``rdd.flatMap(self.some_method)``), you first had to call
+           :py:meth:`self.sandbox() <mrjob.job.MRJob.sandbox>`; otherwise
+           Spark would error because *self* was not serializable.
         """
         raise NotImplementedError
 

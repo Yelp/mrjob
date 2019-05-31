@@ -1,4 +1,5 @@
 # Copyright 2018 Google Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,8 +59,8 @@ class MockGoogleTestCase(SandboxedTestCase):
         # mock project ID, returned by mock google.auth.default()
         self.mock_project_id = 'mock-project-12345'
 
-        # Maps bucket name to a dictionary with the key
-        # *blobs*. *blobs* maps object name to
+        # Maps bucket name to a dictionary with the keys
+        # *blobs* and *location*. *blobs* maps object name to
         # a dictionary with the key *data*, which is
         # a bytestring.
         self.mock_gcs_fs = {}

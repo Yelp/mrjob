@@ -1,6 +1,7 @@
 # Copyright 2009-2013 Yelp and Contributors
 # Copyright 2015-2017 Yelp
 # Copyright 2018 Yelp and Contributors
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@ import os
 import shutil
 import stat
 import platform
+from copy import deepcopy
 from functools import partial
 from multiprocessing import cpu_count
 from os.path import dirname
@@ -144,6 +146,9 @@ class SimMRJobRunner(MRJobRunner):
         if hasattr(self, '_create_setup_wrapper_scripts'):  # inline doesn't
             self._create_setup_wrapper_scripts()
 
+        # this does nothing in inline mode, since there's no _spark_master()
+        self._copy_files_to_wd_mirror()
+
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
             log.info('Running step %d of %d...' % (
@@ -230,7 +235,7 @@ class SimMRJobRunner(MRJobRunner):
                 parse_mr_job_stderr(stderr, counters=self._counters[step_num])
 
     def counters(self):
-        return self._counters
+        return deepcopy(self._counters)
 
     def get_hadoop_version(self):
         return self._opts['hadoop_version']
@@ -376,11 +381,9 @@ class SimMRJobRunner(MRJobRunner):
                 join(working_dir, name) for name, path in named_paths)
 
         if map_split:
-            # mapreduce.map.input.file
-            # mapreduce.map.input.start
-            # mapreduce.map.input.length
-            for key, value in map_split.items():
-                j['mapreduce.map.input.' + key] = str(value)
+            j['mapreduce.map.input.file'] = 'file://' + map_split['file']
+            j['mapreduce.map.input.length'] = str(map_split['length'])
+            j['mapreduce.map.input.start'] = str(map_split['start'])
 
         # translate to correct version
 

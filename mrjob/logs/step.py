@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015-2017 Yelp
 # Copyright 2018 Yelp and Google, Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -217,6 +218,7 @@ def _yield_lines_from_pty_or_pipe(stderr):
             return
         else:
             raise
+
 
 # TODO: could factor out _yield_lines_from_pty_or_pipe() and just have
 # this method take a sequence of lines

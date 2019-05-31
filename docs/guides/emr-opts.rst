@@ -324,7 +324,7 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
     :set: emr
     :default: ``[]``
 
-    Configurations for 4.x AMIs. For example:
+    Cluster configs for AMI version 4.x and later. For example:
 
     .. code-block:: yaml
 
@@ -569,6 +569,11 @@ Other rarely used options
     On EMR, mrjob uses SSH to tunnel to the job tracker (see
     :mrjob-opt:`ssh_tunnel`), as a fallback way of fetching job progress,
     and as a quicker way of accessing your job's logs.
+
+    .. versionchanged:: 0.6.8
+
+       Setting this to an empty value (``--ssh-bin ''``) instructs mrjob to use
+       the default value (used to effectively disable SSH).
 
 .. mrjob-opt::
     :config: tags

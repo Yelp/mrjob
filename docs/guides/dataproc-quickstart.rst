@@ -28,8 +28,10 @@ Enabling Google Cloud Dataproc
 * Go `here <https://console.cloud.google.com/apis/library/dataproc.googleapis.com/>`__ (or search for "dataproc" under **APIs & Services > Library** in the upper left-hand menu)
 * Click **Enable**
 
-Creating credentials
-^^^^^^^^^^^^^^^^^^^^
+.. _google-credentials-setup:
+
+Configuring Google Cloud credentials
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Go `here <https://console.cloud.google.com/apis/credentials>`__ (or pick **APIs & Services > Credentials** in the upper left-hand menu)
 * Pick **Create credentials > Service account key**

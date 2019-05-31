@@ -1,6 +1,6 @@
 # Copyright 2009-2015 Yelp and Contributors
-# Copyright 2016-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2016-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,11 +33,13 @@ from mrjob.util import random_identifier
 from mrjob.util import read_file
 from mrjob.util import read_input
 from mrjob.util import safeeval
+from mrjob.util import save_sys_std
 from mrjob.util import to_lines
 from mrjob.util import unarchive
 from mrjob.util import unique
 from mrjob.util import which
 
+from tests.py2 import Mock
 from tests.py2 import patch
 from tests.sandbox import BasicTestCase
 from tests.sandbox import SandboxedTestCase
@@ -547,6 +549,72 @@ class RandomIdentifierTestCase(BasicTestCase):
         # heh
         with random_seed(0):
             self.assertNotEqual(random_identifier(), random_identifier())
+
+
+class SaveSysStdTestCase(BasicTestCase):
+
+    def setUp(self):
+        # if save_sys_std() *doesn't* work, don't mess up other tests
+        super(SaveSysStdTestCase, self).setUp()
+
+        self.stdin = self.start(patch('sys.stdin'))
+        self.stdout = self.start(patch('sys.stdout'))
+        self.stderr = self.start(patch('sys.stderr'))
+
+    def test_basic(self):
+        fake_stdin = BytesIO(b'HI')
+        fake_stdout = BytesIO()
+        fake_stderr = BytesIO()
+
+        with save_sys_std():
+            sys.stdin = fake_stdin
+            self.assertEqual(sys.stdin.read(), b'HI')
+
+            sys.stdout = fake_stdout
+            sys.stdout.write(b'Hello!\n')
+
+            sys.stderr = fake_stderr
+            sys.stderr.write(b'!!!')
+
+        self.assertEqual(sys.stdin, self.stdin)
+        self.assertEqual(sys.stdout, self.stdout)
+        self.assertEqual(sys.stderr, self.stderr)
+
+        self.assertFalse(self.stdin.read.called)
+        self.assertFalse(self.stdout.write.called)
+        self.assertFalse(self.stderr.write.called)
+
+        self.assertEqual(fake_stdout.getvalue(), b'Hello!\n')
+        self.assertEqual(fake_stderr.getvalue(), b'!!!')
+
+    def test_flushing(self):
+        fake_stderr = Mock()
+
+        with save_sys_std():
+            sys.stderr = fake_stderr
+            sys.stderr.write(b'Hello!\n')
+
+        self.assertEqual(self.stderr.flush.call_count, 1)
+        self.assertEqual(fake_stderr.flush.call_count, 1)
+
+        # stdout was never patched, so it gets flushed twice
+        self.assertEqual(self.stdout.flush.call_count, 2)
+
+        # we don't flush stdin
+        self.assertFalse(self.stdin.flush.called)
+
+    def test_bad_flush(self):
+        fake_stdout = "LOOK AT ME I'M STDOUT"
+        self.assertFalse(hasattr(fake_stdout, 'flush'))
+
+        with save_sys_std():
+            sys.stdout = fake_stdout
+
+        self.assertEqual(sys.stdout, self.stdout)
+        self.assertEqual(self.stdout.flush.call_count, 1)
+
+        # sys.stderr, which was not patched, should be flushed twice
+        self.assertEqual(self.stderr.flush.call_count, 2)
 
 
 class UniqueTestCase(BasicTestCase):

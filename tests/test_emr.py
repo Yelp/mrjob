@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2016 Yelp and Contributors
-# Copyright 2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2017-2018 Yelp
+# Copyright 2019 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,9 +45,9 @@ from mrjob.emr import _3_X_SPARK_SUBMIT
 from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
 from mrjob.emr import _BAD_BASH_IMAGE_VERSION
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
-from mrjob.emr import _HUGE_PART_THRESHOLD
 from mrjob.emr import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
+from mrjob.fs.s3 import _HUGE_PART_SIZE
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _extract_tags
@@ -878,7 +878,7 @@ class TmpBucketTestCase(MockBoto3TestCase):
         existing_bucket_names = set(self.mock_s3_fs)
 
         runner = EMRJobRunner(conf_paths=[], **runner_kwargs)
-        runner._create_s3_tmp_bucket_if_needed()
+        runner._upload_local_files()
 
         bucket_name, path = parse_s3_uri(runner._opts['cloud_tmp_dir'])
 
@@ -2179,7 +2179,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         def side_effect_usable_clusters(*args, **kwargs):
             return [
                 (cluster_id, 0) for cluster_id in self.mock_cluster_ids
-                if cluster_id not in kwargs['exclude']]
+                if cluster_id not in args[2]]
 
         def side_effect_time_sleep(*args):
             self.sleep_counter += 1
@@ -2298,7 +2298,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-D', 'mapreduce.job.reduces=0',
                 '-input', 'input', '-output', 'output',
                 '-mapper',
@@ -2314,7 +2315,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-input', 'input', '-output', 'output',
                 '-mapper', 'cat',
                 '-reducer',
@@ -2339,7 +2341,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-input', 'input', '-output', 'output',
                 '-mapper',
                 "/bin/sh -x -c 'set -e; grep anything | %s"
@@ -2364,7 +2367,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-D', 'mapreduce.job.reduces=0',
                 '-input', 'input', '-output', 'output',
                 '-mapper',
@@ -2392,7 +2396,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
             step['HadoopJarStep']['Args'], [
                 'streaming', '-v',
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-D', 'mapreduce.job.reduces=0',
                 '-input', 'input', '-output', 'output',
                 '-mapper',
@@ -2413,7 +2418,8 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
-                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '%s#my_job.py' % (
+                    runner._dest_in_wd_mirror('my_job.py', 'my_job.py')),
                 '-D', 'mapreduce.job.reduces=0',
                 '-libjars', '/home/hadoop/dora.jar',
                 '-D', 'foo=bar',
@@ -2741,7 +2747,9 @@ class SparkStepTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            script_uri = runner._upload_mgr.uri(runner._script_path)
+            script_uri = runner._dest_in_wd_mirror(
+                runner._script_path,
+                runner._working_dir_mgr.name('file', runner._script_path))
             input1_uri = runner._upload_mgr.uri(input1)
             input2_uri = runner._upload_mgr.uri(input2)
 
@@ -2968,14 +2976,6 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
             side_effect=tests.mock_boto3.s3.MockS3Object.upload_file,
             autospec=True))
 
-    def upload_data(self, runner, data):
-        """Upload some bytes to S3"""
-        data_path = os.path.join(self.tmp_dir, self.TEST_FILENAME)
-        with open(data_path, 'wb') as fp:
-            fp.write(data)
-
-        runner._upload_contents(self.TEST_S3_URI, data_path)
-
     def assert_upload_succeeds(self, runner, data, expected_part_size):
         """Write the data to a temp file, and then upload it to (mock) S3,
         checking that the data successfully uploaded."""
@@ -2985,7 +2985,7 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         with open(data_path, 'wb') as fp:
             fp.write(data)
 
-        runner._upload_contents(self.TEST_S3_URI, data_path)
+        runner.fs.put(data_path, self.TEST_S3_URI)
 
         s3_key = runner.fs.s3._get_s3_key(self.TEST_S3_URI)
         self.assertEqual(s3_key.get()['Body'].read(), data)
@@ -3019,7 +3019,7 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         runner = EMRJobRunner(cloud_part_size_mb=0)
 
         data = b'Mew' * 20
-        self.assert_upload_succeeds(runner, data, _HUGE_PART_THRESHOLD)
+        self.assert_upload_succeeds(runner, data, _HUGE_PART_SIZE)
 
 
 class AWSSessionTokenTestCase(MockBoto3TestCase):
@@ -5347,9 +5347,9 @@ class SparkMasterAndDeployModeTestCase(MockBoto3TestCase):
             self.start(patch('mrjob.emr.EMRJobRunner.get_hadoop_version',
                              return_value='2'))
 
-            self.assertEqual(
-                runner._spark_submit_args(0)[:4],
-                ['--master', 'yarn', '--deploy-mode', 'cluster']
+            self.assertIn(
+                cmd_line(['--master', 'yarn', '--deploy-mode', 'cluster']),
+                cmd_line(runner._spark_submit_args(0))
             )
 
     def test_spark_master_and_deploy_mode_are_hard_coded(self):

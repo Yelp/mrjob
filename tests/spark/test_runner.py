@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test the Spark runner."""
 from io import BytesIO
+from os import listdir
 from os.path import exists
 from os.path import join
 from unittest import skipIf
@@ -22,6 +23,12 @@ try:
 except ImportError:
     pyspark = None
 
+from mrjob.examples.mr_count_lines_by_file import MRCountLinesByFile
+from mrjob.examples.mr_most_used_word import MRMostUsedWord
+from mrjob.examples.mr_nick_nack import MRNickNack
+from mrjob.examples.mr_nick_nack_input_format import \
+    MRNickNackWithHadoopInputFormat
+from mrjob.examples.mr_spark_most_used_word import MRSparkMostUsedWord
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
 from mrjob.examples.mr_sparkaboom import MRSparKaboom
@@ -37,15 +44,23 @@ from mrjob.util import to_lines
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
+from tests.mr_count_lines_by_filename import MRCountLinesByFilename
 from tests.mr_doubler import MRDoubler
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
+from tests.mr_test_jobconf import MRTestJobConf
+from tests.mr_tower_of_powers import MRTowerOfPowers
+from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import ANY
 from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
+from tests.sandbox import mrjob_conf_patcher
+from tests.test_bin import _LOCAL_CLUSTER_MASTER
 
 
 class MockFilesystemsTestCase(
@@ -55,6 +70,11 @@ class MockFilesystemsTestCase(
 
 class SparkTmpDirTestCase(MockFilesystemsTestCase):
 
+    def setUp(self):
+        super(SparkTmpDirTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.spark.runner.log'))
+
     def test_default(self):
         runner = SparkMRJobRunner()
 
@@ -62,6 +82,8 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
         self.assertIsNone(runner._upload_mgr)
 
         self.assertEqual(runner._spark_tmp_dir[-6:], '-spark')
+
+        self.assertFalse(self.log.warning.called)
 
     def test_spark_master_local(self):
         runner = SparkMRJobRunner(spark_master='local[*]')
@@ -104,6 +126,17 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
         self.assertGreater(len(runner._spark_tmp_dir), len('/path/to/tmp/./'))
 
         self.assertIsNone(runner._upload_mgr)
+
+    def test_non_local_uri_with_local_runner(self):
+        SparkMRJobRunner(spark_tmp_dir='s3://walrus/tmp')
+
+        self.assertTrue(self.log.warning.called)
+
+    def test_local_uri_with_non_local_runner(self):
+        SparkMRJobRunner(spark_tmp_dir='/tmp',
+                         spark_master='mesos://host:12345')
+
+        self.assertTrue(self.log.warning.called)
 
 
 class SparkPyFilesTestCase(MockFilesystemsTestCase):
@@ -200,11 +233,114 @@ class SparkRunnerSparkStepsTestCase(MockFilesystemsTestCase):
 
 
 @skipIf(pyspark is None, 'no pyspark module')
+class SparkWorkingDirTestCase(MockFilesystemsTestCase):
+    # regression tests for #1922
+
+    def test_copy_files_with_rename_to_local_wd_mirror(self):
+        # see test_upload_files_with_rename() in test_local for comparison
+
+        fish_path = self.makefile('fish', b'salmon')
+        fowl_path = self.makefile('fowl', b'goose')
+
+        # use _LOCAL_CLUSTER_MASTER because the default master (local[*])
+        # doesn't have a working directory
+        job = MRSparkOSWalk(['-r', 'spark',
+                             '--spark-master', _LOCAL_CLUSTER_MASTER,
+                             '--file', fish_path + '#ghoti',
+                             '--file', fowl_path])
+        job.sandbox()
+
+        file_sizes = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # check working dir mirror
+            wd_mirror = runner._wd_mirror()
+            self.assertIsNotNone(wd_mirror)
+            self.assertFalse(is_uri(wd_mirror))
+
+            self.assertTrue(exists(wd_mirror))
+            # only files which needed to be renamed should be in wd_mirror
+            self.assertTrue(exists(join(wd_mirror, 'ghoti')))
+            self.assertFalse(exists(join(wd_mirror, 'fish')))
+            self.assertFalse(exists(join(wd_mirror, 'fowl')))
+
+            for line in to_lines(runner.cat_output()):
+                path, size = safeeval(line)
+                file_sizes[path] = size
+
+        # check that files were uploaded to working dir
+        self.assertIn('fowl', file_sizes)
+        self.assertEqual(file_sizes['fowl'], 5)
+
+        self.assertIn('ghoti', file_sizes)
+        self.assertEqual(file_sizes['ghoti'], 6)
+
+        # fish was uploaded as "ghoti"
+        self.assertNotIn('fish', file_sizes)
+
+    def test_copy_files_with_rename_to_remote_wd_mirror(self):
+        self.add_mock_s3_data({'walrus': {'fish': b'salmon',
+                                          'fowl': b'goose'}})
+
+        foe_path = self.makefile('foe', b'giant')
+
+        run_spark_submit = self.start(patch(
+            'mrjob.bin.MRJobBinRunner._run_spark_submit',
+            return_value=0))
+
+        job = MRSparkOSWalk(['-r', 'spark',
+                             '--spark-master', 'mesos://host:9999',
+                             '--spark-tmp-dir', 's3://walrus/tmp',
+                             '--file', 's3://walrus/fish#ghoti',
+                             '--file', 's3://walrus/fowl',
+                             '--file', foe_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # check working dir mirror
+            wd_mirror = runner._wd_mirror()
+            fs = runner.fs
+
+            self.assertIsNotNone(wd_mirror)
+            self.assertTrue(is_uri(wd_mirror))
+
+            self.assertTrue(fs.exists(wd_mirror))
+            # uploaded for rename
+            self.assertTrue(fs.exists(fs.join(wd_mirror, 'ghoti')))
+            # wrong name
+            self.assertFalse(fs.exists(fs.join(wd_mirror, 'fish')))
+            # no need to upload, already visible
+            self.assertFalse(fs.exists(fs.join(wd_mirror, 'fowl')))
+            # need to upload from local to remote
+            self.assertTrue(fs.exists(fs.join(wd_mirror, 'foe')))
+
+            run_spark_submit.assert_called_once_with(
+                ANY, ANY, record_callback=ANY)
+
+            spark_submit_args = run_spark_submit.call_args[0][0]
+            self.assertIn('--files', spark_submit_args)
+            files_arg = spark_submit_args[
+                spark_submit_args.index('--files') + 1]
+
+            self.assertEqual(
+                files_arg, ','.join([
+                    fs.join(wd_mirror, 'foe'),
+                    's3://walrus/fowl',
+                    fs.join(wd_mirror, 'ghoti'),
+                    fs.join(wd_mirror, 'mr_spark_os_walk.py'),
+                ]))
+
+
+@skipIf(pyspark is None, 'no pyspark module')
 class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
     # test that the spark harness works as expected.
     #
     # this runs tests similar to those in SparkHarnessOutputComparisonTestCase
-    # in tests/spark/test_mrjob_spark_harness.py.
+    # in tests/spark/test_harness.py.
 
     def test_basic_job(self):
         job = MRWordFreqCount(['-r', 'spark'])
@@ -213,7 +349,6 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
         with job.make_runner() as runner:
             runner.run()
-
             output = dict(job.parse_output(runner.cat_output()))
 
             self.assertEqual(output, dict(blue=1, fish=4, one=1, red=1, two=1))
@@ -222,8 +357,8 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
         # deliberately mix Hadoop 1 and 2 config properties
         jobconf_args = [
             '--jobconf',
-            'mapred.output.compression.codec='\
-            'org.apache.hadoop.io.compress.GzipCodec',
+            ('mapred.output.compression.codec='
+             'org.apache.hadoop.io.compress.GzipCodec'),
             '--jobconf',
             'mapreduce.output.fileoutputformat.compress=true',
         ]
@@ -239,6 +374,71 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
             self.assertEqual(dict(job.parse_output(runner.cat_output())),
                              dict(fa=1, la=8))
+
+    def test_hadoop_output_format(self):
+        input_bytes = b'ee eye ee eye oh'
+
+        job = MRNickNack(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(input_bytes))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # nicknack.MultipleValueOutputFormat should put output in subdirs
+            self.assertTrue(runner.fs.exists(
+                runner.fs.join(runner.get_output_dir(), 'e')))
+
+            self.assertTrue(runner.fs.exists(
+                runner.fs.join(runner.get_output_dir(), 'o')))
+
+            # check for expected output
+            self.assertEqual(
+                sorted(to_lines(runner.cat_output())),
+                [b'"ee"\t2\n', b'"eye"\t2\n', b'"oh"\t1\n'])
+
+    def _num_output_files(self, runner):
+        return sum(
+            1 for f in listdir(runner.get_output_dir())
+            if f.startswith('part-'))
+
+    def test_num_reducers(self):
+        jobconf_args = [
+            '--jobconf', 'mapreduce.job.reduces=1'
+        ]
+
+        job = MRWordFreqCount(['-r', 'spark'] + jobconf_args)
+        job.sandbox(stdin=BytesIO(b'one two one\n two three\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(self._num_output_files(runner), 1)
+
+    def test_max_output_files(self):
+        job = MRWordFreqCount(['-r', 'spark', '--max-output-files', '1'])
+        job.sandbox(stdin=BytesIO(b'one two one\n two three\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(self._num_output_files(runner), 1)
+
+    def test_max_output_files_is_cmd_line_only(self):
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(spark=dict(max_output_files=1)))))
+
+        log = self.start(patch('mrjob.runner.log'))
+
+        job = MRWordFreqCount(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(b'one two one\n two three\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # by default there should be at least 2 output files
+            self.assertNotEqual(self._num_output_files(runner), 1)
+
+        self.assertTrue(log.warning.called)
 
     def test_sort_values(self):
         job = MRSortAndGroup(['-r', 'spark'])
@@ -295,7 +495,79 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
                 ]
             )
 
-    # TODO: add test of file upload args once we fix #1922
+    def _test_file_upload_args(self, job_class, spark_master):
+        input_bytes = (b'Market Song:\n'
+                       b'To market, to market, to buy a fat pig.\n'
+                       b'Home again, home again, jiggety-jig')
+
+        # deliberately collide with FILES = ['stop_words.txt']
+        #
+        # Make "market" a stop word too, so that "home" is most common
+        stop_words_file = self.makefile(
+            'stop_words.txt',
+            b'again\nmarket\nto\n')
+
+        job = job_class(['-r', 'spark',
+                         '--spark-master', spark_master,
+                         '--stop-words-file', stop_words_file])
+        job.sandbox(stdin=BytesIO(input_bytes))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = b''.join(runner.cat_output()).strip()
+
+            self.assertEqual(output, b'"home"')
+
+    def test_streaming_step_file_upload_args_with_working_dir(self):
+        self._test_file_upload_args(MRMostUsedWord, _LOCAL_CLUSTER_MASTER)
+
+    def test_streaming_step_file_upload_args_without_working_dir(self):
+        self._test_file_upload_args(MRMostUsedWord, 'local[*]')
+
+    def test_spark_step_file_upload_args_with_working_dir(self):
+        self._test_file_upload_args(MRSparkMostUsedWord, _LOCAL_CLUSTER_MASTER)
+
+    def test_spark_step_file_upload_args_without_working_dir(self):
+        self._test_file_upload_args(MRSparkMostUsedWord, 'local[*]')
+
+    def _test_file_upload_args_loaded_at_init(self, spark_master):
+        # can we simulate a MRJob that expects to load files in its
+        # constructor?
+
+        # sanity-check that our test; if MRTowerOfPowers can initialize
+        # without its --n-file, we're not testing anything
+        self.assertFalse(exists('n_file'))
+        self.assertRaises(IOError, MRTowerOfPowers, ['--n-file', 'n_file'])
+
+        n_file_path = self.makefile('n_file', b'3')
+        input_bytes = b'0\n1\n2\n'
+
+        # this should work because we can see n_file_path
+        job = MRTowerOfPowers(['-r', 'spark',
+                               '--spark-master', spark_master,
+                               '--n-file', n_file_path])
+        job.sandbox(stdin=BytesIO(input_bytes))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = {n for _, n in job.parse_output(runner.cat_output())}
+            self.assertEqual(output,
+                             {0, 1, (((2 ** 3) ** 3) ** 3)})
+
+    def test_file_upload_args_loaded_at_init_with_working_dir(self):
+        # regression test for #2044. The Spark driver can't see n_file,
+        # but it doesn't need to because it'll only ever construct
+        # job instances in the executor
+        self._test_file_upload_args_loaded_at_init(_LOCAL_CLUSTER_MASTER)
+
+    def test_file_upload_args_loaded_at_init_without_working_dir(self):
+        # this should work even if
+        # test_file_upload_args_loaded_at_init_with_working_dir()
+        # doesn't. if there's no working dir, the job just gets n_file's
+        # actual path
+        self._test_file_upload_args_loaded_at_init('local[*]')
 
 
 class GroupStepsTestCase(MockFilesystemsTestCase):
@@ -361,4 +633,259 @@ class GroupStepsTestCase(MockFilesystemsTestCase):
         ])
 
 
-# TODO: test uploading files and setting up working dir once we fix #1922
+class SparkCounterSimulationTestCase(MockFilesystemsTestCase):
+    # trying to keep number of tests small, since they run actual Spark jobs
+
+    def setUp(self):
+        super(MockFilesystemsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.spark.runner.log'))
+
+    def test_two_step_job(self):
+        # good all-around test. MRTwoStepJob's first step logs counters, but
+        # its second step does not
+        job = MRTwoStepJob(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        counters = runner.counters()
+
+        # should have two steps worth of counters, even though it runs as a
+        # single Spark job
+        self.assertEqual(len(counters), 2)
+
+        # first step counters should be {'count': {'combiners': <int>}}
+        self.assertEqual(sorted(counters[0]), ['count'])
+        self.assertEqual(sorted(counters[0]['count']), ['combiners'])
+        self.assertIsInstance(counters[0]['count']['combiners'], int)
+
+        # second step counters should be empty
+        self.assertEqual(counters[1], {})
+
+        log_output = '\n'.join(c[0][0] for c in self.log.info.call_args_list)
+        log_lines = log_output.split('\n')
+
+        # should log first step counters but not second step
+        self.assertIn('Counters for step 1: 1', log_lines)
+        self.assertIn('\tcount', log_output)
+        self.assertNotIn('Counters for step 2', log_output)
+
+    def test_mixed_job(self):
+        job = MRStreamingAndSpark(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        # should have empty counters for each step
+        self.assertEqual(runner.counters(), [{}, {}])
+
+        # shouldn't log empty counters
+        log_output = '\n'.join(c[0][0] for c in self.log.info.call_args_list)
+        self.assertNotIn('Counters', log_output)
+
+    def test_blank_out_counters_if_not_output(self):
+        self.start(patch('mrjob.bin.MRJobBinRunner._run_spark_submit',
+                         return_value=2))
+
+        job = MRTwoStepJob(['-r', 'spark'])
+        job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+        # should blank out counters from failed step
+        self.assertEqual(runner.counters(), [{}, {}])
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class EmulateMapInputFileTestCase(SandboxedTestCase):
+
+    def test_one_file(self):
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+
+        job = MRCountLinesByFile(['-r', 'spark',
+                                  '--emulate-map-input-file', two_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'file://' + two_lines_path: 2})
+
+    def test_two_files(self):
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+        three_lines_path = self.makefile('three_lines', b'A\nBB\nCCC\n')
+
+        job = MRCountLinesByFile(['-r', 'spark',
+                                  '--emulate-map-input-file',
+                                  two_lines_path, three_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'file://' + two_lines_path: 2,
+                 'file://' + three_lines_path: 3})
+
+    def test_input_dir(self):
+        input_dir = self.makedirs('input')
+
+        two_lines_path = self.makefile('input/two_lines', b'line 1\nline 2\n')
+        three_lines_path = self.makefile('input/three_lines', b'A\nBB\nCCC\n')
+
+        job = MRCountLinesByFile(['-r', 'spark',
+                                  '--emulate-map-input-file',
+                                  input_dir])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'file://' + two_lines_path: 2,
+                 'file://' + three_lines_path: 3})
+
+    def test_mapper_init(self):
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+
+        job = MRTestJobConf(['-r', 'spark',
+                             '--emulate-map-input-file',
+                             two_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output['mapreduce.map.input.file'],
+                'file://' + two_lines_path)
+
+    def test_empty_file(self):
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+        no_lines_path = self.makefile('no_lines', b'')
+
+        job = MRTestJobConf(['-r', 'spark',
+                             '--emulate-map-input-file',
+                             two_lines_path, no_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            paths = [path for jobconf, path in
+                     job.parse_output(runner.cat_output())
+                     if jobconf == 'mapreduce.map.input.file']
+
+            # ideally, no_lines_path would appear too, but what we care
+            # about is that we don't get a crash from trying to read
+            # the "first" line of the file
+            self.assertEqual(paths, ['file://' + two_lines_path])
+
+    def test_second_mapper(self):
+        # we have to run the initial mapper somewhat differently in order
+        # to deal with extra info from --emulate-map-input-file (the
+        # input filename). ensure that we don't accidentally do this with
+        # the second mapper too
+
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+        three_lines_path = self.makefile('three_lines', b'A\nBB\nCCC\n')
+
+        job = MRCountLinesByFilename(['-r', 'spark',
+                                      '--emulate-map-input-file',
+                                      two_lines_path, three_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'two_lines': 2, 'three_lines': 3})
+
+    def test_emulate_map_input_file_in_conf(self):
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(spark=dict(emulate_map_input_file=True)))))
+
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+
+        job = MRCountLinesByFile(['-r', 'spark', two_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(
+                output,
+                {'file://' + two_lines_path: 2})
+
+    def test_override_emulate_map_input_file_in_conf(self):
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(spark=dict(emulate_map_input_file=True)))))
+
+        two_lines_path = self.makefile('two_lines', b'line\nother line\n')
+
+        job = MRCountLinesByFile(['-r', 'spark',
+                                  '--no-emulate-map-input-file',
+                                  two_lines_path])
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            # without emulate_map_input_file, there is no input file path
+            self.assertEqual(output, {None: 2})
+
+    def test_does_not_override_hadoop_input_format(self):
+        input1_path = self.makefile('input1', b'potato')
+        input2_path = self.makefile('input2', b'potato tomato')
+
+        manifest_path = self.makefile('manifest')
+        with open(manifest_path, 'w') as manifest:
+            manifest.write('%s\n%s\n' % (input1_path, input2_path))
+
+        job = MRNickNackWithHadoopInputFormat([
+            '-r', 'spark', manifest_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output_counts = dict(
+                line.strip().split(b'\t')
+                for line in to_lines(runner.cat_output()))
+
+        self.assertEqual(
+            output_counts,
+            {b'"tomato"': b'1', b'"potato"': b'2'})
+
+
+@skipIf(pyspark is None, 'no pyspark module')
+class SparkSetupScriptTestCase(MockFilesystemsTestCase):
+
+    def test_setup_command(self):
+        job = MROSWalkJob(
+            ['-r', 'spark',
+             '--spark-master', _LOCAL_CLUSTER_MASTER,
+             '--setup', 'touch bar'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        self.assertIn('./bar', path_to_size)

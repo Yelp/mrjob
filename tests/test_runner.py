@@ -1,5 +1,5 @@
-# Copyright 2009-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2009-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,11 +29,13 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
-from mrjob.local import LocalMRJobRunner
 from mrjob.job import MRJob
+from mrjob.local import LocalMRJobRunner
 from mrjob.parse import to_uri
 from mrjob.runner import MRJobRunner
+from mrjob.step import INPUT
 from mrjob.step import MRStep
+from mrjob.step import OUTPUT
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import to_lines
 
@@ -471,7 +473,6 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
 
             output_uri_2 = runner._step_output_uri(2)
             self.assertEqual(output_uri_2, to_uri(output_dir))
-
 
 
 class DirArchivePathTestCase(SandboxedTestCase):
@@ -988,7 +989,6 @@ class DeprecatedFileUploadArgsTestCase(SandboxedTestCase):
                 path='/tmp/.fooconf', name='dot-fooconf', type='file')])
 
         self.assertEqual(old_runner._extra_args, new_runner._extra_args)
-        self.assertEqual(old_runner._spark_files, new_runner._spark_files)
         self.assertEqual(old_runner._working_dir_mgr._name_to_typed_path,
                          new_runner._working_dir_mgr._name_to_typed_path)
 
@@ -1250,3 +1250,120 @@ class UnexpectedOptsWarningTestCase(SandboxedTestCase):
             self.assertIn('Unexpected option', warnings)
             self.assertIn('zone', warnings)
             self.assertIn('command line', warnings)
+
+
+class SparkScriptArgsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(SparkScriptArgsTestCase, self).setUp()
+
+        # don't bother with actual input/output URIs, which
+        # are tested elsewhere
+        def mock_interpolate_step_args(args, step_num):
+            def interpolate(arg):
+                if arg == INPUT:
+                    return '<step %d input>' % step_num
+                elif arg == OUTPUT:
+                    return '<step %d output>' % step_num
+                else:
+                    return arg
+
+            return [interpolate(arg) for arg in args]
+
+        self.start(patch(
+            'mrjob.bin.MRJobRunner._interpolate_step_args',
+            side_effect=mock_interpolate_step_args))
+
+        self.start(patch(
+            'mrjob.inline.InlineMRJobRunner._STEP_TYPES',
+            {'spark', 'spark_jar', 'spark_script', 'streaming'}))
+
+    def test_spark_mr_job(self):
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['--step-num=0',
+                 '--spark',
+                 '<step 0 input>',
+                 '<step 0 output>'])
+
+    def test_spark_passthrough_arg(self):
+        job = MRNullSpark(['--extra-spark-arg=--verbose'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['--step-num=0',
+                 '--spark',
+                 '--extra-spark-arg=--verbose',
+                 '<step 0 input>',
+                 '<step 0 output>'])
+
+    def test_spark_file_arg(self):
+        foo_path = self.makefile('foo')
+
+        job = MRNullSpark(['--extra-file', foo_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['--step-num=0',
+                 '--spark',
+                 '--extra-file',
+                 'foo',
+                 '<step 0 input>',
+                 '<step 0 output>'])
+
+            name_to_path = runner._working_dir_mgr.name_to_path('file')
+            self.assertIn('foo', name_to_path)
+            self.assertEqual(name_to_path['foo'], foo_path)
+
+    def test_spark_jar(self):
+        job = MRSparkJar(['--jar-arg', 'foo', '--jar-arg', 'bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['foo', 'bar'])
+
+    def test_spark_jar_interpolation(self):
+        job = MRSparkJar(['--jar-arg', OUTPUT, '--jar-arg', INPUT])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['<step 0 output>', '<step 0 input>'])
+
+    def test_spark_script(self):
+        job = MRSparkScript(['--script-arg', 'foo', '--script-arg', 'bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['foo', 'bar'])
+
+    def test_spark_script_interpolation(self):
+        job = MRSparkScript(['--script-arg', OUTPUT, '--script-arg', INPUT])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['<step 0 output>', '<step 0 input>'])
+
+    def test_streaming_step_not_okay(self):
+        job = MRTwoStepJob()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(
+                TypeError,
+                runner._spark_script_args, 0)

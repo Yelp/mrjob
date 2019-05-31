@@ -212,6 +212,12 @@ Options available to hadoop runner only
 
     If all else fails, we just use ``hadoop`` and hope for the best.
 
+    .. versionchanged:: 0.6.8
+
+       Setting this to an empty value (``--hadoop-bin ''``) means to search
+       for the Hadoop binary (used to effectively disable use of the
+       :command:`hadoop` command).
+
 .. mrjob-opt::
    :config: hadoop_log_dirs
    :switch: --hadoop-log-dir
@@ -298,6 +304,7 @@ Options available to hadoop runner only
 
     * ``$SPARK_HOME/bin``
     * ``$PATH``
+    * your :mod:`pyspark` installation's ``bin/`` directory
     * ``/usr/lib/spark/bin``
     * ``/usr/local/spark/bin``
     * ``/usr/local/lib/spark/bin``
@@ -305,3 +312,7 @@ Options available to hadoop runner only
     If all else fails, we just use ``spark-submit`` and hope for the best.
 
     .. versionadded:: 0.5.7
+
+    .. versionchanged:: 0.6.8
+
+       Searches for :command:`spark-submit` in :mod:`pyspark` installation.

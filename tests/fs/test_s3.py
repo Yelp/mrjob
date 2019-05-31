@@ -2,6 +2,7 @@
 # Copyright 2015 Yelp
 # Copyright 2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,10 +24,10 @@ from botocore.exceptions import ClientError
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _wrap_aws_client
 from mrjob.fs.s3 import _AWS_MAX_TRIES
+from mrjob.fs.s3 import _HUGE_PART_SIZE
 
 from tests.compress import gzip_compress
 from tests.mock_boto3 import MockBoto3TestCase
-from tests.mock_boto3.s3 import MockS3Object
 from tests.py2 import patch
 
 
@@ -74,6 +75,9 @@ class S3FSTestCase(MockBoto3TestCase):
     def setUp(self):
         super(S3FSTestCase, self).setUp()
         self.fs = S3Filesystem()
+
+        self.TransferConfig = self.start(
+            patch('boto3.s3.transfer.TransferConfig'))
 
     def test_ls_key(self):
         self.add_mock_s3_data(
@@ -168,23 +172,26 @@ class S3FSTestCase(MockBoto3TestCase):
         self.fs.put(local_path, dest)
         self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
-    def test_put_part_size_mb(self):
+        self.TransferConfig.assert_called_once_with(
+            multipart_chunksize=_HUGE_PART_SIZE,
+            multipart_threshold=_HUGE_PART_SIZE,
+        )
+
+    def test_put_with_part_size(self):
         self.add_mock_s3_data({'bar-files': {}})
 
         local_path = self.makefile('foo', contents=b'bar')
         dest = 's3://bar-files/foo'
 
-        with patch.object(MockS3Object, 'upload_file') as upload_file:
-            with patch('boto3.s3.transfer.TransferConfig') as TransferConfig:
-                self.fs.put(local_path, dest, part_size_mb=99999)
+        fs = S3Filesystem(part_size=12345)
 
-                upload_file.assert_called_once_with(
-                    local_path, Config=TransferConfig.return_value)
+        fs.put(local_path, dest)
+        self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
-                TransferConfig.assert_called_once_with(
-                    multipart_chunksize=99999,
-                    multipart_threshold=99999,
-                )
+        self.TransferConfig.assert_called_once_with(
+            multipart_chunksize=12345,
+            multipart_threshold=12345,
+        )
 
     def test_rm(self):
         self.add_mock_s3_data({
@@ -239,7 +246,14 @@ class S3FSTestCase(MockBoto3TestCase):
         self.assertRaises(OSError,
                           self.fs.touchz, 's3://walrus/full')
 
-    def test_mkdir_does_nothing(self):
+    def test_mkdir_creates_buckets(self):
+        self.assertNotIn('walrus', self.mock_s3_fs)
+
+        self.fs.mkdir('s3://walrus/data')
+
+        self.assertIn('walrus', self.mock_s3_fs)
+
+    def test_mkdir_does_not_create_directories(self):
         self.add_mock_s3_data({'walrus': {}})
 
         self.assertEqual(list(self.fs.ls('s3://walrus/')), [])
@@ -425,6 +439,34 @@ class S3FSRegionTestCase(MockBoto3TestCase):
                          'https://s3-us-west-2.amazonaws.com')
         self.assertEqual(bucket.meta.client.meta.region_name,
                          'us-west-2')
+
+    def test_create_bucket_in_region_set_at_init_time(self):
+        fs = S3Filesystem(s3_region='us-west-2')
+
+        fs.create_bucket('walrus')
+
+        s3_client = fs.make_s3_client()
+        self.assertEqual(
+            s3_client.get_bucket_location('walrus')['LocationConstraint'],
+            'us-west-2')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3-us-west-2.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-west-2')
+
+    def test_create_bucket_with_mkdir(self):
+        # mkdir() doesn't have a way to specify bucket location, so we
+        # do it at init time
+        fs = S3Filesystem(s3_region='us-west-1')
+
+        fs.mkdir('s3://walrus/data')
+
+        bucket = fs.get_bucket('walrus')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-west-1')
 
 
 class WrapAWSClientTestCase(MockBoto3TestCase):

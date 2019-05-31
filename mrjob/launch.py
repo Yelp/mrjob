@@ -1,8 +1,8 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 David Marin
 # Copyright 2014-2016 Yelp and Contributors
-# Copyright 2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2017-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -137,17 +137,29 @@ class MRJobLauncher(object):
             self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
-        # See sandbox(), below.
-        #
-        # These should always read/write bytes, not unicode. Generally,
-        # on Python 2, sys.std* can read and write bytes, whereas on Python 3,
-        # you need to use sys.std*.buffer (which doesn't exist on Python 2).
-        #
-        # However, certain Python 3 environments, such as Jupyter notebook,
-        # act more like Python 2. See #1441.
-        self.stdin = getattr(sys.stdin, 'buffer', sys.stdin)
-        self.stdout = getattr(sys.stdout, 'buffer', sys.stdout)
-        self.stderr = getattr(sys.stderr, 'buffer', sys.stderr)
+        # See stdin, stdout, stderr properties and sandbox(), below.
+        self._stdin = None
+        self._stdout = None
+        self._stderr = None
+
+    # by default, self.stdin, self.stdout, and self.stderr are sys.std*.buffer
+    # if it exists, and otherwise sys.std* otherwise (they should always deal
+    # with bytes, not Unicode).
+    #
+    # *buffer* is pretty much a Python 3 thing, though some platforms
+    # (notably Jupyterhub) don't have it. See #1441
+
+    @property
+    def stdin(self):
+        return self._stdin or getattr(sys.stdin, 'buffer', sys.stdin)
+
+    @property
+    def stdout(self):
+        return self._stdout or getattr(sys.stdout, 'buffer', sys.stdout)
+
+    @property
+    def stderr(self):
+        return self._stderr or getattr(sys.stderr, 'buffer', sys.stderr)
 
     @classmethod
     def _usage(cls):
@@ -160,7 +172,7 @@ class MRJobLauncher(object):
         or basic help. Override to allow other kinds of help."""
         if options.runner:
             _print_help_for_runner(
-                self._runner_opt_names(), options.deprecated)
+                self._runner_opt_names_for_help(), options.deprecated)
         else:
             _print_basic_help(self.arg_parser,
                               self._usage(),
@@ -322,15 +334,30 @@ class MRJobLauncher(object):
         option, but with the local name of the file in the script's working
         directory.
 
-        We suggest against sending Berkeley DBs to your job, as
-        Berkeley DB is not forwards-compatible (so a Berkeley DB that you
-        construct on your computer may not be readable from within
-        Hadoop). Use SQLite databases instead. If all you need is an on-disk
-        hash table, try out the :py:mod:`sqlite3dbm` module.
+        .. note::
+
+           If you pass a file to a job, best practice is to lazy-load its
+           contents (e.g. make a method that opens the file the first time
+           you call it) rather than loading it in your job's constructor or
+           :py:meth:`load_args`. Not only is this more efficient, it's
+           necessary if you want to run your job in a Spark executor
+           (because the file may not be in the same place in a Spark driver).
+
+        .. note::
+
+           We suggest against sending Berkeley DBs to your job, as
+           Berkeley DB is not forwards-compatible (so a Berkeley DB that you
+           construct on your computer may not be readable from within
+           Hadoop). Use SQLite databases instead. If all you need is an on-disk
+           hash table, try out the :py:mod:`sqlite3dbm` module.
 
         .. versionchanged:: 0.6.6
 
            now accepts explicit ``type=str``
+
+        .. versionchanged:: 0.6.8
+
+           fully supported on Spark, including ``local[*]`` master
         """
         if kwargs.get('type') not in (None, str):
             raise ArgumentTypeError(
@@ -487,8 +514,15 @@ class MRJobLauncher(object):
             self._job_kwargs(),
         )
 
-    def _runner_opt_names(self):
-        return self._runner_class().OPT_NAMES
+    def _runner_opt_names_for_help(self):
+        opts = set(self._runner_class().OPT_NAMES)
+
+        if self.options.runner == 'spark':
+            # specific to Spark runner, but command-line only, so it doesn't
+            # appear in SparkMRJobRunner.OPT_NAMES (see #2040)
+            opts.add('max_output_files')
+
+        return opts
 
     def _non_option_kwargs(self):
         """Keyword arguments to runner constructor that can't be set
@@ -516,12 +550,15 @@ class MRJobLauncher(object):
                         extra_args.append(option_string)
                     extra_args.extend(args)
 
+        # max_output_files is added by _add_runner_args() but can only
+        # be set from the command line, so we add it here (see #2040)
         return dict(
             conf_paths=self.options.conf_paths,
             extra_args=extra_args,
             hadoop_input_format=self.hadoop_input_format(),
             hadoop_output_format=self.hadoop_output_format(),
             input_paths=self.options.args,
+            max_output_files=self.options.max_output_files,
             mr_job_script=self._script_path,
             output_dir=self.options.output_dir,
             partitioner=self.partitioner(),
@@ -643,10 +680,18 @@ class MRJobLauncher(object):
 
             self.assertEqual(mrjob.stdout.getvalue(), ...)
             self.assertEqual(parse_mr_job_stderr(mr_job.stderr), ...)
+
+        .. note::
+
+           If you are using Spark, it's recommended you only pass in
+           :py:class:`io.BytesIO` or other serializable alternatives to file
+           objects. *stdin*, *stdout*, and *stderr* get stored as job
+           attributes, which means if they aren't serializable, neither
+           is the job instance or its methods.
         """
-        self.stdin = stdin or BytesIO()
-        self.stdout = stdout or BytesIO()
-        self.stderr = stderr or BytesIO()
+        self._stdin = stdin or BytesIO()
+        self._stdout = stdout or BytesIO()
+        self._stderr = stderr or BytesIO()
 
         return self
 

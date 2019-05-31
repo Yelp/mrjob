@@ -4,6 +4,7 @@
 # Copyright 2015-2016 Yelp
 # Copyright 2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,13 +24,15 @@ import os.path
 from io import BytesIO
 from subprocess import check_call
 from subprocess import PIPE
+from unittest import skipIf
 
 import mrjob.step
 from mrjob.conf import combine_dicts
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
-from mrjob.util import which
+from mrjob.hadoop import pty
+from mrjob.step import StepFailedException
 
 from tests.mockhadoop import add_mock_hadoop_counters
 from tests.mockhadoop import add_mock_hadoop_output
@@ -53,11 +56,8 @@ from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.test_bin import PYTHON_BIN
 
-# pty isn't available on Windows
-try:
-    import pty
-    pty
-except ImportError:
+if pty is None:
+    # some tests should run even if pty is missing
     pty = Mock()
 
 
@@ -684,7 +684,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             # to PYTHONPATH
             self.assertTrue(os.path.exists(runner._setup_wrapper_script_path))
             self.assertIn(runner._setup_wrapper_script_path,
-                          runner._upload_mgr.path_to_uri())
+                          runner._working_dir_mgr.paths())
             mrjob_zip_name = runner._working_dir_mgr.name(
                 'file', runner._mrjob_zip_path)
             with open(runner._setup_wrapper_script_path) as wrapper:
@@ -1167,6 +1167,9 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
         self.mock_execvpe = self.start(patch(
             'os.execvpe', side_effect=StopIteration))
 
+        # don't actually hard-exit the child, since we're not actually forking
+        self.mock_exit = self.start(patch('os._exit'))
+
     def test_with_pty(self):
         job = MRNullSpark(['-r', 'hadoop'])
         job.sandbox()
@@ -1193,6 +1196,51 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
                 stdout=PIPE, stderr=PIPE, env=dict(FOO='bar', BAZ='qux'))
 
             self.assertFalse(self.mock_execvpe.called)
+
+
+@skipIf(not (pty and hasattr(pty, 'fork')), 'no pty.fork()')
+class BadHadoopBinAfterFork(MockHadoopTestCase):
+    # test what happens if os.execvpe() fails (see #2024)
+
+    # can't just set --hadoop-bin because this would break checking
+    # Hadoop version and uploading files. Instead, patch _args_for_step()
+    def patch_args_for_step(self, runner, bad_hadoop_bin):
+        real_args_for_step = runner._args_for_step
+
+        def args_for_step(*args, **kwargs):
+            args = real_args_for_step(*args, **kwargs)
+            return [bad_hadoop_bin] + args[1:]
+
+        self.start(patch.object(runner, '_args_for_step', args_for_step))
+
+    def test_no_such_file(self):
+        missing_hadoop_bin = os.path.join(self.tmp_dir, 'no-hadoop-here')
+
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.patch_args_for_step(runner, missing_hadoop_bin)
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_permissions_error(self):
+        nonexecutable_hadoop_bin = self.makefile('not-really-hadoop')
+
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.patch_args_for_step(runner, nonexecutable_hadoop_bin)
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_non_oserror_exception(self):
+        self.start(patch('os.execvpe', side_effect=KeyboardInterrupt))
+
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
 
 
 class SparkPyFilesTestCase(MockHadoopTestCase):
@@ -1459,7 +1507,7 @@ class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
         with mr_job.make_runner() as runner:
             runner._add_job_files_for_upload()
             self.assertEqual(
-                runner._spark_submit_args(0)[:4],
+                runner._spark_submit_args(0)[4:8],
                 ['--master', 'yarn', '--deploy-mode', 'client']
             )
 
@@ -1471,7 +1519,7 @@ class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
         with mr_job.make_runner() as runner:
             runner._add_job_files_for_upload()
             self.assertEqual(
-                runner._spark_submit_args(0)[:4],
+                runner._spark_submit_args(0)[2:6],
                 ['--master', 'local', '--deploy-mode', 'client']
             )
 
@@ -1485,7 +1533,7 @@ class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
             runner._add_job_files_for_upload()
 
             self.assertEqual(
-                runner._spark_submit_args(0)[:4],
+                runner._spark_submit_args(0)[4:8],
                 ['--master', 'yarn', '--deploy-mode', 'cluster']
             )
 

@@ -1,6 +1,6 @@
 # Copyright 2009-2016 Yelp and Contributors
-# Copyright 2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2017-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,6 +59,9 @@ _CHUNK_SIZE = 8192
 _AWS_BACKOFF = 20
 _AWS_BACKOFF_MULTIPLIER = 1.5
 _AWS_MAX_TRIES = 20  # this takes about a day before we run out of tries
+
+# used to disable multipart upload
+_HUGE_PART_SIZE = 2 ** 256
 
 
 def _client_error_code(ex):
@@ -133,25 +136,29 @@ class S3Filesystem(Filesystem):
     ``EMRJobRunner().fs``, composed with
     :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
-    """
 
+    :param aws_access_key_id: Your AWS access key ID
+    :param aws_secret_access_key: Your AWS secret access key
+    :param aws_session_token: session token for use with temporary
+                              AWS credentials
+    :param s3_endpoint: If set, always use this endpoint
+    :param s3_region: Default region for connections to the S3 API and
+                      newly created buckets.
+    :param part_size: Part size for multi-part uploading, in bytes, or
+                      ``None``
+
+    .. versionchanged:: 0.6.8 added *part_size*
+    """
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
-                 aws_session_token=None, s3_endpoint=None, s3_region=None):
-        """
-        :param aws_access_key_id: Your AWS access key ID
-        :param aws_secret_access_key: Your AWS secret access key
-        :param aws_session_token: session token for use with temporary
-                                   AWS credentials
-        :param s3_endpoint: If set, always use this endpoint
-        :param s3_region: Region name corresponding to s3_endpoint. Only used
-                          if *s3_endpoint* is set
-        """
+                 aws_session_token=None, s3_endpoint=None, s3_region=None,
+                 part_size=None):
         super(S3Filesystem, self).__init__()
         self._s3_endpoint_url = _endpoint_url(s3_endpoint)
         self._s3_region = s3_region
         self._aws_access_key_id = aws_access_key_id
         self._aws_secret_access_key = aws_secret_access_key
         self._aws_session_token = aws_session_token
+        self._part_size = part_size
 
     def can_handle_path(self, path):
         return is_s3_uri(path)
@@ -242,20 +249,34 @@ class S3Filesystem(Filesystem):
         return any(self._ls(path_glob))
 
     def mkdir(self, dest):
-        """Make a directory. This does nothing on S3 because there are
-        no directories.
+        """Make a directory. This doesn't actually create directories on S3
+        (because there is no such thing), but it will create the corresponding
+        bucket if it doesn't exist.
         """
-        pass
+        bucket_name, key_name = parse_s3_uri(dest)
 
-    def put(self, src, path, part_size_mb=None):
+        client = self.make_s3_client()
+
+        try:
+            client.head_bucket(Bucket=bucket_name)
+        except botocore.exceptions.ClientError as ex:
+            if _client_error_status(ex) != 404:
+                raise
+
+            self.create_bucket(bucket_name)
+
+    def put(self, src, path):
         """Uploads a local file to a specific destination."""
         s3_key = self._get_s3_key(path)
+
+        # if part_size is None or 0, disable multipart upload
+        part_size = self._part_size or _HUGE_PART_SIZE
 
         s3_key.upload_file(
             src,
             Config=boto3.s3.transfer.TransferConfig(
-                multipart_chunksize=part_size_mb,
-                multipart_threshold=part_size_mb,
+                multipart_chunksize=part_size,
+                multipart_threshold=part_size,
             ),
         )
 
@@ -398,9 +419,12 @@ class S3Filesystem(Filesystem):
 
         params = dict(Bucket=bucket_name)
 
+        if region is None:
+            region = self._s3_region
+
         # CreateBucketConfiguration can't be empty, so don't set it
         # unless there's a location constraint (see #1927)
-        if region != _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
+        if region and region != _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
             params['CreateBucketConfiguration'] = dict(
                 LocationConstraint=region)
 

@@ -1,4 +1,5 @@
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -110,6 +111,27 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self.assertEqual(kwargs['steps'], [
             dict(
                 args=['arg1', 'arg2'],
+                jobconf={},
+                script='foo.py',
+                spark_args=[],
+                type='spark_script',
+            )
+        ])
+
+    def test_switches_to_spark_script(self):
+        # regression test for #2070
+        spark_submit_main(['foo.py', '--bar', 'baz'])
+
+        self.assertEqual(self.runner_class.alias, 'spark')
+
+        self.assertTrue(self.runner_class.called)
+        self.assertTrue(self.runner.run.called)
+
+        kwargs = self.get_runner_kwargs()
+
+        self.assertEqual(kwargs['steps'], [
+            dict(
+                args=['--bar', 'baz'],
                 jobconf={},
                 script='foo.py',
                 spark_args=[],

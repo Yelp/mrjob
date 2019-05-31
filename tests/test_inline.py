@@ -3,8 +3,8 @@
 # Copyright 2012 Yelp
 # Copyright 2013 Yelp and Lyft
 # Copyright 2014 Marc Abramowitz
-# Copyright 2015-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2015-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,11 +21,9 @@
 import gzip
 import os
 import os.path
-import sys
 from os.path import exists
 from os.path import join
 from io import BytesIO
-from unittest import TestCase
 from unittest import skipIf
 
 from warcio.warcwriter import WARCWriter
@@ -54,6 +52,7 @@ from tests.py2 import patch
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
+from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.test_sim import MRIncrementerJob
 
 
@@ -291,3 +290,41 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
 
         with job.make_runner() as runner:
             self.assertRaises(Py4JJavaError, runner.run)
+
+    def test_upload_files_with_rename(self):
+        # see test_upload_files_with_rename() in test_local for comparison
+
+        fish_path = self.makefile('fish', b'salmon')
+        fowl_path = self.makefile('fowl', b'goose')
+
+        # --use-driver-cwd gets around issues with the shared JVM not changing
+        # executors' working directory to match the driver on local master
+        job = MRSparkOSWalk(['-r', 'inline',
+                             '--use-driver-cwd',
+                             '--file', fish_path + '#ghoti',
+                             '--file', fowl_path])
+        job.sandbox()
+
+        file_sizes = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # there is no working dir mirror in inline mode; inline
+            # mode simulates the working dir itself
+            wd_mirror = runner._wd_mirror()
+            self.assertIsNone(wd_mirror)
+
+            for line in to_lines(runner.cat_output()):
+                path, size = safeeval(line)
+                file_sizes[path] = size
+
+        # check that files were uploaded to working dir
+        self.assertIn('fowl', file_sizes)
+        self.assertEqual(file_sizes['fowl'], 5)
+
+        self.assertIn('ghoti', file_sizes)
+        self.assertEqual(file_sizes['ghoti'], 6)
+
+        # fish was uploaded as "ghoti"
+        self.assertNotIn('fish', file_sizes)

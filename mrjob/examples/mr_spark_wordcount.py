@@ -30,13 +30,16 @@ class MRSparkWordcount(MRJob):
         lines = sc.textFile(input_path)
 
         counts = (
-            lines.flatMap(lambda line: WORD_RE.findall(line))
+            lines.flatMap(self.get_words)
             .map(lambda word: (word, 1))
             .reduceByKey(add))
 
         counts.saveAsTextFile(output_path)
 
         sc.stop()
+
+    def get_words(self, line):
+        return WORD_RE.findall(line)
 
 
 if __name__ == '__main__':

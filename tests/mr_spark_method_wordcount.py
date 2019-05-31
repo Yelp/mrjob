@@ -17,16 +17,12 @@ from operator import add
 
 from mrjob.job import MRJob
 
-# restrict to a-z so we don't get odd filenames
-WORD_RE = re.compile(r"[A-Za-z]+")
+WORD_RE = re.compile(r"[\w']+")
 
 
-class MRSparkNickNackWordCount(MRJob):
-    # use the nicknack JAR in this directory
-    #
-    # This JAR was downloaded from https://github.com/empiricalresults/nicknack
-    # and is also under the Apache 2.0 license.
-    LIBJARS = ['nicknack-1.0.1.jar']
+class MRSparkMethodWordcount(MRJob):
+    # like MRSparkWordcount, except that we pass methods to Spark,
+    # which means we have to be able to serialize *self*.
 
     def spark(self, input_path, output_path):
         # Spark may not be available where script is launched
@@ -37,19 +33,17 @@ class MRSparkNickNackWordCount(MRJob):
         lines = sc.textFile(input_path)
 
         counts = (
-            lines.flatMap(lambda line: WORD_RE.findall(line))
+            lines.flatMap(self.line_to_words)
             .map(lambda word: (word, 1))
             .reduceByKey(add))
 
-        # MultipleValueOutputFormat expects Text, Text
-        # w_c is (word, count)
-        counts = counts.map(lambda w_c: (w_c[0], str(w_c[1])))
-
-        counts.saveAsHadoopFile(output_path,
-                                'nicknack.MultipleValueOutputFormat')
+        counts.saveAsTextFile(output_path)
 
         sc.stop()
 
+    def line_to_words(self, line):
+        return WORD_RE.findall(line)
+
 
 if __name__ == '__main__':
-    MRSparkNickNackWordCount.run()
+    MRSparkMethodWordcount.run()

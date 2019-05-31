@@ -87,7 +87,7 @@ options related to file uploading.
 
     .. versionchanged:: 0.5.7
 
-       This works with Spark as well.
+       This works with Spark on YARN as well.
 
     .. versionchanged:: 0.6.7
 
@@ -108,7 +108,7 @@ options related to file uploading.
     we copy by appending
     ``#nameinworkingdir`` to the path; otherwise we just use its name.
 
-    This works with Spark as well.
+    This works with Spark on YARN only.
 
     .. versionadded:: 0.5.8
 
@@ -146,6 +146,11 @@ options related to file uploading.
     .. versionchanged:: 0.6.7
 
        Deprecated :option:`--file` in favor of :option:`--files`
+
+    .. versionchanged:: 0.6.8
+
+       In Spark, can use ``#nameinworkingdir`` even when not on YARN.
+
 
 Temp files and cleanup
 ======================
@@ -370,13 +375,21 @@ Job execution context
     You may optionally put a ``/`` after *name* as well
     (e.g. ``cd src-tree/#/subdir``).
 
-    This works for Spark as well when running on YARN. The setup script
-    is run before every executor, but only run before the driver in
+    This works for Spark as well (except on the ``local[*]`` master,
+    where it doesn't make sense). The setup
+    script is run before every executor, but only run before the driver in
     cluster mode.
+
+    .. note::
+
+       Uploading archives and directories (e.g. ``src-tree/#``) to Spark's
+       working directory still only works on YARN.
 
     .. versionadded:: 0.5.8 support for directories (above)
 
-    .. versionadded:: 0.6.7 support for Spark on YARN
+    .. versionadded:: 0.6.7 support for Spark on YARN only
+
+    .. versionadded:: 0.6.8 full support for Spark
 
     For more details of parsing, see
     :py:func:`~mrjob.setup.parse_setup_cmd`.
@@ -412,6 +425,11 @@ Job execution context
     .. versionchanged:: 0.6.7
 
        Used to be :command:`sh -ex` on local and Hadoop runners
+
+    .. versionchanged:: 0.6.8
+
+       Setting this to an empty value (``--sh-bin ''``) means to use the
+       default (used to cause an error).
 
 .. mrjob-opt::
     :config: steps_interpreter

@@ -13,6 +13,7 @@ Guides
     guides/configs-basics.rst
     guides/configs-all-runners.rst
     guides/configs-hadoopy-runners.rst
+    guides/spark-runner-opts.rst
     guides/configs-reference.rst
     guides/cloud-opts.rst
     guides/setup-cookbook.rst

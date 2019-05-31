@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2009-2018 Yelp and Contributors
+# Copyright 2009-2019 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ __credits__ = [
     'Ciaran Doherty <cad106uk@gmail.com>',
     'Tom Dooner <tomdooner@gmail.com>',
     'Tomer Elmalem <telmalem@gmail.com>',
+    'Stuart Elston <selston@yelp.com>',
     'Pedro Emanuel de Castro Faria Salgado <steenzout@ymail.com>',
     'Buck Evan <buck@yelp.com>',
     'Aaron Friedlander <aaron.friedlander@affirm.com>',
@@ -76,6 +77,7 @@ __credits__ = [
     'Boris Lau <boris.w.lau@gmail.com>',
     'Laucia <laucia@users.noreply.github.com>',
     'Jerome Leclanche <jerome@leclan.ch>',
+    'Lydian Lee <tingyenl@yelp.com>',
     'Robert Leftwich <rl.0x0@eml.cc>',
     'Andrew Lenards <andrew.lenards@gmail.com>',
     'Ronny Lindner <ronny.lindner@invia.de>',
@@ -97,6 +99,7 @@ __credits__ = [
     'Spencer Nelson <s@spenczar.com>',
     'Dávid Nemeskey <david@cliqz.com>',
     'Daniel Nephin <dnephin@yelp.com>',
+    'Qui Nguyen <qui@yelp.com>',
     'Oliver Nicholas <bigo@wonlove.net>',
     'Tyler Nisonoff <tyler@asana.com>',
     'Santeri Paavolainen <santtu@iki.fi>',
@@ -135,4 +138,4 @@ __credits__ = [
     'drulludanni <drulludanni5@gmail.com>',
 ]
 
-__version__ = '0.6.8.dev0'
+__version__ = '0.6.9'

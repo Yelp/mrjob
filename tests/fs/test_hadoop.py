@@ -3,6 +3,7 @@
 # Copyright 2015-2016 Yelp
 # Copyright 2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -173,7 +174,6 @@ class HadoopFSTestCase(MockSubprocessTestCase):
 
     def test_no_put_to_dir(self):
         local_path = self.makefile('foo', contents=b'bar')
-        dest = 'hdfs:///bar'
 
         self.assertRaises(ValueError, self.fs.put, local_path, 'hdfs:///')
 

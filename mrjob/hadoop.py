@@ -1,6 +1,7 @@
 # Copyright 2009-2016 Yelp and Contributors
 # Copyright 2017 Yelp
 # Copyright 2018 Yelp and Google, Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -181,8 +182,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             super(HadoopJobRunner, self)._default_opts(),
             dict(
                 hadoop_tmp_dir='tmp/mrjob',
-                spark_deploy_mode='client',
-                spark_master='yarn',
             )
         )
 
@@ -324,7 +323,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         self._find_binaries_and_jars()
         self._create_setup_wrapper_scripts()
         self._add_job_files_for_upload()
-        self._upload_local_files_to_hdfs()
+        self._upload_local_files()
         self._run_job_in_hadoop()
 
     def _find_binaries_and_jars(self):
@@ -337,7 +336,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         # this triggers looking for Hadoop binary
         self.get_hadoop_version()
 
-        if self._has_streaming_steps():
+        if self._has_hadoop_streaming_steps():
             self.get_hadoop_streaming_jar()
 
         if self._has_spark_steps():
@@ -346,23 +345,11 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._working_dir_mgr.paths():
+        for path in self._working_dir_mgr.paths('archive'):
             self._upload_mgr.add(path)
+
         for path in self._py_files():
             self._upload_mgr.add(path)
-
-    def _upload_local_files_to_hdfs(self):
-        """Copy files managed by self._upload_mgr to HDFS
-        """
-        self.fs.mkdir(self._upload_mgr.prefix)
-
-        log.info('Copying local files to %s...' % self._upload_mgr.prefix)
-        for path, uri in self._upload_mgr.path_to_uri().items():
-            self._upload_to_hdfs(path, uri)
-
-    def _upload_to_hdfs(self, path, target):
-        log.debug('  %s -> %s' % (path, target))
-        self.fs.hadoop.put(path, target)
 
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""
@@ -421,7 +408,16 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             else:
                 # we have PTYs
                 if pid == 0:  # we are the child process
-                    os.execvpe(step_args[0], step_args, env)
+                    try:
+                        os.execvpe(step_args[0], step_args, env)
+                        # now we are no longer Python
+                    except OSError as ex:
+                        # use _exit() so we don't do cleanup, etc. that's
+                        # the parent process's job
+                        os._exit(ex.errno)
+                    finally:
+                        # if we got some other exception, still exit hard
+                        os._exit(-1)
                 else:
                     log.debug('Invoking Hadoop via PTY')
 
@@ -462,10 +458,13 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         and *spark_master* is not ``'yarn'``, warn that *upload_archives*
         will be ignored by Spark."""
         if (_is_spark_step_type(step['type']) and
-                self._opts['spark_master'] != 'yarn' and
+                self._spark_master() != 'yarn' and
                 self._opts['upload_archives']):
             log.warning('Spark will probably ignore archives because'
-                        " spark_master is not set to 'yarn'")
+                        " spark_master is not 'yarn'")
+
+    def _spark_master(self):
+        return self._opts['spark_master'] or 'yarn'
 
     def _args_for_step(self, step_num):
         step = self._get_step(step_num)
@@ -510,7 +509,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
         if step.get('args'):
             args.extend(
-                self._interpolate_step_args(step['args'], step_num))
+                self._interpolate_jar_step_args(step['args'], step_num))
 
         return args
 

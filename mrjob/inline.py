@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2011 Matthew Tai and Yelp
 # Copyright 2012-2016 Yelp and Contributors
-# Copyright 2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2017-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ from mrjob.sim import SimMRJobRunner
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 from mrjob.util import save_sys_path
+from mrjob.util import save_sys_std
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +46,11 @@ class InlineMRJobRunner(SimMRJobRunner):
     To more accurately simulate your environment prior to running on
     Hadoop/EMR, use ``-r local`` (see
     :py:class:`~mrjob.local.LocalMRJobRunner`).
+
+    .. versionadded:: 0.6.8
+
+       can run :py:class:`~mrjob.step.SparkStep`\\s via the
+       :py:mod:`pyspark` library.
     """
     alias = 'inline'
 
@@ -98,11 +104,17 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         # Don't care about pickleability since this runs in the same process
         def invoke_task(stdin, stdout, stderr, wd, env):
-            with save_current_environment(), save_cwd(), save_sys_path():
+            with save_current_environment(), save_cwd(), save_sys_path(), \
+                    save_sys_std():
                 # pretend we're running the script in the working dir
                 os.environ.update(env)
                 os.chdir(wd)
                 sys.path = [os.getcwd()] + sys.path
+
+                # pretend we've redirected stdin/stdout/stderr
+                sys.stdin = stdin
+                sys.stdout = stdout
+                sys.stderr = stderr
 
                 input_uri = None
                 try:
@@ -117,8 +129,6 @@ class InlineMRJobRunner(SimMRJobRunner):
                         args = list(args) + [input_uri, input_uri]
 
                     task = self._mrjob_cls(args)
-                    task.sandbox(stdin=stdin, stdout=stdout, stderr=stderr)
-
                     task.execute()
                 except:
                     # so users can figure out where the exception came from;
@@ -158,15 +168,19 @@ class InlineMRJobRunner(SimMRJobRunner):
         # use abspath() on input URIs before changing working dir
         task_args = self._spark_script_args(step_num)
 
-        with save_current_environment(), save_cwd(), save_sys_path():
-            os.environ.update(_fix_env(self._opts['cmdenv']))
-            os.chdir(wd)
-            sys.path = [os.getcwd()] + sys.path
+        with open(stdout_path, 'wb') as stdout, \
+                open(stderr_path, 'wb') as stderr:
+            with save_current_environment(), save_cwd(), save_sys_path(), \
+                    save_sys_std():
+                os.environ.update(_fix_env(self._opts['cmdenv']))
+                os.chdir(wd)
+                sys.path = [os.getcwd()] + sys.path
 
-            task = self._mrjob_cls(task_args)
-            task.sandbox(stdout=stdout_path, stderr=stderr_path)
+                # pretend we redirected stdout and stderr
+                sys.stdout, sys.stderr = stdout, stderr
 
-            task.execute()
+                task = self._mrjob_cls(task_args)
+                task.execute()
 
     def _log_cause_of_error(self, ex):
         """Just tell what file we were reading from (since they'll see
@@ -180,20 +194,11 @@ class InlineMRJobRunner(SimMRJobRunner):
         job_args = ['--steps'] + self._mr_job_extra_args(local=True)
         return self._mrjob_cls(args=job_args)._steps_desc()
 
-    def _spark_script_args(self, step_num):
-        # TODO: this is a simpler version of _spark_script_args() in bin.py.
-        # Some of this code should be pushed up into runner.py
-        step = self._get_step(step_num)
+    def _spark_executors_have_own_wd(self):
+        return True  # because we fake it
 
-        if step['type'] != 'spark':
-            raise TypeError('Bad step type: %r' % step['type'])
+    def _spark_driver_has_own_wd(self):
+        return True  # because we fake it
 
-        return (
-            [
-                '--step-num=%d' % step_num,
-                '--spark',
-            ] + self._mr_job_extra_args() + [
-                ','.join(self._step_input_uris(step_num)),
-                self._step_output_uri(step_num),
-            ]
-        )
+    def _wd_mirror(self):
+        return None  # no need for this, we set up the working dir (Spark too)

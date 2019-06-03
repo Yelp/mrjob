@@ -4522,6 +4522,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
             'tests.mock_boto3.emr.MockEMRClient.describe_cluster',
             return_value=dict(
                 Cluster=dict(
+                    Applications=[],
                     Id='j-CLUSTERID',
                     Status=dict(
                         State='TERMINATING',

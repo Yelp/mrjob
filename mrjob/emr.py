@@ -403,9 +403,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # did we create the cluster we're running on?
         self._created_cluster = False
 
-        # when did our particular task start?
-        self._emr_job_start = None
-
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
 
@@ -415,7 +412,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # - hadoop_version
         # - master_public_dns
         # - master_private_ip
+        #
+        # (we may do this for multiple cluster IDs if we join a pooled cluster
+        # that self-terminates)
         self._cluster_to_cache = defaultdict(dict)
+
+        # set of cluster IDs for which we logged the master node's public DNS
+        self._logged_address_of_master = set()
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task'. These will also always
@@ -1450,12 +1453,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # create a cluster if we're not already using an existing one
         if not self._cluster_id:
-            self._cluster_id = self._create_cluster(
-                persistent=False)
+            self._cluster_id = self._create_cluster()
             self._created_cluster = True
         else:
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
+            self._log_address_of_master_once()
 
         # now that we know which cluster it is, check for Spark support
         if self._has_spark_steps():
@@ -1467,9 +1470,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.debug('Calling add_job_flow_steps(%s)' % ','.join(
             ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
         emr_client.add_job_flow_steps(**steps_kwargs)
-
-        # keep track of when we launched our job
-        self._emr_job_start = time.time()
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if hasattr(self.fs, 'ssh') and version_gte(
@@ -1558,6 +1558,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.debug('Waiting %.1f seconds...' %
                       self._opts['check_cluster_every'])
             time.sleep(self._opts['check_cluster_every'])
+
+            # log address of the master node once if we have it
+            self._log_address_of_master_once()
 
             step = emr_client.describe_step(
                 ClusterId=self._cluster_id, StepId=step_id)['Step']
@@ -1656,6 +1659,23 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 # "Step 0 of ... failed" looks weird
                 step_desc=(
                     'Master node setup step' if step_num == -1 else None))
+
+    def _log_address_of_master_once(self):
+        """Log the master node's public DNS, if we haven't already"""
+        # Some users like to SSH in manually. See #2007
+        if not self._cluster_id:
+            return
+
+        if self._cluster_id in self._logged_address_of_master:
+            return
+
+        master_dns = self._address_of_master()
+
+        if not master_dns:
+            return
+
+        log.info('  master node is %s' % master_dns)
+        self._logged_address_of_master.add(self._cluster_id)
 
     def _log_step_progress(self):
         """Tunnel to the job tracker/resource manager and log the

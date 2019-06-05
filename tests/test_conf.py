@@ -378,7 +378,7 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
             load_mrjob_conf(conf_path)
             assert False
         except Exception as e:
-            self.assertIn('If your mrjob.conf is in YAML', str(e))
+            self.assertIn('If your conf file is in YAML', str(e))
 
 
 class CombineValuesTestCase(BasicTestCase):

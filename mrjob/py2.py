@@ -157,6 +157,12 @@ urljoin
 urlopen
 urlparse
 
+# error types
+try:
+    from json import JSONDecodeError
+except ImportError:
+    JSONDecodeError = ValueError
+
 
 def to_unicode(s):
     """Convert ``bytes`` to unicode.

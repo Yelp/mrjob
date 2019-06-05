@@ -41,6 +41,7 @@ from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_confs
+from mrjob.py2 import JSONDecodeError
 
 from tests.py2 import patch
 from tests.sandbox import BasicTestCase
@@ -376,8 +377,8 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         try:
             load_mrjob_conf(conf_path)
             assert False
-        except ValueError as e:
-            self.assertIn('If your mrjob.conf is in YAML', e.msg)
+        except Exception as e:
+            self.assertIn('If your mrjob.conf is in YAML', str(e))
 
 
 class CombineValuesTestCase(BasicTestCase):

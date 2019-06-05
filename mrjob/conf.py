@@ -30,6 +30,7 @@ try:
 except ImportError:
     yaml = None
 
+from mrjob.py2 import JSONDecodeError
 from mrjob.py2 import string_types
 from mrjob.util import expand_path
 from mrjob.util import shlex_split
@@ -223,7 +224,7 @@ def _conf_object_at_path(conf_path):
         else:
             try:
                 return json.load(f)
-            except ValueError as e:
+            except (ValueError, JSONDecodeError) as e:
                 msg = ('If your mrjob.conf is in YAML, you need to install'
                        ' yaml; see http://pypi.python.org/pypi/PyYAML/')
                 # Use msg attr if it's set

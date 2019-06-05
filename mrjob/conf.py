@@ -30,7 +30,11 @@ try:
 except ImportError:
     yaml = None
 
-from mrjob.py2 import JSONDecodeError
+try:
+    from json import JSONDecodeError
+except ImportError:
+    JSONDecodeError = ValueError  # Python 2 doesn't have JSONDecodeError
+
 from mrjob.py2 import string_types
 from mrjob.util import expand_path
 from mrjob.util import shlex_split

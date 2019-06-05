@@ -41,7 +41,6 @@ from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_confs
-from mrjob.py2 import JSONDecodeError
 
 from tests.py2 import patch
 from tests.sandbox import BasicTestCase

@@ -30,11 +30,6 @@ try:
 except ImportError:
     yaml = None
 
-try:
-    from json import JSONDecodeError
-except ImportError:
-    JSONDecodeError = ValueError  # Python 2 doesn't have JSONDecodeError
-
 from mrjob.py2 import string_types
 from mrjob.util import expand_path
 from mrjob.util import shlex_split
@@ -228,7 +223,7 @@ def _conf_object_at_path(conf_path):
         else:
             try:
                 return json.load(f)
-            except (ValueError, JSONDecodeError) as e:
+            except ValueError as e:
                 raise ValueError(
                     'Could not read JSON from %s\n  %s\n\n'
                     'If your conf file is in YAML, you need to'

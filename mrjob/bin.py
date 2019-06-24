@@ -24,6 +24,7 @@ import os.path
 import pipes
 import re
 import sys
+from platform import python_implementation
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -228,13 +229,21 @@ class MRJobBinRunner(MRJobRunner):
 
         This returns a single-item list (because it's a command).
         """
+        major_version = sys.version_info[0]
+        is_pypy = (python_implementation() == 'PyPy')
+
         if local and sys.executable:
             return [sys.executable]
         elif PY2:
-            return ['python']
+            if is_pypy:
+                return ['pypy']
+            else:
+                return ['python']
         else:
-            # e.g. python3
-            return ['python%d' % sys.version_info[0]]
+            if is_pypy:
+                return ['pypy%d' % major_version]
+            else:
+                return ['python%d' % major_version]
 
     ### running MRJob scripts ###
 

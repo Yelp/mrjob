@@ -543,13 +543,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         except when running Python 2, we explicitly pick :command:`python2.7`
         on AMIs prior to 4.3.0 where's it's not the default.
         """
-        if local or not PY2:
-            return super(EMRJobRunner, self)._default_python_bin(local=local)
+        python_bin = super(EMRJobRunner, self)._default_python_bin(local=local)
 
-        if self._image_version_gte('4.3.0'):
-            return ['python']
-        else:
+        if python_bin == ['python'] and not (
+                self._image_version_gte('4.3.0') or local):
             return ['python2.7']
+        else:
+            return python_bin
 
     def _image_version_gte(self, version):
         """Check if the requested image version is greater than

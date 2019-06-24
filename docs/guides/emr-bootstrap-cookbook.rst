@@ -72,6 +72,23 @@ Or a tarball:
    :command:`pip` appears not to work due to out-of-date SSL
    certificate information.
 
+.. _installing-pypy-on-emr:
+
+Installing PyPy
+===============
+
+First, download the version of PyPy you want to use from
+`Portable PyPy Distributions for Linux <https://bitbucket.org/squeaky/portable-pypy/downloads/>`__.
+
+Then instruct EMR to un-tar it and link to the binary in ``/usr/bin``. For example:
+
+.. code-block:: yaml
+
+   runners:
+     emr:
+       bootstrap:
+       - sudo tar xvfj /local/path/to/pypy-7.1.1-linux_x86_64-portable.tar.bz2# -C /opt
+       - sudo ln -s /opt/pypy-7.1.1-linux_x86_64-portable/bin/pypy /usr/bin/pypy
 
 .. _installing-packages:
 

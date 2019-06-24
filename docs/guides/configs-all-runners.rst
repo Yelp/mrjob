@@ -342,6 +342,11 @@ Job execution context
 
        added ``'pypy'`` and ``'pypy3'`` as possible defaults
 
+    .. note::
+
+       mrjob does not auto-install PyPy for you on EMR; see
+       :ref:`installing-pypy-on-emr` for how to do this
+
 .. mrjob-opt::
     :config: setup
     :switch: --setup

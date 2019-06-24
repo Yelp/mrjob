@@ -29,6 +29,7 @@ import socket
 import sys
 import time
 from io import BytesIO
+from platform import python_implementation
 from shutil import make_archive
 
 import boto3
@@ -82,15 +83,9 @@ from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
+from tests.test_bin import PYTHON_BIN
 from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_inline import InlineInputManifestTestCase
-
-# used to match command lines
-if PY2:
-    PYTHON_BIN = 'python'
-    # prior to AMI 4.3.0, we use python2.7
-else:
-    PYTHON_BIN = 'python3'
 
 # EMR configurations used for testing
 # from http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  # noqa
@@ -2477,10 +2472,10 @@ class DefaultPythonBinTestCase(MockBoto3TestCase):
 
     def test_2_4_3_ami(self):
         runner = EMRJobRunner(image_version='2.4.3')
-        if PY2:
+        if PY2 and python_implementation() == 'CPython':
             self.assertEqual(runner._default_python_bin(), ['python2.7'])
         else:
-            self.assertEqual(runner._default_python_bin(), ['python3'])
+            self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
     def test_local_python_bin(self):
         # just make sure we don't break this

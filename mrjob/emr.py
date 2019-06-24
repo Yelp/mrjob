@@ -201,10 +201,6 @@ _DEFAULT_INSTANCE_TYPE = 'm5.xlarge'
 # m1.medium (3.75) definitely doesn't work.
 _MIN_SPARK_INSTANCE_MEMORY = 7.5
 
-# cheapest instance type that can run everything (resource manager, Hadoop
-# tasks, Spark tasks) and is available on almost all regions. See #1932.
-_CHEAPEST_INSTANCE_TYPE = 'm4.large'
-
 # these are the only kinds of instance roles that exist
 _INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
 
@@ -1011,16 +1007,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     # instance types
 
-    def _cheapest_manager_instance_type(self):
-        """What's the cheapest instance type we can get away with
-        for the master node (when it's not also running jobs)?"""
-        return _CHEAPEST_INSTANCE_TYPE
-
-    def _cheapest_worker_instance_type(self):
-        """What's the cheapest instance type we can get away with
-        running tasks on?"""
-        return _CHEAPEST_INSTANCE_TYPE
-
     def _instance_type(self, role):
         """What instance type should we use for the given role?
         (one of 'MASTER', 'CORE', 'TASK')"""
@@ -1035,11 +1021,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # using *instance_type* here is defensive programming;
             # if set, it should have already been popped into the worker
             # instance type option(s) by _fix_instance_opts() above
-            return (self._opts['instance_type'] or
-                    self._cheapest_worker_instance_type())
-
+            return self._opts['instance_type'] or 'm5.xlarge'
         else:
-            return self._cheapest_manager_instance_type()
+            return 'm5.xlarge'
 
     def _instance_is_worker(self, role):
         """Do instances of the given role run tasks? True for non-master

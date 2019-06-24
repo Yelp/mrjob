@@ -576,17 +576,17 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
     def test_master_alone_requires_big_enough_core_instances(self):
         _, cluster_id = self.make_pooled_cluster(
-            master_instance_type='c1.xlarge',
-            num_core_instances=2)  # core instances are c1.medium
+            master_instance_type='c3.4xlarge',
+            num_core_instances=2)  # core instances are m5.xlarge
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--master-instance-type', 'c1.xlarge'])
+            '--master-instance-type', 'c3.4xlarge'])
 
     def test_master_alone_requires_big_enough_master_when_with_core(self):
         _, cluster_id = self.make_pooled_cluster(
             core_instance_type='c1.xlarge',
-            num_core_instances=2)  # master instances are c1.medium
+            num_core_instances=2)  # master instances are m5.xlarge
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -766,7 +766,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             EbsConfiguration=ebs_config,
             InstanceRole=role,
             InstanceCount=1,
-            InstanceType='m4.large',
+            InstanceType='m5.xlarge',
         )
 
     def test_can_join_cluster_with_same_ebs_config(self):
@@ -1050,7 +1050,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         _, cluster_id = self.make_pooled_cluster(
             core_instance_bid_price='0.25',
             task_instance_bid_price='25.00',
-            task_instance_type='c3.2xlarge',
+            task_instance_type='c3.4xlarge',
             num_core_instances=2,
             num_task_instances=3)
 

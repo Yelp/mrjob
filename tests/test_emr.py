@@ -1015,7 +1015,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
     def test_defaults(self):
         self._test_instance_groups(
             {},
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_instance_type_single_instance(self):
         self._test_instance_groups(
@@ -1026,7 +1026,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         self._test_instance_groups(
             {'instance_type': 'c1.xlarge', 'num_core_instances': 2},
             core=(2, 'c1.xlarge', None),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_explicit_master_and_core_instance_types(self):
         self._test_instance_groups(
@@ -1037,7 +1037,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             {'core_instance_type': 'm2.xlarge',
              'num_core_instances': 2},
             core=(2, 'm2.xlarge', None),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
         self._test_instance_groups(
             {'master_instance_type': 'm1.large',
@@ -1050,26 +1050,26 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         # used to default to m1.small on 2.x AMIs (see #1932)
         self._test_instance_groups(
             dict(image_version='2.4.11'),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_2_x_ami_defaults_multiple_nodes(self):
         # used to default to m1.small on 2.x AMIs (see #1932)
         self._test_instance_groups(
             dict(image_version='2.4.11', num_core_instances=2),
-            core=(2, 'm4.large', None),
-            master=(1, 'm4.large', None))
+            core=(2, 'm5.xlarge', None),
+            master=(1, 'm5.xlarge', None))
 
     def test_release_label_hides_image_version(self):
         self._test_instance_groups(
             dict(release_label='emr-4.0.0', image_version='2.4.11'),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_spark_defaults_single_node(self):
         # when the default instance type was m1.medium, Spark needed
         # m1.large to run tasks, so we needed a separate test. See #1932
         self._test_instance_groups(
             dict(image_version='4.0.0', applications=['Spark']),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_spark_defaults_multiple_nodes(self):
         # This used to test whether we could get away with a smaller
@@ -1078,8 +1078,8 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             dict(image_version='4.0.0',
                  applications=['Spark'],
                  num_core_instances=2),
-            core=(2, 'm4.large', None),
-            master=(1, 'm4.large', None))
+            core=(2, 'm5.xlarge', None),
+            master=(1, 'm5.xlarge', None))
 
     def test_explicit_instance_types_take_precedence(self):
         self._test_instance_groups(
@@ -1114,7 +1114,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         self._test_instance_groups(
             {},
             core=(2, 'c1.xlarge', None),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
         self._test_instance_groups(
             {'master_instance_type': 'm1.large',
@@ -1231,23 +1231,23 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         self._test_instance_groups(
             {'master_instance_bid_price': '0',
              },
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
         self._test_instance_groups(
             {'num_core_instances': 3,
              'core_instance_bid_price': '0.00',
              },
-            core=(3, 'm4.large', None),
-            master=(1, 'm4.large', None))
+            core=(3, 'm5.xlarge', None),
+            master=(1, 'm5.xlarge', None))
 
         self._test_instance_groups(
             {'num_core_instances': 3,
              'num_task_instances': 5,
              'task_instance_bid_price': '',
              },
-            core=(3, 'm4.large', None),
-            master=(1, 'm4.large', None),
-            task=(5, 'm4.large', None))
+            core=(3, 'm5.xlarge', None),
+            master=(1, 'm5.xlarge', None),
+            task=(5, 'm5.xlarge', None))
 
     def test_pass_invalid_bid_prices_through_to_emr(self):
         self.assertRaises(
@@ -1262,7 +1262,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
              'num_task_instances': 20,
              },
             core=(5, 'c1.medium', None),
-            master=(1, 'm4.large', None),
+            master=(1, 'm5.xlarge', None),
             task=(20, 'c1.medium', None))
 
     def test_explicit_instance_groups(self):
@@ -1296,7 +1296,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             dict(
                 instance_fleets=[dict(
                     InstanceFleetType='MASTER',
-                    InstanceTypeConfigs=[dict(InstanceType='m4.large')],
+                    InstanceTypeConfigs=[dict(InstanceType='m5.xlarge')],
                     TargetOnDemandCapacity=1)]
             )
         )
@@ -1306,7 +1306,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             dict(
                 instance_fleets=[dict(
                     InstanceFleetType='MASTER',
-                    InstanceTypeConfigs=[dict(InstanceType='m4.large')],
+                    InstanceTypeConfigs=[dict(InstanceType='m5.xlarge')],
                     TargetOnDemandCapacity=1)],
                 instance_groups=[dict(
                     InstanceRole='MASTER',
@@ -1322,15 +1322,15 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         self.set_in_mrjob_conf(
             instance_fleets=[dict(
                 InstanceFleetType='MASTER',
-                InstanceTypeConfigs=[dict(InstanceType='m4.large')],
+                InstanceTypeConfigs=[dict(InstanceType='m5.xlarge')],
                 TargetOnDemandCapacity=1)])
 
         self._test_uses_instance_fleets({})
 
         self._test_instance_groups(
             dict(num_core_instances=3),
-            master=(1, 'm4.large', None),
-            core=(3, 'm4.large', None)
+            master=(1, 'm5.xlarge', None),
+            core=(3, 'm5.xlarge', None)
         )
 
     def test_command_line_beats_instance_fleets_in_config_file(self):
@@ -1347,8 +1347,8 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
 
         self._test_instance_groups(
             dict(num_core_instances=3),
-            master=(1, 'm4.large', None),
-            core=(3, 'm4.large', None)
+            master=(1, 'm5.xlarge', None),
+            core=(3, 'm5.xlarge', None)
         )
 
 

@@ -191,9 +191,9 @@ _MIN_SPARK_PY3_AMI_VERSION = '4.0.0'
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
 
-# a relatively cheap instance type that's available on (almost) all regions
-# and is big enough to support Spark. See #1932.
-_DEFAULT_INSTANCE_TYPE = 'm4.large'
+# a relatively cheap instance type that's available on all regions
+# and is big enough to support Spark. See #2071.
+_DEFAULT_INSTANCE_TYPE = 'm5.xlarge'
 
 # minimum amount of memory to run spark jobs
 #

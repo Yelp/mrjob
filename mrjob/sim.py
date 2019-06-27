@@ -381,11 +381,9 @@ class SimMRJobRunner(MRJobRunner):
                 join(working_dir, name) for name, path in named_paths)
 
         if map_split:
-            # mapreduce.map.input.file
-            # mapreduce.map.input.start
-            # mapreduce.map.input.length
-            for key, value in map_split.items():
-                j['mapreduce.map.input.' + key] = str(value)
+            j['mapreduce.map.input.file'] = 'file://' + map_split['file']
+            j['mapreduce.map.input.length'] = str(map_split['length'])
+            j['mapreduce.map.input.start'] = str(map_split['start'])
 
         # translate to correct version
 

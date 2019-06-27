@@ -224,14 +224,10 @@ def _conf_object_at_path(conf_path):
             try:
                 return json.load(f)
             except ValueError as e:
-                msg = ('If your mrjob.conf is in YAML, you need to install'
-                       ' yaml; see http://pypi.python.org/pypi/PyYAML/')
-                # Use msg attr if it's set
-                if hasattr(e, 'msg'):
-                    e.msg = '%s (%s)' % (e.msg, msg)
-                else:
-                    e.msg = msg
-                raise e
+                raise ValueError(
+                    'Could not read JSON from %s\n  %s\n\n'
+                    'If your conf file is in YAML, you need to'
+                    ' `pip install PyYAML` to read it' % (conf_path, str(e)))
 
 
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None,

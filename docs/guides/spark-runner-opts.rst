@@ -35,6 +35,8 @@ Options unique to the Spark runner:
    and is ignored by jobs that set
    :py:attr:`~mrjob.job.MRJob.HADOOP_INPUT_FORMAT`.
 
+   .. versionadded:: 0.6.9
+
 .. mrjob-opt::
     :config: gcs_region
     :switch: --gcs-region

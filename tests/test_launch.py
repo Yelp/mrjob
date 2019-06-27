@@ -106,7 +106,6 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
         # regression test for #2058
         self.add_file_option('--bar-db', dest='bar_db', type=str)
 
-
     def load_options(self, args):
         super(MRDeprecatedCustomJobLauncher, self).load_options(args)
 

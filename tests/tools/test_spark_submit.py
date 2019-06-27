@@ -118,6 +118,27 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
             )
         ])
 
+    def test_switches_to_spark_script(self):
+        # regression test for #2070
+        spark_submit_main(['foo.py', '--bar', 'baz'])
+
+        self.assertEqual(self.runner_class.alias, 'spark')
+
+        self.assertTrue(self.runner_class.called)
+        self.assertTrue(self.runner.run.called)
+
+        kwargs = self.get_runner_kwargs()
+
+        self.assertEqual(kwargs['steps'], [
+            dict(
+                args=['--bar', 'baz'],
+                jobconf={},
+                script='foo.py',
+                spark_args=[],
+                type='spark_script',
+            )
+        ])
+
     def test_jar_step(self):
         spark_submit_main(['dora.jar', 'arg1', 'arg2', 'arg3'])
 

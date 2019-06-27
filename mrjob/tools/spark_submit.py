@@ -36,7 +36,8 @@ Options::
   All runners:
     -r {emr,hadoop,local,spark}, --runner {emr,hadoop,local,spark}
                           Where to run the job (default: "spark")
-    --class MAIN_CLASS    Your application's main class (for Java / Scala apps).
+    --class MAIN_CLASS    Your application's main class (for Java /
+                          Scala apps).
     --name NAME           The name of your application.
     --jars LIBJARS        Comma-separated list of jars to include on the
                           driverand executor classpaths.
@@ -47,20 +48,20 @@ Options::
                           --repositories. The format for the coordinates should
                           be groupId:artifactId:version.
     --exclude-packages EXCLUDE_PACKAGES
-                          Comma-separated list of groupId:artifactId, to exclude
-                          while resolving the dependencies provided in
+                          Comma-separated list of groupId:artifactId, to
+                          exclude while resolving the dependencies provided in
                           --packages to avoid dependency conflicts.
     --repositories REPOSITORIES
-                          Comma-separated list of additional remote repositories
-                          to search for the maven coordinates given with
-                          --packages.
+                          Comma-separated list of additional remote
+                          repositories to search for the maven coordinates
+                          given with --packages.
     --py-files PY_FILES   Comma-separated list of .zip, .egg, or .py files to
                           placeon the PYTHONPATH for Python apps.
     --files UPLOAD_FILES  Comma-separated list of files to be placed in the
                           working directory of each executor. Ignored on
                           local[*] master.
-    --cmdenv CMDENV       Arbitrary environment variable to set inside Spark, in
-                          the format NAME=VALUE.
+    --cmdenv CMDENV       Arbitrary environment variable to set inside Spark,
+                          in the format NAME=VALUE.
     --conf JOBCONF        Arbitrary Spark configuration property, in the format
                           PROP=VALUE.
     --setup SETUP         A command to run before each Spark executor in the
@@ -71,8 +72,8 @@ Options::
                           interpolate archives (YARN only), use #/: "cd
                           foo.tar.gz#/; make.
     --properties-file PROPERTIES_FILE
-                          Path to a file from which to load extra properties. If
-                          not specified, this will look for conf/spark-
+                          Path to a file from which to load extra properties.
+                          If not specified, this will look for conf/spark-
                           defaults.conf.
     --driver-memory DRIVER_MEMORY
                           Memory for driver (e.g. 1000M, 2G) (Default: 1024M).
@@ -82,8 +83,8 @@ Options::
                           Extra library path entries to pass to the driver.
     --driver-class-path DRIVER_CLASS_PATH
                           Extra class path entries to pass to the driver. Note
-                          that jars added with --jars are automatically included
-                          in the classpath.
+                          that jars added with --jars are automatically
+                          included in the classpath.
     --executor-memory EXECUTOR_MEMORY
                           Memory per executor (e.g. 1000M, 2G) (Default: 1G).
     --proxy-user PROXY_USER
@@ -104,8 +105,8 @@ Options::
                           local[*] on spark runner, yarn on hadoop runner.
     --deploy-mode SPARK_DEPLOY_MODE
                           Whether to launch the driver program locally
-                          ("client") or on one of the worker machines inside the
-                          cluster ("cluster") (Default: client).
+                          ("client") or on one of the worker machines inside
+                          the cluster ("cluster") (Default: client).
 
   Cluster deploy mode only:
     --driver-cores DRIVER_CORES
@@ -133,17 +134,17 @@ Options::
                           executor.
     --queue QUEUE_NAME    The YARN queue to submit to (Default: "default").
     --num-executors NUM_EXECUTORS
-                          Number of executors to launch (Default: 2). If dynamic
-                          allocation is enabled, the initial number of executors
-                          will be at least NUM.
+                          Number of executors to launch (Default: 2). If
+                          dynamic allocation is enabled, the initial number of
+                          executors will be at least NUM.
     --principal PRINCIPAL
                           Principal to be used to login to KDC, while running
                           onsecure HDFS.
-    --keytab KEYTAB       The full path to the file that contains the keytab for
-                          the principal specified above. This keytab will be
-                          copied to the node running the Application Master via
-                          the Secure Distributed Cache, for renewing the login
-                          tickets and the delegation tokens periodically.
+    --keytab KEYTAB       The full path to the file that contains the keytab
+                          for the principal specified above. This keytab will
+                          be copied to the node running the Application Master
+                          via the Secure Distributed Cache, for renewing the
+                          login tickets and the delegation tokens periodically.
 
 This also supports the same runner-specific switches as
 :py:class:`~mrjob.job.MRJob`\\s (e.g. ``--hadoop-bin``, ``--region``).

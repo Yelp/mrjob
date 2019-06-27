@@ -66,12 +66,7 @@ from tests.py2 import mock
 from tests.py2 import patch
 from tests.sandbox import BasicTestCase
 from tests.sandbox import mrjob_conf_patcher
-
-# used to match command lines
-if PY2:
-    PYTHON_BIN = 'python'
-else:
-    PYTHON_BIN = 'python3'
+from tests.test_bin import PYTHON_BIN
 
 US_EAST_GCE_REGION = 'us-east1'
 EU_WEST_GCE_REGION = 'europe-west1'

@@ -191,19 +191,15 @@ _MIN_SPARK_PY3_AMI_VERSION = '4.0.0'
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
 
-# a relatively cheap instance type that's available on (almost) all regions
-# and is big enough to support Spark. See #1932.
-_DEFAULT_INSTANCE_TYPE = 'm4.large'
+# a relatively cheap instance type that's available on all regions
+# and is big enough to support Spark. See #2071.
+_DEFAULT_INSTANCE_TYPE = 'm5.xlarge'
 
 # minimum amount of memory to run spark jobs
 #
 # it's possible that we could get by with slightly less memory, but
 # m1.medium (3.75) definitely doesn't work.
 _MIN_SPARK_INSTANCE_MEMORY = 7.5
-
-# cheapest instance type that can run everything (resource manager, Hadoop
-# tasks, Spark tasks) and is available on almost all regions. See #1932.
-_CHEAPEST_INSTANCE_TYPE = 'm4.large'
 
 # these are the only kinds of instance roles that exist
 _INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
@@ -403,9 +399,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # did we create the cluster we're running on?
         self._created_cluster = False
 
-        # when did our particular task start?
-        self._emr_job_start = None
-
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
 
@@ -415,7 +408,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # - hadoop_version
         # - master_public_dns
         # - master_private_ip
+        #
+        # (we may do this for multiple cluster IDs if we join a pooled cluster
+        # that self-terminates)
         self._cluster_to_cache = defaultdict(dict)
+
+        # set of cluster IDs for which we logged the master node's public DNS
+        self._logged_address_of_master = set()
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task'. These will also always
@@ -540,13 +539,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         except when running Python 2, we explicitly pick :command:`python2.7`
         on AMIs prior to 4.3.0 where's it's not the default.
         """
-        if local or not PY2:
-            return super(EMRJobRunner, self)._default_python_bin(local=local)
+        python_bin = super(EMRJobRunner, self)._default_python_bin(local=local)
 
-        if self._image_version_gte('4.3.0'):
-            return ['python']
-        else:
+        if python_bin == ['python'] and not (
+                self._image_version_gte('4.3.0') or local):
             return ['python2.7']
+        else:
+            return python_bin
 
     def _image_version_gte(self, version):
         """Check if the requested image version is greater than
@@ -1008,16 +1007,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     # instance types
 
-    def _cheapest_manager_instance_type(self):
-        """What's the cheapest instance type we can get away with
-        for the master node (when it's not also running jobs)?"""
-        return _CHEAPEST_INSTANCE_TYPE
-
-    def _cheapest_worker_instance_type(self):
-        """What's the cheapest instance type we can get away with
-        running tasks on?"""
-        return _CHEAPEST_INSTANCE_TYPE
-
     def _instance_type(self, role):
         """What instance type should we use for the given role?
         (one of 'MASTER', 'CORE', 'TASK')"""
@@ -1032,11 +1021,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # using *instance_type* here is defensive programming;
             # if set, it should have already been popped into the worker
             # instance type option(s) by _fix_instance_opts() above
-            return (self._opts['instance_type'] or
-                    self._cheapest_worker_instance_type())
-
+            return self._opts['instance_type'] or 'm5.xlarge'
         else:
-            return self._cheapest_manager_instance_type()
+            return 'm5.xlarge'
 
     def _instance_is_worker(self, role):
         """Do instances of the given role run tasks? True for non-master
@@ -1450,12 +1437,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # create a cluster if we're not already using an existing one
         if not self._cluster_id:
-            self._cluster_id = self._create_cluster(
-                persistent=False)
+            self._cluster_id = self._create_cluster()
             self._created_cluster = True
         else:
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
+            self._log_address_of_master_once()
 
         # now that we know which cluster it is, check for Spark support
         if self._has_spark_steps():
@@ -1467,9 +1454,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.debug('Calling add_job_flow_steps(%s)' % ','.join(
             ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
         emr_client.add_job_flow_steps(**steps_kwargs)
-
-        # keep track of when we launched our job
-        self._emr_job_start = time.time()
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if hasattr(self.fs, 'ssh') and version_gte(
@@ -1558,6 +1542,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.debug('Waiting %.1f seconds...' %
                       self._opts['check_cluster_every'])
             time.sleep(self._opts['check_cluster_every'])
+
+            # log address of the master node once if we have it
+            self._log_address_of_master_once()
 
             step = emr_client.describe_step(
                 ClusterId=self._cluster_id, StepId=step_id)['Step']
@@ -1656,6 +1643,23 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 # "Step 0 of ... failed" looks weird
                 step_desc=(
                     'Master node setup step' if step_num == -1 else None))
+
+    def _log_address_of_master_once(self):
+        """Log the master node's public DNS, if we haven't already"""
+        # Some users like to SSH in manually. See #2007
+        if not self._cluster_id:
+            return
+
+        if self._cluster_id in self._logged_address_of_master:
+            return
+
+        master_dns = self._address_of_master()
+
+        if not master_dns:
+            return
+
+        log.info('  master node is %s' % master_dns)
+        self._logged_address_of_master.add(self._cluster_id)
 
     def _log_step_progress(self):
         """Tunnel to the job tracker/resource manager and log the

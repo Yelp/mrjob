@@ -80,11 +80,25 @@ _PASSTHRU_OPTIONS = [
         help=("Hadoop input format class. Set to '' to indicate no"
               " format (otherwise we'll instantiate a job and ask it"),
     )),
+    (['--no-hadoop-input-format'], dict(
+        action='store_const',
+        const='',
+        default=None,
+        dest='hadoop_input_format',
+        help=("Alternate way to specify no Hadoop input format class."),
+    )),
     (['--hadoop-output-format'], dict(
         default=None,
         dest='hadoop_output_format',
         help=("Hadoop output format class. Set to '' to indicate no"
               " format (otherwise we'll instantiate a job and ask it"),
+    )),
+    (['--no-hadoop-output-format'], dict(
+        action='store_const',
+        const='',
+        default=None,
+        dest='hadoop_output_format',
+        help=("Alternate way to specify no Hadoop output format class."),
     )),
     (['--sort-values'], dict(
         action='store_true',

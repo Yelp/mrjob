@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the Spark runner."""
+import json
 from io import BytesIO
 from os import listdir
 from os.path import exists
@@ -230,6 +231,25 @@ class SparkRunnerSparkStepsTestCase(MockFilesystemsTestCase):
             blue=1, fish=4, one=1, red=1, two=1))
 
     # TODO: add a Spark JAR to the repo, so we can test it
+
+
+class SparkStepsDescTestCase(MockFilesystemsTestCase):
+
+    def test_steps_desc_is_emr_proof(self):
+        # regression test for #2070
+        job = MRTwoStepJob(['-r', 'spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            args = runner._spark_script_args(step_num=0, last_step_num=1)
+            steps_desc_arg = args[args.index('--steps-desc') + 1]
+
+            # EMR's command-runner.jar deletes '}}' from args!
+            self.assertNotIn('}}', steps_desc_arg)
+
+            # make sure we didn't mangle the JSON
+            self.assertEqual(json.loads(steps_desc_arg),
+                             runner._get_steps())
 
 
 @skipIf(pyspark is None, 'no pyspark module')

@@ -49,6 +49,9 @@ from mrjob.util import _create_zip_file
 
 log = logging.getLogger(__name__)
 
+_CLOSE_BRACE_AFTER_CLOSE_BRACE_RE = re.compile(r'(?<=\})\}')
+
+
 
 class SparkMRJobRunner(MRJobBinRunner):
     """Runs a :py:class:`~mrjob.job.MRJob` on your Spark cluster (with or
@@ -414,7 +417,8 @@ class SparkMRJobRunner(MRJobBinRunner):
             args.append('--no-sort-values')
 
         # --steps-desc
-        args.extend(['--steps-desc', json.dumps(steps)])
+        args.extend(['--steps-desc',
+                     _emr_proof_steps_desc(json.dumps(steps))])
 
         # --counter-output-dir, to simulate counters
         args.extend(['--counter-output-dir',
@@ -487,3 +491,10 @@ class SparkMRJobRunner(MRJobBinRunner):
         """Treat streaming steps as Spark steps that use Python."""
         return (super(SparkMRJobRunner, self)._is_pyspark_step(step) or
                 step['type'] == 'streaming')
+
+
+def _emr_proof_steps_desc(steps_desc):
+    # EMR's command-runner.jar does some very strange things to
+    # arguments, including deleting empty args and deleting
+    # '}}' from arguments. See #2070
+    return _CLOSE_BRACE_AFTER_CLOSE_BRACE_RE.sub(' }', steps_desc)

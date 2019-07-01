@@ -1194,7 +1194,7 @@ class MRJob(MRJobLauncher):
         (not the script). Note that the job runner will *always* expand
         environment variables and ``~`` in paths returned by this method.
 
-        You do not have to worry about inadvertently disabling ``--dir``;
+        You do not have to worry about inadvertently disabling ``--dirs``;
         this switch is handled separately.
 
         .. versionadded:: 0.6.4

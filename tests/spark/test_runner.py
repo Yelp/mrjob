@@ -266,8 +266,8 @@ class SparkWorkingDirTestCase(MockFilesystemsTestCase):
         # doesn't have a working directory
         job = MRSparkOSWalk(['-r', 'spark',
                              '--spark-master', _LOCAL_CLUSTER_MASTER,
-                             '--file', fish_path + '#ghoti',
-                             '--file', fowl_path])
+                             '--files',
+                             '%s#ghoti,%s' % (fish_path, fowl_path)])
         job.sandbox()
 
         file_sizes = {}
@@ -313,9 +313,9 @@ class SparkWorkingDirTestCase(MockFilesystemsTestCase):
         job = MRSparkOSWalk(['-r', 'spark',
                              '--spark-master', 'mesos://host:9999',
                              '--spark-tmp-dir', 's3://walrus/tmp',
-                             '--file', 's3://walrus/fish#ghoti',
-                             '--file', 's3://walrus/fowl',
-                             '--file', foe_path])
+                             '--files',
+                             ('s3://walrus/fish#ghoti,s3://walrus/fowl,%s' %
+                              foe_path)])
         job.sandbox()
 
         with job.make_runner() as runner:

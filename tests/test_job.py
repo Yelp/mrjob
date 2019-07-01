@@ -1750,9 +1750,9 @@ class UploadAttrsTestCase(SandboxedTestCase):
         )
 
     def test_deprecated_archive_dir_file_switches(self):
-        job = MRJob(['--archives', 'stuff.zip',
-                     '--dirs', 'foo',
-                     '--files', 'foo/bar.txt'])
+        job = MRJob(['--archive', 'stuff.zip',
+                     '--dir', 'foo',
+                     '--file', 'foo/bar.txt'])
 
         self.assertEqual(
             job._runner_kwargs()['upload_archives'], ['stuff.zip'])

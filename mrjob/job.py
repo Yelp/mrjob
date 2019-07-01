@@ -1073,8 +1073,8 @@ class MRJob(MRJobLauncher):
 
         .. versionchanged:: 0.6.6
 
-           re-defining this no longer clobbers command-line
-           ``--libjar`` options.
+           re-defining this no longer clobbers the command-line
+           ``--libjars`` option
         """
         script_dir = os.path.dirname(self.mr_job_script())
 

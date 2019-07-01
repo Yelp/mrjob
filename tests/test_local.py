@@ -1152,8 +1152,8 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
         fowl_path = self.makefile('fowl', b'goose')
 
         job = MRSparkOSWalk(['-r', 'local',
-                             '--file', fish_path + '#ghoti',
-                             '--file', fowl_path])
+                             '--files',
+                             '%s#ghoti,%s' % (fish_path, fowl_path)])
         job.sandbox()
 
         file_sizes = {}

@@ -1818,7 +1818,7 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
         self.log = self.start(patch('mrjob.bin.log'))
 
     def test_no_setup(self):
-        job = MRNullSpark(['-r', 'hadoop', '--file', 'foo'])
+        job = MRNullSpark(['-r', 'hadoop', '--files', 'foo'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1833,7 +1833,7 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
         job = MRNullSpark(
             ['-r', 'hadoop',
              '--setup', 'make -f Makefile#',
-             '--file', 'foo',
+             '--files', 'foo',
              ])
         job.sandbox()
 
@@ -1853,7 +1853,7 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
         job = MRNullSpark(
             ['-r', 'hadoop',
              '--setup', 'make -f Makefile#',
-             '--file', 'foo',
+             '--files', 'foo',
              '--spark-master', 'local[*]',
              ])
         job.sandbox()

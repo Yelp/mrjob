@@ -200,7 +200,7 @@ _DEFAULT_RUNNER = 'spark'  # just find spark-submit and use it
 # for the --help message. Differences:
 #
 # spark_master (--master) is in its own "Spark and Hadoop runners only" group
-# added upload_dirs (--dirs) which is similar to --archive
+# added upload_dirs (--dirs) which is similar to --archives
 #
 # --runner and other basic options are patched into the first ("None")
 # argument group in _make_basic_help_parser(), below

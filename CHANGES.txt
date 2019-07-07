@@ -413,8 +413,8 @@ v0.6.0, 2017-11-01 -- wave of deprecation
        * pool_emr_job_flows
        * s3_log_uri
        * s3_scratch_uri
-       * s3_tmp_dir
        * s3_sync_wait_time
+       * s3_tmp_dir
        * s3_upload_part_size
        * ssh_tunnel_to_job_tracker
    * mrjob.parse:

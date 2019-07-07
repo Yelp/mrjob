@@ -2570,7 +2570,7 @@ class JarStepTestCase(MockBoto3TestCase):
             pass
 
         job = MRJarWithGenericArgs(
-            ['-r', 'emr', '--jar', fake_jar, '--libjar', fake_libjar])
+            ['-r', 'emr', '--jar', fake_jar, '--libjars', fake_libjar])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5390,7 +5390,7 @@ class BadBashWorkaroundTestCase(MockBoto3TestCase):
         cookie_jar = self.makefile('cookie.jar')
 
         job = MRTwoStepJob(['-r', 'emr', '--image-version', image_version,
-                            '--libjar', cookie_jar])
+                            '--libjars', cookie_jar])
         job.sandbox()
 
         def check_script(path):

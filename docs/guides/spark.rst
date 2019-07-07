@@ -241,7 +241,7 @@ uploaded via :mrjob-opt:`setup` scripts all should work as expected (except
 on ``local`` masters because there is no working directory).
 
 Note that you can give files a different name in the working directory
-(e.g. ``--file foo#bar``) on all Spark masters, even though Spark treats
+(e.g. ``--files foo#bar``) on all Spark masters, even though Spark treats
 that as a YARN-specific feature.
 
 Archives and directories

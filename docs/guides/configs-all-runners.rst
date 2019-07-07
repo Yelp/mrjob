@@ -137,7 +137,7 @@ options related to file uploading.
 
     On the command line::
 
-        --file file_1.txt --file file_2.sqlite
+        --files file_1.txt,file_2.sqlite
 
     .. versionchanged:: 0.5.7
 

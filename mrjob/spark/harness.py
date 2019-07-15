@@ -610,10 +610,18 @@ def _make_arg_parser():
         '--emulate-map-input-file',
         dest='emulate_map_input_file',
         action='store_true',
-        help=('set mapreduce_map_input_file to the input file path'
+        help=('Set mapreduce_map_input_file to the input file path'
               ' in the first mapper function, so we can read it'
               ' with mrjob.compat.jobconf_from_env(). Ignored if'
               ' job has a Hadoop input format'),
+    )
+    parser.add_argument(
+        '--skip-internal-protocol',
+        dest='skip_internal_protocol',
+        action='store_true',
+        help=("Don't use the job's internal protocol to communicate"
+              " between tasks internal to the job, instead relying"
+              " on Spark to encode and decode raw data structures.")
     )
 
     for args, kwargs in _PASSTHRU_OPTIONS:

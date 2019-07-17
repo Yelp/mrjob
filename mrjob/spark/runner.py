@@ -82,6 +82,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         'project_id',  # used by GCS filesystem
         's3_endpoint',
         's3_region',  # used when creating buckets on S3
+        'skip_internal_protocol',
         'spark_deploy_mode',
         'spark_master',
         'spark_tmp_dir',  # where to put temp files in Spark
@@ -458,8 +459,13 @@ class SparkMRJobRunner(MRJobBinRunner):
             args.extend(['--max-output-files',
                          str(self._max_output_files)])
 
+        # --emulate-map-input-file
         if self._opts['emulate_map_input_file']:
             args.append('--emulate-map-input-file')
+
+        # --skip_internal-protocol
+        if self._opts['skip_internal_protocol']:
+            args.append('--skip-internal-protocol')
 
         return args
 

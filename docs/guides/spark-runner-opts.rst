@@ -62,6 +62,30 @@ Options unique to the Spark runner:
     (not GCS)
 
 .. mrjob-opt::
+    :config: skip_internal_protocol
+    :switch: --skip-internal-protocol, --no-skip-internal-protocol
+    :type: boolean
+    :set: spark
+    :default: ``False``
+
+    Don't emulate the job's internal protocol (used for communicating between
+    job steps and tasks in the same step), instead relying on Spark to encode
+    and decode data structures.
+
+    This should work for most but not all jobs, and make them run at least
+    somewhat faster. Some things to keep in mind:
+
+    * data will no longer be "normalized" by being converted to and from string
+      representation. For example, running a tuple through
+      :py:class:`~mrjob.protocol.JSONProtocol` (the default) implicitly
+      converts it to a list because there are no tuples in JSON. With internal
+      protocols skipped, it would remain a tuple.
+    * if your job uses :py:attr:`~mrjob.job.MRJob.SORT_VALUES`, keep in mind
+      that your values will need to be comparable as Spark will be comparing
+      them directly, rather than comparing their internal-protocol-encoded
+      representation. This may also affect sorting order.
+
+.. mrjob-opt::
     :config: spark_tmp_dir
     :switch: --spark-tmp-dir
     :type: :ref:`string <data-type-string>`

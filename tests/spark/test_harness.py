@@ -154,7 +154,8 @@ class SparkHarnessOutputComparisonBaseTestCase(
                      job_args=None, spark_conf=None, first_step_num=None,
                      last_step_num=None, counter_output_dir=None,
                      num_reducers=None, max_output_files=None,
-                     emulate_map_input_file=False):
+                     emulate_map_input_file=False,
+                     skip_internal_protocol=False):
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -185,6 +186,9 @@ class SparkHarnessOutputComparisonBaseTestCase(
         if emulate_map_input_file:
             harness_job_args.append('--emulate-map-input-file')
 
+        if skip_internal_protocol:
+            harness_job_args.append('--skip-internal-protocol')
+
         harness_job_args.extend(input_paths)
 
         harness_job = MRSparkHarness(harness_job_args)
@@ -202,7 +206,7 @@ class SparkHarnessOutputComparisonBaseTestCase(
     def _assert_output_matches(
             self, job_class, input_bytes=b'', input_paths=(), job_args=[],
             num_reducers=None, max_output_files=None,
-            emulate_map_input_file=False):
+            emulate_map_input_file=False, skip_internal_protocol=False):
 
         # run classes defined in this module in inline mode, classes
         # with their own script files in local mode. used by
@@ -238,6 +242,7 @@ class SparkHarnessOutputComparisonBaseTestCase(
             max_output_files=max_output_files,
             num_reducers=num_reducers,
             emulate_map_input_file=emulate_map_input_file,
+            skip_internal_protocol=skip_internal_protocol,
             runner_alias=harness_job_runner_alias)
 
         with harness_job.make_runner() as runner:
@@ -486,6 +491,50 @@ class SparkHarnessOutputComparisonTestCase(
         self._assert_output_matches(MRNoMapper, input_bytes=input_bytes)
 
 
+class SkipInternalProtocolTestCase(
+        SparkHarnessOutputComparisonBaseTestCase):
+
+    def test_basic_job(self):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+
+        self._assert_output_matches(MRWordFreqCount, input_bytes=input_bytes,
+                                    skip_internal_protocol=True)
+
+    def test_two_step_job(self):
+        input_bytes = b'foo\nbar\n'
+
+        self._assert_output_matches(MRTwoStepJob, input_bytes=input_bytes,
+                                    skip_internal_protocol=True)
+
+    def test_sort_values(self):
+        input_bytes = (
+            b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n')
+
+        self._assert_output_matches(MRSortAndGroup, input_bytes=input_bytes,
+                                    skip_internal_protocol=True)
+
+    def test_sort_values_sorts_unencoded_values(self):
+        # compare to test_sort_values_sorts_encoded_values(), above.
+        # It won't matter that MRSortAndGroupReversedText uses
+        # ReversedTextProtocol as its internal protocol, because we ignore that
+        input_bytes = (
+            b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n')
+
+        job = self._harness_job(MRSortAndGroupReversedText,
+                                input_bytes=input_bytes,
+                                skip_internal_protocol=True)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(a=['actuary', 'alligator', 'artichoke'],
+                     b=['baby', 'balloon', 'bowling']))
+
+
+
+
 class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
 
     def _assert_partition_count_different(self, cls, num_reducers):
@@ -504,7 +553,7 @@ class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
         assert part_files != default_partitions
         assert part_files == num_reducers
 
-    def test_reducer_cannot_set_to_zero(self):
+    def test_num_reducers_cannot_be_set_to_zero(self):
         with self.assertRaises(ValueError):
             job = self._harness_job(MRWordFreqCount, num_reducers=0)
             with job.make_runner() as runner:

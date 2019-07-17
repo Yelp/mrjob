@@ -113,6 +113,15 @@ _PASSTHRU_OPTIONS = [
 ]
 
 
+# Used to implement skip_internal_protocol
+# internal_protocol() method. pick_protocols() just expects a thing with
+# *read* and *write* attributes, and a class is the simplest way to get it.
+# The harness has special cases for when *read* or *write* is ``None``.
+class _NO_INTERNAL_PROTOCOL(object):
+    read = None
+    write = None
+
+
 class CounterAccumulator(AccumulatorParam):
 
     def zero(self, value):
@@ -210,6 +219,11 @@ def main(cmd_line_args=None):
         # patch increment_counter() to update the accumulator for this step
         j.increment_counter = make_increment_counter(step_num)
 
+        # if skip_internal_protocol is true, patch internal_protocol() to
+        # return an object whose *read* and *write* attributes are ``None``
+        if args.skip_internal_protocol:
+            j.internal_protocol = lambda: _NO_INTERNAL_PROTOCOL
+
         return j
 
     # --emulate-map-input-file doesn't work with hadoop_input_format
@@ -243,7 +257,8 @@ def main(cmd_line_args=None):
             rdd = _run_step(step, step_num, rdd,
                             make_mrc_job,
                             args.num_reducers, sort_values,
-                            emulate_map_input_file)
+                            emulate_map_input_file,
+                            args.skip_internal_protocol)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
@@ -298,7 +313,8 @@ def _text_file_with_path(sc, path):
 
 def _run_step(step, step_num, rdd, make_mrc_job,
               num_reducers=None, sort_values=None,
-              emulate_map_input_file=False):
+              emulate_map_input_file=False,
+              skip_internal_protocol=False):
     """Run the given step on the RDD and return the transformed RDD."""
     _check_step(step, step_num)
 
@@ -336,7 +352,8 @@ def _run_step(step, step_num, rdd, make_mrc_job,
             num_reducers=num_reducers)
     elif step.get('reducer'):
         rdd = _shuffle_and_sort(
-            rdd, sort_values=sort_values, num_reducers=num_reducers)
+            rdd, sort_values=sort_values, num_reducers=num_reducers,
+            skip_internal_protocol=skip_internal_protocol)
 
     # reducer
     if step.get('reducer'):
@@ -384,7 +401,10 @@ def _run_mapper(make_mrc_job, step_num, rdd, rdd_includes_input_path):
         # decode lines into key-value pairs (as a generator, not a list)
         #
         # line -> (k, v)
-        pairs = (read(line) for line in lines)
+        if read:
+            pairs = (read(line) for line in lines)
+        else:
+            pairs = lines  # was never encoded
 
         # reduce_pairs() runs key-value pairs through mapper
         #
@@ -393,7 +413,10 @@ def _run_mapper(make_mrc_job, step_num, rdd, rdd_includes_input_path):
             # encode key-value pairs back into lines
             #
             # (k, v) -> line
-            yield write(k, v)
+            if write:
+                yield write(k, v)
+            else:
+                yield k, v
 
     return rdd.mapPartitions(map_lines)
 
@@ -419,7 +442,8 @@ def _run_combiner(combiner_job, rdd, sort_values=False, num_reducers=None):
     # decode lines into key-value pairs
     #
     # line -> (k, v)
-    rdd = rdd.map(c_read)
+    if c_read:
+        rdd = rdd.map(c_read)
 
     # The common case for MRJob combiners is to yield a single key-value pair
     # (for example ``(key, sum(values))``. If the combiner does something
@@ -457,9 +481,10 @@ def _run_combiner(combiner_job, rdd, sort_values=False, num_reducers=None):
 
     # encode lists of key-value pairs into lists of lines
     #
-    # (k, ([(k, v1), (k, v2), ...])) -> (k, [line1, line2, ...])
-    rdd = rdd.mapValues(
-        lambda pairs: [c_write(*pair) for pair in pairs])
+    # (k, [(k, v1), (k, v2), ...]) -> (k, [line1, line2, ...])
+    if c_write:
+        rdd = rdd.mapValues(
+            lambda pairs: [c_write(*pair) for pair in pairs])
 
     # free the lines!
     #
@@ -469,7 +494,8 @@ def _run_combiner(combiner_job, rdd, sort_values=False, num_reducers=None):
     return rdd
 
 
-def _shuffle_and_sort(rdd, sort_values=False, num_reducers=None):
+def _shuffle_and_sort(rdd, sort_values=False, num_reducers=None,
+                      skip_internal_protocol=False):
     """Simulate Hadoop's shuffle-and-sort step, so that data will be in the
     format the reducer expects.
 
@@ -480,12 +506,19 @@ def _shuffle_and_sort(rdd, sort_values=False, num_reducers=None):
                         are sorted (by their encoded value)
     :param num_reducers: limit the number of paratitions of output rdd, which
                          is similar to mrjob's limit on number of reducers.
+    :param skip_internal_protocol: if true, assume *rdd* contains key/value
+                                   pairs, not lines
+
     :return: an RDD containing "reducer ready" lines representing encoded
              key-value pairs, that is, where all lines with the same key are
              adjacent and in the same partition
     """
-    rdd = rdd.groupBy(
-        lambda line: line.split(b'\t')[0], numPartitions=num_reducers)
+    if skip_internal_protocol:
+        key_func = lambda k_v: k_v[0]
+    else:
+        key_func = lambda line: line.split(b'\t')[0]
+
+    rdd = rdd.groupBy(key_func, numPartitions=num_reducers)
     rdd = _discard_key_and_flatten_values(rdd, sort_values=sort_values)
 
     return rdd
@@ -513,7 +546,10 @@ def _run_reducer(make_mrc_job, step_num, rdd, num_reducers=None):
         # decode lines into key-value pairs (as a generator, not a list)
         #
         # line -> (k, v)
-        pairs = (read(line) for line in lines)
+        if read:
+            pairs = (read(line) for line in lines)
+        else:
+            pairs = lines  # pairs were never encoded
 
         # reduce_pairs() runs key-value pairs through reducer
         #
@@ -522,7 +558,10 @@ def _run_reducer(make_mrc_job, step_num, rdd, num_reducers=None):
             # encode key-value pairs back into lines
             #
             # (k, v) -> line
-            yield write(k, v)
+            if write:
+                yield write(k, v)
+            else:
+                yield k, v
 
     # if *num_reducers* is set, don't re-partition. otherwise, doesn't matter
     return rdd.mapPartitions(reduce_lines,

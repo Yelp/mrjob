@@ -45,6 +45,7 @@ from tests.mr_no_mapper import MRNoMapper
 from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_sort_and_group_reversed_text import MRSortAndGroupReversedText
 from tests.mr_spark_harness import MRSparkHarness
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_freq_count_with_combiner_cmd import \
@@ -52,28 +53,6 @@ from tests.mr_word_freq_count_with_combiner_cmd import \
 from tests.py2 import Mock
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
-
-
-def _rev(s):
-    return ''.join(reversed(s))
-
-
-class ReversedTextProtocol(TextProtocol):
-    """Like TextProtocol, but stores text backwards."""
-
-    def read(self, line):
-        key, value = super(ReversedTextProtocol, self).read(line)
-
-        return _rev(key), _rev(value)
-
-    def write(self, key, value):
-        return super(ReversedTextProtocol, self).write(
-            _rev(key), _rev(value))
-
-
-class MRSortAndGroupReversedText(MRSortAndGroup):
-
-    INTERNAL_PROTOCOL = ReversedTextProtocol
 
 
 class MRWordFreqCountCombinerYieldsTwo(MRWordFreqCount):

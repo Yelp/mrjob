@@ -29,6 +29,7 @@ import socket
 import sys
 import time
 from io import BytesIO
+from platform import python_implementation
 from shutil import make_archive
 
 import boto3
@@ -82,15 +83,15 @@ from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
+from tests.test_bin import PYTHON_BIN
 from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_inline import InlineInputManifestTestCase
 
-# used to match command lines
-if PY2:
-    PYTHON_BIN = 'python'
-    # prior to AMI 4.3.0, we use python2.7
+
+if PYTHON_BIN == 'python':
+    OLD_AMI_PYTHON_BIN = 'python2.7'
 else:
-    PYTHON_BIN = 'python3'
+    OLD_AMI_PYTHON_BIN = PYTHON_BIN
 
 # EMR configurations used for testing
 # from http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  # noqa
@@ -1014,7 +1015,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
     def test_defaults(self):
         self._test_instance_groups(
             {},
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_instance_type_single_instance(self):
         self._test_instance_groups(
@@ -1025,7 +1026,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         self._test_instance_groups(
             {'instance_type': 'c1.xlarge', 'num_core_instances': 2},
             core=(2, 'c1.xlarge', None),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_explicit_master_and_core_instance_types(self):
         self._test_instance_groups(
@@ -1036,7 +1037,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             {'core_instance_type': 'm2.xlarge',
              'num_core_instances': 2},
             core=(2, 'm2.xlarge', None),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
         self._test_instance_groups(
             {'master_instance_type': 'm1.large',
@@ -1049,26 +1050,26 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         # used to default to m1.small on 2.x AMIs (see #1932)
         self._test_instance_groups(
             dict(image_version='2.4.11'),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_2_x_ami_defaults_multiple_nodes(self):
         # used to default to m1.small on 2.x AMIs (see #1932)
         self._test_instance_groups(
             dict(image_version='2.4.11', num_core_instances=2),
-            core=(2, 'm4.large', None),
-            master=(1, 'm4.large', None))
+            core=(2, 'm5.xlarge', None),
+            master=(1, 'm5.xlarge', None))
 
     def test_release_label_hides_image_version(self):
         self._test_instance_groups(
             dict(release_label='emr-4.0.0', image_version='2.4.11'),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_spark_defaults_single_node(self):
         # when the default instance type was m1.medium, Spark needed
         # m1.large to run tasks, so we needed a separate test. See #1932
         self._test_instance_groups(
             dict(image_version='4.0.0', applications=['Spark']),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
     def test_spark_defaults_multiple_nodes(self):
         # This used to test whether we could get away with a smaller
@@ -1077,8 +1078,8 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             dict(image_version='4.0.0',
                  applications=['Spark'],
                  num_core_instances=2),
-            core=(2, 'm4.large', None),
-            master=(1, 'm4.large', None))
+            core=(2, 'm5.xlarge', None),
+            master=(1, 'm5.xlarge', None))
 
     def test_explicit_instance_types_take_precedence(self):
         self._test_instance_groups(
@@ -1113,7 +1114,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         self._test_instance_groups(
             {},
             core=(2, 'c1.xlarge', None),
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
         self._test_instance_groups(
             {'master_instance_type': 'm1.large',
@@ -1230,23 +1231,23 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         self._test_instance_groups(
             {'master_instance_bid_price': '0',
              },
-            master=(1, 'm4.large', None))
+            master=(1, 'm5.xlarge', None))
 
         self._test_instance_groups(
             {'num_core_instances': 3,
              'core_instance_bid_price': '0.00',
              },
-            core=(3, 'm4.large', None),
-            master=(1, 'm4.large', None))
+            core=(3, 'm5.xlarge', None),
+            master=(1, 'm5.xlarge', None))
 
         self._test_instance_groups(
             {'num_core_instances': 3,
              'num_task_instances': 5,
              'task_instance_bid_price': '',
              },
-            core=(3, 'm4.large', None),
-            master=(1, 'm4.large', None),
-            task=(5, 'm4.large', None))
+            core=(3, 'm5.xlarge', None),
+            master=(1, 'm5.xlarge', None),
+            task=(5, 'm5.xlarge', None))
 
     def test_pass_invalid_bid_prices_through_to_emr(self):
         self.assertRaises(
@@ -1261,7 +1262,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
              'num_task_instances': 20,
              },
             core=(5, 'c1.medium', None),
-            master=(1, 'm4.large', None),
+            master=(1, 'm5.xlarge', None),
             task=(20, 'c1.medium', None))
 
     def test_explicit_instance_groups(self):
@@ -1295,7 +1296,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             dict(
                 instance_fleets=[dict(
                     InstanceFleetType='MASTER',
-                    InstanceTypeConfigs=[dict(InstanceType='m4.large')],
+                    InstanceTypeConfigs=[dict(InstanceType='m5.xlarge')],
                     TargetOnDemandCapacity=1)]
             )
         )
@@ -1305,7 +1306,7 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             dict(
                 instance_fleets=[dict(
                     InstanceFleetType='MASTER',
-                    InstanceTypeConfigs=[dict(InstanceType='m4.large')],
+                    InstanceTypeConfigs=[dict(InstanceType='m5.xlarge')],
                     TargetOnDemandCapacity=1)],
                 instance_groups=[dict(
                     InstanceRole='MASTER',
@@ -1321,15 +1322,15 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         self.set_in_mrjob_conf(
             instance_fleets=[dict(
                 InstanceFleetType='MASTER',
-                InstanceTypeConfigs=[dict(InstanceType='m4.large')],
+                InstanceTypeConfigs=[dict(InstanceType='m5.xlarge')],
                 TargetOnDemandCapacity=1)])
 
         self._test_uses_instance_fleets({})
 
         self._test_instance_groups(
             dict(num_core_instances=3),
-            master=(1, 'm4.large', None),
-            core=(3, 'm4.large', None)
+            master=(1, 'm5.xlarge', None),
+            core=(3, 'm5.xlarge', None)
         )
 
     def test_command_line_beats_instance_fleets_in_config_file(self):
@@ -1346,8 +1347,8 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
 
         self._test_instance_groups(
             dict(num_core_instances=3),
-            master=(1, 'm4.large', None),
-            core=(3, 'm4.large', None)
+            master=(1, 'm5.xlarge', None),
+            core=(3, 'm5.xlarge', None)
         )
 
 
@@ -1631,13 +1632,13 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
     def test_create_master_bootstrap_script_on_3_11_0_ami(self):
         self._test_create_master_bootstrap_script(
-            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
+            expected_python_bin=(OLD_AMI_PYTHON_BIN),
             image_version='3.11.0')
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
             image_version='2.4.11',
-            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN))
+            expected_python_bin=(OLD_AMI_PYTHON_BIN))
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,
@@ -2467,20 +2468,15 @@ class DefaultPythonBinTestCase(MockBoto3TestCase):
 
     def test_4_x_release_label(self):
         runner = EMRJobRunner(release_label='emr-4.0.0')
-        self.assertEqual(runner._default_python_bin(),
-                         ['python2.7'] if PY2 else [PYTHON_BIN])
+        self.assertEqual(runner._default_python_bin(), [OLD_AMI_PYTHON_BIN])
 
     def test_3_11_0_ami(self):
         runner = EMRJobRunner(image_version='3.11.0')
-        self.assertEqual(runner._default_python_bin(),
-                         ['python2.7'] if PY2 else [PYTHON_BIN])
+        self.assertEqual(runner._default_python_bin(), [OLD_AMI_PYTHON_BIN])
 
     def test_2_4_3_ami(self):
         runner = EMRJobRunner(image_version='2.4.3')
-        if PY2:
-            self.assertEqual(runner._default_python_bin(), ['python2.7'])
-        else:
-            self.assertEqual(runner._default_python_bin(), ['python3'])
+        self.assertEqual(runner._default_python_bin(), [OLD_AMI_PYTHON_BIN])
 
     def test_local_python_bin(self):
         # just make sure we don't break this
@@ -2574,7 +2570,7 @@ class JarStepTestCase(MockBoto3TestCase):
             pass
 
         job = MRJarWithGenericArgs(
-            ['-r', 'emr', '--jar', fake_jar, '--libjar', fake_libjar])
+            ['-r', 'emr', '--jar', fake_jar, '--libjars', fake_libjar])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4522,6 +4518,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
             'tests.mock_boto3.emr.MockEMRClient.describe_cluster',
             return_value=dict(
                 Cluster=dict(
+                    Applications=[],
                     Id='j-CLUSTERID',
                     Status=dict(
                         State='TERMINATING',
@@ -5393,7 +5390,7 @@ class BadBashWorkaroundTestCase(MockBoto3TestCase):
         cookie_jar = self.makefile('cookie.jar')
 
         job = MRTwoStepJob(['-r', 'emr', '--image-version', image_version,
-                            '--libjar', cookie_jar])
+                            '--libjars', cookie_jar])
         job.sandbox()
 
         def check_script(path):
@@ -5874,3 +5871,58 @@ class EMRClientBackoffTest(MockBoto3TestCase):
     def test_small_check_cluster_every(self):
         # minimum backoff is always 20
         self._test_backoff(20, check_cluster_every=1)
+
+
+class LogAddressOfMasterTestCase(MockBoto3TestCase):
+    """Test that we log the address of the master node."""
+
+    def setUp(self):
+        super(LogAddressOfMasterTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+    def _num_times_address_of_master_logged(self):
+        return sum(1 for args, kwargs in self.log.info.call_args_list
+                   if args[0].strip().startswith('master node is '))
+
+    def test_basic(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self._num_times_address_of_master_logged(), 1)
+
+    def test_pooled_cluster(self):
+        job1 = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job1.sandbox()
+        with job1.make_runner() as runner:
+            runner.run()
+
+        self.log.info.reset_mock()
+
+        job2 = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job2.sandbox()
+        with job2.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self._num_times_address_of_master_logged(), 1)
+
+    def test_relaunch_pooled_cluster(self):
+        job1 = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job1.sandbox()
+        with job1.make_runner() as runner:
+            runner.run()
+            cluster_id = runner.get_cluster_id()
+
+        self.log.info.reset_mock()
+
+        self.mock_emr_self_termination.add(cluster_id)
+
+        job2 = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job2.sandbox()
+        with job2.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self._num_times_address_of_master_logged(), 2)

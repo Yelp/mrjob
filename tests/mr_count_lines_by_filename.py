@@ -30,5 +30,6 @@ class MRCountLinesByFilename(MRCountLinesByFile):
             MRStep(mapper=self.mapper2)
         ]
 
+
 if __name__ == '__main__':
     MRCountLinesByFilename.run()

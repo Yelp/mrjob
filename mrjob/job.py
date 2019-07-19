@@ -1073,8 +1073,8 @@ class MRJob(MRJobLauncher):
 
         .. versionchanged:: 0.6.6
 
-           re-defining this no longer clobbers command-line
-           ``--libjar`` options.
+           re-defining this no longer clobbers the command-line
+           ``--libjars`` option
         """
         script_dir = os.path.dirname(self.mr_job_script())
 
@@ -1178,7 +1178,7 @@ class MRJob(MRJobLauncher):
         (not the script). Note that the job runner will *always* expand
         environment variables and ``~`` in paths returned by this method.
 
-        You do not have to worry about inadvertently disabling ``--archive``;
+        You do not have to worry about inadvertently disabling ``--archives``;
         this switch is handled separately.
 
         .. versionadded:: 0.6.4
@@ -1194,7 +1194,7 @@ class MRJob(MRJobLauncher):
         (not the script). Note that the job runner will *always* expand
         environment variables and ``~`` in paths returned by this method.
 
-        You do not have to worry about inadvertently disabling ``--dir``;
+        You do not have to worry about inadvertently disabling ``--dirs``;
         this switch is handled separately.
 
         .. versionadded:: 0.6.4
@@ -1210,7 +1210,7 @@ class MRJob(MRJobLauncher):
         (not the script). Note that the job runner will *always* expand
         environment variables and ``~`` in paths returned by this method.
 
-        You do not have to worry about inadvertently disabling ``--file``;
+        You do not have to worry about inadvertently disabling ``--files``;
         this switch is handled separately.
 
         .. versionadded:: 0.6.4

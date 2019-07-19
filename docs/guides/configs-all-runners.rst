@@ -137,7 +137,7 @@ options related to file uploading.
 
     On the command line::
 
-        --file file_1.txt --file file_2.sqlite
+        --files file_1.txt,file_2.sqlite
 
     .. versionchanged:: 0.5.7
 
@@ -329,11 +329,23 @@ Job execution context
     If you're on Python 2, this defaults to ``'python'`` (except on EMR
     AMIs prior to 4.3.0, where it will be ``'python2.7'``).
 
+    Likewise, if you're using PyPy, this defaults to ``'pypy'`` or ``'pypy3'``
+    depending on your version.
+
     This option also affects which Python binary is used for file locking in
     :mrjob-opt:`setup` scripts, so it might be useful to set even if you're
     using a non-Python :mrjob-opt:`interpreter` (deprecated). It's also
     used by :py:class:`~mrjob.emr.EMRJobRunner` to compile mrjob after
     bootstrapping it (see :mrjob-opt:`bootstrap_mrjob`).
+
+    .. versionchanged:: 0.6.10
+
+       added ``'pypy'`` and ``'pypy3'`` as possible defaults
+
+    .. note::
+
+       mrjob does not auto-install PyPy for you on EMR; see
+       :ref:`installing-pypy-on-emr` for how to do this
 
 .. mrjob-opt::
     :config: setup

@@ -241,7 +241,7 @@ uploaded via :mrjob-opt:`setup` scripts all should work as expected (except
 on ``local`` masters because there is no working directory).
 
 Note that you can give files a different name in the working directory
-(e.g. ``--file foo#bar``) on all Spark masters, even though Spark treats
+(e.g. ``--files foo#bar``) on all Spark masters, even though Spark treats
 that as a YARN-specific feature.
 
 Archives and directories
@@ -474,3 +474,28 @@ A lighter weight solution is ``--max-output-files``, allows you to limit
 the number of output files by running ``coalesce()`` just before
 writing output. Running your job with ``--max-output-files=100`` would ensure
 it produces no more than 100 output files (but it could output less).
+
+.. _mrjobs-on-spark-on-emr:
+
+Running classic MRJobs on Spark on EMR
+--------------------------------------
+
+It's often faster to run classic MRJobs on Spark than Hadoop Streaming. It's
+also convenient to be able to run on EMR rather than setting up your own
+Spark cluster (or SSH'ing in).
+
+Can you do both? Yes! Run the job with the Spark runner, but tell it
+to use :command:`mrjob spark-submit` to launch Spark jobs on EMR.
+
+It looks something like this:
+
+.. code-block:: sh
+
+   python mr_your_job.py -r spark \
+     --spark-submit-bin 'mrjob spark-submit -r emr' \
+     --spark-master yarn --spark-tmp-dir s3://your-bucket/tmp/ input1 input2
+
+Note that because the Spark runner itself doesn't know the job is going to
+run on EMR, you have to give it a couple of hints so that it knows
+it's running on YARN (:command:`--spark-master`) and that it needs to
+use S3 as its temp space (:command:`--spark-tmp-dir`).

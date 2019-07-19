@@ -23,7 +23,15 @@ class MRRot13Lib(MRJob):
     OUTPUT_PROTOCOL = RawValueProtocol
 
     def mapper(self, _, line):
-        from rot13lib.text import encode
+        # . isn't in sys.path on EMR for some reason
+        import sys
+        sys.path.append('.')
+        try:
+            from rot13lib.text import encode
+
+            rot13_line = encode(line)
+        finally:
+            sys.path.pop()
 
         yield None, encode(line)
 

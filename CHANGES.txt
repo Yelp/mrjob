@@ -1,3 +1,20 @@
+v0.6.9, 2019-05-29 -- Better emulation
+ * formally dropped support for Python 3.4
+   * (still seems to work except for Google libraries)
+ * jobs:
+   * deprecated add_*_option() methods can take types as their type arg (#2058)
+ * all runners
+   * archives no longer go into working dir mirror (#2059)
+     * fixes bug in v0.6.8 that could break archives on Hadoop
+ * sim runners (local, inline)
+   * simulated mapreduce.map.input.file is now a file:// URL (#2066)
+ * Spark runner
+   * added emulate_map_input_file option (#2061)
+     * can optionally emulate mapreduce.map.input.file in first step's mapper
+   * increment counter() emulation now uses correct arg names (#2060)
+   * warns if spark_tmp_dir and master aren't both local/remote (#2062)
+ * mrjob spark-submit can take switches to script without using "--" (#2055)
+
 v0.6.8, 2019-04-25 -- Spark runner
  * updated library dependencies (#2019, #2025)
    * google-cloud-dataproc>=0.3.0
@@ -396,8 +413,8 @@ v0.6.0, 2017-11-01 -- wave of deprecation
        * pool_emr_job_flows
        * s3_log_uri
        * s3_scratch_uri
-       * s3_tmp_dir
        * s3_sync_wait_time
+       * s3_tmp_dir
        * s3_upload_part_size
        * ssh_tunnel_to_job_tracker
    * mrjob.parse:

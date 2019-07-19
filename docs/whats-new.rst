@@ -4,6 +4,36 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.9:
+
+0.6.9
+-----
+
+This fixes a bug introduced in :ref:`v0.6.8` that could break archives or
+directories uploaded into Hadoop or Spark if the name of the unpacked archive
+didn't have an archive extension (e.g. ``.tar.gz``).
+
+The Spark runner can now optionally emulate Hadoop's
+``mapreduce.map.input.file`` configuration property when running the mapper of
+the first step of a streaming job if you enable
+:mrjob-opt:`emulate_map_input_file`. This means that jobs that depend on
+:py:func:`jobconf_from_env('mapreduce.map.input.file') <mrjob.compat.jobconf_from_env>`
+will still work.
+
+The Spark runner also now uses the correct argument names when emulating
+:py:meth:`~mrjob.job.MRJob.increment_counter`, and logs a warning if
+:mrjob-opt:`spark_tmp_dir` doesn't match :mrjob-opt:`spark_master`.
+
+:ref:`mrjob spark-submit <spark-submit>` can now pass switches to the
+Spark script/JAR without explicitly separating them out with ``--``.
+
+The local and inline runners now more correctly emulate the
+`mapreduce.map.input.file` config property by making it a ``file://`` URL.
+
+Deprecated methods :py:meth:`~mrjob.job.MRJob.add_file_option` and
+:py:meth:`~mrjob.job.MRJob.add_passthrough_option` can now take a type
+(e.g. ``int``) as their ``type`` argument, to better emulate :mod:`optparse`.
+
 .. _v0.6.8:
 
 0.6.8

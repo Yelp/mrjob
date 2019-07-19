@@ -301,8 +301,8 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
         # executors' working directory to match the driver on local master
         job = MRSparkOSWalk(['-r', 'inline',
                              '--use-driver-cwd',
-                             '--file', fish_path + '#ghoti',
-                             '--file', fowl_path])
+                             '--files',
+                             '%s#ghoti,%s' % (fish_path, fowl_path)])
         job.sandbox()
 
         file_sizes = {}

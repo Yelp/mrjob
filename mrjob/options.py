@@ -1197,6 +1197,20 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    skip_internal_protocol=dict(
+        switches=[
+            (['--skip-internal-protocol'], dict(
+                action='store_true',
+                help=("Don't use the job's internal protocol to communicate"
+                      " between tasks internal to the job, instead relying"
+                      " on Spark to encode and decode raw data structures.")
+            )),
+            (['--no-skip-internal-protocol'], dict(
+                action='store_false',
+                help='Use internal protocols as usual',
+            )),
+        ],
+    ),
     sort_bin=dict(
         combiner=combine_cmds,
         switches=[

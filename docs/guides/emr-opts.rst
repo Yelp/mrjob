@@ -324,7 +324,7 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
     :set: emr
     :default: ``[]``
 
-    Configurations for 4.x and later AMIs. For example:
+    Cluster configs for AMI version 4.x and later. For example:
 
     .. code-block:: yaml
 

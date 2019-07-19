@@ -101,15 +101,9 @@ Number and type of instances
     :switch: --instance-type
     :type: :ref:`string <data-type-string>`
     :set: cloud
-    :default: ``m1.medium`` (usually) on EMR, ``n1-standard-1`` on Dataproc
+    :default: ``m5.xlarge`` on EMR, ``n1-standard-1`` on Dataproc
 
     Type of instance that runs your Hadoop tasks.
-
-    On Amazon EMR, mrjob picks the cheapest instance type that will work at
-    all. This is ``m1.medium``, with two exceptions:
-
-    * ``m1.large`` if you're running Spark (see :mrjob-opt:`bootstrap_spark`)
-    * ``m1.small`` if you're running on the (deprecated) 2.x AMIs
 
     Once you've tested a job and want to run it at scale, it's usually a good
     idea to use instances larger than the default. For EMR, see
@@ -127,9 +121,19 @@ Number and type of instances
     coordinating tasks, not running them. Use :mrjob-opt:`master_instance_type`
     instead.
 
+    .. versionchanged:: 0.6.10
+
+       Default on EMR is now ``m5.xlarge``
+
+    .. versionchanged:: 0.6.6
+
+       Default on EMR was ``m4.large``
+
     .. versionchanged:: 0.5.6
 
-       Used to default to ``m1.medium`` in all cases.
+       On EMR, defaulted to ``m1.large`` if running Spark, ``m1.small`` if
+       running on the (deprecated) 2.x AMIs, and ``m1.medium`` otherwise
+       (``m1.medium`` was previously the default in all cases).
 
     .. versionchanged:: 0.5.4
 

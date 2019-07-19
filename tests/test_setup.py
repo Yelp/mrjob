@@ -451,7 +451,6 @@ class WorkingDirManagerTestCase(BasicTestCase):
         self.assertEqual(wd.paths('archive'), set())
         self.assertEqual(wd.paths('file'), set())
 
-
     def test_basic(self):
         wd = WorkingDirManager()
         wd.add('archive', 's3://bucket/path/to/baz.tar.gz')

@@ -40,6 +40,7 @@ from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
+from mrjob.parse import to_uri
 from mrjob.py2 import to_unicode
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
@@ -47,6 +48,9 @@ from mrjob.util import cmd_line
 from mrjob.util import _create_zip_file
 
 log = logging.getLogger(__name__)
+
+_CLOSE_BRACE_AFTER_CLOSE_BRACE_RE = re.compile(r'(?<=\})\}')
+
 
 
 class SparkMRJobRunner(MRJobBinRunner):
@@ -78,6 +82,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         'project_id',  # used by GCS filesystem
         's3_endpoint',
         's3_region',  # used when creating buckets on S3
+        'skip_internal_protocol',
         'spark_deploy_mode',
         'spark_master',
         'spark_tmp_dir',  # where to put temp files in Spark
@@ -105,6 +110,9 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         self._max_output_files = max_output_files
 
+        if self._opts['spark_tmp_dir']:
+            self._check_spark_tmp_dir_opt()
+
         self._spark_tmp_dir = self._pick_spark_tmp_dir()
 
         # where local files are uploaded into Spark
@@ -129,6 +137,19 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         # TODO: we may eventually want log interpretation, but it shouldn't
         # include counters, as they are not found in logs.
+
+    def _check_spark_tmp_dir_opt(self):
+        # warn if spark_tmp_dir isn't actually visible to Spark executors
+        # (see #2062)
+        tmp_dir_is_local = to_uri(
+            self._opts['spark_tmp_dir']).startswith('file://')
+        spark_master_is_local = self._spark_master().startswith('local')
+
+        if tmp_dir_is_local != spark_master_is_local:
+            log.warning(
+                'Warning: executors on Spark master %s may not be able to'
+                ' access spark_tmp_dir %s' %
+                (self._spark_master(), self._opts['spark_tmp_dir']))
 
     def _check_step(self, step, step_num):
         """Don't try to run steps that include commands or use manifests."""
@@ -400,7 +421,8 @@ class SparkMRJobRunner(MRJobBinRunner):
             args.append('--no-sort-values')
 
         # --steps-desc
-        args.extend(['--steps-desc', json.dumps(steps)])
+        args.extend(['--steps-desc',
+                     _emr_proof_steps_desc(json.dumps(steps))])
 
         # --counter-output-dir, to simulate counters
         args.extend(['--counter-output-dir',
@@ -440,8 +462,13 @@ class SparkMRJobRunner(MRJobBinRunner):
             args.extend(['--max-output-files',
                          str(self._max_output_files)])
 
+        # --emulate-map-input-file
         if self._opts['emulate_map_input_file']:
             args.append('--emulate-map-input-file')
+
+        # --skip_internal-protocol
+        if self._opts['skip_internal_protocol']:
+            args.append('--skip-internal-protocol')
 
         return args
 
@@ -473,3 +500,10 @@ class SparkMRJobRunner(MRJobBinRunner):
         """Treat streaming steps as Spark steps that use Python."""
         return (super(SparkMRJobRunner, self)._is_pyspark_step(step) or
                 step['type'] == 'streaming')
+
+
+def _emr_proof_steps_desc(steps_desc):
+    # EMR's command-runner.jar does some very strange things to
+    # arguments, including deleting empty args and deleting
+    # '}}' from arguments. See #2070
+    return _CLOSE_BRACE_AFTER_CLOSE_BRACE_RE.sub(' }', steps_desc)

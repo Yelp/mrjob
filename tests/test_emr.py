@@ -29,7 +29,6 @@ import socket
 import sys
 import time
 from io import BytesIO
-from platform import python_implementation
 from shutil import make_archive
 
 import boto3

@@ -32,7 +32,6 @@ from mrjob.examples.mr_nick_nack_input_format import \
     MRNickNackWithHadoopInputFormat
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
-from mrjob.protocol import TextProtocol
 from mrjob.spark.harness import _run_combiner
 from mrjob.spark.harness import _run_reducer
 from mrjob.spark.harness import _shuffle_and_sort

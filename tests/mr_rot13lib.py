@@ -29,7 +29,7 @@ class MRRot13Lib(MRJob):
         try:
             from rot13lib.text import encode
 
-            rot13_line = encode(line)
+            encode(line)
         finally:
             sys.path.pop()
 

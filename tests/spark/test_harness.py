@@ -511,8 +511,6 @@ class SkipInternalProtocolTestCase(
                      b=['baby', 'balloon', 'bowling']))
 
 
-
-
 class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):
 
     def _assert_partition_count_different(self, cls, num_reducers):

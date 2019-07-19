@@ -52,7 +52,6 @@ log = logging.getLogger(__name__)
 _CLOSE_BRACE_AFTER_CLOSE_BRACE_RE = re.compile(r'(?<=\})\}')
 
 
-
 class SparkMRJobRunner(MRJobBinRunner):
     """Runs a :py:class:`~mrjob.job.MRJob` on your Spark cluster (with or
     without Hadoop). Invoked when you run your job with ``-r spark``.

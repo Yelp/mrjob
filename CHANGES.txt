@@ -1,3 +1,14 @@
+v0.6.10, 2019-07-19 -- official PyPy support
+ * officially support PyPy (#1011)
+   * when launched in PyPy, defaults python_bin to pypy or pypy3
+ * Spark runner
+   * turn off internal protocol with --skip-internal-protocol (#1952)
+   * spark Harness can run inside EMR (#2070)
+ * EMR runner
+   * default instance type is now m5.xlarge (#2071)
+   * log DNS of master node as soon as we know it (#2074)
+ * better error when reading YAML conf file without YAML library (#2047)
+
 v0.6.9, 2019-05-29 -- Better emulation
  * formally dropped support for Python 3.4
    * (still seems to work except for Google libraries)

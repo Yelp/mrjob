@@ -323,11 +323,11 @@ _DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
 # switches: list of switches to add to ArgumentParser for this option. Items
 #   have the format (['--switch-names', ...], dict(**kwargs)), where kwargs
 #   can be:
-#     action: action to pass to add_argument() (e.g. 'store_true')
-#     deprecated: if True, this switch is deprecated and slated for removal
-#     deprecated_aliases: list of old '--switch-names' slated for removal
-#     help: help string to pass to add_argument()
-#     type: option type for add_argument() to enforce (e.g. float).
+#     action -- action to pass to add_argument() (e.g. 'store_true')
+#     deprecated -- if True, this switch is deprecated and slated for removal
+#     deprecated_aliases -- list of old '--switch-names' slated for removal
+#     help -- help string to pass to add_argument()
+#     type -- option type for add_argument() to enforce (e.g. float).
 #   You can't set the ArgumentParser's default; we use [] if *action* is
 #   'append' and None otherwise.
 #

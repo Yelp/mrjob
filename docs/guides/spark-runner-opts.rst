@@ -85,6 +85,8 @@ Options unique to the Spark runner:
       them directly, rather than comparing their internal-protocol-encoded
       representation. This may also affect sorting order.
 
+    .. versionadded:: 0.6.10
+
 .. mrjob-opt::
     :config: spark_tmp_dir
     :switch: --spark-tmp-dir

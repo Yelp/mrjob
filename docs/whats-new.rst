@@ -4,6 +4,37 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.10:
+
+0.6.10
+------
+
+Adds official support for PyPy (that is any version of it compatible with
+Python 2.7/3.5+). If you launch a job in PyPy :mrjob-opt:`python_bin` will
+automatically default to ``pypy`` or ``pypy3`` as appropriate.
+
+Note that mrjob does not auto-install PyPy for you on EMR (Amazon Linux does
+not provide a PyPy package). Installing PyPy yourself at bootstrap time is
+fairly straightforward, see :ref:`installing-pypy-on-emr`.
+
+The Spark harness can now be used on EMR, allowing you to run "classic"
+MRJobs in Spark, which is often faster. Essentially, you launch jobs in
+the Spark runner with ``--spark-submit-bin 'mrjob spark-submit -r emr'``;
+see :ref:`mrjobs-on-spark-on-emr` for details.
+
+The Spark runner can now optionally disable internal protocols when running
+"classic" MRJobs, eliminating the (usually) unnecessary effort of encoding data
+structures into JSON or other string representations and then decoding
+them. See :mrjob-opt:`skip_internal_protocol` for details.
+
+The EMR runner's default instance type is now ``m5.xlarge``, which works
+with newer reasons and should make it easier to run Spark jobs. The EMR runner
+also now logs the DNS of the master node as soon as it is available, to make
+it easier to SSH in.
+
+Finally, mrjob gives a much clearer error message if you attempt to read a YAML
+mrjob.conf file without :mod:`PyYAML` installed.
+
 .. _v0.6.9:
 
 0.6.9

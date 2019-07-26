@@ -26,6 +26,7 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.conf import combine_envs
+from mrjob.examples.mr_wc import MRWordCountUtility
 from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.job import _im_func
@@ -1804,3 +1805,25 @@ class SparkJobMethodsTestCase(SandboxedTestCase, SingleSparkContextTestCase):
 
         # check that we didn't alter the job to make it serializable
         self.assertFalse(self.job_sandbox.called)
+
+
+class IntermixedArgsTestCase(SandboxedTestCase):
+
+    def test_intermixed_args(self):
+        # test of #1701
+
+        file1 = self.makefile('file1', b'the quick brown fox')
+        file2 = self.makefile('file2', b'jumped over\nthe lazy dogs')
+        args = [file1, '-v', file2]
+
+        if sys.version_info < (3, 7):
+            # argparse can't do this before Python 3.7
+            self.assertRaises(ValueError, MRWordCountUtility, args)
+        else:
+            job = MRWordCountUtility(args)
+
+            with job.make_runner() as runner:
+                runner.run()
+                output = dict(job.parse_output(runner.cat_output()))
+
+                self.assertEqual(output, dict(chars=46, words=9, lines=3))

@@ -311,7 +311,11 @@ class MRJobLauncher(object):
                 self.stop_words = self.options.stop_words.split(',')
                 ...
         """
-        self.options = self.arg_parser.parse_args(args)
+        if hasattr(self.arg_parser, 'parse_intermixed_args'):
+            # restore old optparse behavior on Python 3.7+. See #1701
+            self.options = self.arg_parser.parse_intermixed_args(args)
+        else:
+            self.options = self.arg_parser.parse_args(args)
 
         if self.options.help:
             self._print_help(self.options)

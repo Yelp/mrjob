@@ -126,8 +126,8 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
         env = dict(os.environ)
         env.update(self._spark_cmdenv(step_num))
 
-        returncode = self._run_spark_submit(spark_submit_args, env,
-                                            record_callback=_log_log4j_record)
+        returncode, step_interpretation = self._run_spark_submit(
+            spark_submit_args, env, record_callback=_log_log4j_record)
 
         if returncode:
             reason = str(CalledProcessError(returncode, spark_submit_args))

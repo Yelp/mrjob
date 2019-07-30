@@ -121,7 +121,7 @@ def _format_error_helper(error):
         if java_error.get('path'):
             result += '\n\n(from %s)' % _describe_source(java_error)
 
-    # for practical purposes, there's always a hadoop error with a message,
+    # for practical purposes, there's always a Java error with a message,
     # so don't worry too much about spacing.
 
     task_error = error.get('task_error')

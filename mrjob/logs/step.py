@@ -250,6 +250,17 @@ def _interpret_hadoop_jar_command_stderr(lines, record_callback=None):
     return result
 
 
+def _interpret_spark_submit_command_stderr(lines, record_callback=None):
+    """Parse *lines* from the ``spark-submit`` command's stderr (lines can
+    be either bytes or unicode).
+
+    If *record_callback* is set, will call it once for each log4j record
+    (see :py:func:`~mrjob.logs.log4j._parse_hadoop_log4j_records`)
+    """
+    # for now, parse this the same as Hadoop
+    return _interpret_hadoop_jar_command_stderr(lines, record_callback)
+
+
 def _parse_step_syslog(lines):
     """Parse the syslog from the ``hadoop jar`` command.
 

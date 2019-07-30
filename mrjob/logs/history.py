@@ -131,8 +131,8 @@ def _interpret_history_log(fs, matches):
 
         # patch path, task_id, etc. into errors
         for error in result.get('errors') or ():
-            if 'hadoop_error' in error:
-                error['hadoop_error']['path'] = path
+            if 'java_error' in error:
+                error['java_error']['path'] = path
             _add_implied_task_id(error)
 
         return result
@@ -151,7 +151,7 @@ def _parse_yarn_history_log(lines):
     counters: map from group to counter to amount. If job failed, we sum
         counters for succesful tasks
     errors: a list of dictionaries with the keys:
-        hadoop_error:
+        java_error:
             message: lines of error, as as string
             start_line: first line of log containing the error (0-indexed)
             num_lines: # of lines of log containing the error
@@ -196,7 +196,7 @@ def _parse_yarn_history_log(lines):
                     continue
 
                 error = dict(
-                    hadoop_error=dict(
+                    java_error=dict(
                         message=err_msg,
                         start_line=line_num,
                         num_lines=1))
@@ -320,7 +320,7 @@ def _parse_pre_yarn_history_log(lines):
               fields.get('ERROR')):
             result.setdefault('errors', [])
             result['errors'].append(dict(
-                hadoop_error=dict(
+                java_error=dict(
                     message=fields['ERROR'],
                     start_line=record['start_line'],
                     num_lines=record['num_lines']),

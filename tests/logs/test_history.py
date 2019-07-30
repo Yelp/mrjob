@@ -171,7 +171,7 @@ class InterpretHistoryLogTestCase(BasicTestCase):
         self.mock_parse_yarn_history_log.return_value = dict(
             errors=[
                 dict(attempt_id='attempt_1449525218032_0005_m_000000_0'),
-                dict(hadoop_error=dict()),
+                dict(java_error=dict()),
             ])
 
         self.assertEqual(
@@ -183,7 +183,7 @@ class InterpretHistoryLogTestCase(BasicTestCase):
                         'attempt_1449525218032_0005_m_000000_0'),
                     task_id='task_1449525218032_0005_m_000000'),
                 dict(
-                    hadoop_error=dict(
+                    java_error=dict(
                         path='/path/to/yarn-history.jhist')),
             ]))
 
@@ -298,7 +298,7 @@ class ParseYARNHistoryLogTestCase(BasicTestCase):
             dict(
                 errors=[
                     dict(
-                        hadoop_error=dict(
+                        java_error=dict(
                             message=(
                                 'Error: java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads(): subprocess failed with'
@@ -312,7 +312,7 @@ class ParseYARNHistoryLogTestCase(BasicTestCase):
                         attempt_id='attempt_1449525218032_0005_m_000000_0',
                     ),
                     dict(
-                        hadoop_error=dict(
+                        java_error=dict(
                             message=(
                                 'Error: java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads(): subprocess failed with'
@@ -434,7 +434,7 @@ class ParsePreYARNHistoryLogTestCase(BasicTestCase):
             dict(
                 errors=[
                     dict(
-                        hadoop_error=dict(
+                        java_error=dict(
                             message=(
                                 'java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads():'

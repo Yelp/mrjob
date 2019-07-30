@@ -260,7 +260,7 @@ def _interpret_task_logs(fs, matches, partial=True, log_callback=None):
     Returns a dictionary possibly containing the key 'errors', which
     is a dict containing:
 
-    hadoop_error:
+    java_error:
         message: string containing error message and Java exception
         num_lines: number of lines in syslog this takes up
         path: syslog we read this error from
@@ -312,12 +312,12 @@ def _interpret_task_logs(fs, matches, partial=True, log_callback=None):
         syslog_error = _parse_task_syslog(_cat_log_lines(fs, syslog_path))
         syslogs_parsed.add(syslog_path)
 
-        if not syslog_error.get('hadoop_error'):
+        if not syslog_error.get('java_error'):
             # if no entry in Hadoop syslog, probably just noise
             continue
 
         error.update(syslog_error)
-        error['hadoop_error']['path'] = syslog_path
+        error['java_error']['path'] = syslog_path
 
         # patch in IDs we learned from path
         for id_key in 'attempt_id', 'container_id':
@@ -347,7 +347,7 @@ def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
     Returns a dictionary possibly containing the key 'errors', which
     is a dict containing:
 
-    hadoop_error:
+    java_error:
         message: string containing error message and Java exception
         num_lines: number of lines in syslog this takes up
         path: syslog we read this error from
@@ -367,7 +367,7 @@ def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
 
     *task_error* will only be set if we read from stdout (if the Spark
     application master fails). Otherwise, the Python traceback will
-    be included in the java stack trace in *hadoop_error*.
+    be included in the java stack trace in *java_error*.
     """
     result = {}
 
@@ -381,8 +381,8 @@ def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
         # stderr is Spark's syslog
         stderr_error = _parse_task_syslog(_cat_log_lines(fs, stderr_path))
 
-        if stderr_error.get('hadoop_error'):
-            stderr_error['hadoop_error']['path'] = stderr_path
+        if stderr_error.get('java_error'):
+            stderr_error['java_error']['path'] = stderr_path
             error.update(stderr_error)
         else:
             continue
@@ -424,7 +424,7 @@ def _parse_task_syslog(lines):
     check_stdout:
         if true, we should look for task errors in the corresponding
         'stdout' file. Used for Spark logs.
-    hadoop_error:
+    java_error:
         message: string containing error message and Java exception
         num_lines: number of lines in syslog this takes up
         start_line: where in syslog exception starts (0-indexed)
@@ -459,7 +459,7 @@ def _parse_task_syslog_records(records):
 
         m = _JAVA_TRACEBACK_RE.search(message)
         if m:
-            result['hadoop_error'] = dict(
+            result['java_error'] = dict(
                 message=message,
                 num_lines=record['num_lines'],
                 start_line=record['start_line'],
@@ -470,7 +470,7 @@ def _parse_task_syslog_records(records):
                 record['level'] == 'ERROR'):
             m = _SPARK_APP_EXITED_RE.match(message)
             if m:
-                result['hadoop_error'] = dict(
+                result['java_error'] = dict(
                     message=message,
                     num_lines=record['num_lines'],
                     start_line=record['start_line'],

@@ -1878,7 +1878,7 @@ class TaskLogInterpretationTestCase(MockLogEntriesTestCase):
         error = interp['errors'][0]
 
         self.assertEqual(error['container_id'], CONTAINER_ID_1)
-        self.assertEqual(error['hadoop_error']['message'], STACK_TRACE)
+        self.assertEqual(error['java_error']['message'], STACK_TRACE)
         self.assertEqual(error['split'], SPLIT)
         self.assertEqual(error['task_error']['message'], TRACEBACK)
 
@@ -1899,7 +1899,7 @@ class TaskLogInterpretationTestCase(MockLogEntriesTestCase):
         self.assertEqual(error['container_id'], CONTAINER_ID_2)
         self.assertTrue(interp.get('partial'))
 
-    def test_keep_going_if_just_hadoop_error(self):
+    def test_keep_going_if_just_java_error(self):
         self.add_stack_trace(CONTAINER_ID_1)
         self.add_traceback(CONTAINER_ID_1)
         self.add_stack_trace(CONTAINER_ID_2)
@@ -1918,7 +1918,7 @@ class TaskLogInterpretationTestCase(MockLogEntriesTestCase):
 
         self.assertTrue(interp.get('partial'))
 
-    def test_hadoop_errors_only(self):
+    def test_java_errors_only(self):
         self.add_stack_trace(CONTAINER_ID_1)
         self.add_stack_trace(CONTAINER_ID_2)
 
@@ -2001,7 +2001,7 @@ class CauseOfErrorTestCase(MockLogEntriesTestCase):
             self.assertIsNotNone(error)
 
             self.assertEqual(error['split'], SPLIT)
-            self.assertEqual(error['hadoop_error']['message'], STACK_TRACE)
+            self.assertEqual(error['java_error']['message'], STACK_TRACE)
             self.assertEqual(error['task_error']['message'], TRACEBACK)
 
     def test_no_read_logs(self):

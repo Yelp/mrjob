@@ -102,7 +102,7 @@ NOT_A_VALID_JAR_LOG_LINES = [
 PARSED_NOT_A_VALID_JAR_LOG_LINES = dict(
     errors=[
         dict(
-            hadoop_error=dict(
+            java_error=dict(
                 message='Not a valid JAR: /home/hadoop/hadoop-examples.jar',
                 start_line=0,
                 num_lines=1,
@@ -179,7 +179,7 @@ class InterpretHadoopJarCommandStderrTestCase(BasicTestCase):
                 errors=[
                     dict(
                         attempt_id='attempt_1453488173054_0001_m_000000_0',
-                        hadoop_error=dict(
+                        java_error=dict(
                             message=(
                                 'Error: java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads(): subprocess failed with'
@@ -211,7 +211,7 @@ class InterpretHadoopJarCommandStderrTestCase(BasicTestCase):
                 errors=[
                     dict(
                         attempt_id='attempt_1453488173054_0001_m_000000_0',
-                        hadoop_error=dict(
+                        java_error=dict(
                             message=(
                                 'Task Id :'
                                 ' attempt_1453488173054_0001_m_000000_0,'
@@ -531,7 +531,7 @@ class InterpretEMRStepSyslogTestCase(BasicTestCase):
         self.path_to_mock_result = {
             log_path: dict(errors=[dict(
                 attempt_id='attempt_201512232143_0008_m_000001_3',
-                hadoop_error=dict(message='BOOM'),
+                java_error=dict(message='BOOM'),
             )]),
         }
 
@@ -539,7 +539,7 @@ class InterpretEMRStepSyslogTestCase(BasicTestCase):
             self.interpret_emr_step_syslog(),
             dict(errors=[dict(
                 attempt_id='attempt_201512232143_0008_m_000001_3',
-                hadoop_error=dict(
+                java_error=dict(
                     message='BOOM',
                     path=log_path,
                 ),
@@ -556,7 +556,7 @@ class InterpretEMRStepSyslogTestCase(BasicTestCase):
             prev_path: dict(
                 errors=[
                     dict(
-                        hadoop_error=dict(
+                        java_error=dict(
                             message='first error',
                         ),
                     ),
@@ -567,7 +567,7 @@ class InterpretEMRStepSyslogTestCase(BasicTestCase):
                 counters=dict(foo=dict(bar=1)),
                 errors=[
                     dict(
-                        hadoop_error=dict(
+                        java_error=dict(
                             message='second error',
                         ),
                     ),
@@ -582,13 +582,13 @@ class InterpretEMRStepSyslogTestCase(BasicTestCase):
                 counters=dict(foo=dict(bar=1)),
                 errors=[
                     dict(
-                        hadoop_error=dict(
+                        java_error=dict(
                             message='first error',
                             path=prev_path,
                         ),
                     ),
                     dict(
-                        hadoop_error=dict(
+                        java_error=dict(
                             message='second error',
                             path=current_path,
                         ),

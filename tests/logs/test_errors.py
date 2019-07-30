@@ -32,11 +32,11 @@ class PickErrorTestCase(BasicTestCase):
                 errors=[
                     dict(
                         container_id='container_1450486922681_0005_01_000003',
-                        hadoop_error=dict(message='BOOM'),
+                        java_error=dict(message='BOOM'),
                     ),
                     dict(
                         container_id='container_1450486922681_0005_01_000004',
-                        hadoop_error=dict(message='elephant problems'),
+                        java_error=dict(message='elephant problems'),
                     ),
                 ],
             ),
@@ -46,7 +46,7 @@ class PickErrorTestCase(BasicTestCase):
             _pick_error(log_interpretation),
             dict(
                 container_id='container_1450486922681_0005_01_000004',
-                hadoop_error=dict(message='elephant problems'),
+                java_error=dict(message='elephant problems'),
             )
         )
 
@@ -56,12 +56,12 @@ class PickErrorTestCase(BasicTestCase):
                 errors=[
                     dict(
                         container_id='container_1450486922681_0005_01_000003',
-                        hadoop_error=dict(message='BOOM'),
+                        java_error=dict(message='BOOM'),
                         task_error=dict(message='things exploding'),
                     ),
                     dict(
                         container_id='container_1450486922681_0005_01_000004',
-                        hadoop_error=dict(message='elephant problems'),
+                        java_error=dict(message='elephant problems'),
                     ),
                 ],
             ),
@@ -71,7 +71,7 @@ class PickErrorTestCase(BasicTestCase):
             _pick_error(log_interpretation),
             dict(
                 container_id='container_1450486922681_0005_01_000003',
-                hadoop_error=dict(message='BOOM'),
+                java_error=dict(message='BOOM'),
                 task_error=dict(message='things exploding'),
             )
         )
@@ -82,12 +82,12 @@ class PickErrorTestCase(BasicTestCase):
                 errors=[
                     dict(
                         container_id='container_1450486922681_0005_01_000003',
-                        hadoop_error=dict(message='BOOM'),
+                        java_error=dict(message='BOOM'),
                         task_error=dict(message='things exploding'),
                     ),
                     dict(
                         container_id='container_1450489999999_0005_01_000004',
-                        hadoop_error=dict(message='elephant problems'),
+                        java_error=dict(message='elephant problems'),
                     ),
                 ],
             ),
@@ -97,7 +97,7 @@ class PickErrorTestCase(BasicTestCase):
             _pick_error(log_interpretation),
             dict(
                 container_id='container_1450486922681_0005_01_000003',
-                hadoop_error=dict(message='BOOM'),
+                java_error=dict(message='BOOM'),
                 task_error=dict(message='things exploding'),
             ),
         )
@@ -109,7 +109,7 @@ class PickErrorTestCase(BasicTestCase):
                 errors=[
                     dict(
                         container_id='container_1450486922681_0005_01_000004',
-                        hadoop_error=dict(message='BOOM'),
+                        java_error=dict(message='BOOM'),
                     ),
                 ],
             ),
@@ -117,7 +117,7 @@ class PickErrorTestCase(BasicTestCase):
                 errors=[
                     dict(
                         container_id='container_1450486922681_0005_01_000004',
-                        hadoop_error=dict(
+                        java_error=dict(
                             message='BOOM',
                             path='history.jhist',
                         ),
@@ -129,7 +129,7 @@ class PickErrorTestCase(BasicTestCase):
                 errors=[
                     dict(
                         container_id='container_1450486922681_0005_01_000004',
-                        hadoop_error=dict(
+                        java_error=dict(
                             message='BOOM',
                             path='some_syslog',
                         ),
@@ -146,7 +146,7 @@ class PickErrorTestCase(BasicTestCase):
             _pick_error(log_interpretation),
             dict(
                 container_id='container_1450486922681_0005_01_000004',
-                hadoop_error=dict(
+                java_error=dict(
                     message='BOOM',
                     path='some_syslog',
                 ),
@@ -167,7 +167,7 @@ class MergeAndSortErrorsTestCase(BasicTestCase):
     def test_single_error(self):
         error = dict(
             container_id='container_1450486922681_0005_01_000003',
-            hadoop_error=dict(message='BOOM'),
+            java_error=dict(message='BOOM'),
         )
 
         self.assertEqual(_merge_and_sort_errors([error]), [error])
@@ -176,15 +176,15 @@ class MergeAndSortErrorsTestCase(BasicTestCase):
         errors = [
             dict(
                 container_id='container_1450486922681_0005_01_000003',
-                hadoop_error=dict(message='BOOM')
+                java_error=dict(message='BOOM')
             ),
             dict(  # from a different container, shouldn't be merged
                 container_id='container_1450486922681_0005_01_000004',
-                hadoop_error=dict(message='bad stuff, maybe?')
+                java_error=dict(message='bad stuff, maybe?')
             ),
             dict(
                 container_id='container_1450486922681_0005_01_000003',
-                hadoop_error=dict(
+                java_error=dict(
                     message='BOOM',
                     path='history.jhist',
                 ),
@@ -192,7 +192,7 @@ class MergeAndSortErrorsTestCase(BasicTestCase):
             ),
             dict(
                 container_id='container_1450486922681_0005_01_000003',
-                hadoop_error=dict(
+                java_error=dict(
                     message='BOOM\n',
                     path='some_syslog',
                 ),
@@ -208,7 +208,7 @@ class MergeAndSortErrorsTestCase(BasicTestCase):
             [
                 dict(
                     container_id='container_1450486922681_0005_01_000003',
-                    hadoop_error=dict(
+                    java_error=dict(
                         message='BOOM\n',
                         path='some_syslog',
                     ),
@@ -220,7 +220,7 @@ class MergeAndSortErrorsTestCase(BasicTestCase):
                 ),
                 dict(
                     container_id='container_1450486922681_0005_01_000004',
-                    hadoop_error=dict(message='bad stuff, maybe?')
+                    java_error=dict(message='bad stuff, maybe?')
                 ),
             ])
 
@@ -231,12 +231,12 @@ class MergeAndSortErrorsTestCase(BasicTestCase):
         errors = [
             dict(
                 attempt_id='attempt_201512232143_0008_r_000000_0',
-                hadoop_error=dict(message='BOOM'),
+                java_error=dict(message='BOOM'),
                 split=dict(path='trade_secrets.dat'),
             ),
             dict(
                 attempt_id='attempt_201512232143_0008_r_000000_0',
-                hadoop_error=dict(message='BOOM'),
+                java_error=dict(message='BOOM'),
                 task_id='task_201512232143_0008_r_000000',
             ),
         ]
@@ -246,7 +246,7 @@ class MergeAndSortErrorsTestCase(BasicTestCase):
             [
                 dict(
                     attempt_id='attempt_201512232143_0008_r_000000_0',
-                    hadoop_error=dict(message='BOOM'),
+                    java_error=dict(message='BOOM'),
                     split=dict(path='trade_secrets.dat'),
                     task_id='task_201512232143_0008_r_000000',
                 ),
@@ -257,11 +257,11 @@ class MergeAndSortErrorsTestCase(BasicTestCase):
         errors = [
             dict(
                 attempt_id='attempt_201512232143_0008_r_000000_0',
-                hadoop_error=dict(message='BOOM'),
+                java_error=dict(message='BOOM'),
             ),
             dict(
                 attempt_id='attempt_201512232143_0008_r_000000_1',
-                hadoop_error=dict(message='BOOM again'),
+                java_error=dict(message='BOOM again'),
             ),
             dict(
                 container_id='container_1450486922681_0005_01_000003',
@@ -280,12 +280,12 @@ class MergeAndSortErrorsTestCase(BasicTestCase):
                 dict(
                     attempt_id='attempt_201512232143_0008_r_000000_1',
                     container_id='container_1450486922681_0005_01_000003',
-                    hadoop_error=dict(message='BOOM again'),
+                    java_error=dict(message='BOOM again'),
                     task_error=dict(message='it was probably snakes'),
                 ),
                 dict(
                     attempt_id='attempt_201512232143_0008_r_000000_0',
-                    hadoop_error=dict(message='BOOM'),
+                    java_error=dict(message='BOOM'),
                 ),
             ],
         )
@@ -299,22 +299,22 @@ class FormatErrorTestCase(BasicTestCase):
     def test_fall_back_to_json(self):
         self.assertEqual(_format_error([]), '[]')
 
-    def test_hadoop_error(self):
+    def test_java_error(self):
         self.assertEqual(
-            _format_error(dict(hadoop_error=dict(
+            _format_error(dict(java_error=dict(
                 message='DevastatingJavaException')
             )),
             'DevastatingJavaException')
 
         self.assertEqual(
-            _format_error(dict(hadoop_error=dict(
+            _format_error(dict(java_error=dict(
                 message='DevastatingJavaException',
                 path='history.jhist'
             ))),
             'DevastatingJavaException\n\n(from history.jhist)')
 
         self.assertEqual(
-            _format_error(dict(hadoop_error=dict(
+            _format_error(dict(java_error=dict(
                 message='DevastatingJavaException',
                 path='history.jhist',
                 start_line=23,
@@ -323,7 +323,7 @@ class FormatErrorTestCase(BasicTestCase):
             'DevastatingJavaException\n\n(from line 24 of history.jhist)')
 
         self.assertEqual(
-            _format_error(dict(hadoop_error=dict(
+            _format_error(dict(java_error=dict(
                 message='DevastatingJavaException',
                 path='history.jhist',
                 start_line=23,

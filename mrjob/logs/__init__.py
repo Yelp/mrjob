@@ -81,7 +81,7 @@ _interpret_*_logs(fs, matches, partial=True):
     application_id: YARN application ID for the step
     counters: group -> counter -> amount
     errors: [
-        hadoop_error:  (for errors internal to Hadoop)
+        java_error:  (for errors internal to Hadoop/Spark)
             message: string representation of Java stack trace
             path: URI of log file containing error
             start_line: first line of <path> with error (0-indexed)

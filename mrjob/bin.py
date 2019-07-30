@@ -46,7 +46,7 @@ from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.logs.log4j import _parse_hadoop_log4j_records
-from mrjob.logs.step import _yield_lines_from_pty_or_pipe
+from mrjob.logs.step import _eio_to_eof
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
@@ -849,8 +849,7 @@ class MRJobBinRunner(MRJobRunner):
                 spark_submit_args, stdout=PIPE, stderr=PIPE, env=env)
 
             for line in step_proc.stderr:
-                for record in _parse_hadoop_log4j_records(
-                        _yield_lines_from_pty_or_pipe(step_proc.stderr)):
+                for record in _parse_hadoop_log4j_records(step_proc.stderr):
                     record_callback(record)
 
             # there shouldn't be much output on STDOUT
@@ -879,7 +878,7 @@ class MRJobBinRunner(MRJobRunner):
 
                 with os.fdopen(master_fd, 'rb') as master:
                     for record in _parse_hadoop_log4j_records(
-                            _yield_lines_from_pty_or_pipe(master)):
+                            _eio_to_eof(master)):
                         record_callback(record)
                     _, returncode = os.waitpid(pid, 0)
 

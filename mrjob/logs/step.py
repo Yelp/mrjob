@@ -206,12 +206,12 @@ def _interpret_emr_step_stderr(fs, matches):
     return {}
 
 
-def _yield_lines_from_pty_or_pipe(stderr):
-    """Yield lines from a PTY or pipe, converting to unicode and gracefully
-    handling errno.EIO"""
+def _eio_to_eof(pty_master):
+    """Yield lines from a PTY, gracefully handling an ``IOError`` with
+    ``errno == EIO`` as end-of-file."""
     try:
-        for line in stderr:
-            yield to_unicode(line)
+        for line in pty_master:
+            yield line
     except IOError as e:
         # this is just the PTY's way of saying goodbye
         if e.errno == errno.EIO:
@@ -221,20 +221,15 @@ def _yield_lines_from_pty_or_pipe(stderr):
 
 
 def _interpret_hadoop_jar_command_stderr(lines, record_callback=None):
-    """Parse *lines* (which should be unicode) from the ``hadoop jar``
-    command's stderr. Works like :py:func:`_parse_step_syslog` (same return
-    format)  with a few extra features to handle the output of the
+    """Parse *lines* from the ``hadoop jar`` command's stderr (lines can be
+    either bytes or unicode). Works like :py:func:`_parse_step_syslog` (same
+    return format) with a few extra features to handle the output of the
     ``hadoop jar`` command on the fly:
 
-    - Converts ``bytes`` lines to ``str``
     - Pre-filters non-log4j stuff from Hadoop Streaming so it doesn't
       get treated as part of a multi-line message
     - Optionally calls *record_callback* for each log4j record (see
       :py:func:`~mrjob.logs.log4j._parse_hadoop_log4j_records`).
-
-    You'll probably want to run the ``hadoop jar`` command's stderr through
-    :py:meth:`_yield_lines_from_pty_or_pipe`, to convert bytes to unicode and
-    gracefully handle EIO from PTYs.
     """
     def pre_filter(line):
         return bool(_HADOOP_STREAMING_NON_LOG4J_LINE_RE.match(line))

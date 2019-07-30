@@ -38,11 +38,11 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.step import _eio_to_eof
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
 from mrjob.logs.step import _log_line_from_driver
 from mrjob.logs.step import _log_log4j_record
-from mrjob.logs.step import _yield_lines_from_pty_or_pipe
 from mrjob.logs.wrap import _logs_exist
 from mrjob.parse import is_uri
 from mrjob.py2 import to_unicode
@@ -395,7 +395,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
                 step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE, env=env)
 
                 step_interpretation = _interpret_hadoop_jar_command_stderr(
-                    _yield_lines_from_pty_or_pipe(step_proc.stderr),
+                    step_proc.stderr,
                     record_callback=_log_record_from_hadoop)
 
                 # there shouldn't be much output to STDOUT
@@ -427,7 +427,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
                         # stderr and stdout (it's a fake terminal)
                         step_interpretation = (
                             _interpret_hadoop_jar_command_stderr(
-                                _yield_lines_from_pty_or_pipe(master),
+                                _eio_to_eof(master),
                                 record_callback=_log_record_from_hadoop))
                         _, returncode = os.waitpid(pid, 0)
 

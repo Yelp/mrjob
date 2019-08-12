@@ -322,14 +322,14 @@ class InterpretTaskLogsTestCase(BasicTestCase):
         self.mock_paths = [syslog_path]
 
         self.path_to_mock_result = {
-            syslog_path: dict(java_error=dict(message='BOOM')),
+            syslog_path: dict(hadoop_error=dict(message='BOOM')),
         }
 
         self.assertEqual(self.interpret_task_logs(), dict(
             errors=[
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000001_3',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM',
                         path=syslog_path,
                     ),
@@ -345,7 +345,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
         self.mock_paths = [syslog_path]
 
         self.path_to_mock_result = {
-            syslog_path: dict(java_error=dict(message='BOOM'),
+            syslog_path: dict(hadoop_error=dict(message='BOOM'),
                               split=dict(path='best_input_file_ever')),
         }
 
@@ -353,7 +353,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
             errors=[
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000001_3',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM',
                         path=syslog_path,
                     ),
@@ -371,7 +371,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
         self.mock_paths = [syslog_path, stderr_path]
 
         self.path_to_mock_result = {
-            syslog_path: dict(java_error=dict(message='BOOM')),
+            syslog_path: dict(hadoop_error=dict(message='BOOM')),
             stderr_path: dict(message='because, exploding code')
         }
 
@@ -381,7 +381,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
                 errors=[
                     dict(
                         attempt_id='attempt_201512232143_0008_m_000001_3',
-                        java_error=dict(
+                        hadoop_error=dict(
                             message='BOOM',
                             path=syslog_path,
                         ),
@@ -407,7 +407,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
         self.mock_paths = [syslog_path, stderr_path]
 
         self.path_to_mock_result = {
-            syslog_path: dict(java_error=dict(message='BOOM')),
+            syslog_path: dict(hadoop_error=dict(message='BOOM')),
         }
 
         self.assertEqual(
@@ -416,7 +416,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
                 errors=[
                     dict(
                         attempt_id='attempt_201512232143_0008_m_000001_3',
-                        java_error=dict(
+                        hadoop_error=dict(
                             message='BOOM',
                             path=syslog_path,
                         ),
@@ -440,14 +440,14 @@ class InterpretTaskLogsTestCase(BasicTestCase):
         self.mock_paths = [syslog_path]
 
         self.path_to_mock_result = {
-            syslog_path: dict(java_error=dict(message='BOOM')),
+            syslog_path: dict(hadoop_error=dict(message='BOOM')),
         }
 
         self.assertEqual(self.interpret_task_logs(), dict(
             errors=[
                 dict(
                     container_id='container_1450486922681_0005_01_000003',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM',
                         path=syslog_path,
                     ),
@@ -504,10 +504,10 @@ class InterpretTaskLogsTestCase(BasicTestCase):
         ]
 
         self.path_to_mock_result = {
-            syslog1_path: dict(java_error=dict(message='BOOM1')),
-            syslog2_path: dict(java_error=dict(message='BOOM2')),
+            syslog1_path: dict(hadoop_error=dict(message='BOOM1')),
+            syslog2_path: dict(hadoop_error=dict(message='BOOM2')),
             stderr2_path: dict(message='BoomException'),
-            syslog3_path: dict(java_error=dict(message='BOOM3')),
+            syslog3_path: dict(hadoop_error=dict(message='BOOM3')),
             # no errors for stderr1_path, stderr3_path, or syslog4_path
         }
 
@@ -516,7 +516,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
             errors=[
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000002_3',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM2',
                         path=syslog2_path,
                     ),
@@ -545,7 +545,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
             errors=[
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000002_3',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM2',
                         path=syslog2_path,
                     ),
@@ -557,7 +557,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
                 ),
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000003_3',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM3',
                         path=syslog3_path,
                     ),
@@ -565,7 +565,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
                 ),
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000001_3',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM1',
                         path=syslog1_path,
                     ),
@@ -728,14 +728,14 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
         self.mock_paths = [stderr_path]
 
         self.path_to_mock_result = {
-            stderr_path: dict(java_error=dict(message='BOOM')),
+            stderr_path: dict(hadoop_error=dict(message='BOOM')),
         }
 
         self.assertEqual(self.interpret_spark_task_logs(), dict(
             errors=[
                 dict(
                     container_id='container_1450486922681_0005_01_000004',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM',
                         path=stderr_path,
                     ),
@@ -751,7 +751,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
         self.mock_paths = [stderr_path]
 
         self.path_to_mock_result = {
-            stderr_path: dict(java_error=dict(message='BOOM'),
+            stderr_path: dict(hadoop_error=dict(message='BOOM'),
                               split=dict(path='best_input_file_ever')),
         }
 
@@ -759,7 +759,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
             errors=[
                 dict(
                     container_id='container_1450486922681_0005_01_000004',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM',
                         path=stderr_path,
                     ),
@@ -780,7 +780,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
         self.path_to_mock_result = {
             stderr_path: dict(
                 check_stdout=True,
-                java_error=dict(message='application exited')),
+                hadoop_error=dict(message='application exited')),
             stdout_path: dict(message='because, exploding code')
         }
 
@@ -790,7 +790,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
                 errors=[
                     dict(
                         container_id='container_1450486922681_0005_01_000004',
-                        java_error=dict(
+                        hadoop_error=dict(
                             message='application exited',
                             path=stderr_path,
                         ),
@@ -819,7 +819,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
         self.path_to_mock_result = {
             stderr_path: dict(
                 check_stdout=True,
-                java_error=dict(message='application exited')),
+                hadoop_error=dict(message='application exited')),
         }
 
         self.assertEqual(
@@ -828,7 +828,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
                 errors=[
                     dict(
                         container_id='container_1450486922681_0005_01_000004',
-                        java_error=dict(
+                        hadoop_error=dict(
                             message='application exited',
                             path=stderr_path,
                         ),
@@ -851,7 +851,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
         self.path_to_mock_result = {
             stderr_path: dict(
                 check_stdout=True,
-                java_error=dict(message='application exited')),
+                hadoop_error=dict(message='application exited')),
         }
 
         self.assertEqual(
@@ -860,7 +860,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
                 errors=[
                     dict(
                         container_id='container_1450486922681_0005_01_000004',
-                        java_error=dict(
+                        hadoop_error=dict(
                             message='application exited',
                             path=stderr_path,
                         ),
@@ -924,14 +924,14 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
 
         self.path_to_mock_result = {
             stderr1_path: dict(
-                java_error=dict(message='BOOM1')),
+                hadoop_error=dict(message='BOOM1')),
             stderr2_path: dict(
                 check_stdout=True,
-                java_error=dict(message='exited with status 2')),
+                hadoop_error=dict(message='exited with status 2')),
             stdout2_path: dict(message='BoomException'),
             stderr4_path: dict(
                 check_stdout=True,
-                java_error=dict(message='exited with status 4')),
+                hadoop_error=dict(message='exited with status 4')),
             # no errors for stdout1_path, stdout3_path, or stderr4_path
         }
 
@@ -941,7 +941,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
             errors=[
                 dict(
                     container_id='container_1450486922681_0005_01_000002',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='exited with status 2',
                         path=stderr2_path,
                     ),
@@ -968,7 +968,7 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
             errors=[
                 dict(
                     container_id='container_1450486922681_0005_01_000002',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='exited with status 2',
                         path=stderr2_path,
                     ),
@@ -979,14 +979,14 @@ class InterpretSparkTaskLogsTestCase(BasicTestCase):
                 ),
                 dict(
                     container_id='container_1450486922681_0005_01_000001',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='BOOM1',
                         path=stderr1_path,
                     ),
                 ),
                 dict(
                     container_id='container_1450486922681_0005_01_000004',
-                    java_error=dict(
+                    hadoop_error=dict(
                         message='exited with status 4',
                         path=stderr4_path,
                     ),
@@ -1058,7 +1058,7 @@ class ParseTaskSyslogTestCase(BasicTestCase):
         self.assertEqual(
             _parse_task_syslog(lines),
             dict(
-                java_error=dict(
+                hadoop_error=dict(
                     message=(
                         'Exception running child : java.lang.RuntimeException:'
                         ' PipeMapRed.waitOutputThreads():'
@@ -1085,7 +1085,7 @@ class ParseTaskSyslogTestCase(BasicTestCase):
         self.assertEqual(
             _parse_task_syslog(lines),
             dict(
-                java_error=dict(
+                hadoop_error=dict(
                     message=(
                         'Error running child\n'
                         'java.lang.RuntimeException:'
@@ -1115,7 +1115,7 @@ class ParseTaskSyslogTestCase(BasicTestCase):
         self.assertEqual(
             _parse_task_syslog(lines),
             dict(
-                java_error=dict(
+                hadoop_error=dict(
                     message=(
                         'Exception in task 0.2 in stage'
                         ' 0.0 (TID 4)'
@@ -1150,7 +1150,7 @@ class ParseTaskSyslogTestCase(BasicTestCase):
             _parse_task_syslog(lines),
             dict(
                 check_stdout=True,
-                java_error=dict(
+                hadoop_error=dict(
                     message='User application exited with status 1',
                     num_lines=1,
                     start_line=0,

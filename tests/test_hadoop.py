@@ -1352,7 +1352,7 @@ class PickErrorTestCase(MockHadoopTestCase):
 
         self.assertIsNotNone(error)
 
-        self.assertEqual(error['java_error']['path'], syslog_path)
+        self.assertEqual(error['hadoop_error']['path'], syslog_path)
         self.assertEqual(error['task_error']['path'], stderr_path)
 
 

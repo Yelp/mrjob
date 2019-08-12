@@ -168,8 +168,8 @@ def _interpret_emr_step_syslog(fs, matches):
 
         result.update(interpretation)
         for error in result.get('errors') or ():
-            if 'java_error' in error:
-                error['java_error']['path'] = path
+            if 'hadoop_error' in error:
+                error['hadoop_error']['path'] = path
             _add_implied_task_id(error)
             errors.append(error)
 
@@ -271,7 +271,7 @@ def _parse_step_syslog(lines):
     counters: a map from counter group -> counter -> amount, or None if
         no counters found (only YARN prints counters)
     errors: a list of errors, with the following keys:
-        java_error:
+        hadoop_error:
             message: lines of error, as as string
             start_line: first line of log containing the error (0-indexed)
             num_lines: # of lines of log containing the error
@@ -336,7 +336,7 @@ def _parse_step_syslog_from_log4j_records(records, step_interpretation=None):
         m = _NOT_A_VALID_JAR_RE.match(message)
         if m:
             error = dict(
-                java_error=dict(
+                hadoop_error=dict(
                     message=message,
                     num_lines=record['num_lines'],
                     start_line=record['start_line'],
@@ -354,7 +354,7 @@ def _parse_step_syslog_from_log4j_records(records, step_interpretation=None):
 
             error = dict(
                 attempt_id=m.group('attempt_id'),
-                java_error=dict(
+                hadoop_error=dict(
                     message=error_str,
                     num_lines=record['num_lines'],
                     start_line=record['start_line'],

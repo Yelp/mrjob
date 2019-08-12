@@ -905,7 +905,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 self._task_syslog_records(
                     application_id, container_id, step_type))
 
-            if not error.get('java_error'):
+            if not error.get('hadoop_error'):
                 # not sure if this ever happens, since we already know
                 # which containers failed
                 continue
@@ -913,8 +913,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             error['container_id'] = container_id
 
             # fix weird munging of java stacktrace
-            error['java_error']['message'] = _fix_java_stack_trace(
-                error['java_error']['message'])
+            error['hadoop_error']['message'] = _fix_java_stack_trace(
+                error['hadoop_error']['message'])
 
             task_error = _parse_task_stderr(
                 self._task_stderr_lines(

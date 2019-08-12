@@ -61,7 +61,7 @@ def _pick_error_attempt_ids(log_interpretation):
 def _is_probably_task_error(error):
     """Used to identify task errors."""
     return ('subprocess failed' in
-            error.get('java_error', {}).get('message', ''))
+            error.get('hadoop_error', {}).get('message', ''))
 
 
 def _merge_and_sort_errors(errors, attempt_to_container_id=None):
@@ -114,19 +114,19 @@ def _format_error_helper(error):
     """Return string to log/print explaining the given error."""
     result = ''
 
-    java_error = error.get('java_error')
-    if java_error:
-        result += java_error.get('message', '')
+    hadoop_error = error.get('hadoop_error')
+    if hadoop_error:
+        result += hadoop_error.get('message', '')
 
-        if java_error.get('path'):
-            result += '\n\n(from %s)' % _describe_source(java_error)
+        if hadoop_error.get('path'):
+            result += '\n\n(from %s)' % _describe_source(hadoop_error)
 
     # for practical purposes, there's always a Java error with a message,
     # so don't worry too much about spacing.
 
     task_error = error.get('task_error')
     if task_error:
-        if java_error:
+        if hadoop_error:
             result += '\n\ncaused by:\n\n%s' % (task_error.get('message', ''))
         else:
             result += task_error.get('message', '')

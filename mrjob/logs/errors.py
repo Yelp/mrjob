@@ -28,6 +28,7 @@ def _pick_error(log_interpretation):
     are no errors.
     """
     errors = _pick_errors(log_interpretation)
+
     if errors:
         return errors[0]
     else:
@@ -48,9 +49,9 @@ def _pick_errors(log_interpretation):
 
     # no point in merging spark errors, which may not be tied to a container
     # because they're not even necessarily on Hadoop
-    spark_errors = [error for error in errors if error.get('spark_error')]
+    spark_errors = _pick_spark_errors(errors)
     if spark_errors:
-        return _pick_spark_errors(spark_errors)
+        return spark_errors
 
     attempt_to_container_id = log_interpretation.get('history', {}).get(
         'attempt_to_container_id', {})
@@ -58,9 +59,10 @@ def _pick_errors(log_interpretation):
     return _merge_and_sort_errors(yield_errors(), attempt_to_container_id)
 
 
-def _pick_spark_errors(spark_errors):
+def _pick_spark_errors(errors):
     """Pick the shortest Spark error with a traceback."""
-    def sort_key(spark_error):
+    def sort_key(error):
+        spark_error = error['spark_error']
         msg = spark_error.get('message') or ''
         num_lines = spark_error.get('num_lines') or 1
 
@@ -70,7 +72,9 @@ def _pick_spark_errors(spark_errors):
             -num_lines,
         )
 
-    return sorted(spark_errors, key=sort_key, reverse=True)
+    return sorted(
+        (e for e in errors if e.get('spark_error')),
+         key=sort_key, reverse=True)
 
 
 def _pick_error_attempt_ids(log_interpretation):

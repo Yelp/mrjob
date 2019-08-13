@@ -42,7 +42,7 @@ def _parse_spark_log_from_log4j_records(records):
     result = {}
 
     for record in records:
-        if record['level'] == 'ERROR':
+        if record['level'] in ('WARN', 'ERROR'):
             error = dict(
                 spark_error=dict(
                     message=record['message'],

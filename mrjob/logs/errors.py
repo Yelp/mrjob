@@ -142,6 +142,11 @@ def _merge_and_sort_errors(errors, attempt_to_container_id=None):
             sorted(key_to_error.items(), key=sort_key, reverse=True)]
 
 
+def _log_probable_cause_of_failure(log, error):
+    """Log "probable cause of failure" log message."""
+    log.error('\nProbable cause of failure:\n\n%s\n\n' % _format_error(error))
+
+
 def _format_error(error):
     """Return string to log/print explaining the given error."""
     # it's just sad if we error while trying to explain an error

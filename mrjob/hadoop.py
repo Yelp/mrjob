@@ -36,7 +36,7 @@ from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
-from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _log_probable_cause_of_failure
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _eio_to_eof
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
@@ -445,8 +445,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             if returncode:
                 error = self._pick_error(log_interpretation, step_type)
                 if error:
-                    log.error('Probable cause of failure:\n\n%s\n' %
-                              _format_error(error))
+                    _log_probable_cause_of_failure(log, error)
 
                 # use CalledProcessError's well-known message format
                 reason = str(CalledProcessError(returncode, step_args))

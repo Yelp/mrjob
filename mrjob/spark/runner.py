@@ -38,7 +38,7 @@ from mrjob.fs.s3 import boto3 as boto3_installed
 from mrjob.fs.s3 import _is_permanent_boto3_error
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.logs.counters import _format_counters
-from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _log_probable_cause_of_failure
 from mrjob.logs.errors import _pick_error
 from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
@@ -359,8 +359,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         if returncode:
             error = _pick_error(dict(step=step_interpretation))
             if error:
-                log.error('Probable cause of failure:\n\n%s\n' %
-                          _format_error(error))
+                _log_probable_cause_of_failure(log, error)
 
             reason = str(CalledProcessError(returncode, spark_submit_args))
             raise StepFailedException(

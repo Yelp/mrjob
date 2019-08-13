@@ -70,7 +70,7 @@ from mrjob.logs.bootstrap import _check_for_nonzero_return_code
 from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
 from mrjob.logs.bootstrap import _ls_emr_bootstrap_stderr_logs
 from mrjob.logs.counters import _pick_counters
-from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _log_probable_cause_of_failure
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_emr_step_syslog
@@ -1635,8 +1635,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if step['Status']['State'] == 'FAILED':
                 error = self._pick_error(log_interpretation, step_type)
                 if error:
-                    log.error('Probable cause of failure:\n\n%s\n\n' %
-                              _format_error(error))
+                    _log_probable_cause_of_failure(log, error)
 
             raise StepFailedException(
                 step_num=step_num, num_steps=num_steps,
@@ -1814,8 +1813,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # should be 0 or 1 errors, since we're checking a single stderr file
         if bootstrap_interpretation.get('errors'):
             error = bootstrap_interpretation['errors'][0]
-            log.error('Probable cause of failure:\n\n%s\n\n' %
-                      _format_error(error))
+            _log_probable_cause_of_failure(log, error)
 
     def _ls_bootstrap_stderr_logs(self, action_num=None, node_id=None):
         """_ls_bootstrap_stderr_logs(), with logging for each log we parse."""

@@ -41,39 +41,19 @@ def _parse_spark_log_from_log4j_records(records):
 
     result = {}
 
-    def add_task_error(task_error):
-        if not result.get('errors'):
-            result['errors'] = []
-
-        result['errors'].append(dict(task_error=task_error))
-
     for record in records:
-        msg = record['message']
-
-        # is it a Python traceback?
-        if (msg.rstrip().endswith(_TRACEBACK_ENDS_WITH) and
-                msg.lstrip() == msg):
-
-            # strip "Caused by:", which is just confusing
-            if msg.startswith(_CAUSED_BY):
-                msg = msg[len(_CAUSED_BY):]
-
-            task_error = dict(
-                message=record['message'],
-                start_line=record['start_line'],
-                num_lines=record['num_lines'],
+        if record['level'] == 'ERROR':
+            error = dict(
+                spark_error=dict(
+                    message=record['message'],
+                    start_line=record['start_line'],
+                    num_lines=record['num_lines'],
+                )
             )
 
-            # non-log4j driver output, reconstruct the message
-            if task_error['num_lines'] == 1:
-                for record in records:
-                    task_error['message'] += '\n' + record['message']
-                    task_error['num_lines'] += record['num_lines']
+            if not result.get('errors'):
+                result['errors'] = []
 
-                # last line of traceback is not indented
-                if record['message'] == record['message'].lstrip():
-                    break
-
-            add_task_error(task_error)
+            result['errors'].append(error)
 
     return result

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2015-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ import json
 from mrjob.util import unique
 from .ids import _time_sort_key
 
+_PYTHON_TRACEBACK_HEADER = 'Traceback (most recent call last):'
+
 
 def _pick_error(log_interpretation):
     """Pick most recent error from a dictionary possibly containing
@@ -35,16 +37,40 @@ def _pick_error(log_interpretation):
 def _pick_errors(log_interpretation):
     """Yield all errors from the given log interpretation, sorted
     by recency."""
+    # TODO: no longer helpful to yield, since we sort all the errors
     def yield_errors():
         for log_type in ('step', 'history', 'task'):
             errors = log_interpretation.get(log_type, {}).get('errors')
             for error in errors or ():
                 yield error
 
+    errors = list(yield_errors())
+
+    # no point in merging spark errors, which may not be tied to a container
+    # because they're not even necessarily on Hadoop
+    spark_errors = [error for error in errors if error.get('spark_error')]
+    if spark_errors:
+        return _pick_spark_errors(spark_errors)
+
     attempt_to_container_id = log_interpretation.get('history', {}).get(
         'attempt_to_container_id', {})
 
     return _merge_and_sort_errors(yield_errors(), attempt_to_container_id)
+
+
+def _pick_spark_errors(spark_errors):
+    """Pick the shortest Spark error with a traceback."""
+    def sort_key(spark_error):
+        msg = spark_error.get('message') or ''
+        num_lines = spark_error.get('num_lines') or 1
+
+        return (
+            _PYTHON_TRACEBACK_HEADER in msg,
+            num_lines > 1,
+            -num_lines,
+        )
+
+    return sorted(spark_errors, key=sort_key, reverse=True)
 
 
 def _pick_error_attempt_ids(log_interpretation):
@@ -92,8 +118,19 @@ def _merge_and_sort_errors(errors, attempt_to_container_id=None):
     def sort_key(key_and_error):
         key, error = key_and_error
 
+        # if we have spark errors, pick the shortest one
+        spark_error = error.get('spark_error')
+        if spark_error:
+            num_lines = spark_error.get('num_lines') or 1
+            msg = spark_error.get('message') or ''
+
+            spark_key = [True, 'Traceback' in msg, num_lines > 1, -num_lines]
+        else:
+            spark_key = [False]
+
         # key[0] is 'container_id' or 'time_key'
-        return (bool(error.get('task_error')),
+        return (spark_key,
+                bool(error.get('task_error')),
                 key[0] == 'container_id',
                 key[1:])
 
@@ -114,25 +151,37 @@ def _format_error_helper(error):
     """Return string to log/print explaining the given error."""
     result = ''
 
-    hadoop_error = error.get('hadoop_error')
-    if hadoop_error:
-        result += hadoop_error.get('message', '')
+    spark_error = error.get('spark_error')
+    if spark_error:
+        result += spark_error.get('message', '')
 
-        if hadoop_error.get('path'):
-            result += '\n\n(from %s)' % _describe_source(hadoop_error)
+        if spark_error.get('path'):
+            result += '\n\n(from %s)' % _describe_source(spark_error)
 
-    # for practical purposes, there's always a Java error with a message,
-    # so don't worry too much about spacing.
-
-    task_error = error.get('task_error')
-    if task_error:
+        # spark errors typically include both java and Python stacktraces,
+        # so it's not helpful to print hadoop/task errors (and there probably
+        # wouldn't be any)
+    else:
+        hadoop_error = error.get('hadoop_error')
         if hadoop_error:
-            result += '\n\ncaused by:\n\n%s' % (task_error.get('message', ''))
-        else:
-            result += task_error.get('message', '')
+            result += hadoop_error.get('message', '')
 
-        if task_error.get('path'):
-            result += '\n\n(from %s)' % _describe_source(task_error)
+            if hadoop_error.get('path'):
+                result += '\n\n(from %s)' % _describe_source(hadoop_error)
+
+        # for practical purposes, there's always a Java error with a message,
+        # so don't worry too much about spacing.
+
+        task_error = error.get('task_error')
+        if task_error:
+            if hadoop_error:
+                result += '\n\ncaused by:\n\n%s' % (
+                    task_error.get('message', ''))
+            else:
+                result += task_error.get('message', '')
+
+            if task_error.get('path'):
+                result += '\n\n(from %s)' % _describe_source(task_error)
 
     split = error.get('split')
     if split and split.get('path'):

@@ -46,8 +46,8 @@ from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.logs.log4j import _parse_hadoop_log4j_records
+from mrjob.logs.spark import _parse_spark_log
 from mrjob.logs.step import _eio_to_eof
-from mrjob.logs.step import _interpret_spark_submit_command_stderr
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
@@ -853,7 +853,7 @@ class MRJobBinRunner(MRJobRunner):
                 spark_submit_args, stdout=PIPE, stderr=PIPE, env=env)
 
             # parse driver output
-            step_interpretation = _interpret_spark_submit_command_stderr(
+            step_interpretation = _parse_spark_log(
                 step_proc.stderr, record_callback=record_callback)
 
             # there shouldn't be much output on STDOUT, just echo it
@@ -882,7 +882,7 @@ class MRJobBinRunner(MRJobRunner):
 
                 with os.fdopen(master_fd, 'rb') as master:
                     step_interpretation = (
-                        _interpret_spark_submit_command_stderr(
+                        _parse_spark_log(
                             _eio_to_eof(master),
                             record_callback=record_callback))
 

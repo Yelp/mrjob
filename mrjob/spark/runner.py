@@ -21,7 +21,6 @@ from copy import deepcopy
 from subprocess import CalledProcessError
 from tempfile import gettempdir
 
-import mrjob.spark.harness
 from mrjob.bin import MRJobBinRunner
 from mrjob.cloud import _DEFAULT_CLOUD_PART_SIZE_MB
 from mrjob.conf import combine_dicts
@@ -473,6 +472,10 @@ class SparkMRJobRunner(MRJobBinRunner):
 
     def _spark_harness_path(self):
         """Where to find the Spark harness."""
+        # harness requires pyspark, which may be in spark-submit's PYTHONPATH
+        # but not ours. So don't import the harness unless we need it.
+        # (See #2091)
+        import mrjob.spark.harness
         path = mrjob.spark.harness.__file__
         if path.endswith('.pyc'):
             path = path[:-1]

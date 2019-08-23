@@ -830,7 +830,7 @@ class MRJobBinRunner(MRJobRunner):
                                 ._parse_hadoop_log4j_records)
 
         :return: tuple of the subprocess's return code and a
-                 step interpretation
+                 step interpretation dictionary
         """
         log.debug('> %s' % cmd_line(spark_submit_args))
         log.debug('  with environment: %r' % sorted(env.items()))

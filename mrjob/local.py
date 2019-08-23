@@ -35,6 +35,7 @@ except ImportError:
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.logs.errors import _log_probable_cause_of_failure
+from mrjob.logs.errors import _pick_error
 from mrjob.logs.step import _log_log4j_record
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.py2 import string_types
@@ -130,6 +131,10 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             spark_submit_args, env, record_callback=_log_log4j_record)
 
         if returncode:
+            error = _pick_error(dict(step=step_interpretation))
+            if error:
+                _log_probable_cause_of_failure(log, error)
+
             reason = str(CalledProcessError(returncode, spark_submit_args))
             raise StepFailedException(
                 reason=reason, step_num=step_num,

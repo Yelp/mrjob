@@ -1043,7 +1043,7 @@ class MRJobBinRunner(MRJobRunner):
 
         cmdenv = {}
 
-        if self._is_pyspark_step(step):
+        if self._is_pyspark_step_type(step['type']):
             driver_python = cmd_line(self._python_bin())
 
             if self._spark_python_wrapper_path:

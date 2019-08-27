@@ -99,7 +99,7 @@ class LogInterpretationMixin(object):
     def _pick_counters(self, log_interpretation, step_type):
         """Pick counters from our log interpretation, interpreting
         history logs if need be."""
-        if _is_spark_step_type(step_type):
+        if self._is_spark_step_type(step_type):
             return {}
 
         counters = _pick_counters(log_interpretation)
@@ -215,7 +215,7 @@ class LogInterpretationMixin(object):
                     log.warning("Can't fetch task logs; missing job ID")
                 return
 
-        if _is_spark_step_type(step_type):
+        if self._is_spark_step_type(step_type):
             interpret_func = _interpret_spark_task_logs
         else:
             interpret_func = _interpret_task_logs
@@ -240,7 +240,7 @@ class LogInterpretationMixin(object):
         if not self._read_logs():
             return
 
-        if _is_spark_step_type(step_type):
+        if self._is_spark_step_type(step_type):
             ls_func = _ls_spark_task_logs
         else:
             ls_func = _ls_task_logs
@@ -263,7 +263,7 @@ class LogInterpretationMixin(object):
         """Utility for logging counters (if any) for a step."""
         step_type = self._get_step(step_num)['type']
 
-        if not _is_spark_step_type(step_type):
+        if not self._is_spark_step_type(step_type):
             counters = self._pick_counters(
                 log_interpretation, step_type)
             if counters:

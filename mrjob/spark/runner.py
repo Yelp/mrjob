@@ -509,6 +509,12 @@ class SparkMRJobRunner(MRJobBinRunner):
             super(SparkMRJobRunner, self)._is_pyspark_step_type(step_type) or
             step['type'] == 'streaming')
 
+    def _is_spark_step_type(self, step_type):
+        """Treat streaming steps as Spark steps that use Python."""
+        return (
+            super(SparkMRJobRunner, self)._is_spark_step_type(step_type) or
+            step['type'] == 'streaming')
+
 
 def _emr_proof_steps_desc(steps_desc):
     # EMR's command-runner.jar does some very strange things to

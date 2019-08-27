@@ -14,7 +14,10 @@
 """Parse Spark driver and executor output. This can appear as either a "step"
 log (output of the spark-submit binary) or as a "task" log (executors in
 YARN containers), but has more or less the same format in either case."""
+from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
+from .wrap import _cat_log_lines
+
 
 # if a message ends with this, it's the beginning of a traceback
 _TRACEBACK_ENDS_WITH = 'Traceback (most recent call last):'
@@ -55,5 +58,35 @@ def _parse_spark_log_from_log4j_records(records):
                 result['errors'] = []
 
             result['errors'].append(error)
+
+    return result
+
+
+def _interpret_spark_logs(fs, matches, partial=True):
+    result = {}
+
+    for match in matches:
+        path = match['path']
+
+        interpretation = _parse_spark_log(_cat_log_lines(fs, path))
+
+        result.update(interpretation)
+        # don't _add_implied_job_id() because it doesn't work that way on Spark
+
+        for error in result.get('errors') or ():
+            if 'spark_error' in error:
+                error['spark_error']['path'] = path
+
+            for id_key in 'attempt_id', 'container_id':
+                if id_key in match:
+                    error[id_key] = match[id_key]
+            _add_implied_task_id(error)
+
+            result.setdefault('errors', [])
+            result['errors'].append(error)
+
+        if partial and result.get('errors'):
+            result['partial'] = True
+            break
 
     return result

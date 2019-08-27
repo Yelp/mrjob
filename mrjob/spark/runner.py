@@ -503,10 +503,10 @@ class SparkMRJobRunner(MRJobBinRunner):
         on Hadoop Streaming?"""
         return any(step['type'] == 'streaming' for step in self._get_steps())
 
-    def _is_pyspark_step_type(self, step_type):
+    def _step_type_uses_pyspark(self, step_type):
         """Treat streaming steps as Spark steps that use Python."""
         return (
-            super(SparkMRJobRunner, self)._is_pyspark_step_type(step_type) or
+            super(SparkMRJobRunner, self)._step_type_uses_pyspark(step_type) or
             step_type == 'streaming')
 
     def _step_type_uses_spark(self, step_type):

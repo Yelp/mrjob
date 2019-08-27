@@ -1909,9 +1909,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.warning("Can't fetch step log; missing step ID")
             return
 
-        if _is_spark_step_type(step_type):
+        if self._step_type_uses_spark(step_type):
             # Spark also has a "controller" log4j log, but it doesn't
             # contain errors or anything else we need
+            #
+            # the step log is unlikely to be very much help because
+            # Spark on EMR runs in cluster mode. See #2056
             return _interpret_emr_step_syslog(
                 self.fs, self._ls_step_stderr_logs(step_id=step_id))
         else:

@@ -26,6 +26,15 @@ def _sort_by_recency(ds):
     return sorted(ds, key=_time_sort_key, reverse=True)
 
 
+def _sort_by_task_id_for_spark(ds):
+    """Sort the given list/sequence of dicts in forward order by task/container
+    ID, with most recent attempts first. This is used for finding errors on
+    Spark, see #2056.
+    """
+    return sorted(sorted(ds, key=_task_sort_key),
+                  key=_step_sort_key, reverse=True)
+
+
 def _time_sort_key(d):
     """Sort key to sort the given dictionaries containing IDs roughly by time
     (earliest first).
@@ -76,6 +85,31 @@ def _time_sort_key(d):
         task_type,
         attempt_num,
         task_num)
+
+
+def _step_sort_key(d):
+    """Sort by timestamp and step"""
+    return _time_sort_key(d)[0]
+
+
+def _task_sort_key(d):
+    """Sort in forward order by task type and number, but reverse order
+    by attempt number (used to sort Spark logs)."""
+    timestamp_and_step, container_id, task_type, attempt_num, task_num = (
+        _time_sort_key(d))
+
+    def to_int(s):
+        try:
+            return int(s)
+        except ValueError:
+            return 0
+
+    return (container_id, task_type, task_num, -to_int(attempt_num))
+
+
+
+
+
 
 
 def _add_implied_task_id(d):

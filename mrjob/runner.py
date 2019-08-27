@@ -908,7 +908,7 @@ class MRJobRunner(object):
 
         Generally used to tell if we need a Spark setup script.
         """
-        return any(self._is_pyspark_step_type(step['type'])
+        return any(self._step_type_uses_pyspark(step['type'])
                    for step in self._get_steps())
 
     def _step_type_uses_spark(self, step_type):
@@ -919,7 +919,7 @@ class MRJobRunner(object):
         """
         return _is_spark_step_type(step_type)
 
-    def _is_pyspark_step_type(self, step_type):
+    def _step_type_uses_pyspark(self, step_type):
         """Does this step involve running Python on Spark?
 
         (This is re-defined in the Spark runner to include

@@ -36,8 +36,8 @@ from mrjob.logs.errors import _pick_error
 from mrjob.logs.errors import _pick_error_attempt_ids
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _ls_history_logs
+from mrjob.logs.spark import _interpret_spark_logs
 from mrjob.logs.task import _interpret_task_logs
-from mrjob.logs.task import _interpret_spark_task_logs
 from mrjob.logs.task import _ls_task_logs
 from mrjob.logs.task import _ls_spark_task_logs
 from mrjob.step import _is_spark_step_type
@@ -232,7 +232,7 @@ class LogInterpretationMixin(object):
                 return
 
         if self._step_type_uses_spark(step_type):
-            interpret_func = _interpret_spark_task_logs
+            interpret_func = _interpret_spark_logs
         else:
             interpret_func = _interpret_task_logs
 

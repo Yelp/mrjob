@@ -1915,8 +1915,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             #
             # the step log is unlikely to be very much help because
             # Spark on EMR runs in cluster mode. See #2056
-            return _interpret_emr_step_syslog(
-                self.fs, self._ls_step_stderr_logs(step_id=step_id))
+            #
+            # there's generally only one log (unless the job has been running
+            # long enough for log rotation), so use partial=False
+            return _interpret_spark_logs(
+                self.fs, self._ls_step_stderr_logs(step_id=step_id),
+                partial=False)
         else:
             return (
                 _interpret_emr_step_syslog(

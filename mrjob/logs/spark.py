@@ -62,18 +62,23 @@ def _parse_spark_log_from_log4j_records(records):
     return result
 
 
-def _interpret_spark_logs(fs, matches, partial=True):
+def _interpret_spark_logs(fs, matches, partial=True, log_callback=None):
     result = {}
+    errors = []
+
+    matches = list(matches)
 
     for match in matches:
         path = match['path']
+        if log_callback:
+            log_callback(path)
 
         interpretation = _parse_spark_log(_cat_log_lines(fs, path))
 
         result.update(interpretation)
         # don't _add_implied_job_id() because it doesn't work that way on Spark
 
-        for error in result.get('errors') or ():
+        for error in interpretation.get('errors') or ():
             if 'spark_error' in error:
                 error['spark_error']['path'] = path
 
@@ -82,11 +87,11 @@ def _interpret_spark_logs(fs, matches, partial=True):
                     error[id_key] = match[id_key]
             _add_implied_task_id(error)
 
-            result.setdefault('errors', [])
-            result['errors'].append(error)
+            errors.append(error)
 
         if partial and result.get('errors'):
             result['partial'] = True
             break
 
+    result['errors'] = errors
     return result

@@ -174,9 +174,10 @@ def _ls_task_logs_helper(fs, log_dir_stream, is_spark,
     # less desirable errors to yield if we don't find the ones we want
     other_matches = []
 
-    for match in _ls_logs(fs, log_subdir_stream, _match_task_log_path,
-                          application_id=application_id,
-                          job_id=job_id):
+    for match in _ls_logs(
+            fs, log_subdir_stream, _match_task_log_path, is_spark,
+            application_id=application_id,
+            job_id=job_id):
 
         log_key = _log_key(match)
         log_type = match['log_type']

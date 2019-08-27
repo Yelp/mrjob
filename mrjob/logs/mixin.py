@@ -140,7 +140,7 @@ class LogInterpretationMixin(object):
 
     def _logs_needed_to_pick_error(self, step_type):
         """We don't need all the logs when interpreting Spark steps"""
-        if self._is_spark_step_type(step_type):
+        if self._step_type_runs_on_spark(step_type):
             if self._spark_deploy_mode == 'cluster':
                 return ('step', 'task')
             else:

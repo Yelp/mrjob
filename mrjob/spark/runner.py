@@ -509,10 +509,10 @@ class SparkMRJobRunner(MRJobBinRunner):
             super(SparkMRJobRunner, self)._is_pyspark_step_type(step_type) or
             step_type == 'streaming')
 
-    def _is_spark_step_type(self, step_type):
+    def _step_type_runs_on_spark(self, step_type):
         """Treat streaming steps as Spark steps that use Python."""
         return (
-            super(SparkMRJobRunner, self)._is_spark_step_type(step_type) or
+            super(SparkMRJobRunner, self)._step_type_runs_on_spark(step_type) or
             step_type == 'streaming')
 
 

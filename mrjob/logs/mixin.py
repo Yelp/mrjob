@@ -99,7 +99,7 @@ class LogInterpretationMixin(object):
     def _pick_counters(self, log_interpretation, step_type):
         """Pick counters from our log interpretation, interpreting
         history logs if need be."""
-        if self._step_type_runs_on_spark(step_type):
+        if self._step_type_uses_spark(step_type):
             return {}
 
         counters = _pick_counters(log_interpretation)
@@ -140,7 +140,7 @@ class LogInterpretationMixin(object):
 
     def _logs_needed_to_pick_error(self, step_type):
         """We don't need all the logs when interpreting Spark steps"""
-        if self._step_type_runs_on_spark(step_type):
+        if self._step_type_uses_spark(step_type):
             if self._spark_deploy_mode == 'cluster':
                 return ('step', 'task')
             else:
@@ -231,7 +231,7 @@ class LogInterpretationMixin(object):
                     log.warning("Can't fetch task logs; missing job ID")
                 return
 
-        if self._step_type_runs_on_spark(step_type):
+        if self._step_type_uses_spark(step_type):
             interpret_func = _interpret_spark_task_logs
         else:
             interpret_func = _interpret_task_logs
@@ -256,7 +256,7 @@ class LogInterpretationMixin(object):
         if not self._read_logs():
             return
 
-        if self._step_type_runs_on_spark(step_type):
+        if self._step_type_uses_spark(step_type):
             ls_func = _ls_spark_task_logs
         else:
             ls_func = _ls_task_logs
@@ -279,7 +279,7 @@ class LogInterpretationMixin(object):
         """Utility for logging counters (if any) for a step."""
         step_type = self._get_step(step_num)['type']
 
-        if not self._step_type_runs_on_spark(step_type):
+        if not self._step_type_uses_spark(step_type):
             counters = self._pick_counters(
                 log_interpretation, step_type)
             if counters:

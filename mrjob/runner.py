@@ -899,7 +899,7 @@ class MRJobRunner(object):
 
         Generally used to determine if we need to install Spark on a cluster.
         """
-        return any(self._step_type_runs_on_spark(step['type'])
+        return any(self._step_type_uses_spark(step['type'])
                    for step in self._get_steps())
 
     def _has_pyspark_steps(self):
@@ -911,7 +911,7 @@ class MRJobRunner(object):
         return any(self._is_pyspark_step_type(step['type'])
                    for step in self._get_steps())
 
-    def _step_type_runs_on_spark(self, step_type):
+    def _step_type_uses_spark(self, step_type):
         """Does this step run on Spark?
 
         (This is re-defined in the Spark runner to include

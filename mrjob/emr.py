@@ -72,6 +72,7 @@ from mrjob.logs.bootstrap import _ls_emr_bootstrap_stderr_logs
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _log_probable_cause_of_failure
 from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.spark import _interpret_spark_logs
 from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _ls_emr_step_stderr_logs

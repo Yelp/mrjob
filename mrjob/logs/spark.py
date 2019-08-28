@@ -76,8 +76,6 @@ def _interpret_spark_logs(fs, matches, partial=True, log_callback=None):
     result = {}
     errors = []
 
-    matches = list(matches)
-
     for match in matches:
         path = match['path']
         if log_callback:

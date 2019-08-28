@@ -16,6 +16,7 @@ log (output of the spark-submit binary) or as a "task" log (executors in
 YARN containers), but has more or less the same format in either case."""
 from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
+from .step import _SUBMITTED_APPLICATION_RE
 from .wrap import _cat_log_lines
 
 
@@ -45,10 +46,18 @@ def _parse_spark_log_from_log4j_records(records):
     result = {}
 
     for record in records:
+        message = record['message']
+
+        m = _SUBMITTED_APPLICATION_RE.match(message)
+        if m:
+            # need this on YARN or we won't be able to find container logs
+            result['application_id'] = m.group('application_id')
+            continue
+
         if record['level'] in ('WARN', 'ERROR'):
             error = dict(
                 spark_error=dict(
-                    message=record['message'],
+                    message=message,
                     start_line=record['start_line'],
                     num_lines=record['num_lines'],
                 )
@@ -58,6 +67,7 @@ def _parse_spark_log_from_log4j_records(records):
                 result['errors'] = []
 
             result['errors'].append(error)
+            continue
 
     return result
 

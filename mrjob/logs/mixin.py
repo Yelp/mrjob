@@ -40,7 +40,6 @@ from mrjob.logs.spark import _interpret_spark_logs
 from mrjob.logs.task import _interpret_task_logs
 from mrjob.logs.task import _ls_task_logs
 from mrjob.logs.task import _ls_spark_task_logs
-from mrjob.step import _is_spark_step_type
 
 log = getLogger(__name__)
 

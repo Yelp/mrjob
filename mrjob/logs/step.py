@@ -22,7 +22,6 @@ import re
 import logging
 from logging import getLogger
 
-from mrjob.py2 import to_unicode
 from .ids import _add_implied_job_id
 from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records

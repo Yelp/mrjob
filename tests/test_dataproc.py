@@ -18,10 +18,15 @@
 import getpass
 import os
 import os.path
+import sys
 from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
 from subprocess import PIPE
+from unittest import SkipTest
+
+if sys.version_info[:2] == (3, 4):
+    raise SkipTest('Google libraries are not supported on Python 3.4')
 
 from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound

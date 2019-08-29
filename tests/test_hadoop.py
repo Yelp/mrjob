@@ -1145,10 +1145,6 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
     def setUp(self):
         super(RunJobInHadoopUsesEnvTestCase, self).setUp()
 
-        self.mock_get_steps = self.start(patch(
-            'mrjob.hadoop.HadoopJobRunner._get_steps',
-            return_value=[dict(type='spark')]))
-
         self.mock_args_for_step = self.start(patch(
             'mrjob.hadoop.HadoopJobRunner._args_for_step',
             return_value=['args', 'for', 'step']))
@@ -1171,7 +1167,7 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
         self.mock_exit = self.start(patch('os._exit'))
 
     def test_with_pty(self):
-        job = MRNullSpark(['-r', 'hadoop'])
+        job = MRWordCount(['-r', 'hadoop'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1185,7 +1181,7 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
     def test_without_pty(self):
         self.mock_pty_fork.side_effect = OSError
 
-        job = MRNullSpark(['-r', 'hadoop'])
+        job = MRWordCount(['-r', 'hadoop'])
         job.sandbox()
 
         with job.make_runner() as runner:

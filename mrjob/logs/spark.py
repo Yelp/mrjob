@@ -55,6 +55,10 @@ def _parse_spark_log_from_log4j_records(records):
             continue
 
         if record['level'] in ('WARN', 'ERROR'):
+            # only interested in multi-line warnings
+            if record['level'] == 'WARN' and record['num_lines'] == 1:
+                continue
+
             error = dict(
                 spark_error=dict(
                     message=message,
@@ -77,6 +81,8 @@ def _interpret_spark_logs(fs, matches, partial=True, log_callback=None):
     errors = []
 
     for match in matches:
+        stop_if_partial = False
+
         path = match['path']
         if log_callback:
             log_callback(path)
@@ -89,6 +95,9 @@ def _interpret_spark_logs(fs, matches, partial=True, log_callback=None):
         for error in interpretation.get('errors') or ():
             if 'spark_error' in error:
                 error['spark_error']['path'] = path
+                if error['spark_error']['num_lines'] > 1:
+                    stop_if_partial = True
+                    # still worth parsing all the errors in this log
 
             for id_key in 'attempt_id', 'container_id':
                 if id_key in match:
@@ -97,7 +106,7 @@ def _interpret_spark_logs(fs, matches, partial=True, log_callback=None):
 
             errors.append(error)
 
-        if partial and result.get('errors'):
+        if partial and stop_if_partial:
             result['partial'] = True
             break
 

@@ -66,15 +66,14 @@ from tests.test_bin import _LOCAL_CLUSTER_MASTER
 
 # Google libs don't work in Python 3.4. The tests don't actually use
 # Google Cloud Storage, just mocking out Google out of an abundance of caution
-if sys.version_info[:2] != (3, 4):
-    from tests.mock_google import MockGoogleTestCase
+if sys.version_info[:2] == (3, 4):
+    class MockFilesystemsTestCase(MockBoto3TestCase, MockHadoopTestCase):
+        pass
 else:
-    MockGoogleTestCase = object
-
-
-class MockFilesystemsTestCase(
-        MockBoto3TestCase, MockGoogleTestCase, MockHadoopTestCase):
-    pass
+    from tests.mock_google import MockGoogleTestCase
+    class MockFilesystemsTestCase(
+            MockBoto3TestCase, MockGoogleTestCase, MockHadoopTestCase):
+        pass
 
 
 class SparkTmpDirTestCase(MockFilesystemsTestCase):

@@ -15,7 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import bz2
+import syst
 from hashlib import md5
+from unittest import SkipTest
+
+if sys.version_info[:2] == (3, 4):
+    raise SkipTest('Google libraries are not supported on Python 3.4')
 
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import _CAT_CHUNK_SIZE

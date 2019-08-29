@@ -20,7 +20,7 @@ from mrjob.py2 import to_unicode
 from mrjob.util import to_lines
 
 from .ids import _sort_by_recency
-from .ids import _sort_by_task_id_for_spark
+from .ids import _sort_for_spark
 
 log = getLogger(__name__)
 
@@ -88,7 +88,7 @@ def _ls_logs(fs, log_dir_stream, matcher, is_spark=False, **kwargs):
                 matched = True
 
                 if is_spark:
-                    matches = _sort_by_task_id_for_spark(matches)
+                    matches = _sort_for_spark(matches)
                 else:
                     matches = _sort_by_recency(matches)
 

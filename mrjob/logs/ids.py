@@ -16,8 +16,6 @@
 """Utility for handling IDs, especially sorting by recency."""
 
 
-# TODO: test these!
-
 def _sort_by_recency(ds):
     """Sort the given list/sequence of dicts containing IDs so that the
     most recent ones come first (e.g. to find the best error, or the best
@@ -26,13 +24,18 @@ def _sort_by_recency(ds):
     return sorted(ds, key=_time_sort_key, reverse=True)
 
 
-def _sort_by_task_id_for_spark(ds):
+def _sort_for_spark(ds):
     """Sort the given list/sequence of dicts in forward order by task/container
     ID, with most recent attempts first. This is used for finding errors on
     Spark, see #2056.
     """
-    return sorted(sorted(ds, key=_task_sort_key),
-                  key=_step_sort_key, reverse=True)
+    return (
+        sorted(
+            sorted(
+                sorted(
+                    ds, key=_attempt_num, reverse=True),
+                key=_container_num),
+            key=_step_sort_key, reverse=True))
 
 
 def _time_sort_key(d):
@@ -82,17 +85,6 @@ def _step_sort_key(d):
     )
 
 
-def _task_sort_key(d):
-    """Sort in forward order by task type and number, but reverse order
-    by attempt number (used to sort Spark logs)."""
-    return (
-        _container_num(d),
-        _task_type(d),
-        _task_num(d),
-        -_to_int(_attempt_num(d), -1),
-    )
-
-
 def _id_part(id, i):
     """Get the ith part of some container ID, e.g.
     container_1567013493699_0003_01_000002. If *id* is None
@@ -103,13 +95,6 @@ def _id_part(id, i):
         return ''
     else:
         return parts[i]
-
-
-def _to_int(s, default):
-    try:
-        return int(s)
-    except ValueError:
-        return default
 
 
 def _any_id(d):

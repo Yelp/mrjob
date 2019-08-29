@@ -162,6 +162,8 @@ def _format_error_helper(error):
 
     spark_error = error.get('spark_error')
     if spark_error:
+        spark_error = _trim_spark_error(spark_error)
+
         result += spark_error.get('message', '')
 
         if spark_error.get('path'):
@@ -212,3 +214,17 @@ def _describe_source(d):
                 d['start_line'] + 1, d['start_line'] + d['num_lines'], path)
     else:
         return path
+
+
+def _trim_spark_error(spark_error):
+    """If *spark_error* contains a stack trace followed by a blank line,
+    trim off the blank line and everything that follows."""
+    spark_error = dict(spark_error)
+
+    parts = spark_error['message'].split('\n\n')
+
+    if len(parts) > 1 and _PYTHON_TRACEBACK_HEADER in parts[0]:
+        spark_error['message'] = parts[0]
+        spark_error['num_lines'] = len(parts[0].split('\n')) + 1
+
+    return spark_error

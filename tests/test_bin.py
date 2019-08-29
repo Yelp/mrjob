@@ -1106,10 +1106,6 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         self.start(patch('mrjob.bin.MRJobBinRunner._bootstrap_mrjob',
                          return_value=False))
 
-    def _expected_conf_args(self, cmdenv=None, jobconf=None, yarn=False):
-        from unittest import SkipTest
-        raise SkipTest
-
     def test_default(self):
         job = MRNullSpark(['-r', 'spark'])
         job.sandbox()

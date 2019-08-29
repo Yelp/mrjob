@@ -18,6 +18,7 @@ from os import listdir
 from os.path import exists
 from os.path import join
 from unittest import skipIf
+import sys
 
 try:
     import pyspark
@@ -43,7 +44,6 @@ from mrjob.util import safeeval
 from mrjob.util import to_lines
 
 from tests.mock_boto3 import MockBoto3TestCase
-from tests.mock_google import MockGoogleTestCase
 from tests.mockhadoop import MockHadoopTestCase
 from tests.mr_count_lines_by_filename import MRCountLinesByFilename
 from tests.mr_doubler import MRDoubler
@@ -64,10 +64,16 @@ from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_bin import _LOCAL_CLUSTER_MASTER
 
-
-class MockFilesystemsTestCase(
-        MockBoto3TestCase, MockGoogleTestCase, MockHadoopTestCase):
-    pass
+# Google libs don't work in Python 3.4. The tests don't actually use
+# Google Cloud Storage, just mocking out Google out of an abundance of caution
+if sys.version_info[:2] == (3, 4):
+    class MockFilesystemsTestCase(MockBoto3TestCase, MockHadoopTestCase):
+        pass
+else:
+    from tests.mock_google import MockGoogleTestCase
+    class MockFilesystemsTestCase(
+            MockBoto3TestCase, MockGoogleTestCase, MockHadoopTestCase):
+        pass
 
 
 class SparkTmpDirTestCase(MockFilesystemsTestCase):

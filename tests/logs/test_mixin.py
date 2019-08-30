@@ -16,6 +16,7 @@ from copy import deepcopy
 
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.mixin import _log_parsing_task_log
+from mrjob.step import _is_spark_step_type
 
 from tests.py2 import Mock
 from tests.py2 import patch
@@ -30,6 +31,7 @@ class LogInterpretationMixinTestCase(BasicTestCase):
     def setUp(self):
         self.runner = self.MockRunner()
         self.runner._opts = {}
+        self.runner._step_type_uses_spark = _is_spark_step_type
 
         self.log = self.start(patch('mrjob.logs.mixin.log'))
 
@@ -205,12 +207,13 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
     def setUp(self):
         super(InterpretTaskLogsTestCase, self).setUp()
 
+        self.runner.get_hadoop_version = Mock(return_value='2.7.1')
         self.runner._ls_task_logs = Mock()
+
+        self._interpret_spark_logs = (
+            self.start(patch('mrjob.logs.mixin._interpret_spark_logs')))
         self._interpret_task_logs = (
             self.start(patch('mrjob.logs.mixin._interpret_task_logs')))
-        self._interpret_spark_task_logs = (
-            self.start(patch('mrjob.logs.mixin._interpret_spark_task_logs')))
-        self.runner.get_hadoop_version = Mock(return_value='2.7.1')
 
     def _test_task_interpretation_already_filled(
             self, log_interpretation, step_type='streaming', **kwargs):
@@ -224,7 +227,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.assertFalse(self.log.warning.called)
         self.assertFalse(self._interpret_task_logs.called)
         self.assertFalse(self.runner._ls_task_logs.called)
-        self.assertFalse(self.runner._ls_spark_task_logs.called)
+        self.assertFalse(self.runner._ls_spark_logs.called)
 
     def test_task_interpretation_already_filled(self):
         log_interpretation = dict(task={})
@@ -290,7 +293,9 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
     def test_spark(self):
         # don't need to test spark with job_id, since it doesn't run
         # in Hadoop 1
-        self._interpret_spark_task_logs.return_value = dict(
+
+        # TODO: Spark wouldn't have counters in logs
+        self._interpret_spark_logs.return_value = dict(
             counters={'foo': {'bar': 1}})
 
         log_interpretation = dict(step=dict(application_id='app_1'))
@@ -310,7 +315,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
             application_id='app_1',
             job_id=None,
             output_dir=None)
-        self._interpret_spark_task_logs.assert_called_once_with(
+        self._interpret_spark_logs.assert_called_once_with(
             self.runner.fs,
             self.runner._ls_task_logs.return_value,
             partial=True,

@@ -28,6 +28,7 @@ _CAUSED_BY = 'Caused by: '
 
 
 def _parse_spark_log(lines, record_callback=None):
+    """Parse a Spark log, looking for errors and application_id"""
 
     def yield_records():
         for record in _parse_hadoop_log4j_records(lines):
@@ -39,6 +40,7 @@ def _parse_spark_log(lines, record_callback=None):
 
 
 def _parse_spark_log_from_log4j_records(records):
+    """Helper for _parse_spark_log()"""
 
     # make sure *records* is a generator
     records = iter(records)

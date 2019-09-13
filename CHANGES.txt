@@ -273,7 +273,7 @@ v0.6.0, 2017-11-01 -- wave of deprecation
      * add_passthrough_option() -> add_passthru_arg()
      * configure_options() -> configure_args()
      * load_options() -> load_args()
-     * pass_through_option -> pass_arg_through()
+     * pass_through_option() -> pass_arg_through()
      * self.args -> self.options.args
    * duplicate file upload args are passed through to job
  * runners:

@@ -52,7 +52,7 @@ class ParseSparkLogTestCase(BasicTestCase):
                 dict(
                     spark_error=(
                         dict(
-                            message=(_SINGLE_LINE_ERROR[20:]),
+                            message=(_SINGLE_LINE_ERROR[49:]),
                             start_line=0,
                             num_lines=1,
                         )
@@ -67,18 +67,18 @@ class ParseSparkLogTestCase(BasicTestCase):
             {}
         )
 
+    maxDiff = None
+
     def test_multi_line_error(self):
         self.assertEqual(
             _parse_spark_log(_MULTI_LINE_ERROR.split('\n')),
             dict(errors=[
                 dict(
-                    spark_error=[
-                        dict(
-                            message=(_MULTI_LINE_ERROR[27:]),
-                            start_line=0,
-                            num_lines=10,
-                        )
-                    ]
+                    spark_error=dict(
+                        message=(_MULTI_LINE_ERROR[37:]),
+                        start_line=0,
+                        num_lines=10,
+                    )
                 )
             ])
         )

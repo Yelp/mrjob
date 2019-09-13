@@ -122,19 +122,8 @@ def _merge_and_sort_errors(errors, attempt_to_container_id=None):
     def sort_key(key_and_error):
         key, error = key_and_error
 
-        # if we have spark errors, pick the shortest one
-        spark_error = error.get('spark_error')
-        if spark_error:
-            num_lines = spark_error.get('num_lines') or 1
-            msg = spark_error.get('message') or ''
-
-            spark_key = [True, 'Traceback' in msg, num_lines > 1, -num_lines]
-        else:
-            spark_key = [False]
-
         # key[0] is 'container_id' or 'time_key'
-        return (spark_key,
-                bool(error.get('task_error')),
+        return (bool(error.get('task_error')),
                 key[0] == 'container_id',
                 key[1:])
 

@@ -58,6 +58,10 @@ Exception: KABOOM
 	... 10 more"""
 
 
+_APPLICATION_ID_LINE = """\
+19/09/13 22:51:14 INFO YarnClientImpl: Submitted application application_1568415025507_0001"""
+
+
 class ParseSparkLogTestCase(BasicTestCase):
 
     def test_empty(self):
@@ -107,14 +111,51 @@ class ParseSparkLogTestCase(BasicTestCase):
         # from warnings, not errors
         self.assertEqual(
             _parse_spark_log(_MULTI_LINE_WARNING.split('\n')),
-                dict(errors=[
+            dict(errors=[
+                dict(
+                    spark_error=dict(
+                        message=(_MULTI_LINE_WARNING[180:]),
+                        start_line=1,
+                        num_lines=13,
+                    )
+                )
+            ])
+        )
+
+    def test_application_id(self):
+        self.assertEqual(
+            _parse_spark_log(_APPLICATION_ID_LINE.split('\n')),
+            dict(application_id='application_1568415025507_0001')
+        )
+
+    def test_multiple_errors(self):
+        ERRORS = '\n'.join([
+            _SINGLE_LINE_ERROR, _MULTI_LINE_ERROR, _MULTI_LINE_WARNING])
+
+        self.assertEqual(
+            _parse_spark_log(ERRORS.split('\n')),
+            dict(errors=[
                 dict(
                     spark_error=(
                         dict(
-                            message=(_MULTI_LINE_WARNING[180:]),
-                            start_line=1,
-                            num_lines=13,
+                            message=(_SINGLE_LINE_ERROR[49:]),
+                            start_line=0,
+                            num_lines=1,
                         )
+                    )
+                ),
+                dict(
+                    spark_error=dict(
+                        message=(_MULTI_LINE_ERROR[37:]),
+                        start_line=1,
+                        num_lines=10,
+                    )
+                ),
+                dict(
+                    spark_error=dict(
+                        message=(_MULTI_LINE_WARNING[180:]),
+                        start_line=12,
+                        num_lines=13,
                     )
                 )
             ])

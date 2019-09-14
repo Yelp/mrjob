@@ -35,17 +35,21 @@ def _pick_error(log_interpretation):
         return None
 
 
+def _extract_errors(log_interpretation):
+    """Extract all errors from *log_interpretation*, in no particular order."""
+    errors = []
+
+    for log_type in ('step', 'history', 'task'):
+        errors.extend(
+            log_interpretation.get(log_type, {}).get('errors') or ())
+
+    return errors
+
+
 def _pick_errors(log_interpretation):
     """Yield all errors from the given log interpretation, sorted
     by recency."""
-    # TODO: no longer helpful to yield, since we sort all the errors
-    def yield_errors():
-        for log_type in ('step', 'history', 'task'):
-            errors = log_interpretation.get(log_type, {}).get('errors')
-            for error in errors or ():
-                yield error
-
-    errors = list(yield_errors())
+    errors = _extract_errors(log_interpretation)
 
     # no point in merging spark errors, which may not be tied to a container
     # because they're not even necessarily on Hadoop
@@ -56,7 +60,7 @@ def _pick_errors(log_interpretation):
     attempt_to_container_id = log_interpretation.get('history', {}).get(
         'attempt_to_container_id', {})
 
-    return _merge_and_sort_errors(yield_errors(), attempt_to_container_id)
+    return _merge_and_sort_errors(errors, attempt_to_container_id)
 
 
 def _pick_spark_errors(errors):

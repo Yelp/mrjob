@@ -27,12 +27,23 @@ def _pick_error(log_interpretation):
     step, history, and task interpretations. Returns None if there
     are no errors.
     """
-    errors = _pick_errors(log_interpretation)
+    errors = _extract_errors(log_interpretation)
 
-    if errors:
-        return errors[0]
-    else:
-        return None
+    # no point in merging spark errors, which may not be tied to a container
+    # because they're not even necessarily on Hadoop
+    spark_errors = _pick_spark_errors(errors)
+    if spark_errors:
+        return spark_errors[0]
+
+    # otherwise, merge hadoop/task errors and pick the most recent one
+    attempt_to_container_id = log_interpretation.get('history', {}).get(
+        'attempt_to_container_id', {})
+
+    merged_errors = _merge_and_sort_errors(errors, attempt_to_container_id)
+    if merged_errors:
+        return merged_errors[0]
+
+    return None
 
 
 def _extract_errors(log_interpretation):
@@ -44,23 +55,6 @@ def _extract_errors(log_interpretation):
             log_interpretation.get(log_type, {}).get('errors') or ())
 
     return errors
-
-
-def _pick_errors(log_interpretation):
-    """Yield all errors from the given log interpretation, sorted
-    by recency."""
-    errors = _extract_errors(log_interpretation)
-
-    # no point in merging spark errors, which may not be tied to a container
-    # because they're not even necessarily on Hadoop
-    spark_errors = _pick_spark_errors(errors)
-    if spark_errors:
-        return spark_errors
-
-    attempt_to_container_id = log_interpretation.get('history', {}).get(
-        'attempt_to_container_id', {})
-
-    return _merge_and_sort_errors(errors, attempt_to_container_id)
 
 
 def _pick_spark_errors(errors):
@@ -82,8 +76,14 @@ def _pick_spark_errors(errors):
 
 
 def _pick_error_attempt_ids(log_interpretation):
-    """Pick error attempt IDs, so we know which task logs to look at."""
-    errors = _pick_errors(log_interpretation)
+    """Pick error attempt IDs from step and history logs, so we know which
+    task logs to look at (most relevant first)"""
+    errors = _extract_errors(log_interpretation)
+
+    attempt_to_container_id = log_interpretation.get('history', {}).get(
+        'attempt_to_container_id', {})
+
+    errors = _merge_and_sort_errors(errors, attempt_to_container_id)
 
     errors.sort(key=_is_probably_task_error, reverse=True)
 

@@ -16,6 +16,9 @@ from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _merge_and_sort_errors
 from mrjob.logs.errors import _pick_error
 
+from tests.logs.test_spark import _MULTI_LINE_ERROR
+from tests.logs.test_spark import _MULTI_LINE_WARNING
+from tests.logs.test_spark import _SINGLE_LINE_ERROR
 from tests.sandbox import BasicTestCase
 
 
@@ -155,6 +158,140 @@ class PickErrorTestCase(BasicTestCase):
                     message='exploding snakes, now?!',
                     path='some_stderr',
                 ),
+            )
+        )
+
+    def test_pick_shortest_spark_error(self):
+        log_interpretation = dict(
+            step=dict(
+                errors=[
+                    dict(
+                        spark_error=dict(
+                            message=_MULTI_LINE_ERROR[37:],
+                            start_line=1,
+                            num_lines=10,
+                        )
+                    ),
+                    dict(
+                        spark_error=dict(
+                            message=_MULTI_LINE_WARNING[180:],
+                            start_line=12,
+                            num_lines=13,
+                        )
+                    ),
+                ]
+            )
+        )
+
+        self.assertEqual(
+            _pick_error(log_interpretation),
+            dict(
+                spark_error=dict(
+                    message=_MULTI_LINE_ERROR[37:],
+                    start_line=1,
+                    num_lines=10,
+                )
+            )
+        )
+
+    def test_multiline_spark_error_beats_single_line(self):
+        log_interpretation = dict(
+            step=dict(
+                errors=[
+                    dict(
+                        spark_error=(
+                            dict(
+                                message=_SINGLE_LINE_ERROR[49:],
+                                start_line=0,
+                                num_lines=1,
+                            )
+                        )
+                    ),
+                    dict(
+                        spark_error=dict(
+                            message=_MULTI_LINE_WARNING[180:],
+                            start_line=12,
+                            num_lines=13,
+                        )
+                    ),
+                ]
+            )
+        )
+
+        self.assertEqual(
+            _pick_error(log_interpretation),
+            dict(
+                spark_error=dict(
+                    message=_MULTI_LINE_WARNING[180:],
+                    start_line=12,
+                    num_lines=13,
+                )
+            )
+        )
+
+    def test_can_get_spark_errors_from_task_logs(self):
+        log_interpretation = dict(
+            task=dict(
+                application_id='application_1566607039137_0001',
+                errors=[
+                    dict(
+                        container_id='container_1450486922681_0005_01_000004',
+                        spark_error=dict(
+                            message=_MULTI_LINE_ERROR[37:],
+                            start_line=1,
+                            num_lines=10,
+                        ),
+                    ),
+                ]
+            )
+        )
+
+        self.assertEqual(
+            _pick_error(log_interpretation),
+            dict(
+                container_id='container_1450486922681_0005_01_000004',
+                spark_error=dict(
+                    message=_MULTI_LINE_ERROR[37:],
+                    start_line=1,
+                    num_lines=10,
+                )
+            )
+        )
+
+
+    def test_spark_error_beats_task_error(self):
+        log_interpretation = dict(
+            task=dict(
+                application_id='application_1566607039137_0001',
+                errors=[
+                    dict(
+                        container_id='container_1450486922681_0001_01_000001',
+                        spark_error=dict(
+                            message=_MULTI_LINE_ERROR[37:],
+                            start_line=1,
+                            num_lines=10,
+                        ),
+                    ),
+                    dict(
+                        container_id='container_1450486922681_0005_01_000004',
+                        task_error=dict(
+                            message='exploding snakes, now?!',
+                            path='some_stderr',
+                        ),
+                    ),
+                ]
+            )
+        )
+
+        self.assertEqual(
+            _pick_error(log_interpretation),
+            dict(
+                container_id='container_1450486922681_0001_01_000001',
+                spark_error=dict(
+                    message=_MULTI_LINE_ERROR[37:],
+                    start_line=1,
+                    num_lines=10,
+                )
             )
         )
 

@@ -74,7 +74,7 @@ class ParseSparkLogTestCase(BasicTestCase):
                 dict(
                     spark_error=(
                         dict(
-                            message=(_SINGLE_LINE_ERROR[49:]),
+                            message=_SINGLE_LINE_ERROR[49:],
                             start_line=0,
                             num_lines=1,
                         )
@@ -98,7 +98,7 @@ class ParseSparkLogTestCase(BasicTestCase):
             dict(errors=[
                 dict(
                     spark_error=dict(
-                        message=(_MULTI_LINE_ERROR[37:]),
+                        message=_MULTI_LINE_ERROR[37:],
                         start_line=0,
                         num_lines=10,
                     )
@@ -114,7 +114,7 @@ class ParseSparkLogTestCase(BasicTestCase):
             dict(errors=[
                 dict(
                     spark_error=dict(
-                        message=(_MULTI_LINE_WARNING[180:]),
+                        message=_MULTI_LINE_WARNING[180:],
                         start_line=1,
                         num_lines=13,
                     )
@@ -138,7 +138,7 @@ class ParseSparkLogTestCase(BasicTestCase):
                 dict(
                     spark_error=(
                         dict(
-                            message=(_SINGLE_LINE_ERROR[49:]),
+                            message=_SINGLE_LINE_ERROR[49:],
                             start_line=0,
                             num_lines=1,
                         )
@@ -146,14 +146,14 @@ class ParseSparkLogTestCase(BasicTestCase):
                 ),
                 dict(
                     spark_error=dict(
-                        message=(_MULTI_LINE_ERROR[37:]),
+                        message=_MULTI_LINE_ERROR[37:],
                         start_line=1,
                         num_lines=10,
                     )
                 ),
                 dict(
                     spark_error=dict(
-                        message=(_MULTI_LINE_WARNING[180:]),
+                        message=_MULTI_LINE_WARNING[180:],
                         start_line=12,
                         num_lines=13,
                     )

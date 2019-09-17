@@ -37,6 +37,7 @@ class LogInterpretationMixinTestCase(BasicTestCase):
         self.runner = self.MockRunner()
         self.runner._opts = {}
         self.runner._step_type_uses_spark = _is_spark_step_type
+        self.runner._spark_deploy_mode.return_value = 'client'
 
         self.log = self.start(patch('mrjob.logs.mixin.log'))
 
@@ -737,7 +738,7 @@ class PickErrorTestCase(LogInterpretationMixinTestCase):
     def test_spark_cluster_mode(self):
         log_interpretation = {}
 
-        self.runner._opts['spark_deploy_mode'] = 'cluster'
+        self.runner._spark_deploy_mode.return_value = 'cluster'
 
         self.assertEqual(
             self.runner._pick_error(log_interpretation, 'spark'),

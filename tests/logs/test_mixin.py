@@ -14,13 +14,18 @@
 # limitations under the License.
 from copy import deepcopy
 
+from mrjob.emr import EMRJobRunner
+from mrjob.hadoop import HadoopJobRunner
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.mixin import _log_parsing_task_log
 from mrjob.step import _is_spark_step_type
+from mrjob.spark.runner import SparkMRJobRunner
 
 from tests.py2 import Mock
 from tests.py2 import patch
 from tests.sandbox import BasicTestCase
+from tests.mock_boto3 import MockBoto3TestCase
+from tests.mockhadoop import MockHadoopTestCase
 
 
 class LogInterpretationMixinTestCase(BasicTestCase):
@@ -716,3 +721,74 @@ class PickErrorTestCase(LogInterpretationMixinTestCase):
 
     def test_step_and_task_logs_only(self):
         self._test_interpret_all_logs(dict(step={}, task={}))
+
+    def test_spark_client_mode(self):
+        log_interpretation = {}
+
+        self.assertEqual(
+            self.runner._pick_error(log_interpretation, 'spark'),
+            self._pick_error.return_value)
+
+        self.assertTrue(self.log.info.called)
+        self.assertFalse(self.runner._interpret_history_log.called)
+        self.assertTrue(self.runner._interpret_step_logs.called)
+        self.assertFalse(self.runner._interpret_task_logs.called)
+
+    def test_spark_cluster_mode(self):
+        log_interpretation = {}
+
+        self.runner._opts['spark_deploy_mode'] = 'cluster'
+
+        self.assertEqual(
+            self.runner._pick_error(log_interpretation, 'spark'),
+            self._pick_error.return_value)
+
+        self.assertTrue(self.log.info.called)
+        self.assertFalse(self.runner._interpret_history_log.called)
+        self.assertTrue(self.runner._interpret_step_logs.called)
+        self.assertTrue(self.runner._interpret_task_logs.called)
+
+    def test_logs_needed_to_pick_error_used(self):
+        log_interpretation = {}
+
+        self.runner._logs_needed_to_pick_error = Mock(
+            return_value=('history', 'task'))
+
+        self.assertEqual(
+            self.runner._pick_error(log_interpretation, 'streaming'),
+            self._pick_error.return_value)
+
+        self.assertTrue(self.runner._logs_needed_to_pick_error.called)
+
+        self.assertTrue(self.log.info.called)
+        self.assertTrue(self.runner._interpret_history_log.called)
+        self.assertFalse(self.runner._interpret_step_logs.called)
+        self.assertTrue(self.runner._interpret_task_logs.called)
+
+
+class LogsNeededToPickErrorTestCase(MockBoto3TestCase, MockHadoopTestCase):
+
+    def test_emr_runner(self):
+        # EMR runner is always in cluster mode
+        runner = EMRJobRunner()
+
+        self.assertEqual(runner._logs_needed_to_pick_error('streaming'),
+                         ('step', 'history', 'task'))
+        self.assertEqual(runner._logs_needed_to_pick_error('spark'),
+                         ('step', 'task'))
+
+    def test_hadoop_runner_client_mode(self):
+        runner = HadoopJobRunner()
+
+        self.assertEqual(runner._logs_needed_to_pick_error('streaming'),
+                         ('step', 'history', 'task'))
+        self.assertEqual(runner._logs_needed_to_pick_error('spark'),
+                         ('step',))
+
+    def test_hadoop_runner_cluster_mode(self):
+        runner = HadoopJobRunner(spark_deploy_mode='cluster')
+
+        self.assertEqual(runner._logs_needed_to_pick_error('streaming'),
+                         ('step', 'history', 'task'))
+        self.assertEqual(runner._logs_needed_to_pick_error('spark'),
+                         ('step', 'task'))

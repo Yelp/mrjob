@@ -11,9 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from tests.py2 import Mock
+from tests.py2 import patch
 from tests.sandbox import BasicTestCase
 
+from mrjob.logs.spark import _interpret_spark_logs
 from mrjob.logs.spark import _parse_spark_log
+from mrjob.logs.task import _ls_spark_task_logs
 
 # these are actual error messages from Spark, though the tracebacks
 # in
@@ -160,3 +164,61 @@ class ParseSparkLogTestCase(BasicTestCase):
                 )
             ])
         )
+
+
+class InterpretSparkLogsTestCase(BasicTestCase):
+
+    def setUp(self):
+        super(InterpretSparkLogsTestCase, self).setUp()
+
+        # instead of mocking out contents of files, just mock out
+        # what _parse_spark_log() should return, and have
+        # _cat_log_lines() just pass through the path
+        self.mock_paths = []
+        self.path_to_mock_result = {}
+
+        self.mock_log_callback = Mock()
+
+        self.mock_paths_catted = []
+
+        def mock_cat_log_lines(fs, path):
+            if path in self.mock_paths:
+                self.mock_paths_catted.append(path)
+            return path
+
+        # (the actual log-parsing functions take lines from the log)
+        def mock_parse_spark_log(path_from_mock_cat_log_lines):
+            # default is {}
+            return self.path_to_mock_result.get(
+                path_from_mock_cat_log_lines, {})
+
+        def mock_exists(path):
+            return path in self.mock_paths or path == 'MOCK_LOG_DIR'
+
+        # need to mock ls so that _ls_task_logs() can work
+        def mock_ls(log_dir):
+            return self.mock_paths
+
+        self.mock_fs = Mock()
+        self.mock_fs.exists = Mock(side_effect=mock_exists)
+        self.mock_fs.ls = Mock(side_effect=mock_ls)
+
+        self.mock_cat_log_lines = self.start(
+            patch('mrjob.logs.spark._cat_log_lines',
+                  side_effect=mock_cat_log_lines))
+
+        self.start(patch('mrjob.logs.spark._parse_spark_log',
+                         side_effect=mock_parse_spark_log))
+
+    def mock_path_matches(self):
+        mock_log_dir_stream = [['MOCK_LOG_DIR']]  # _ls_logs() needs this
+        return _ls_spark_task_logs(self.mock_fs, mock_log_dir_stream)
+
+    def interpret_spark_logs(self, **kwargs):
+        return _interpret_spark_logs(
+            self.mock_fs, self.mock_path_matches(),
+            log_callback=self.mock_log_callback,
+            **kwargs)
+
+    def test_empty(self):
+        self.assertEqual(self.interpret_spark_logs(), {})

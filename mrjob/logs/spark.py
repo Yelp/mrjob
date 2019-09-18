@@ -111,5 +111,7 @@ def _interpret_spark_logs(fs, matches, partial=True, log_callback=None):
             result['partial'] = True
             break
 
-    result['errors'] = errors
+    if errors:
+        result['errors'] = errors
+
     return result

@@ -167,6 +167,7 @@ class ParseSparkLogTestCase(BasicTestCase):
 
 
 class InterpretSparkLogsTestCase(BasicTestCase):
+    # this mostly checks when partial log parsing stops
 
     def setUp(self):
         super(InterpretSparkLogsTestCase, self).setUp()
@@ -222,3 +223,114 @@ class InterpretSparkLogsTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(self.interpret_spark_logs(), {})
+
+    def test_stderr_with_error(self):
+        stderr_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                       '/container_1450486922681_0005_01_000004/stderr')
+
+        self.mock_paths = [stderr_path]
+
+        self.path_to_mock_result = {
+            stderr_path: dict(errors=[dict(spark_error=dict(
+                message='cat trace:\ntoo many cats',
+                start_line=999,
+                num_lines=2))]),
+        }
+
+        self.assertEqual(self.interpret_spark_logs(), dict(
+            errors=[
+                dict(
+                    container_id='container_1450486922681_0005_01_000004',
+                    spark_error=dict(
+                        message='cat trace:\ntoo many cats',
+                        num_lines=2,
+                        path=stderr_path,
+                        start_line=999,
+                    ),
+                ),
+            ],
+            partial=True,
+        ))
+
+    def test_stop_after_first_multiline_error(self):
+        stderr_path1 = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000001/stderr')
+        stderr_path2 = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000004/stderr')
+
+        self.mock_paths = [stderr_path1, stderr_path2]
+
+        self.path_to_mock_result = {
+            stderr_path1: dict(errors=[dict(spark_error=dict(
+                message='cat trace:\ntoo many cats',
+                start_line=999,
+                num_lines=2))]),
+            stderr_path2: dict(errors=[dict(spark_error=dict(
+                message='cat trace:\ntoo many cats',
+                start_line=999,
+                num_lines=2))]),
+        }
+
+        self.assertEqual(self.interpret_spark_logs(), dict(
+            errors=[
+                dict(
+                    container_id='container_1450486922681_0005_01_000001',
+                    spark_error=dict(
+                        message='cat trace:\ntoo many cats',
+                        num_lines=2,
+                        path=stderr_path1,
+                        start_line=999,
+                    ),
+                ),
+            ],
+            partial=True,
+        ))
+
+    def test_disable_partial_log_parsing(self):
+        stderr_path1 = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000001/stderr')
+        stderr_path2 = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000004/stderr')
+
+        self.mock_paths = [stderr_path1, stderr_path2]
+
+        cat_trace_error = dict(errors=[dict(spark_error=dict(
+            message='cat trace:\ntoo many cats',
+            start_line=999,
+            num_lines=2))])
+
+        self.path_to_mock_result = {
+            stderr_path1: dict(errors=[dict(spark_error=dict(
+                message='cat trace:\ntoo many cats',
+                start_line=999,
+                num_lines=2))]),
+            stderr_path2: dict(errors=[dict(spark_error=dict(
+                message='cat trace:\ntoo many cats',
+                start_line=999,
+                num_lines=2))]),
+        }
+
+        self.assertEqual(self.interpret_spark_logs(partial=False), dict(
+            errors=[
+                dict(
+                    container_id='container_1450486922681_0005_01_000001',
+                    spark_error=dict(
+                        message='cat trace:\ntoo many cats',
+                        num_lines=2,
+                        path=stderr_path1,
+                        start_line=999,
+                    ),
+                ),
+                dict(
+                    container_id='container_1450486922681_0005_01_000004',
+                    spark_error=dict(
+                        message='cat trace:\ntoo many cats',
+                        num_lines=2,
+                        path=stderr_path2,
+                        start_line=999,
+                    ),
+                ),
+            ],
+        ))
+
+    maxDiff = None

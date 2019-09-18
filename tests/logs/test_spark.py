@@ -286,6 +286,98 @@ class InterpretSparkLogsTestCase(BasicTestCase):
             partial=True,
         ))
 
+    def test_continue_after_single_line_error(self):
+        stderr_path1 = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000001/stderr')
+        stderr_path2 = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000004/stderr')
+
+        self.mock_paths = [stderr_path1, stderr_path2]
+
+        self.path_to_mock_result = {
+            stderr_path1: dict(errors=[dict(spark_error=dict(
+                message='cat problems',
+                start_line=333,
+                num_lines=1))]),
+            stderr_path2: dict(errors=[dict(spark_error=dict(
+                message='cat trace:\ntoo many cats',
+                start_line=999,
+                num_lines=2))]),
+        }
+
+        self.assertEqual(self.interpret_spark_logs(), dict(
+            errors=[
+                dict(
+                    container_id='container_1450486922681_0005_01_000001',
+                    spark_error=dict(
+                        message='cat problems',
+                        num_lines=1,
+                        path=stderr_path1,
+                        start_line=333,
+                    ),
+                ),
+                dict(
+                    container_id='container_1450486922681_0005_01_000004',
+                    spark_error=dict(
+                        message='cat trace:\ntoo many cats',
+                        num_lines=2,
+                        path=stderr_path2,
+                        start_line=999,
+                    ),
+                ),
+            ],
+            partial=True,
+        ))
+
+    def test_parse_entire_file_before_stopping(self):
+        stderr_path1 = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000001/stderr')
+        stderr_path2 = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000004/stderr')
+
+        self.mock_paths = [stderr_path1, stderr_path2]
+
+        self.path_to_mock_result = {
+            stderr_path1: dict(errors=[
+                dict(spark_error=dict(
+                    message='cat trace:\ntoo many cats',
+                    start_line=222,
+                    num_lines=2)),
+                dict(spark_error=dict(
+                    message='cat problems',
+                    start_line=333,
+                    num_lines=1)),
+            ]),
+            stderr_path2: dict(errors=[dict(spark_error=dict(
+                message='cat trace:\ntoo many cats',
+                start_line=999,
+                num_lines=2))]),
+        }
+
+        self.assertEqual(self.interpret_spark_logs(), dict(
+            errors=[
+                dict(
+                    container_id='container_1450486922681_0005_01_000001',
+                    spark_error=dict(
+                        message='cat trace:\ntoo many cats',
+                        start_line=222,
+                        num_lines=2,
+                        path=stderr_path1,
+                    ),
+                ),
+                dict(
+                    container_id='container_1450486922681_0005_01_000001',
+                    spark_error=dict(
+                        message='cat problems',
+                        start_line=333,
+                        num_lines=1,
+                        path=stderr_path1,
+                    ),
+                ),
+            ],
+            partial=True,
+        ))
+
     def test_disable_partial_log_parsing(self):
         stderr_path1 = ('/log/dir/userlogs/application_1450486922681_0005'
                         '/container_1450486922681_0005_01_000001/stderr')
@@ -332,5 +424,3 @@ class InterpretSparkLogsTestCase(BasicTestCase):
                 ),
             ],
         ))
-
-    maxDiff = None

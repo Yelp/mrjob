@@ -3986,6 +3986,9 @@ class GetStepLogInterpretationTestCase(MockBoto3TestCase):
         self._ls_step_stderr_logs = self.start(patch(
             'mrjob.emr.EMRJobRunner._ls_step_stderr_logs'))
 
+        self._interpret_spark_logs = self.start(patch(
+            'mrjob.emr._interpret_spark_logs'))
+
     def test_basic(self):
         runner = EMRJobRunner()
 
@@ -4074,13 +4077,20 @@ class GetStepLogInterpretationTestCase(MockBoto3TestCase):
         self.assertEqual(
             runner._get_step_log_interpretation(
                 log_interpretation, 'spark'),
-            self._interpret_emr_step_syslog.return_value)
+            self._interpret_spark_logs.return_value)
+
+        # shouldn't use partial=True with step logs, there's usually only one
+        # anyhow (this isn't even an option for Hadoop step logs, but for
+        # spark logs it's the same method as for task logs)
+        self._interpret_spark_logs.assert_called_once_with(
+            runner.fs, self._ls_step_stderr_logs.return_value, partial=False)
 
         self.assertFalse(self.log.warning.called)
         self.assertFalse(self._ls_step_syslogs.called)
         self._ls_step_stderr_logs.assert_called_once_with(step_id='s-STEPID')
-        self._interpret_emr_step_syslog.assert_called_once_with(
+        self._interpret_spark_logs(
             runner.fs, self._ls_step_stderr_logs.return_value)
+        self.assertFalse(self._interpret_emr_step_syslog.called)
         self.assertFalse(self._interpret_emr_step_stderr.called)
 
 

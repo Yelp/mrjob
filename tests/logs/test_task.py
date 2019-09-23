@@ -13,8 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import skip
+
 from mrjob.logs.task import _interpret_task_logs
-from mrjob.logs.task import _interpret_spark_task_logs
 from mrjob.logs.task import _ls_spark_task_logs
 from mrjob.logs.task import _ls_task_logs
 from mrjob.logs.task import _match_task_log_path
@@ -639,6 +640,7 @@ class InterpretTaskLogsTestCase(BasicTestCase):
         )
 
 
+@skip('_interpret_spark_task_logs() is now _interpret_spark_logs()')
 class InterpretSparkTaskLogsTestCase(BasicTestCase):
 
     maxDiff = None

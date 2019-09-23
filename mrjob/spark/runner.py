@@ -37,6 +37,8 @@ from mrjob.fs.s3 import boto3 as boto3_installed
 from mrjob.fs.s3 import _is_permanent_boto3_error
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.logs.counters import _format_counters
+from mrjob.logs.errors import _log_probable_cause_of_failure
+from mrjob.logs.errors import _pick_error
 from mrjob.logs.step import _log_log4j_record
 from mrjob.parse import is_uri
 from mrjob.parse import to_uri
@@ -325,8 +327,8 @@ class SparkMRJobRunner(MRJobBinRunner):
         env = dict(os.environ)
         env.update(self._spark_cmdenv(step_num))
 
-        returncode = self._run_spark_submit(spark_submit_args, env,
-                                            record_callback=_log_log4j_record)
+        returncode, step_interpretation = self._run_spark_submit(
+            spark_submit_args, env, record_callback=_log_log4j_record)
 
         counters = None
         if step['type'] == 'streaming':
@@ -354,6 +356,10 @@ class SparkMRJobRunner(MRJobBinRunner):
             self._counters.append({})
 
         if returncode:
+            error = _pick_error(dict(step=step_interpretation))
+            if error:
+                _log_probable_cause_of_failure(log, error)
+
             reason = str(CalledProcessError(returncode, spark_submit_args))
             raise StepFailedException(
                 reason=reason, step_num=step_num, last_step_num=last_step_num,
@@ -495,13 +501,19 @@ class SparkMRJobRunner(MRJobBinRunner):
     def _has_streaming_steps(self):
         """Are any of our steps "streaming" steps that would normally run
         on Hadoop Streaming?"""
-        return any(step['type'] == 'streaming'
-                   for step in self._get_steps())
+        return any(step['type'] == 'streaming' for step in self._get_steps())
 
-    def _is_pyspark_step(self, step):
+    def _step_type_uses_pyspark(self, step_type):
         """Treat streaming steps as Spark steps that use Python."""
-        return (super(SparkMRJobRunner, self)._is_pyspark_step(step) or
-                step['type'] == 'streaming')
+        return (
+            super(SparkMRJobRunner, self)._step_type_uses_pyspark(step_type) or
+            step_type == 'streaming')
+
+    def _step_type_uses_spark(self, step_type):
+        """Treat streaming steps as Spark steps that use Python."""
+        return (
+            super(SparkMRJobRunner, self)._step_type_uses_spark(step_type) or
+            step_type == 'streaming')
 
 
 def _emr_proof_steps_desc(steps_desc):

@@ -46,7 +46,8 @@ from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.logs.log4j import _parse_hadoop_log4j_records
-from mrjob.logs.step import _yield_lines_from_pty_or_pipe
+from mrjob.logs.spark import _parse_spark_log
+from mrjob.logs.step import _eio_to_eof
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
@@ -828,12 +829,15 @@ class MRJobBinRunner(MRJobRunner):
                                 :py:func:`~mrjob.logs.log4j\
                                 ._parse_hadoop_log4j_records)
 
-        :return: the subprocess's return code
+        :return: tuple of the subprocess's return code and a
+                 step interpretation dictionary
         """
         log.debug('> %s' % cmd_line(spark_submit_args))
         log.debug('  with environment: %r' % sorted(env.items()))
 
-        returncode = 0  # should always be set, but just in case
+        # these should always be set, but just in case
+        returncode = 0
+        step_interpretation = {}
 
         # try to use a PTY if it's available
         try:
@@ -848,12 +852,11 @@ class MRJobBinRunner(MRJobRunner):
             step_proc = Popen(
                 spark_submit_args, stdout=PIPE, stderr=PIPE, env=env)
 
-            for line in step_proc.stderr:
-                for record in _parse_hadoop_log4j_records(
-                        _yield_lines_from_pty_or_pipe(step_proc.stderr)):
-                    record_callback(record)
+            # parse driver output
+            step_interpretation = _parse_spark_log(
+                step_proc.stderr, record_callback=record_callback)
 
-            # there shouldn't be much output on STDOUT
+            # there shouldn't be much output on STDOUT, just echo it
             for record in _parse_hadoop_log4j_records(step_proc.stdout):
                 record_callback(record)
 
@@ -878,12 +881,14 @@ class MRJobBinRunner(MRJobRunner):
                 log.debug('Invoking spark-submit via PTY')
 
                 with os.fdopen(master_fd, 'rb') as master:
-                    for record in _parse_hadoop_log4j_records(
-                            _yield_lines_from_pty_or_pipe(master)):
-                        record_callback(record)
+                    step_interpretation = (
+                        _parse_spark_log(
+                            _eio_to_eof(master),
+                            record_callback=record_callback))
+
                     _, returncode = os.waitpid(pid, 0)
 
-        return returncode
+        return (returncode, step_interpretation)
 
     def get_spark_submit_bin(self):
         """Return the location of the ``spark-submit`` binary, searching for it
@@ -1038,7 +1043,7 @@ class MRJobBinRunner(MRJobRunner):
 
         cmdenv = {}
 
-        if self._is_pyspark_step(step):
+        if self._step_type_uses_pyspark(step['type']):
             driver_python = cmd_line(self._python_bin())
 
             if self._spark_python_wrapper_path:

@@ -36,8 +36,9 @@ from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
-from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _log_probable_cause_of_failure
 from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.step import _eio_to_eof
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
 from mrjob.logs.step import _log_line_from_driver
@@ -368,6 +369,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         for step_num, step in enumerate(self._get_steps()):
             self._warn_about_spark_archives(step)
 
+            step_type = step['type']
             step_args = self._args_for_step(step_num)
             env = _fix_env(self._env_for_step(step_num))
 
@@ -381,56 +383,14 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             log_interpretation = {}
             self._log_interpretations.append(log_interpretation)
 
-            # try to use a PTY if it's available
-            try:
-                pid, master_fd = pty.fork()
-            except (AttributeError, OSError):
-                # no PTYs, just use Popen
-
-                # user won't get much feedback for a while, so tell them
-                # Hadoop is running
-                log.debug('No PTY available, using Popen() to invoke Hadoop')
-
-                step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE, env=env)
-
-                step_interpretation = _interpret_hadoop_jar_command_stderr(
-                    step_proc.stderr,
-                    record_callback=_log_record_from_hadoop)
-
-                # there shouldn't be much output to STDOUT
-                for line in step_proc.stdout:
-                    _log_line_from_driver(to_unicode(line).strip('\r\n'))
-
-                step_proc.stdout.close()
-                step_proc.stderr.close()
-
-                returncode = step_proc.wait()
+            if self._step_type_uses_spark(step_type):
+                returncode, step_interpretation = self._run_spark_submit(
+                    step_args, env, record_callback=_log_log4j_record)
             else:
-                # we have PTYs
-                if pid == 0:  # we are the child process
-                    try:
-                        os.execvpe(step_args[0], step_args, env)
-                        # now we are no longer Python
-                    except OSError as ex:
-                        # use _exit() so we don't do cleanup, etc. that's
-                        # the parent process's job
-                        os._exit(ex.errno)
-                    finally:
-                        # if we got some other exception, still exit hard
-                        os._exit(-1)
-                else:
-                    log.debug('Invoking Hadoop via PTY')
+                returncode, step_interpretation = self._run_hadoop(
+                    step_args, env, record_callback=_log_record_from_hadoop)
 
-                    with os.fdopen(master_fd, 'rb') as master:
-                        # reading from master gives us the subprocess's
-                        # stderr and stdout (it's a fake terminal)
-                        step_interpretation = (
-                            _interpret_hadoop_jar_command_stderr(
-                                master,
-                                record_callback=_log_record_from_hadoop))
-                        _, returncode = os.waitpid(pid, 0)
-
-            # make sure output_dir is filled
+            # make sure output_dir is filled (used for history log)
             if 'output_dir' not in step_interpretation:
                 step_interpretation['output_dir'] = (
                     self._step_output_uri(step_num))
@@ -439,19 +399,68 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
             self._log_counters(log_interpretation, step_num)
 
-            step_type = step['type']
-
             if returncode:
                 error = self._pick_error(log_interpretation, step_type)
                 if error:
-                    log.error('Probable cause of failure:\n\n%s\n' %
-                              _format_error(error))
+                    _log_probable_cause_of_failure(log, error)
 
                 # use CalledProcessError's well-known message format
                 reason = str(CalledProcessError(returncode, step_args))
                 raise StepFailedException(
                     reason=reason, step_num=step_num,
                     num_steps=self._num_steps())
+
+    def _run_hadoop(self, hadoop_args, env, record_callback):
+        # try to use a PTY if it's available
+        try:
+            pid, master_fd = pty.fork()
+        except (AttributeError, OSError):
+            # no PTYs, just use Popen
+
+            # user won't get much feedback for a while, so tell them
+            # Hadoop is running
+            log.debug('No PTY available, using Popen() to invoke Hadoop')
+
+            step_proc = Popen(hadoop_args, stdout=PIPE, stderr=PIPE, env=env)
+
+            step_interpretation = _interpret_hadoop_jar_command_stderr(
+                step_proc.stderr,
+                record_callback=_log_record_from_hadoop)
+
+            # there shouldn't be much output to STDOUT
+            for line in step_proc.stdout:
+                _log_line_from_driver(to_unicode(line).strip('\r\n'))
+
+            step_proc.stdout.close()
+            step_proc.stderr.close()
+
+            returncode = step_proc.wait()
+        else:
+            # we have PTYs
+            if pid == 0:  # we are the child process
+                try:
+                    os.execvpe(hadoop_args[0], hadoop_args, env)
+                    # now we are no longer Python
+                except OSError as ex:
+                    # use _exit() so we don't do cleanup, etc. that's
+                    # the parent process's job
+                    os._exit(ex.errno)
+                finally:
+                    # if we got some other exception, still exit hard
+                    os._exit(-1)
+            else:
+                log.debug('Invoking Hadoop via PTY')
+
+                with os.fdopen(master_fd, 'rb') as master:
+                    # reading from master gives us the subprocess's
+                    # stderr and stdout (it's a fake terminal)
+                    step_interpretation = (
+                        _interpret_hadoop_jar_command_stderr(
+                            _eio_to_eof(master),
+                            record_callback=_log_record_from_hadoop))
+                    _, returncode = os.waitpid(pid, 0)
+
+        return returncode, step_interpretation
 
     def _warn_about_spark_archives(self, step):
         """If *step* is a Spark step, the *upload_archives* option is set,

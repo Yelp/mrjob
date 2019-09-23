@@ -291,28 +291,6 @@ class InterpretHadoopJarCommandStderrTestCase(BasicTestCase):
                 ),
             ])
 
-    def test_treat_eio_as_eof(self):
-        def yield_lines():
-            yield ('15/12/11 13:33:11 INFO mapreduce.Job:'
-                   ' Running job: job_1449857544442_0002\n')
-            e = IOError()
-            e.errno = errno.EIO
-            raise e
-
-        self.assertEqual(
-            _interpret_hadoop_jar_command_stderr(yield_lines()),
-            dict(job_id='job_1449857544442_0002'))
-
-    def test_raise_other_io_errors(self):
-        def yield_lines():
-            yield ('15/12/11 13:33:11 INFO mapreduce.Job:'
-                   ' Running job: job_1449857544442_0002\n')
-            raise IOError
-
-        self.assertRaises(
-            IOError,
-            _interpret_hadoop_jar_command_stderr, yield_lines())
-
 
 class ParseIndentedCountersTestCase(BasicTestCase):
 

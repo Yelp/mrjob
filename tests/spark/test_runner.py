@@ -157,7 +157,7 @@ class SparkPyFilesTestCase(MockFilesystemsTestCase):
         # don't bother actually running spark
         self.start(patch(
             'mrjob.spark.runner.SparkMRJobRunner._run_spark_submit',
-            return_value=0))
+            return_value=(0, {})))
 
     def test_dont_upload_mrjob_zip(self):
         job = MRNullSpark(['-r', 'spark', '--spark-master', 'yarn'])
@@ -315,7 +315,7 @@ class SparkWorkingDirTestCase(MockFilesystemsTestCase):
 
         run_spark_submit = self.start(patch(
             'mrjob.bin.MRJobBinRunner._run_spark_submit',
-            return_value=0))
+            return_value=(0, {})))
 
         job = MRSparkOSWalk(['-r', 'spark',
                              '--spark-master', 'mesos://host:9999',
@@ -733,7 +733,7 @@ class SparkCounterSimulationTestCase(MockFilesystemsTestCase):
 
     def test_blank_out_counters_if_not_output(self):
         self.start(patch('mrjob.bin.MRJobBinRunner._run_spark_submit',
-                         return_value=2))
+                         return_value=(2, {})))
 
         job = MRTwoStepJob(['-r', 'spark'])
         job.sandbox(stdin=BytesIO(b'foo\nbar\n'))

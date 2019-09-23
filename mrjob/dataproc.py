@@ -41,7 +41,7 @@ from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
-from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _log_probable_cause_of_failure
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _parse_task_syslog_records
@@ -766,8 +766,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if job_state == 'ERROR':
                 error = self._pick_error(log_interpretation, step_type)
                 if error:
-                    log.error('Probable cause of failure:\n\n%s\n\n' %
-                              _format_error(error))
+                    _log_probable_cause_of_failure(log, error)
 
             # we're done, will return at the end of this
             if job_state == 'DONE':

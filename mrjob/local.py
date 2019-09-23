@@ -34,7 +34,8 @@ except ImportError:
     pty = None
 
 from mrjob.bin import MRJobBinRunner
-from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _log_probable_cause_of_failure
+from mrjob.logs.errors import _pick_error
 from mrjob.logs.step import _log_log4j_record
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.py2 import string_types
@@ -126,10 +127,14 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
         env = dict(os.environ)
         env.update(self._spark_cmdenv(step_num))
 
-        returncode = self._run_spark_submit(spark_submit_args, env,
-                                            record_callback=_log_log4j_record)
+        returncode, step_interpretation = self._run_spark_submit(
+            spark_submit_args, env, record_callback=_log_log4j_record)
 
         if returncode:
+            error = _pick_error(dict(step=step_interpretation))
+            if error:
+                _log_probable_cause_of_failure(log, error)
+
             reason = str(CalledProcessError(returncode, spark_submit_args))
             raise StepFailedException(
                 reason=reason, step_num=step_num,
@@ -182,10 +187,10 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
                 task_error = _parse_task_stderr(stderr)
                 if task_error:
                     task_error['path'] = stderr_path
-                    log.error('Cause of failure:\n\n%s\n\n' %
-                              _format_error(dict(
-                                  split=dict(path=input_path),
-                                  task_error=task_error)))
+                    error = dict(
+                        split=dict(path=input_path),
+                        task_error=task_error)
+                    _log_probable_cause_of_failure(log, error)
                     return
 
         # fallback if we can't find the error (e.g. the job does something

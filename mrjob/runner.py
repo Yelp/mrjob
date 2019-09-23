@@ -899,7 +899,7 @@ class MRJobRunner(object):
 
         Generally used to determine if we need to install Spark on a cluster.
         """
-        return any(_is_spark_step_type(step['type'])
+        return any(self._step_type_uses_spark(step['type'])
                    for step in self._get_steps())
 
     def _has_pyspark_steps(self):
@@ -908,11 +908,24 @@ class MRJobRunner(object):
 
         Generally used to tell if we need a Spark setup script.
         """
-        return any(self._is_pyspark_step(step) for step in self._get_steps())
+        return any(self._step_type_uses_pyspark(step['type'])
+                   for step in self._get_steps())
 
-    def _is_pyspark_step(self, step):
-        """Does this step involve running Python on Spark?"""
-        return _is_pyspark_step_type(step['type'])
+    def _step_type_uses_spark(self, step_type):
+        """Does this step run on Spark?
+
+        (This is re-defined in the Spark runner to include
+        streaming steps, and used by mrjob.logs.mixin)
+        """
+        return _is_spark_step_type(step_type)
+
+    def _step_type_uses_pyspark(self, step_type):
+        """Does this step involve running Python on Spark?
+
+        (This is re-defined in the Spark runner to include
+        streaming steps, and used by mrjob.logs.mixin)
+        """
+        return _is_pyspark_step_type(step_type)
 
     def _spark_master(self):
         return self._opts.get('spark_master') or 'local[*]'

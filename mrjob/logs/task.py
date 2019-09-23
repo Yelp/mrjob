@@ -174,9 +174,10 @@ def _ls_task_logs_helper(fs, log_dir_stream, is_spark,
     # less desirable errors to yield if we don't find the ones we want
     other_matches = []
 
-    for match in _ls_logs(fs, log_subdir_stream, _match_task_log_path,
-                          application_id=application_id,
-                          job_id=job_id):
+    for match in _ls_logs(
+            fs, log_subdir_stream, _match_task_log_path, is_spark,
+            application_id=application_id,
+            job_id=job_id):
 
         log_key = _log_key(match)
         log_type = match['log_type']
@@ -318,87 +319,6 @@ def _interpret_task_logs(fs, matches, partial=True, log_callback=None):
 
         error.update(syslog_error)
         error['hadoop_error']['path'] = syslog_path
-
-        # patch in IDs we learned from path
-        for id_key in 'attempt_id', 'container_id':
-            if id_key in match:
-                error[id_key] = match[id_key]
-        _add_implied_task_id(error)
-
-        result.setdefault('errors', [])
-        result['errors'].append(error)
-
-        if partial:
-            result['partial'] = True
-            break
-
-    return result
-
-
-def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
-    """Look for errors in Spark task stderr, reading stdout when appropriate.
-
-    If *partial* is true (the default), stop when we find the first error
-    that includes a *task_error*.
-
-    If *log_callback* is set, every time we're about to parse a
-        file, call it with a single argument, the path of that file
-
-    Returns a dictionary possibly containing the key 'errors', which
-    is a dict containing:
-
-    hadoop_error:
-        message: string containing error message and Java exception
-        num_lines: number of lines in syslog this takes up
-        path: syslog we read this error from
-        start_line: where in syslog exception starts (0-indexed)
-    split: (optional)
-        path: URI of input file task was processing
-        num_lines: (optional) number of lines in split
-        start_line: (optional) first line of split (0-indexed)
-    task_error:
-        message: command and error message from task, as a string
-        num_lines: number of lines in stderr this takes up
-        path: stderr we read this from
-        start_line: where in stderr error message starts (0-indexed)
-
-    In addition, if *partial* is set to true (and we found an error),
-    this dictionary will contain the key *partial*, set to True.
-
-    *task_error* will only be set if we read from stdout (if the Spark
-    application master fails). Otherwise, the Python traceback will
-    be included in the java stack trace in *hadoop_error*.
-    """
-    result = {}
-
-    for match in matches:
-        error = {}
-
-        stderr_path = match['path']
-
-        if log_callback:
-            log_callback(stderr_path)
-        # stderr is Spark's syslog
-        stderr_error = _parse_task_syslog(_cat_log_lines(fs, stderr_path))
-
-        if stderr_error.get('hadoop_error'):
-            stderr_error['hadoop_error']['path'] = stderr_path
-            error.update(stderr_error)
-        else:
-            continue
-
-        stdout_path = (match.get('stdout') or {}).get('path')
-        check_stdout = error.pop('check_stdout', None)
-
-        if stdout_path and check_stdout:
-            if log_callback:
-                log_callback(stdout_path)
-            # the stderr of the application master ends up in "stdout"
-            task_error = _parse_task_stderr(_cat_log_lines(fs, stdout_path))
-
-            if task_error:
-                task_error['path'] = stdout_path
-                error['task_error'] = task_error
 
         # patch in IDs we learned from path
         for id_key in 'attempt_id', 'container_id':

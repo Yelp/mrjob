@@ -70,8 +70,9 @@ from mrjob.logs.bootstrap import _check_for_nonzero_return_code
 from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
 from mrjob.logs.bootstrap import _ls_emr_bootstrap_stderr_logs
 from mrjob.logs.counters import _pick_counters
-from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _log_probable_cause_of_failure
 from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.spark import _interpret_spark_logs
 from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _ls_emr_step_stderr_logs
@@ -1635,8 +1636,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if step['Status']['State'] == 'FAILED':
                 error = self._pick_error(log_interpretation, step_type)
                 if error:
-                    log.error('Probable cause of failure:\n\n%s\n\n' %
-                              _format_error(error))
+                    _log_probable_cause_of_failure(log, error)
 
             raise StepFailedException(
                 step_num=step_num, num_steps=num_steps,
@@ -1814,8 +1814,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # should be 0 or 1 errors, since we're checking a single stderr file
         if bootstrap_interpretation.get('errors'):
             error = bootstrap_interpretation['errors'][0]
-            log.error('Probable cause of failure:\n\n%s\n\n' %
-                      _format_error(error))
+            _log_probable_cause_of_failure(log, error)
 
     def _ls_bootstrap_stderr_logs(self, action_num=None, node_id=None):
         """_ls_bootstrap_stderr_logs(), with logging for each log we parse."""
@@ -1911,11 +1910,18 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.warning("Can't fetch step log; missing step ID")
             return
 
-        if _is_spark_step_type(step_type):
+        if self._step_type_uses_spark(step_type):
             # Spark also has a "controller" log4j log, but it doesn't
             # contain errors or anything else we need
-            return _interpret_emr_step_syslog(
-                self.fs, self._ls_step_stderr_logs(step_id=step_id))
+            #
+            # the step log is unlikely to be very much help because
+            # Spark on EMR runs in cluster mode. See #2056
+            #
+            # there's generally only one log (unless the job has been running
+            # long enough for log rotation), so use partial=False
+            return _interpret_spark_logs(
+                self.fs, self._ls_step_stderr_logs(step_id=step_id),
+                partial=False)
         else:
             return (
                 _interpret_emr_step_syslog(

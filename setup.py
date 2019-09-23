@@ -58,6 +58,9 @@ except ImportError:
     from distutils.core import setup
     setuptools_kwargs = {}
 
+with open('README.rst') as f:
+    long_description = f.read()
+
 setup(
     author='David Marin',
     author_email='dm@davidmarin.org',
@@ -85,7 +88,7 @@ setup(
         ]
     ),
     license='Apache',
-    long_description=open('README.rst').read(),
+    long_description=long_description,
     name='mrjob',
     packages=[
         'mrjob',

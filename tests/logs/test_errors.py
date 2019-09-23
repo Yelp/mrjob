@@ -493,3 +493,52 @@ class FormatErrorTestCase(BasicTestCase):
                 start_line=665,
                 num_lines=334))),
             '\n\nwhile reading input from lines 666-999 of very_troubling.log')
+
+    def test_spark_error(self):
+        self.assertEqual(
+            _format_error(dict(spark_error=dict(
+                message='Task attempt_20190829211242_0004_m_000000_0 aborted.',
+                start_line=0,
+                num_lines=1,
+            ))),
+            'Task attempt_20190829211242_0004_m_000000_0 aborted.')
+
+        self.assertEqual(
+            _format_error(dict(spark_error=dict(
+                message='Task attempt_20190829211242_0004_m_000000_0 aborted.',
+                start_line=0,
+                num_lines=1,
+                path='/path/to/log'
+            ))),
+            ('Task attempt_20190829211242_0004_m_000000_0 aborted.'
+             '\n\n(from line 1 of /path/to/log)'))
+
+    def test_spark_error_hides_other_errors(self):
+        self.assertEqual(
+            _format_error(dict(
+                hadoop_error=dict(
+                    message='DevastatingJavaException',
+                    path='history.jhist',
+                    start_line=23,
+                    num_lines=1,
+                ),
+                spark_error=dict(
+                    message='Aborting task',
+                    start_line=99,
+                    num_lines=1,
+                ),
+                task_error=dict(
+                    message='system will self-destruct in 5s'
+                ),
+            )),
+            'Aborting task')
+
+    def test_trim_spark_stacktrace(self):
+        self.assertEqual(
+            _format_error(dict(spark_error=dict(
+                message=_MULTI_LINE_ERROR[37:],
+                start_line=0,
+                num_lines=10,
+            ))),
+            _MULTI_LINE_ERROR[37:423]
+        )

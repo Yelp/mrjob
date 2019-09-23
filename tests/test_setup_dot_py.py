@@ -35,6 +35,8 @@ class SetupDotPyTestCase(BasicTestCase):
 
     def setUp(self):
         # 'import setup' triggers running the setup script
+        self.start(patch.dict(sys.modules))
+
         if 'setup' in sys.modules:
             del sys.modules['setup']
 

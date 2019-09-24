@@ -4206,6 +4206,9 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
 
 class EMRConfigurationsTestCase(MockBoto3TestCase):
 
+    # don't patch load_opts_from_mrjob_confs()
+    MRJOB_CONF_CONTENTS = None
+
     # example from:
     # http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  # noqa
 

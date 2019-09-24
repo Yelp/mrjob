@@ -2983,6 +2983,17 @@ def _get_reason(cluster_or_step):
     return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
+def _combine_emr_configurations(*confs):
+    """Combine zero or more EMR configurations, which are lists
+    of dicts with the key ``Classification`` and optionally ``Properties``
+    and ``Configurations`` (a sub-list with the same properties).
+    Configurations may also be a :py:class:`~mrjob.conf.ClearedValue`
+    wrapping said type of list.
+    """
+    # TODO: start here
+    pass
+
+
 def _fix_configuration_opt(c):
     """Return copy of *c* with *Properties* is always set
     (defaults to {}) and with *Configurations* is not set if empty.

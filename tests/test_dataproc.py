@@ -502,8 +502,10 @@ class GCEClusterConfigTestCase(MockGoogleTestCase):
 
 class ClusterPropertiesTestCase(MockGoogleTestCase):
 
+    MRJOB_CONF_CONTENTS = None
+
     def _get_cluster_properties(self, *args):
-        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job = MRWordCount(['--no-conf', '-r', 'dataproc'] + list(args))
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -534,9 +536,7 @@ class ClusterPropertiesTestCase(MockGoogleTestCase):
             b"      'dataproc:dataproc.allow.zero.workers': true\n"
             b"      'hdfs:dfs.namenode.handler.count': 40\n")
 
-        self.mrjob_conf_patcher.stop()
         props = self._get_cluster_properties('-c', conf_path)
-        self.mrjob_conf_patcher.start()
 
         self.assertEqual(props['dataproc:dataproc.allow.zero.workers'], 'true')
         self.assertEqual(props['hdfs:dfs.namenode.handler.count'], '40')
@@ -2261,8 +2261,10 @@ class HadoopStreamingJarTestCase(MockGoogleTestCase):
 
 class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
 
+    MRJOB_CONF_CONTENTS = None
+
     def _get_project_id_and_gce_config(self, *args):
-        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job = MRWordCount(['--no-conf', '-r', 'dataproc'] + list(args))
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -2349,10 +2351,8 @@ class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
             'mrjob.conf',
             b'runners:\n  dataproc:\n    subnet: default')
 
-        self.mrjob_conf_patcher.stop()
         project_id, gce_config = self._get_project_id_and_gce_config(
             '-c', conf_path, '--network', 'test')
-        self.mrjob_conf_patcher.start()
 
         self.assertEqual(
             gce_config.network_uri,
@@ -2365,10 +2365,8 @@ class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
             'mrjob.conf',
             b'runners:\n  dataproc:\n    network: default')
 
-        self.mrjob_conf_patcher.stop()
         project_id, gce_config = self._get_project_id_and_gce_config(
             '-c', conf_path, '--subnet', 'test')
-        self.mrjob_conf_patcher.start()
 
         self.assertEqual(
             gce_config.subnetwork_uri,

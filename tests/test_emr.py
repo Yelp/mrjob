@@ -4302,6 +4302,39 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
                              [CORE_SITE_EMR_CONFIGURATION,
                               HADOOP_ENV_EMR_CONFIGURATION])
 
+    def test_clear_tag(self):
+        # regression test for #2097
+
+        mrjob_1_conf = self.makefile('mrjob.1.conf', contents="""\
+            runners:
+              emr:
+                emr_configurations:
+                - Classification: spark-defaults
+                  Properties:
+                    spark.executor.memory: 28G
+                - Classification:
+                  Properties:
+                    hive.metastore.client.factory.class: Bees""")
+
+        mrjob_2_conf = self.makefile('mrjob.1.conf', contents="""\
+            runners:
+              emr:
+                emr_configurations: !clear
+                - Classification: spark-defaults
+                  Properties:
+                    spark.executor.memory: 2G""")
+
+        job = MRTwoStepJob(
+            ['-r', 'emr', '-c', mrjob_1_conf, '-c', mrjob_2_conf])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._opts['emr_configurations'],
+                [dict(Classification='spark-defaults',
+                      Properties={'spark.executor.memory': '2G'})])
+
+
 
 class GetJobStepsTestCase(MockBoto3TestCase):
 

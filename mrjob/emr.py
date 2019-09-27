@@ -23,6 +23,7 @@ import pipes
 import posixpath
 import re
 import time
+from collections import OrderedDict
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
@@ -474,6 +475,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if (version_gte(opts['image_version'], '4') and
                 not opts['release_label']):
             opts['release_label'] = 'emr-' + opts['image_version']
+
+        # don't keep two confs with the same Classification (see #2097)
+        opts['emr_configurations'] = _deduplicate_emr_configurations(
+            opts['emr_configurations'])
 
         return opts
 
@@ -2983,15 +2988,24 @@ def _get_reason(cluster_or_step):
     return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
-def _combine_emr_configurations(*confs):
-    """Combine zero or more EMR configurations, which are lists
-    of dicts with the key ``Classification`` and optionally ``Properties``
-    and ``Configurations`` (a sub-list with the same properties).
-    Configurations may also be a :py:class:`~mrjob.conf.ClearedValue`
-    wrapping said type of list.
+def _deduplicate_emr_configurations(emr_configurations):
+    """Takes the value of the *emr_configurations* opt, and ensures that
+    later configs overwrite earlier ones with the same Classification.
+
+    Additionally, any configs that contain empty or unset Properties
+    and Configurations will be removed (this is a way of deleting
+    existing config dicts without replacing them).
+
+    You can assume that all config dicts have run through
+    _fix_configuration_opt()
     """
-    # TODO: start here
-    pass
+    results = OrderedDict()
+
+    for c in emr_configurations:
+        results[c['Classification']] = c
+
+    return [c for c in results.values() if
+            c['Properties'] or c.get('Configurations')]
 
 
 def _fix_configuration_opt(c):

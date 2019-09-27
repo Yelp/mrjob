@@ -32,6 +32,7 @@ from shutil import rmtree
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import translate_jobconf_for_all_versions
+from mrjob.conf import ClearedValue
 from mrjob.conf import combine_jobconfs
 from mrjob.conf import combine_opts
 from mrjob.conf import load_opts_from_mrjob_confs
@@ -426,7 +427,15 @@ class MRJobRunner(object):
                 k = aliased_opt
 
             if k in self.OPT_NAMES:
-                results[k] = None if v is None else self._fix_opt(k, v, source)
+                if v is None:
+                    fixed_v = None
+                elif isinstance(v, ClearedValue):
+                    # _fix_opt() doesn't need to know about !clear (see #2102)
+                    fixed_v = ClearedValue(self._fix_opt(k, v.value, source))
+                else:
+                    fixed_v = self._fix_opt(k, v, source)
+
+                results[k] = fixed_v
             elif v:
                 log.warning('Unexpected option %s (from %s)' % (k, source))
 

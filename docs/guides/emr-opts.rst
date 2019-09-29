@@ -345,6 +345,14 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
 
     .. versionadded:: 0.5.3
 
+    .. versionchanged:: 0.6.11
+
+       ``!clear`` tag works. Later config dicts will overwrite earlier ones
+       with the same ``Classification``. If the later dict has empty
+       ``Properties`` and ``Configurations``, the earlier dict will be simply
+       deleted.
+
+
 .. mrjob-opt::
     :config: release_label
     :switch: --release-label

@@ -4206,6 +4206,9 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
 
 class EMRConfigurationsTestCase(MockBoto3TestCase):
 
+    # don't patch load_opts_from_mrjob_confs()
+    MRJOB_CONF_CONTENTS = None
+
     # example from:
     # http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  # noqa
 
@@ -4298,6 +4301,80 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
             self.assertEqual(runner._opts['emr_configurations'],
                              [CORE_SITE_EMR_CONFIGURATION,
                               HADOOP_ENV_EMR_CONFIGURATION])
+
+    def test_clear_tag(self):
+        # regression test for !clear tag crash #2097
+
+        mrjob_1_conf = self.makefile('mrjob.1.conf', contents="""\
+            runners:
+              emr:
+                emr_configurations:
+                - Classification: spark-defaults
+                  Properties:
+                    spark.executor.memory: 28G
+                - Classification: hive-site
+                  Properties:
+                    hive.metastore.client.factory.class: Bees
+                - Classification: core-site
+                  Properties:
+                    hadoop.security.groups.cache.secs: 250""")
+
+        mrjob_2_conf = self.makefile('mrjob.2.conf', contents="""\
+            runners:
+              emr:
+                emr_configurations: !clear
+                - Classification: spark-defaults
+                  Properties:
+                    spark.executor.memory: 2G""")
+
+        job = MRTwoStepJob(
+            ['-r', 'emr', '-c', mrjob_1_conf, '-c', mrjob_2_conf])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._opts['emr_configurations'],
+                [dict(Classification='spark-defaults',
+                      Properties={'spark.executor.memory': '2G'})])
+
+    def test_overwrite_previous_configurations(self):
+        # regression test for suggested fix to #2097
+
+        mrjob_1_conf = self.makefile('mrjob.1.conf', contents="""\
+            runners:
+              emr:
+                emr_configurations:
+                - Classification: spark-defaults
+                  Properties:
+                    spark.executor.memory: 28G
+                - Classification: hive-site
+                  Properties:
+                    hive.metastore.client.factory.class: Bees
+                - Classification: core-site
+                  Properties:
+                    hadoop.security.groups.cache.secs: 25""")
+
+        mrjob_2_conf = self.makefile('mrjob.2.conf', contents="""\
+            runners:
+              emr:
+                emr_configurations:
+                - Classification: spark-defaults
+                  Properties:
+                    spark.executor.memory: 2G
+                - Classification: hive-site""")
+
+        job = MRTwoStepJob(
+            ['-r', 'emr', '-c', mrjob_1_conf, '-c', mrjob_2_conf])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._opts['emr_configurations'],
+                [dict(Classification='spark-defaults',
+                      Properties={'spark.executor.memory': '2G'}),
+                 dict(Classification='core-site',
+                      Properties={'hadoop.security.groups.cache.secs': '25'})])
+
 
 
 class GetJobStepsTestCase(MockBoto3TestCase):

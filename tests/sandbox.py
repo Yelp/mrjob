@@ -128,10 +128,7 @@ class EmptyMrjobConfTestCase(BasicTestCase):
         super(EmptyMrjobConfTestCase, self).setUp()
 
         if self.MRJOB_CONF_CONTENTS is not None:
-            self.mrjob_conf_patcher = mrjob_conf_patcher(
-                self.MRJOB_CONF_CONTENTS)
-            self.mrjob_conf_patcher.start()
-            self.addCleanup(self.mrjob_conf_patcher.stop)
+            self.start(mrjob_conf_patcher(self.MRJOB_CONF_CONTENTS))
 
 
 class SandboxedTestCase(EmptyMrjobConfTestCase):

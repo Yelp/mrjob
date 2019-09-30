@@ -24,6 +24,7 @@ log = logging.getLogger(__name__)
 _DEFAULT_BACKOFF = 15
 _DEFAULT_MULTIPLIER = 1.5
 _DEFAULT_MAX_TRIES = 10
+_DEFAULT_MAX_BACKOFF = 1200  # 20 minutes
 
 
 class RetryWrapper(object):
@@ -36,38 +37,54 @@ class RetryWrapper(object):
     exception.
     """
     def __init__(self, wrapped, retry_if,
-                 backoff=_DEFAULT_BACKOFF,
+                 initial_backoff=_DEFAULT_BACKOFF,
                  multiplier=_DEFAULT_MULTIPLIER,
-                 max_tries=_DEFAULT_MAX_TRIES):
+                 max_tries=_DEFAULT_MAX_TRIES,
+                 max_backoff=_DEFAULT_MAX_BACKOFF):
         """
         Wrap the given object
 
         :param wrapped: the object to wrap
         :param retry_if: a method that takes an exception, and returns whether
                          we should retry
-        :type backoff: float
-        :param backoff: the number of seconds to wait the first time we get a
-                        retriable error
+        :type initial_backoff: float
+        :param initial_backoff: the number of seconds to wait the first time
+                                we get a retriable error
         :type multiplier: float
         :param multiplier: if we retry multiple times, the amount to multiply
                            the backoff time by every time we get an error
         :type max_tries: int
         :param max_tries: how many tries we get. ``0`` means to keep trying
                           forever
+        :type max_backoff: float
+        :param max_backoff: cap the backoff at this number of seconds
         """
         self.__wrapped = wrapped
 
         self.__retry_if = retry_if
 
-        self.__backoff = backoff
-        if self.__backoff <= 0:
-            raise ValueError('backoff must be positive')
+        self.__initial_backoff = initial_backoff
+        if self.__initial_backoff <= 0:
+            raise ValueError('initial_backoff must be positive')
 
         self.__multiplier = multiplier
         if self.__multiplier < 1:
             raise ValueError('multiplier must be at least one!')
 
         self.__max_tries = max_tries
+
+        self.__max_backoff = max_backoff
+
+    def __iter__(self):
+        """The paginator uses `_make_request` to make any API calls, so we
+        wrap this method manually in our retry logic and pass the iteration
+        back to the paginator."""
+        if hasattr(self.__wrapped, '__iter__'):
+            self.__wrapped._make_request = \
+                self.__wrap_method_with_call_and_maybe_retry(
+                    self.__wrapped._make_request)
+            return self.__wrapped.__iter__()
+        raise Exception('Not iterable')
 
     def __getattr__(self, name):
         """The glue that makes functions retriable, and returns other
@@ -82,7 +99,7 @@ class RetryWrapper(object):
         """Wrap method f in a retry loop."""
 
         def call_and_maybe_retry(*args, **kwargs):
-            backoff = self.__backoff
+            backoff = self.__initial_backoff
             tries = 0
 
             while not self.__max_tries or tries < self.__max_tries:
@@ -97,6 +114,7 @@ class RetryWrapper(object):
                         time.sleep(backoff)
                         tries += 1
                         backoff *= self.__multiplier
+                        backoff = min(backoff, self.__max_backoff)
                     else:
                         raise
 

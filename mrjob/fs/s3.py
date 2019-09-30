@@ -18,7 +18,6 @@
 Also the place for common code used to establish and wrap AWS connections."""
 import fnmatch
 import logging
-import socket
 
 try:
     import botocore.client
@@ -33,21 +32,16 @@ try:
 except ImportError:
     boto3 = None
 
-# ssl is a built-in package, but isn't available if no SSL library is installed
-try:
-    from ssl import SSLError
-except ImportError:
-    SSLError = None
 
-
+from mrjob.aws import _client_error_status
 from mrjob.aws import _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
+from mrjob.aws import _wrap_aws_client
 from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_uri
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
-from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
 
 
@@ -55,26 +49,8 @@ log = logging.getLogger(__name__)
 
 _CHUNK_SIZE = 8192
 
-# if AWS throttles us, how long to wait (in seconds) before trying again?
-_AWS_BACKOFF = 20
-_AWS_BACKOFF_MULTIPLIER = 1.5
-_AWS_MAX_TRIES = 20  # this takes about a day before we run out of tries
-
 # used to disable multipart upload
 _HUGE_PART_SIZE = 2 ** 256
-
-
-def _client_error_code(ex):
-    """Get the error code for the given ClientError"""
-    return ex.response.get('Error', {}).get('Code', '')
-
-
-def _client_error_status(ex):
-    """Get the HTTP status for the given ClientError"""
-    resp = ex.response
-    # sometimes status code is in ResponseMetadata, not Error
-    return (resp.get('Error', {}).get('HTTPStatusCode') or
-            resp.get('ResponseMetadata', {}).get('HTTPStatusCode'))
 
 
 def _endpoint_url(host_or_uri):
@@ -95,40 +71,6 @@ def _get_bucket_region(client, bucket_name):
     it to a region name."""
     resp = client.get_bucket_location(Bucket=bucket_name)
     return resp['LocationConstraint'] or _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
-
-
-def _is_retriable_client_error(ex):
-    """Is the exception from a boto3 client retriable?"""
-    if isinstance(ex, botocore.exceptions.ClientError):
-        # these rarely get through in boto3
-        code = _client_error_code(ex)
-        # "Throttl" catches "Throttled" and "Throttling"
-        if any(c in code for c in ('Throttl', 'RequestExpired', 'Timeout')):
-            return True
-        # spurious 505s thought to be part of an AWS load balancer issue
-        return _client_error_status(ex) == 505
-    # in Python 2.7, SSLError is a subclass of socket.error, so catch
-    # SSLError first
-    elif isinstance(ex, SSLError):
-        # catch ssl.SSLError: ('The read operation timed out',). See #1827.
-        # also catches 'The write operation timed out'
-        return any(isinstance(arg, str) and 'timed out' in arg
-                   for arg in ex.args)
-    elif isinstance(ex, socket.error):
-        return ex.args in ((104, 'Connection reset by peer'),
-                           (110, 'Connection timed out'))
-    else:
-        return False
-
-
-def _wrap_aws_client(raw_client, min_backoff=None):
-    """Wrap a given boto3 Client object so that it can retry when
-    throttled."""
-    return RetryWrapper(raw_client,
-                        retry_if=_is_retriable_client_error,
-                        backoff=max(_AWS_BACKOFF, min_backoff or 0),
-                        multiplier=_AWS_BACKOFF_MULTIPLIER,
-                        max_tries=_AWS_MAX_TRIES)
 
 
 class S3Filesystem(Filesystem):

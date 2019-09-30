@@ -193,10 +193,6 @@ _MIN_SPARK_PY3_AMI_VERSION = '4.0.0'
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
 
-# a relatively cheap instance type that's available on all regions
-# and is big enough to support Spark. See #2071.
-_DEFAULT_INSTANCE_TYPE = 'm5.xlarge'
-
 # minimum amount of memory to run spark jobs
 #
 # it's possible that we could get by with slightly less memory, but
@@ -1027,9 +1023,18 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # using *instance_type* here is defensive programming;
             # if set, it should have already been popped into the worker
             # instance type option(s) by _fix_instance_opts() above
-            return self._opts['instance_type'] or 'm5.xlarge'
+            return self._opts['instance_type'] or self._default_instance_type()
         else:
+            return self._default_instance_type()
+
+    def _default_instance_type(self):
+        """Default instance type if not set by the user."""
+        # m5.xlarge is available on all regions, but only works in AMI 5.13.0
+        # or later. See #2098.
+        if self._image_version_gte('5.13.0'):
             return 'm5.xlarge'
+        else:
+            return 'm4.large'
 
     def _instance_is_worker(self, role):
         """Do instances of the given role run tasks? True for non-master

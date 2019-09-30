@@ -101,7 +101,7 @@ Number and type of instances
     :switch: --instance-type
     :type: :ref:`string <data-type-string>`
     :set: cloud
-    :default: ``m5.xlarge`` on EMR, ``n1-standard-1`` on Dataproc
+    :default: ``m4.large`` or ``m5.xlarge`` on EMR, ``n1-standard-1`` on Dataproc
 
     Type of instance that runs your Hadoop tasks.
 
@@ -120,6 +120,10 @@ Number and type of instances
     this option *doesn't* apply to the master node because it's just
     coordinating tasks, not running them. Use :mrjob-opt:`master_instance_type`
     instead.
+
+    .. versionchanged:: 0.6.11
+
+       Default on EMR is ``m5.xlarge`` on AMI version 5.13.0 and later, ``m4.large`` on earlier versions
 
     .. versionchanged:: 0.6.10
 

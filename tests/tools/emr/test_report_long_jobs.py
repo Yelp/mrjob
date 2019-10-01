@@ -52,6 +52,19 @@ CLUSTERS = [
         _steps=[],
     ),
     dict(
+        Id='j-WAITING',
+        Name='mr_grieving',
+        Status=dict(
+            State='WAITING',
+            Timeline=dict(
+                CreationDateTime=parse('2010-06-06T00:05:00Z'),
+                ReadyDateTime=parse('2010-06-06T00:15:00Z'),
+            ),
+        ),
+        Tags=[],
+        _steps=[],
+    ),
+    dict(
         Id='j-RUNNING1STEP',
         Name='mr_grieving',
         Status=dict(
@@ -325,6 +338,18 @@ class FindLongRunningJobsTestCase(MockBoto3TestCase):
               'state': u'BOOTSTRAPPING',
               'time': timedelta(hours=3, minutes=55)}])
 
+    def test_waiting(self):
+        self.assertEqual(
+            list(self._find_long_running_jobs(
+                [CLUSTER_SUMMARIES_BY_ID['j-WAITING']],
+                min_time=timedelta(hours=1),
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
+            )),
+            [{'cluster_id': u'j-WAITING',
+              'name': u'mr_grieving',
+              'state': u'WAITING',
+              'time': timedelta(hours=3, minutes=45)}])
+
     def test_running_one_step(self):
         self.assertEqual(
             list(self._find_long_running_jobs(
@@ -455,6 +480,10 @@ class FindLongRunningJobsTestCase(MockBoto3TestCase):
               'name': u'mr_grieving',
               'state': u'BOOTSTRAPPING',
               'time': timedelta(hours=3, minutes=55)},
+             {'cluster_id': u'j-WAITING',
+              'name': u'mr_grieving',
+              'state': u'WAITING',
+              'time': timedelta(hours=3, minutes=45)},
              {'cluster_id': u'j-RUNNING1STEP',
               'name': u'mr_denial: Step 1 of 5',
               'state': u'RUNNING',

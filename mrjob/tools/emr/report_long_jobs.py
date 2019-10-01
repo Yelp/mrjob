@@ -83,7 +83,7 @@ def main(args=None):
     emr_client = EMRJobRunner(**_runner_kwargs(options)).make_emr_client()
     cluster_summaries = _boto3_paginate(
         'Clusters', emr_client, 'list_clusters',
-        ClusterStates=['STARTING', 'BOOTSTRAPPING', 'RUNNING'])
+        ClusterStates=['STARTING', 'BOOTSTRAPPING', 'RUNNING', 'WAITING'])
 
     if not options.exclude:
         filtered_cluster_summaries = cluster_summaries
@@ -131,6 +131,18 @@ def _filter_clusters(cluster_summaries, emr_client, exclude_strings):
             yield cs
 
 
+non_running_state_to_start_time_field = {
+    'STARTING': 'CreationDateTime',
+
+    # there isn't a way to tell when the cluster stopped being
+    # provisioned and started bootstrapping, so just measure
+    # from cluster creation time
+    'BOOTSTRAPPING': 'CreationDateTime',
+    'WAITING': 'ReadyDateTime',
+}
+non_running_states = non_running_state_to_start_time_field.keys()
+
+
 def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
     """Identify jobs that have been running or pending for a long time.
 
@@ -146,7 +158,8 @@ def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
     * *cluster_id*: the cluster's unique ID (e.g. ``j-SOMECLUSTER``)
     * *name*: name of the step, or the cluster when bootstrapping
     * *state*: state of the step (``'RUNNING'`` or ``'PENDING'``) or, if there
-               is no step, the cluster (``'STARTING'`` or ``'BOOTSTRAPPING'``)
+               is no step, the cluster (``'STARTING'``, ``'BOOTSTRAPPING'``,
+               or ``'WAITING'``)
     * *time*: amount of time step was running or pending, as a
               :py:class:`datetime.timedelta`
     """
@@ -155,14 +168,13 @@ def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
 
     for cs in cluster_summaries:
 
-        # special case for jobs that are taking a long time to bootstrap
-        if cs['Status']['State'] in ('STARTING', 'BOOTSTRAPPING'):
-            # there isn't a way to tell when the cluster stopped being
-            # provisioned and started bootstrapping, so just measure
-            # from cluster creation time
-            created = cs['Status']['Timeline']['CreationDateTime']
+        # special case for jobs that are taking a long time to start running
+        state = cs['Status']['State']
+        if state in non_running_states:
+            start_time_field = non_running_state_to_start_time_field[state]
+            start_time = cs['Status']['Timeline'][start_time_field]
 
-            time_running = now - created
+            time_running = now - start_time
 
             if time_running >= min_time:
                 yield({'cluster_id': cs['Id'],

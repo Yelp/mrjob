@@ -75,17 +75,6 @@ class RetryWrapper(object):
 
         self.__max_backoff = max_backoff
 
-    def __iter__(self):
-        """The paginator uses `_make_request` to make any API calls, so we
-        wrap this method manually in our retry logic and pass the iteration
-        back to the paginator."""
-        if hasattr(self.__wrapped, '__iter__'):
-            self.__wrapped._make_request = \
-                self.__wrap_method_with_call_and_maybe_retry(
-                    self.__wrapped._make_request)
-            return self.__wrapped.__iter__()
-        raise Exception('Not iterable')
-
     def __getattr__(self, name):
         """The glue that makes functions retriable, and returns other
         attributes from the wrapped object as-is."""

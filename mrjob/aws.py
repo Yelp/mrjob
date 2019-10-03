@@ -218,6 +218,17 @@ _AWS_BACKOFF_MULTIPLIER = 1.5
 _AWS_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
 
+class _Boto3ClientRetryWrapper(RetryWrapper):
+    """Like RetryWrapper, but with special handling for pagination."""
+    # See #2005 for why this is important
+
+    def get_paginator(operation_name):
+        """Instead of retry-wrapping get_paginator() (which doesn't
+        have transient failures) pass the retry-wrapped object
+        into the unwrapped get_paginator() method"""
+        return self.__wrapped.get_paginator.__func(self, operation_name)
+
+
 def _client_error_code(ex):
     """Get the error code for the given ClientError"""
     return ex.response.get('Error', {}).get('Code', '')
@@ -258,11 +269,12 @@ def _is_retriable_client_error(ex):
 def _wrap_aws_client(raw_client, min_backoff=None):
     """Wrap a given boto3 Client object so that it can retry when
     throttled."""
-    return RetryWrapper(raw_client,
-                        retry_if=_is_retriable_client_error,
-                        initial_backoff=max(_AWS_BACKOFF, min_backoff or 0),
-                        multiplier=_AWS_BACKOFF_MULTIPLIER,
-                        max_tries=_AWS_MAX_TRIES)
+    return _Boto3ClientRetryWrapper(
+        raw_client,
+        retry_if=_is_retriable_client_error,
+        initial_backoff=max(_AWS_BACKOFF, min_backoff or 0),
+        multiplier=_AWS_BACKOFF_MULTIPLIER,
+        max_tries=_AWS_MAX_TRIES)
 
 
 def _boto3_now():
@@ -293,16 +305,7 @@ def _boto3_paginate(what, boto3_client, api_call, **api_params):
 
     paginator = boto3_client.get_paginator(api_call)
 
-    # We wrap the pagination object itself so that all the paginator's request
-    # method is  retried in the background; otherwise the generator will fail
-    # on the first retriable exception.
-    paginator_generator = paginator.paginate(**api_params)
-    if isinstance(boto3_client, RetryWrapper):
-        current_backoff = boto3_client._RetryWrapper__initial_backoff
-        paginator_generator = _wrap_aws_client(paginator_generator,
-                                               min_backoff=current_backoff)
-
-    for page in paginator_generator:
+    for page in paginator.paginate(**api_params):
         if _delay:
             time.sleep(_delay)
 

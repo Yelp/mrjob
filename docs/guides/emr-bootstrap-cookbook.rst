@@ -34,7 +34,8 @@ Figure out which version of Python you'll be running on EMR (see
 
  * If it's Python 2, use :command:`pip-2.7` (just plain :command:`pip` also
    works on AMI 4.3.0 and later)
- * If it's Python 3, use :command:`pip-3.4`
+ * If it's Python 3, use :command:`pip-3.6` on AMI 5.20.0+,
+   and :command:`pip-3.4` for earlier AMIs
 
 For example, to install :py:mod:`ujson` on Python 2:
 
@@ -98,8 +99,8 @@ Installing System Packages
 EMR gives you access to a variety of different Amazon Machine Images, or AMIs
 for short (see :mrjob-opt:`image_version`).
 
-3.x and 4.x AMIs
-----------------
+3.x and later AMIs
+------------------
 
 Starting with 3.0.0, EMR AMIs use Amazon Linux, which uses :command:`yum` to
 install packages. For example, to install NumPy:
@@ -109,27 +110,14 @@ install packages. For example, to install NumPy:
     runners:
       emr:
         bootstrap:
-        - sudo yum install -y python27-numpy
+        - sudo yum install -y python-numpy
 
 (Don't forget the ``-y``!)
 
-Amazon Linux currently has few packages for Python 3 libraries; if you're
-on Python 3, just :ref:`use pip <using-pip>`.
+Amazon Linux's Python packages generally only work for Python 2.
+If you're on Python 3, just :ref:`use pip <using-pip>`.
 
-Here are the package lists for all the various versions of Amazon Linux used
-by EMR:
-
- * `2015.09 <http://aws.amazon.com/amazon-linux-ami/2015.09-packages/>`__ (3.11.0 and 4.2.0-4.4.0)
- * `2015.03 <http://aws.amazon.com/amazon-linux-ami/2015.03-packages/>`__ (3.7.0-3.10.0 and 4.0.0-4.1.0)
- * `2014.09 <http://aws.amazon.com/amazon-linux-ami/2014.09-packages/>`__ (3.4.0-3.6.0)
- * `2014.03 <http://aws.amazon.com/amazon-linux-ami/2014.03-packages/>`__ (3.1.0-3.3.2)
- * `2013.09 <http://aws.amazon.com/amazon-linux-ami/2013.09-packages/>`__ (3.0.0-3.0.4)
-
-.. note::
-
-   The package lists gloss over Python versions; wherever you see a package
-   named ``python-<lib name>``, you'll want to install ``python26-<lib name>``
-   or ``python27-<lib name>`` instead.
+The most recent list of Amazon linux packages can be found `here <https://aws.amazon.com/amazon-linux-ami/>`__ (click on "Packages List" in the left sidebar).
 
 2.x AMIs
 --------
@@ -140,54 +128,3 @@ that is so old it has been "archived," which makes their package installer,
 packages work for Python 2.6, not 2.7.
 
 Instead, just use :command:`pip-2.7` to install Python libraries.
-
-.. _installing-python-from-source:
-
-Installing Python from source
-=============================
-
-If you really must use a version of Python that's not available on EMR
-(e.g. Python 3.5 or a very specific patch version), you can
-download and compile Python from source.
-
-.. note::
-
-   This adds an extra 5 to 10 minutes before the cluster can run your job.
-
-Here's how you download and install a Python tarball:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        bootstrap:
-        - wget -S -T 10 -t 5 https://www.python.org/ftp/python/x.y.z/Python-x.y.z.tgz
-        - tar xfz Python-x.y.z.tgz
-        - cd Python-x.y.z; ./configure && make && sudo make install; cd ..
-        bootstrap_python: false
-        python_bin: /usr/local/bin/python
-
-(Replace ``x.y.z`` with a specific version of Python.)
-
-Python 3.4+ comes with :command:`pip` by default, but earlier versions do not,
-so you'll want to tack on ``get-pip.py``:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        bootstrap:
-        ...
-        - wget -S -T 10 -t 5 https://bootstrap.pypa.io/get-pip.py
-        - sudo /usr/local/bin/python get-pip.py
-
-Also, :command:`pip` will be installed in ``/usr/local/bin``, which is not in
-the path for :command:`sudo`, so use its full path:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        bootstrap:
-        ...
-        - sudo /usr/local/bin/pip install ...

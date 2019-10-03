@@ -49,6 +49,7 @@ from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
+from mrjob.aws import _wrap_aws_client
 from mrjob.cloud import HadoopInTheCloudJobRunner
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
@@ -60,7 +61,6 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _client_error_status
 from mrjob.fs.s3 import _endpoint_url
 from mrjob.fs.s3 import _get_bucket_region
-from mrjob.fs.s3 import _wrap_aws_client
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.hadoop import _DEFAULT_YARN_HDFS_LOG_DIR
 from mrjob.iam import _FALLBACK_INSTANCE_PROFILE

@@ -16,8 +16,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """General information about Amazon Web Services, such as region-to-endpoint
-mappings, plus a couple of utilities for working with boto3.
+mappings. Also includes basic utilities for working with boto3.
 """
+import socket
 import time
 from datetime import datetime
 
@@ -27,6 +28,26 @@ try:
     tzutc
 except ImportError:
     tzutc = None
+
+try:
+    import boto3
+    boto3  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    boto3 = None
+
+try:
+    import botocore.client
+    botocore  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    botocore = None
+
+# ssl is a built-in package, but isn't available if no SSL library is installed
+try:
+    from ssl import SSLError
+except ImportError:
+    SSLError = None
+
+from mrjob.retry import RetryWrapper
 
 
 ### EC2 Instances ###
@@ -189,6 +210,63 @@ _S3_REGION_WITH_NO_LOCATION_CONSTRAINT = 'us-east-1'
 _DEFAULT_AWS_REGION = 'us-east-1'
 
 
+### Utilities ###
+
+# if AWS throttles us, how long to wait (in seconds) before trying again?
+_AWS_BACKOFF = 20
+_AWS_BACKOFF_MULTIPLIER = 1.5
+_AWS_MAX_TRIES = 20  # this takes about a day before we run out of tries
+
+
+def _client_error_code(ex):
+    """Get the error code for the given ClientError"""
+    return ex.response.get('Error', {}).get('Code', '')
+
+
+def _client_error_status(ex):
+    """Get the HTTP status for the given ClientError"""
+    resp = ex.response
+    # sometimes status code is in ResponseMetadata, not Error
+    return (resp.get('Error', {}).get('HTTPStatusCode') or
+            resp.get('ResponseMetadata', {}).get('HTTPStatusCode'))
+
+
+def _is_retriable_client_error(ex):
+    """Is the exception from a boto3 client retriable?"""
+    if isinstance(ex, botocore.exceptions.ClientError):
+        # these rarely get through in boto3
+        code = _client_error_code(ex)
+        # "Throttl" catches "Throttled" and "Throttling"
+        if any(c in code for c in ('Throttl', 'RequestExpired', 'Timeout')):
+            return True
+        # spurious 505s thought to be part of an AWS load balancer issue
+        return _client_error_status(ex) == 505
+    # in Python 2.7, SSLError is a subclass of socket.error, so catch
+    # SSLError first
+    elif isinstance(ex, SSLError):
+        # catch ssl.SSLError: ('The read operation timed out',). See #1827.
+        # also catches 'The write operation timed out'
+        return any(isinstance(arg, str) and 'timed out' in arg
+                   for arg in ex.args)
+    elif isinstance(ex, socket.error):
+        return ex.args in ((104, 'Connection reset by peer'),
+                           (110, 'Connection timed out'))
+    else:
+        return False
+
+
+def _wrap_aws_client(raw_client, min_backoff=None):
+    """Wrap a given boto3 Client object so that it can retry when
+    throttled."""
+    return RetryWrapper(
+        raw_client,
+        retry_if=_is_retriable_client_error,
+        backoff=max(_AWS_BACKOFF, min_backoff or 0),
+        multiplier=_AWS_BACKOFF_MULTIPLIER,
+        max_tries=_AWS_MAX_TRIES,
+        unwrap_methods={'get_paginator'})
+
+
 def _boto3_now():
     """Get a ``datetime`` that's compatible with :py:mod:`boto3`.
     These are always UTC time, with time zone ``dateutil.tz.tzutc()``.
@@ -216,6 +294,7 @@ def _boto3_paginate(what, boto3_client, api_call, **api_params):
     _delay = api_params.pop('_delay', None)
 
     paginator = boto3_client.get_paginator(api_call)
+
     for page in paginator.paginate(**api_params):
         if _delay:
             time.sleep(_delay)

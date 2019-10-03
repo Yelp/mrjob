@@ -222,7 +222,7 @@ class _Boto3ClientRetryWrapper(RetryWrapper):
     """Like RetryWrapper, but with special handling for pagination."""
     # See #2005 for why this is important
 
-    def get_paginator(operation_name):
+    def get_paginator(self, operation_name):
         """Instead of retry-wrapping get_paginator() (which doesn't
         have transient failures) pass the retry-wrapped object
         into the unwrapped get_paginator() method"""

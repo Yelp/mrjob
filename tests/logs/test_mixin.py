@@ -19,7 +19,6 @@ from mrjob.hadoop import HadoopJobRunner
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.mixin import _log_parsing_task_log
 from mrjob.step import _is_spark_step_type
-from mrjob.spark.runner import SparkMRJobRunner
 
 from tests.py2 import Mock
 from tests.py2 import patch

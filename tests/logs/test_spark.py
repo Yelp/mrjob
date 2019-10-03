@@ -386,11 +386,6 @@ class InterpretSparkLogsTestCase(BasicTestCase):
 
         self.mock_paths = [stderr_path1, stderr_path2]
 
-        cat_trace_error = dict(errors=[dict(spark_error=dict(
-            message='cat trace:\ntoo many cats',
-            start_line=999,
-            num_lines=2))])
-
         self.path_to_mock_result = {
             stderr_path1: dict(errors=[dict(spark_error=dict(
                 message='cat trace:\ntoo many cats',

@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import errno
-
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr

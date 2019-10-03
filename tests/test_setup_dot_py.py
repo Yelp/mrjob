@@ -16,7 +16,6 @@ import os.path  # for os.path.sep
 import sys
 from os.path import dirname
 from os.path import relpath
-from os.path import sep as path_separator
 from unittest import skipIf
 
 import mrjob
@@ -44,6 +43,7 @@ class SetupDotPyTestCase(BasicTestCase):
 
     def test_packages(self):
         import setup
+        setup  # shh, pyflakes
 
         self.assertEqual(self.setup_func.call_count, 1)
 

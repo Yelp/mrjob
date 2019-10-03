@@ -1049,26 +1049,26 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
         # used to default to m1.small on 2.x AMIs (see #1932)
         self._test_instance_groups(
             dict(image_version='2.4.11'),
-            master=(1, 'm5.xlarge', None))
+            master=(1, 'm4.large', None))
 
     def test_2_x_ami_defaults_multiple_nodes(self):
         # used to default to m1.small on 2.x AMIs (see #1932)
         self._test_instance_groups(
             dict(image_version='2.4.11', num_core_instances=2),
-            core=(2, 'm5.xlarge', None),
-            master=(1, 'm5.xlarge', None))
+            core=(2, 'm4.large', None),
+            master=(1, 'm4.large', None))
 
     def test_release_label_hides_image_version(self):
         self._test_instance_groups(
             dict(release_label='emr-4.0.0', image_version='2.4.11'),
-            master=(1, 'm5.xlarge', None))
+            master=(1, 'm4.large', None))
 
     def test_spark_defaults_single_node(self):
         # when the default instance type was m1.medium, Spark needed
         # m1.large to run tasks, so we needed a separate test. See #1932
         self._test_instance_groups(
             dict(image_version='4.0.0', applications=['Spark']),
-            master=(1, 'm5.xlarge', None))
+            master=(1, 'm4.large', None))
 
     def test_spark_defaults_multiple_nodes(self):
         # This used to test whether we could get away with a smaller
@@ -1077,8 +1077,8 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             dict(image_version='4.0.0',
                  applications=['Spark'],
                  num_core_instances=2),
-            core=(2, 'm5.xlarge', None),
-            master=(1, 'm5.xlarge', None))
+            core=(2, 'm4.large', None),
+            master=(1, 'm4.large', None))
 
     def test_explicit_instance_types_take_precedence(self):
         self._test_instance_groups(

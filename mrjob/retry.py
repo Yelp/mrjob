@@ -37,7 +37,7 @@ class RetryWrapper(object):
     exception.
     """
     def __init__(self, wrapped, retry_if,
-                 initial_backoff=_DEFAULT_BACKOFF,
+                 backoff=_DEFAULT_BACKOFF,
                  multiplier=_DEFAULT_MULTIPLIER,
                  max_tries=_DEFAULT_MAX_TRIES,
                  max_backoff=_DEFAULT_MAX_BACKOFF):
@@ -47,9 +47,9 @@ class RetryWrapper(object):
         :param wrapped: the object to wrap
         :param retry_if: a method that takes an exception, and returns whether
                          we should retry
-        :type initial_backoff: float
-        :param initial_backoff: the number of seconds to wait the first time
-                                we get a retriable error
+        :type backoff: float
+        :param backoff: the number of seconds to wait the first time we get a
+                        retriable error
         :type multiplier: float
         :param multiplier: if we retry multiple times, the amount to multiply
                            the backoff time by every time we get an error
@@ -63,9 +63,9 @@ class RetryWrapper(object):
 
         self.__retry_if = retry_if
 
-        self.__initial_backoff = initial_backoff
-        if self.__initial_backoff <= 0:
-            raise ValueError('initial_backoff must be positive')
+        self.__backoff = backoff
+        if self.__backoff <= 0:
+            raise ValueError('backoff must be positive')
 
         self.__multiplier = multiplier
         if self.__multiplier < 1:
@@ -88,7 +88,7 @@ class RetryWrapper(object):
         """Wrap method f in a retry loop."""
 
         def call_and_maybe_retry(*args, **kwargs):
-            backoff = self.__initial_backoff
+            backoff = self.__backoff
             tries = 0
 
             while not self.__max_tries or tries < self.__max_tries:

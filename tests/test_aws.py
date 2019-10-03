@@ -19,6 +19,7 @@ from ssl import SSLError
 from botocore.exceptions import ClientError
 
 from mrjob.aws import _AWS_MAX_TRIES
+from mrjob.aws import _boto3_paginate
 from mrjob.aws import _wrap_aws_client
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
@@ -50,9 +51,11 @@ class WrapAWSClientTestCase(MockBoto3TestCase):
 
         self.log = self.start(patch('mrjob.retry.log'))
 
+        self.bucket_names = []
+
         self.list_buckets = self.start(patch(
             'tests.mock_boto3.s3.MockS3Client.list_buckets',
-            side_effect=[dict(Buckets=[])]))
+            side_effect=[dict(Buckets=self.bucket_names)]))
 
         self.client = self.client('s3')
         self.wrapped_client = _wrap_aws_client(self.client)
@@ -169,3 +172,12 @@ class WrapAWSClientTestCase(MockBoto3TestCase):
         self.sleep.assert_called_with(1000)
 
         self.assertTrue(self.log.info.called)
+
+    def test_pagination(self):
+        self.add_transient_error(socket.error(110, 'Connection timed out'))
+
+        self.bucket_names = ['walrus%02d' % i for i in range(100)]
+
+        self.assertEqual(list(_boto3_paginate(
+            'Buckets', self.wrapped_client, 'list_buckets')),
+            self.bucket_names)

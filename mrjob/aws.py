@@ -218,17 +218,6 @@ _AWS_BACKOFF_MULTIPLIER = 1.5
 _AWS_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
 
-class _Boto3ClientRetryWrapper(RetryWrapper):
-    """Like RetryWrapper, but with special handling for pagination."""
-    # See #2005 for why this is important
-
-    def get_paginator(self, operation_name):
-        """Instead of retry-wrapping get_paginator() (which doesn't
-        have transient failures) pass the retry-wrapped object
-        into the unwrapped get_paginator() method"""
-        return self.__wrapped.get_paginator.__func(self, operation_name)
-
-
 def _client_error_code(ex):
     """Get the error code for the given ClientError"""
     return ex.response.get('Error', {}).get('Code', '')
@@ -269,12 +258,13 @@ def _is_retriable_client_error(ex):
 def _wrap_aws_client(raw_client, min_backoff=None):
     """Wrap a given boto3 Client object so that it can retry when
     throttled."""
-    return _Boto3ClientRetryWrapper(
+    return RetryWrapper(
         raw_client,
         retry_if=_is_retriable_client_error,
         backoff=max(_AWS_BACKOFF, min_backoff or 0),
         multiplier=_AWS_BACKOFF_MULTIPLIER,
-        max_tries=_AWS_MAX_TRIES)
+        max_tries=_AWS_MAX_TRIES,
+        unwrap_methods={'get_paginator'})
 
 
 def _boto3_now():

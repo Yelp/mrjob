@@ -23,6 +23,7 @@ class MockClientMeta(object):
         self.endpoint_url = endpoint_url
         self.region_name = region_name
 
+
 class MockPageIterator(object):
 
     def __init__(self, method, result_key, page_size, **kwargs):

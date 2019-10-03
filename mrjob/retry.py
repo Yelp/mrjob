@@ -17,6 +17,7 @@
 """Wrappers for gracefully retrying on error."""
 import logging
 import time
+from functools import partial
 
 log = logging.getLogger(__name__)
 

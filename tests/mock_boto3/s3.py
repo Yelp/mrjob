@@ -25,6 +25,7 @@ from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import _boto3_now
 
 from .util import MockClientMeta
+from .util import MockPaginator
 
 
 class MockS3Client(object):
@@ -41,6 +42,12 @@ class MockS3Client(object):
                        *restore* is an optional field showing whether
                        the object has been restored or is being restored.
     """
+    DEFAULT_MAX_ITEMS = 10
+
+    OPERATION_NAME_TO_RESULT_KEY = dict(
+        list_buckets='Buckets',
+    )
+
     def __init__(self,
                  mock_s3_fs,
                  aws_access_key_id=None,
@@ -61,6 +68,13 @@ class MockS3Client(object):
         self.meta = MockClientMeta(
             endpoint_url=endpoint_url,
             region_name=region_name)
+
+    # TODO: merge with code from MockIAMClient
+    def get_paginator(self, operation_name):
+        return MockPaginator(
+            getattr(self, operation_name),
+            self.OPERATION_NAME_TO_RESULT_KEY[operation_name],
+            self.DEFAULT_MAX_ITEMS)
 
     def _check_bucket_exists(self, bucket_name, operation_name):
         if bucket_name not in self.mock_s3_fs:

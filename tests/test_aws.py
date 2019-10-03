@@ -51,11 +51,9 @@ class WrapAWSClientTestCase(MockBoto3TestCase):
 
         self.log = self.start(patch('mrjob.retry.log'))
 
-        self.bucket_names = []
-
         self.list_buckets = self.start(patch(
             'tests.mock_boto3.s3.MockS3Client.list_buckets',
-            side_effect=[dict(Buckets=self.bucket_names)]))
+            side_effect=[dict(Buckets=[])]))
 
         self.client = self.client('s3')
         self.wrapped_client = _wrap_aws_client(self.client)
@@ -173,11 +171,21 @@ class WrapAWSClientTestCase(MockBoto3TestCase):
 
         self.assertTrue(self.log.info.called)
 
-    def test_pagination(self):
+    def test_retry_during_pagination(self):
+        # regression test for #2005
+        bucket_names = ['walrus%02d' % i for i in range(100)]
+
+        # must set side_effect before adding error
+        self.list_buckets.side_effect = [dict(Buckets=bucket_names)]
         self.add_transient_error(socket.error(110, 'Connection timed out'))
 
-        self.bucket_names = ['walrus%02d' % i for i in range(100)]
+        # our mock pagination somewhat messes with this test; rather than
+        # getting called once per page of bucket names, list_buckets() only
+        # gets called twice, once to fail with a transient error, and once to
+        # get the full list of buckets, which mock pagination then breaks
+        # into "pages". This still tests the important thing though, which is
+        # that we can retry at all within pagination
 
         self.assertEqual(list(_boto3_paginate(
             'Buckets', self.wrapped_client, 'list_buckets')),
-            self.bucket_names)
+            bucket_names)

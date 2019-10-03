@@ -101,7 +101,7 @@ Number and type of instances
     :switch: --instance-type
     :type: :ref:`string <data-type-string>`
     :set: cloud
-    :default: ``m5.xlarge`` on EMR, ``n1-standard-1`` on Dataproc
+    :default: ``m4.large`` or ``m5.xlarge`` on EMR, ``n1-standard-1`` on Dataproc
 
     Type of instance that runs your Hadoop tasks.
 
@@ -120,6 +120,10 @@ Number and type of instances
     this option *doesn't* apply to the master node because it's just
     coordinating tasks, not running them. Use :mrjob-opt:`master_instance_type`
     instead.
+
+    .. versionchanged:: 0.6.11
+
+       Default on EMR is ``m5.xlarge`` on AMI version 5.13.0 and later, ``m4.large`` on earlier versions
 
     .. versionchanged:: 0.6.10
 
@@ -265,7 +269,7 @@ Cluster software configuration
     :switch: --image-version
     :type: :ref:`string <data-type-string>`
     :set: cloud
-    :default: ``'5.8.0'`` on EMR, ``'1.0'`` on Dataproc
+    :default: ``'5.27.0'`` on EMR, ``'1.0'`` on Dataproc
 
     Machine image version to use. This controls which Hadoop
     version(s) are available and which version of Python is installed, among
@@ -283,9 +287,21 @@ Cluster software configuration
     You can use this instead of :mrjob-opt:`release_label` on EMR, even for
     4.x+ AMIs; mrjob will just prepend ``emr-`` to form the release label.
 
+    .. versionchanged:: 0.6.11
+
+       Default on EMR is now ``5.27.0``
+
+    .. versionchanged:: 0.6.5
+
+       Default on EMR is now ``5.16.0``
+
+    .. versionchanged:: 0.6.0
+
+       Default on EMR is now ``5.8.0``
+
     .. versionchanged:: 0.5.7
 
-       Default on EMR used to be ``'3.11.0'``.
+       Default on EMR is now ``4.8.2`` (used to be ``'3.11.0'``).
 
     .. versionchanged:: 0.5.4
 

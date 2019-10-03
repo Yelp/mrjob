@@ -25,12 +25,15 @@ from io import BytesIO
 from subprocess import PIPE
 from unittest import SkipTest
 
-if sys.version_info[:2] == (3, 4):
-    raise SkipTest('Google libraries are not supported on Python 3.4')
-
-from google.api_core.exceptions import InvalidArgument
-from google.api_core.exceptions import NotFound
-from google.api_core.exceptions import RequestRangeNotSatisfiable
+try:
+    from google.api_core.exceptions import InvalidArgument
+    from google.api_core.exceptions import NotFound
+    from google.api_core.exceptions import RequestRangeNotSatisfiable
+except ImportError:
+    if sys.version_info[:2] == (3, 4):
+        raise SkipTest('Google libraries are not supported on Python 3.4')
+    else:
+        raise
 
 import mrjob
 import mrjob.dataproc

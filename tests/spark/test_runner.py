@@ -71,6 +71,7 @@ if sys.version_info[:2] == (3, 4):
         pass
 else:
     from tests.mock_google import MockGoogleTestCase
+
     class MockFilesystemsTestCase(
             MockBoto3TestCase, MockGoogleTestCase, MockHadoopTestCase):
         pass

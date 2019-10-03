@@ -19,9 +19,6 @@ import sys
 from hashlib import md5
 from unittest import SkipTest
 
-if sys.version_info[:2] == (3, 4):
-    raise SkipTest('Google libraries are not supported on Python 3.4')
-
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import _CAT_CHUNK_SIZE
 
@@ -29,6 +26,9 @@ from tests.compress import gzip_compress
 from tests.mock_google import MockGoogleTestCase
 from tests.py2 import Mock
 from tests.py2 import patch
+
+if sys.version_info[:2] == (3, 4):
+    raise SkipTest('Google libraries are not supported on Python 3.4')
 
 
 class CatTestCase(MockGoogleTestCase):

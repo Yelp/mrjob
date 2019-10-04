@@ -16,9 +16,15 @@
 """
 from io import BytesIO
 
-from google.cloud.logging.entries import StructEntry
-from google.cloud.logging.resource import Resource
-from google.oauth2.credentials import Credentials
+try:
+    from google.cloud.logging.entries import StructEntry
+    from google.cloud.logging.resource import Resource
+    from google.oauth2.credentials import Credentials
+except ImportError:
+    if sys.version_info[:2] == (3, 4):
+        raise SkipTest('Google libraries are not supported on Python 3.4')
+    else:
+        raise
 
 from mrjob.fs.gcs import parse_gcs_uri
 

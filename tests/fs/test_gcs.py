@@ -27,9 +27,6 @@ from tests.mock_google import MockGoogleTestCase
 from tests.py2 import Mock
 from tests.py2 import patch
 
-if sys.version_info[:2] == (3, 4):
-    raise SkipTest('Google libraries are not supported on Python 3.4')
-
 
 class CatTestCase(MockGoogleTestCase):
 

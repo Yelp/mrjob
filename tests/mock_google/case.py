@@ -16,6 +16,7 @@
 """
 import sys
 from io import BytesIO
+from unittest import SkipTest
 
 try:
     from google.cloud.logging.entries import StructEntry

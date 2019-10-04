@@ -15,9 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import bz2
-import sys
 from hashlib import md5
-from unittest import SkipTest
 
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import _CAT_CHUNK_SIZE

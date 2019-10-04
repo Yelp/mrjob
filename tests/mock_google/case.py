@@ -14,6 +14,7 @@
 # limitations under the License.
 """Limited mock of google-cloud-sdk for tests
 """
+import sys
 from io import BytesIO
 
 try:

@@ -18,6 +18,7 @@ from mrjob.logs.ids import _sort_for_spark
 # _sort_by_recency() is tested implicitly by
 # tests.logs.test_task.InterpretTaskLogsTestCase
 
+
 class SortForSparkTestCase(BasicTestCase):
 
     def test_empty(self):

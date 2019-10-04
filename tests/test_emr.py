@@ -4376,7 +4376,6 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
                       Properties={'hadoop.security.groups.cache.secs': '25'})])
 
 
-
 class GetJobStepsTestCase(MockBoto3TestCase):
 
     def test_empty(self):

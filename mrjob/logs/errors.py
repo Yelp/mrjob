@@ -72,7 +72,7 @@ def _pick_spark_errors(errors):
 
     return sorted(
         (e for e in errors if e.get('spark_error')),
-         key=sort_key, reverse=True)
+        key=sort_key, reverse=True)
 
 
 def _pick_error_attempt_ids(log_interpretation):

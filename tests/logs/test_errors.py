@@ -258,7 +258,6 @@ class PickErrorTestCase(BasicTestCase):
             )
         )
 
-
     def test_spark_error_beats_task_error(self):
         log_interpretation = dict(
             task=dict(

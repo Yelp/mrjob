@@ -115,12 +115,6 @@ class S3Filesystem(Filesystem):
         *path_glob* can include ``?`` to match single characters or
         ``*`` to match 0 or more characters. Both ``?`` and ``*`` can match
         ``/``.
-
-        .. versionchanged:: 0.5.0
-
-            You no longer need a trailing slash to list "directories" on S3;
-            both ``ls('s3://b/dir')`` and `ls('s3://b/dir/')` will list
-            all keys starting with ``dir/``.
         """
         for uri, key in self._ls(path_glob):
             yield uri
@@ -264,8 +258,6 @@ class S3Filesystem(Filesystem):
         It's best to use :py:meth:`get_bucket` because it chooses the
         appropriate S3 endpoint automatically. If you are trying to get
         bucket metadata, use :py:meth:`make_s3_client`.
-
-        .. versionadded:: 0.6.0
         """
         # give a non-cryptic error message if boto3 isn't installed
         if boto3 is None:
@@ -286,8 +278,6 @@ class S3Filesystem(Filesystem):
         wrapped in a :py:class:`mrjob.retry.RetryWrapper`
 
         :param region: region to use to choose S3 endpoint.
-
-        .. versionadded:: 0.6.0
         """
         # give a non-cryptic error message if boto3 isn't installed
         if boto3 is None:
@@ -343,8 +333,6 @@ class S3Filesystem(Filesystem):
     def get_all_bucket_names(self):
         """Get a list of the names of all buckets owned by this user
         on S3.
-
-        .. versionadded:: 0.6.0
         """
         c = self.make_s3_client()
         return [b['Name'] for b in c.list_buckets()['Buckets']]
@@ -352,10 +340,6 @@ class S3Filesystem(Filesystem):
     def create_bucket(self, bucket_name, region=None):
         """Create a bucket on S3 with a location constraint
         matching the given region.
-
-        .. versionchanged:: 0.6.0
-
-           The *region* argument used to be called *location*.
         """
         client = self.make_s3_client()
 

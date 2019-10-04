@@ -395,9 +395,6 @@ def combine_lists(*seqs):
 
     Strings, bytes, and non-sequence objects (e.g. numbers) are treated as
     single-item lists.
-
-    .. versionchanged:: 0.5.3
-       Dicts are treated as single-item lists
     """
     result = []
 

@@ -1055,8 +1055,6 @@ class MRJob(MRJobLauncher):
     #:
     #: If you require more sophisticated behavior, try overriding
     #: :py:meth:`libjars`.
-    #:
-    #: .. versionadded:: 0.5.3
     LIBJARS = []
 
     def libjars(self):
@@ -1068,8 +1066,6 @@ class MRJob(MRJobLauncher):
 
         Note that ``~`` and environment variables in paths will always be
         expanded by the job runner (see :mrjob-opt:`libjars`).
-
-        .. versionadded:: 0.5.3
 
         .. versionchanged:: 0.6.6
 

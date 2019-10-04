@@ -532,10 +532,6 @@ class MRJobRunner(object):
         names start with ``"_"`` or ``"."`` (e.g. ``_SUCCESS``, ``_logs/``,
         ``.part-00000.crc``.
 
-        .. versionadded:: 0.6.0
-
-           In previous versions, you'd use :py:meth:`stream_output`.
-
         .. versionchanged:: 0.6.8
 
            Ignore file/dirnames starting with ``"."`` as well as ``"_"``.

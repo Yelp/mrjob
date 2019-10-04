@@ -52,13 +52,6 @@ log = getLogger(__name__)
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
 #: * ``'TMP'``: delete local, HDFS, and cloud storage temp files, but not logs
-#:
-#: .. versionchanged:: 0.5.0
-#:
-#:     - ``LOCAL_TMP`` used to be ``LOCAL_SCRATCH``
-#:     - ``HADOOP_TMP`` is new (and used to be covered by ``LOCAL_SCRATCH``)
-#:     - ``CLOUD_TMP`` used to be ``REMOTE_SCRATCH``
-#:
 CLEANUP_CHOICES = [
     'ALL',
     'CLOUD_TMP',

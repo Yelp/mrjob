@@ -48,10 +48,6 @@ options related to file uploading.
     Set this to ``False`` if you've already installed ``mrjob`` on your
     Hadoop cluster or install it by some other method.
 
-    .. versionchanged 0.5.7:
-
-    mrjob used to be bootstrapped as a tarball.
-
 .. mrjob-opt::
    :config: py_files
    :switch: --py-files
@@ -63,8 +59,6 @@ options related to file uploading.
 
    This is based on a Spark feature, but it works just as well with streaming
    jobs.
-
-   .. versionadded:: 0.5.7
 
    .. versionchanged:: 0.6.7
 
@@ -84,10 +78,6 @@ options related to file uploading.
     name of the archive file (e.g. ``foo.tar.gz`` is unpacked to the directory
     ``foo.tar.gz/``, and ``foo.tar.gz#stuff`` is unpacked to the directory
     ``stuff/``).
-
-    .. versionchanged:: 0.5.7
-
-       This works with Spark on YARN as well.
 
     .. versionchanged:: 0.6.7
 
@@ -109,8 +99,6 @@ options related to file uploading.
     ``#nameinworkingdir`` to the path; otherwise we just use its name.
 
     This works with Spark on YARN only.
-
-    .. versionadded:: 0.5.8
 
     .. versionchanged:: 0.6.7
 
@@ -139,17 +127,13 @@ options related to file uploading.
 
         --files file_1.txt,file_2.sqlite
 
-    .. versionchanged:: 0.5.7
+    .. versionchanged:: 0.6.8
 
-       This works with Spark as well.
+       In Spark, can use ``#nameinworkingdir`` even when not on YARN.
 
     .. versionchanged:: 0.6.7
 
        Deprecated :option:`--file` in favor of :option:`--files`
-
-    .. versionchanged:: 0.6.8
-
-       In Spark, can use ``#nameinworkingdir`` even when not on YARN.
 
 
 Temp files and cleanup
@@ -185,10 +169,6 @@ Temp files and cleanup
 
         --cleanup=LOGS,JOB
 
-    .. versionchanged:: 0.5.0
-
-       Options ending in ``TMP`` used to end in ``SCRATCH``
-
 .. mrjob-opt::
    :config: cleanup_on_failure
    :switch: --cleanup-on-failure
@@ -215,10 +195,6 @@ Temp files and cleanup
     .. versionchanged:: 0.6.6
 
        Added `--local-tmp-dir` switch.
-
-    .. versionchanged:: 0.5.0
-
-       This option used to be named ``base_tmp_dir``.
 
 .. mrjob-opt::
    :config: output_dir
@@ -287,11 +263,6 @@ Job execution context
     On the command line::
 
         --cmdenv PYTHONPATH=$HOME/stuff,TZ=America/Los_Angeles
-
-    .. versionchanged:: 0.5.7
-
-       This works with Spark too. In client mode (hadoop runner), these
-       environment variables are passed directly to :command:`spark-submit`.
 
 .. mrjob-opt::
     :config: interpreter
@@ -397,11 +368,13 @@ Job execution context
        Uploading archives and directories (e.g. ``src-tree/#``) to Spark's
        working directory still only works on YARN.
 
-    .. versionadded:: 0.5.8 support for directories (above)
+    .. versionchanged:: 0.6.8
 
-    .. versionadded:: 0.6.7 support for Spark on YARN only
+       added full support for Spark
 
-    .. versionadded:: 0.6.8 full support for Spark
+    .. versionchanged:: 0.6.7
+
+       added support for Spark on YARN only
 
     For more details of parsing, see
     :py:func:`~mrjob.setup.parse_setup_cmd`.
@@ -426,22 +399,14 @@ Job execution context
     one command into another (see e.g.
     :py:meth:`~mrjob.job.MRJob.mapper_pre_filter`).
 
-    .. versionchanged:: 0.5.9
-
-       Starting with EMR AMI 5.2.0, :command:`/bin/sh -e` is broken, so we
-       emulate the :command:`-e` switch by using :command:`/bin/sh -x` as our
-       shell, and prepending :command:`set -e` to any shell script generated
-       by mrjob. :command:`set -e` is not prepended if you
-       set *sh_bin* yourself; you could add it with :mrjob-opt:`setup`.
-
-    .. versionchanged:: 0.6.7
-
-       Used to be :command:`sh -ex` on local and Hadoop runners
-
     .. versionchanged:: 0.6.8
 
        Setting this to an empty value (``--sh-bin ''``) means to use the
        default (used to cause an error).
+
+    .. versionchanged:: 0.6.7
+
+       Used to be :command:`sh -ex` on local and Hadoop runners
 
 .. mrjob-opt::
     :config: steps_interpreter

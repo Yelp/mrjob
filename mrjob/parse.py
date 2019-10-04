@@ -36,11 +36,6 @@ log = logging.getLogger(__name__)
 def is_uri(uri):
     r"""Return True if *uri* is a URI and contains ``://``
     (we only care about URIs that can describe files)
-
-    .. versionchanged:: 0.5.7
-
-       used to recognize anything containing a colon as a URI
-       unless it was a Windows path (``C:\...``).
     """
     return '://' in uri and bool(urlparse(uri).scheme)
 

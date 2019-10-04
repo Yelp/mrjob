@@ -96,8 +96,6 @@ def parse_setup_cmd(cmd):
     the original command. You may optionally include a slash after *name* as
     well (this will only result in a single slash in the final command).
 
-    .. versionadded:: 0.5.8 support for directories (above)
-
     Parsed hash paths are dicitionaries with the keys ``path``, ``name``, and
     ``type`` (either ``'file'``, ``'archive'``, or ``'dir'``).
 

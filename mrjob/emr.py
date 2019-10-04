@@ -370,8 +370,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                         ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
         elif not version_gte(self._opts['image_version'], '2.4.3'):
             log.warning("AMIs prior to 2.4.3 probably will not work because"
-                        " they don't support Python 2.7. Use a later AMI"
-                        " version or mrjob v0.5.11")
+                        " they don't support Python 2.7.")
         elif not self._image_version_gte('5.7.0'):
             if self._opts['image_id']:
                 log.warning('AMIs prior to 5.7.0 will probably not work'
@@ -2723,10 +2722,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def get_image_version(self):
         """Get the version of the AMI that our cluster is running, or ``None``.
-
-        .. versionchanged:: 0.5.4
-
-           This used to be called :py:meth:`get_ami_version`
         """
         return self._get_cluster_info('image_version')
 

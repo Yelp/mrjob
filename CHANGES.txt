@@ -1,3 +1,16 @@
+v0.6.11, 2019-10-04 -- Spark log parsing
+ * Python 3.4 is again supported, except for Google libraries (#2090)
+ * can intermix positional (input file) args to MRJobs on Python 3.7 (#1701)
+ * all runners
+   * can parse logs to find cause of error in Spark (#2056)
+ * EMR runner
+   * retrying on transient API errors now works with pagination (#2005)
+   * default image_version (AMI) is now 5.27.0 (#2105)
+   * restored m4.large as default instance type for pre-5.13.0 AMIs (#2098)
+   * can override emr_configurations with !clear or by Classification (#2097)
+ * Spark runner
+   * can run scripts with spark-submit without pyspark in $PYTHONPATH (#2091)
+
 v0.6.10, 2019-07-19 -- official PyPy support
  * officially support PyPy (#1011)
    * when launched in PyPy, defaults python_bin to pypy or pypy3

@@ -4,6 +4,41 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.11:
+
+0.6.11
+------
+
+Adds support for parsing Spark logs and driver output to determine why a job
+failed. This works with with the local, Hadoop, EMR, and Spark runners.
+
+The Spark runner no longer needs :py:mod:`pyspark` in the ``$PYTHONPATH`` to
+launch scripts with :command:`spark-submit` (it still needs :py:mod:`pyspark`
+to use the Spark harness).
+
+On Python 3.7, you can now intermix positional arguments to
+:py:class:`~mrjob.job.MRJob` with switches, similar to how you could back when
+mrjob used :py:mod:`optparse`. For example:
+:command:`mr_your_script.py file1 -v file2`.
+
+On EMR, the default :mrjob-opt:`image_version` (AMI) is now 5.27.0.
+
+Restored ``m4.large`` as the default instance type pre-5.13.0 AMIs, as they
+do not support ``m5.xlarge``. (``m5.xlarge`` is still the default for AMI
+5.13.0 and later.)
+
+mrjob can now retry on transient AWS API errors (e.g. throttling) or network
+errors when making API calls that use pagination (e.g. listing clusters).
+
+The :mrjob-opt:`emr_configurations` opt now supports the ``!clear`` tag
+rather than crashing. You may also override individual configs by setting
+a config with the same ``Classification``.
+
+This version restores official support for Python 3.4, as it's the version
+of Python 3 installed on EMR AMIs prior to 5.20.0. In order to make this work,
+mrjob drops support for Google Cloud services in Python 3.4, as the recent
+Google libraries appear to need a later Python version.
+
 .. _v0.6.10:
 
 0.6.10
@@ -40,7 +75,9 @@ mrjob.conf file without :mod:`PyYAML` installed.
 0.6.9
 -----
 
-This fixes a bug introduced in :ref:`v0.6.8` that could break archives or
+Drops support for Python 3.4.
+
+Fixes a bug introduced in :ref:`v0.6.8` that could break archives or
 directories uploaded into Hadoop or Spark if the name of the unpacked archive
 didn't have an archive extension (e.g. ``.tar.gz``).
 

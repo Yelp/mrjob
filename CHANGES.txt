@@ -1,3 +1,8 @@
+v0.7.0, 2019-10-?? -- fall cleaning
+ * removed the following deprecated code:
+
+
+
 v0.6.11, 2019-10-04 -- Spark log parsing
  * Python 3.4 is again supported, except for Google libraries (#2090)
  * can intermix positional (input file) args to MRJobs on Python 3.7 (#1701)

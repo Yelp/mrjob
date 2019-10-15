@@ -141,7 +141,7 @@ Project Links
 -------------
 
 * `Source code <http://github.com/Yelp/mrjob>`__
-* `Documentation <http://packages.python.org/mrjob/>`_
+* `Documentation <https://mrjob.readthedocs.io/en/latest/>`_
 * `Discussion group <http://groups.google.com/group/mrjob>`_
 
 Reference

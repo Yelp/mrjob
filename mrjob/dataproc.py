@@ -68,7 +68,7 @@ _DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
 
 # default imageVersion to use on Dataproc. This may be updated with each
 # version of mrjob
-_DEFAULT_IMAGE_VERSION = '1.0'
+_DEFAULT_IMAGE_VERSION = '1.3'
 _DEFAULT_CHECK_CLUSTER_EVERY = 10.0
 _DEFAULT_CLOUD_FS_SYNC_SECS = 5.0
 _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS = 90
@@ -87,7 +87,10 @@ _STATE_MATCHER_ACTIVE = 1
 # for the full list.
 _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
     '0.1': '2.7.1',
-    '1.0': '2.7.2'
+    '1.0': '2.7.2',
+    '1.1': '2.7.7',
+    '1.2': '2.8.5',
+    '1.3': '2.9.2',
 }
 
 _HADOOP_STREAMING_JAR_URI = (

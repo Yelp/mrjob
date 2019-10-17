@@ -109,6 +109,12 @@ class LocalFSTestCase(SandboxedTestCase):
         self.assertEqual(sorted(list(self.fs.ls(self.tmp_dir))),
                          sorted(self.abs_paths('f', 'd/f2')))
 
+    def test_ls_with_file_uri(self):
+        f_path = self.makefile('f', 'contents')
+        f_uri = 'file://' + f_path
+
+        self.assertEqual(list(self.fs.ls(f_uri)), [f_uri])
+
     def test_mkdir(self):
         path = join(self.tmp_dir, 'dir')
         self.fs.mkdir(path)

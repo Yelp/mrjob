@@ -19,6 +19,7 @@ import os.path
 import stat
 
 from mrjob import conf
+from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.inline import InlineMRJobRunner
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
@@ -389,3 +390,20 @@ class FSDoesntHandleURIsTestCase(SandboxedTestCase):
         # non-file:/// URI should raise IOError, not return False
         self.assertRaises(IOError,
                           runner.fs.exists, 's3://walrus/fish')
+
+
+class FileURIsAsInputTestCase(SandboxedTestCase):
+    # regression test for #1986
+
+    def test_file_uris_as_input(self):
+        input1 = self.makefile('input1.txt', b'cat rat bat')
+        input2 = 'file://' + self.makefile('input2.txt', b'dog dog dog')
+
+        job = MRWordFreqCount([input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(dict(job.parse_output(runner.cat_output())),
+                             dict(bat=1, cat=1, dog=3, rat=1))

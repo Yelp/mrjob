@@ -37,6 +37,13 @@ class CatTestCase(SandboxedTestCase):
             b''.join(self.fs._cat_file(path)),
             b'bar\nfoo\n')
 
+    def test_cat_file_uri(self):
+        uri = 'file://' + self.makefile('f', b'bar\nfoo\n')
+
+        self.assertEqual(
+            b''.join(self.fs._cat_file(uri)),
+            b'bar\nfoo\n')
+
     def test_yields_lines(self):
         # since it's just opening the fileobj directly
         path = self.makefile('f', b'bar\nfoo\n')
@@ -115,31 +122,58 @@ class LocalFSTestCase(SandboxedTestCase):
 
         self.assertEqual(list(self.fs.ls(f_uri)), [f_uri])
 
+    def test_ls_dir_with_file_uri(self):
+        self.makefile('f', 'contents')
+        self.makefile('f2', 'contents')
+        tmp_dir_uri = 'file://' + self.tmp_dir
+
+        self.assertEqual(sorted(list(self.fs.ls(tmp_dir_uri))),
+                         [tmp_dir_uri + '/f', tmp_dir_uri + '/f2'])
+
     def test_mkdir(self):
         path = join(self.tmp_dir, 'dir')
         self.fs.mkdir(path)
         self.assertEqual(os.path.isdir(path), True)
 
+    def test_mkdir_file_uri(self):
+        path = join(self.tmp_dir, 'dir')
+        self.fs.mkdir('file://' + path)
+        self.assertEqual(os.path.isdir(path), True)
+
     def test_exists_no(self):
         path = join(self.tmp_dir, 'f')
         self.assertEqual(self.fs.exists(path), False)
+        self.assertEqual(self.fs.exists('file://' + path), False)
 
     def test_exists_yes(self):
         path = self.makefile('f', 'contents')
         self.assertEqual(self.fs.exists(path), True)
+        self.assertEqual(self.fs.exists('file://' + path), True)
 
     def test_put(self):
         src = self.makefile('f', 'contents')
-        dest = join(self.tmp_dir, 'g')
+        dest1 = join(self.tmp_dir, 'g')
+        dest2 = join(self.tmp_dir, 'h')
 
-        self.fs.put(src, dest)
-        self.assertEqual(b''.join(self.fs.cat(dest)), b'contents')
+        self.fs.put(src, dest1)
+        self.assertEqual(b''.join(self.fs.cat(dest1)), b'contents')
+
+        # test put()-ing to a URI. *src* has to be an actual path
+        self.fs.put(src, 'file://' + dest2)
+        self.assertEqual(b''.join(self.fs.cat(dest1)), b'contents')
 
     def test_rm_file(self):
         path = self.makefile('f', 'contents')
         self.assertEqual(self.fs.exists(path), True)
 
         self.fs.rm(path)
+        self.assertEqual(self.fs.exists(path), False)
+
+    def test_rm_file_by_uri(self):
+        path = self.makefile('f', 'contents')
+        self.assertEqual(self.fs.exists(path), True)
+
+        self.fs.rm('file://' + path)
         self.assertEqual(self.fs.exists(path), False)
 
     def test_rm_dir(self):
@@ -151,13 +185,34 @@ class LocalFSTestCase(SandboxedTestCase):
 
     def test_touchz(self):
         path = join(self.tmp_dir, 'f')
+
+        self.assertEqual(self.fs.exists(path), False)
+
         self.fs.touchz(path)
+        self.assertEqual(self.fs.exists(path), True)
+
+        # okay to touchz() an empty file
         self.fs.touchz(path)
+
         with open(path, 'w') as f:
             f.write('not empty anymore')
+
+        # not okay to touchz() a non-empty file
         self.assertRaises(OSError, self.fs.touchz, path)
+
+    def test_touchz_file_uri(self):
+        uri = 'file://' + join(self.tmp_dir, 'f')
+
+        self.assertEqual(self.fs.exists(uri), False)
+
+        self.fs.touchz(uri)
+        self.assertEqual(self.fs.exists(uri), True)
 
     def test_md5sum(self):
         path = self.makefile('f', 'abcd')
+
         self.assertEqual(self.fs.md5sum(path),
+                         'e2fc714c4727ee9395f324cd2e7f331f')
+
+        self.assertEqual(self.fs.md5sum('file://' + path),
                          'e2fc714c4727ee9395f324cd2e7f331f')

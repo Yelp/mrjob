@@ -2,6 +2,7 @@
 # Copyright 2015 Yelp
 # Copyright 2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,18 +16,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import bz2
-import socket
-from ssl import SSLError
 
 from botocore.exceptions import ClientError
 
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import _wrap_aws_client
-from mrjob.fs.s3 import _AWS_MAX_TRIES
+from mrjob.fs.s3 import _HUGE_PART_SIZE
 
 from tests.compress import gzip_compress
 from tests.mock_boto3 import MockBoto3TestCase
-from tests.mock_boto3.s3 import MockS3Object
 from tests.py2 import patch
 
 
@@ -74,6 +71,9 @@ class S3FSTestCase(MockBoto3TestCase):
     def setUp(self):
         super(S3FSTestCase, self).setUp()
         self.fs = S3Filesystem()
+
+        self.TransferConfig = self.start(
+            patch('boto3.s3.transfer.TransferConfig'))
 
     def test_ls_key(self):
         self.add_mock_s3_data(
@@ -168,23 +168,26 @@ class S3FSTestCase(MockBoto3TestCase):
         self.fs.put(local_path, dest)
         self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
-    def test_put_part_size_mb(self):
+        self.TransferConfig.assert_called_once_with(
+            multipart_chunksize=_HUGE_PART_SIZE,
+            multipart_threshold=_HUGE_PART_SIZE,
+        )
+
+    def test_put_with_part_size(self):
         self.add_mock_s3_data({'bar-files': {}})
 
         local_path = self.makefile('foo', contents=b'bar')
         dest = 's3://bar-files/foo'
 
-        with patch.object(MockS3Object, 'upload_file') as upload_file:
-            with patch('boto3.s3.transfer.TransferConfig') as TransferConfig:
-                self.fs.put(local_path, dest, part_size_mb=99999)
+        fs = S3Filesystem(part_size=12345)
 
-                upload_file.assert_called_once_with(
-                    local_path, Config=TransferConfig.return_value)
+        fs.put(local_path, dest)
+        self.assertEqual(b''.join(self.fs.cat(dest)), b'bar')
 
-                TransferConfig.assert_called_once_with(
-                    multipart_chunksize=99999,
-                    multipart_threshold=99999,
-                )
+        self.TransferConfig.assert_called_once_with(
+            multipart_chunksize=12345,
+            multipart_threshold=12345,
+        )
 
     def test_rm(self):
         self.add_mock_s3_data({
@@ -239,7 +242,14 @@ class S3FSTestCase(MockBoto3TestCase):
         self.assertRaises(OSError,
                           self.fs.touchz, 's3://walrus/full')
 
-    def test_mkdir_does_nothing(self):
+    def test_mkdir_creates_buckets(self):
+        self.assertNotIn('walrus', self.mock_s3_fs)
+
+        self.fs.mkdir('s3://walrus/data')
+
+        self.assertIn('walrus', self.mock_s3_fs)
+
+    def test_mkdir_does_not_create_directories(self):
         self.add_mock_s3_data({'walrus': {}})
 
         self.assertEqual(list(self.fs.ls('s3://walrus/')), [])
@@ -426,137 +436,30 @@ class S3FSRegionTestCase(MockBoto3TestCase):
         self.assertEqual(bucket.meta.client.meta.region_name,
                          'us-west-2')
 
+    def test_create_bucket_in_region_set_at_init_time(self):
+        fs = S3Filesystem(s3_region='us-west-2')
 
-class WrapAWSClientTestCase(MockBoto3TestCase):
-    """Test that _wrap_aws_client() works as expected.
+        fs.create_bucket('walrus')
 
-    We're going to wrap S3Client.list_buckets(), but it should work the
-    same on any method on any AWS client/resource."""
+        s3_client = fs.make_s3_client()
+        self.assertEqual(
+            s3_client.get_bucket_location('walrus')['LocationConstraint'],
+            'us-west-2')
 
-    def setUp(self):
-        super(WrapAWSClientTestCase, self).setUp()
+        bucket = fs.get_bucket('walrus')
 
-        # don't actually wait between retries
-        self.sleep = self.start(patch('time.sleep'))
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3-us-west-2.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-west-2')
 
-        self.log = self.start(patch('mrjob.retry.log'))
+    def test_create_bucket_with_mkdir(self):
+        # mkdir() doesn't have a way to specify bucket location, so we
+        # do it at init time
+        fs = S3Filesystem(s3_region='us-west-1')
 
-        self.list_buckets = self.start(patch(
-            'tests.mock_boto3.s3.MockS3Client.list_buckets',
-            side_effect=[dict(Buckets=[])]))
+        fs.mkdir('s3://walrus/data')
 
-        self.client = self.client('s3')
-        self.wrapped_client = _wrap_aws_client(self.client)
-
-    def add_transient_error(self, ex):
-        self.list_buckets.side_effect = (
-            [ex] + list(self.list_buckets.side_effect))
-
-    def test_unwrapped_no_errors(self):
-        # just a sanity check of our mocks
-        self.assertEqual(self.client.list_buckets(), dict(Buckets=[]))
-
-    def test_unwrapped_with_errors(self):
-        self.add_transient_error(socket.error(104, 'Connection reset by peer'))
-
-        self.assertRaises(socket.error, self.client.list_buckets)
-
-    def test_wrapped_no_errors(self):
-        self.assertEqual(self.wrapped_client.list_buckets(), dict(Buckets=[]))
-
-        self.assertFalse(self.log.info.called)
-
-    def assert_retry(self, ex):
-        self.add_transient_error(ex)
-        self.assertEqual(self.wrapped_client.list_buckets(), dict(Buckets=[]))
-        self.assertTrue(self.log.info.called)
-
-    def assert_no_retry(self, ex):
-        self.add_transient_error(ex)
-        self.assertRaises(ex.__class__, self.wrapped_client.list_buckets)
-        self.assertFalse(self.log.info.called)
-
-    def test_socket_connection_reset_by_peer(self):
-        self.assert_retry(socket.error(104, 'Connection reset by peer'))
-
-    def test_socket_connection_timed_out(self):
-        self.assert_retry(socket.error(110, 'Connection timed out'))
-
-    def test_other_socket_errors(self):
-        self.assert_no_retry(socket.error(111, 'Connection refused'))
-
-    def test_ssl_read_op_timed_out_error(self):
-        self.assert_retry(SSLError('The read operation timed out'))
-
-    def test_ssl_write_op_timed_out_error(self):
-        self.assert_retry(SSLError('The write operation timed out'))
-
-    def test_other_ssl_error(self):
-        self.assert_no_retry(SSLError('certificate verify failed'))
-
-    def test_throttling_error(self):
-        self.assert_retry(ClientError(
-            dict(
-                Error=dict(
-                    Code='ThrottlingError'
-                )
-            ),
-            'ListBuckets'))
-
-    def test_aws_505_error(self):
-        self.assert_retry(ClientError(
-            dict(
-                ResponseMetadata=dict(
-                    HTTPStatusCode=505
-                )
-            ),
-            'ListBuckets'))
-
-    def test_other_client_error(self):
-        self.assert_no_retry(ClientError(
-            dict(
-                Error=dict(
-                    Code='AccessDenied',
-                    Message='Access Denied',
-                ),
-                ResponseMetadata=dict(
-                    HTTPStatusCode=403
-                ),
-            ),
-            'GetBucketLocation'))
-
-    def test_other_error(self):
-        self.assert_no_retry(ValueError())
-
-    def test_two_retriable_errors(self):
-        self.add_transient_error(socket.error(110, 'Connection timed out'))
-        self.add_transient_error(SSLError('The read operation timed out'))
-        self.assertEqual(self.wrapped_client.list_buckets(), dict(Buckets=[]))
-        self.assertTrue(self.log.info.called)
-
-    def test_retriable_and_no_retriable_error(self):
-        # errors are prepended to side effects
-        # we want socket.error to happen first
-        self.add_transient_error(ValueError())
-        self.add_transient_error(socket.error(110, 'Connection timed out'))
-
-        self.assertRaises(ValueError, self.wrapped_client.list_buckets)
-        self.assertTrue(self.log.info.called)
-
-    def test_eventually_give_up(self):
-        for _ in range(_AWS_MAX_TRIES + 1):
-            self.add_transient_error(socket.error(110, 'Connection timed out'))
-
-        self.assertRaises(socket.error, self.wrapped_client.list_buckets)
-        self.assertTrue(self.log.info.called)
-
-    def test_min_backoff(self):
-        self.wrapped_client = _wrap_aws_client(self.client, min_backoff=1000)
-
-        self.add_transient_error(socket.error(110, 'Connection timed out'))
-
-        self.assertEqual(self.wrapped_client.list_buckets(), dict(Buckets=[]))
-
-        self.sleep.assert_called_with(1000)
-
-        self.assertTrue(self.log.info.called)
+        bucket = fs.get_bucket('walrus')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-west-1')

@@ -1,5 +1,6 @@
 # Copyright 2009-2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +25,7 @@ from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import _boto3_now
 
 from .util import MockClientMeta
+from .util import MockPaginator
 
 
 class MockS3Client(object):
@@ -40,6 +42,12 @@ class MockS3Client(object):
                        *restore* is an optional field showing whether
                        the object has been restored or is being restored.
     """
+    DEFAULT_MAX_ITEMS = 10
+
+    OPERATION_NAME_TO_RESULT_KEY = dict(
+        list_buckets='Buckets',
+    )
+
     def __init__(self,
                  mock_s3_fs,
                  aws_access_key_id=None,
@@ -60,6 +68,13 @@ class MockS3Client(object):
         self.meta = MockClientMeta(
             endpoint_url=endpoint_url,
             region_name=region_name)
+
+    # TODO: merge with code from MockIAMClient
+    def get_paginator(self, operation_name):
+        return MockPaginator(
+            getattr(self, operation_name),
+            self.OPERATION_NAME_TO_RESULT_KEY[operation_name],
+            self.DEFAULT_MAX_ITEMS)
 
     def _check_bucket_exists(self, bucket_name, operation_name):
         if bucket_name not in self.mock_s3_fs:
@@ -101,6 +116,11 @@ class MockS3Client(object):
         location_constraint = self.mock_s3_fs[Bucket].get('location') or None
 
         return dict(LocationConstraint=location_constraint)
+
+    def head_bucket(self, Bucket):
+        self._check_bucket_exists(Bucket, 'HeadBucket')
+
+        return dict()
 
     def list_buckets(self):
         buckets = [
@@ -316,6 +336,16 @@ class MockS3Object(object):
                 'Failed to upload %s to %s/%s: %s' % (
                     path, self.bucket_name, self.key,
                     str(_no_such_bucket_error('PutObject'))))
+
+        # verify that config doesn't have empty part size (see #2033)
+        #
+        # config is a boto3.s3.transfer.TransferConfig (we don't mock it),
+        # which is actually part of s3transfer. Very old versions of s3transfer
+        # (e.g. 0.10.0) disallow initializing TransferConfig with part sizes
+        # that are zero or None
+        if Config and not (Config.multipart_chunksize and
+                           Config.multipart_threshold):
+            raise TypeError('part size may not be 0 or None')
 
         mock_keys = self._mock_bucket_keys('PutObject')
         with open(path, 'rb') as f:

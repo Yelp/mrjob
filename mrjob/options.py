@@ -2,6 +2,7 @@
 # Copyright 2009-2016 Yelp and Contributors
 # Copyright 2017 Yelp
 # Copyright 2018 Yelp, Google, Inc., and Contributors
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -84,6 +85,16 @@ _OPTPARSE_TYPES = dict(
 
 # use to identify malformed JSON
 _PROBABLY_JSON_RE = re.compile(r'^\s*[\{\[\"].*$')
+
+# names of runners
+_RUNNER_ALIASES = {
+    'dataproc',
+    'emr',
+    'hadoop',
+    'inline',
+    'local',
+    'spark',
+}
 
 
 ### custom actions ###
@@ -312,11 +323,11 @@ _DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
 # switches: list of switches to add to ArgumentParser for this option. Items
 #   have the format (['--switch-names', ...], dict(**kwargs)), where kwargs
 #   can be:
-#     action: action to pass to add_argument() (e.g. 'store_true')
-#     deprecated: if True, this switch is deprecated and slated for removal
-#     deprecated_aliases: list of old '--switch-names' slated for removal
-#     help: help string to pass to add_argument()
-#     type: option type for add_argument() to enforce (e.g. float).
+#     action -- action to pass to add_argument() (e.g. 'store_true')
+#     deprecated -- if True, this switch is deprecated and slated for removal
+#     deprecated_aliases -- list of old '--switch-names' slated for removal
+#     help -- help string to pass to add_argument()
+#     type -- option type for add_argument() to enforce (e.g. float).
 #   You can't set the ArgumentParser's default; we use [] if *action* is
 #   'append' and None otherwise.
 #
@@ -657,6 +668,22 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    emulate_map_input_file=dict(
+        switches=[
+            (['--emulate-map-input-file'], dict(
+                action='store_true',
+                help=("In the first mapper, set $mapreduce_map_input_file to"
+                      " the input file path, like Hadoop would, to support"
+                      " jobs that use"
+                      " jobconf_from_env('mapreduce.map.input.file')."
+                      " Ignored if job sets HADOOP_INPUT_FORMAT."),
+            )),
+            (['--no-emulate-map-input-file'], dict(
+                action='store_false',
+                help=("Disables setting $mapreduce_map_input_file"),
+            )),
+        ],
+    ),
     enable_emr_debugging=dict(
         cloud_role='launch',
         switches=[
@@ -689,6 +716,14 @@ _RUNNER_OPTS = dict(
         combiner=combine_cmds,
         switches=[
             (['--gcloud-bin'], dict(help='path to gcloud binary')),
+        ],
+    ),
+    gcs_region=dict(
+        cloud_role='connect',
+        switches=[
+            (['--gcs-region'], dict(
+                help='region to create Google Cloud Storage buckets in',
+            )),
         ],
     ),
     hadoop_bin=dict(
@@ -933,6 +968,17 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    # Spark runner only, only passed in on the command line (see #2040)
+    max_output_files=dict(
+        switches=[
+            (['--max-output-files'], dict(
+                help=('Maximum number of output files when running a'
+                      ' streaming job on Spark; just runs rdd.coalesce()'
+                      ' before outputting files'),
+                type=int,
+            )),
+        ],
+    ),
     mins_to_end_of_hour=dict(
         cloud_role='launch',
         deprecated=True,
@@ -1027,7 +1073,8 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--project-id'], dict(
                 deprecated_aliases=['--gcp-project'],
-                help='Project to run Dataproc jobs in'
+                help=('Project to use when connecting to Google Cloud Services'
+                      ' and to run Cloud Dataproc jobs in')
             )),
         ],
     ),
@@ -1097,6 +1144,14 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    s3_region=dict(
+        cloud_role='connect',
+        switches=[
+            (['--s3-region'], dict(
+                help='AWS region to create s3 buckets in',
+            )),
+        ],
+    ),
     service_account=dict(
         cloud_role='launch',
         switches=[
@@ -1139,6 +1194,20 @@ _RUNNER_OPTS = dict(
             (['--sh-bin'], dict(
                 help=('Alternate shell command for setup scripts. You may'
                       ' include arguments, e.g. --sh-bin "bash -ex"'),
+            )),
+        ],
+    ),
+    skip_internal_protocol=dict(
+        switches=[
+            (['--skip-internal-protocol'], dict(
+                action='store_true',
+                help=("Don't use the job's internal protocol to communicate"
+                      " between tasks internal to the job, instead relying"
+                      " on Spark to encode and decode raw data structures.")
+            )),
+            (['--no-skip-internal-protocol'], dict(
+                action='store_false',
+                help='Use internal protocols as usual',
             )),
         ],
     ),
@@ -1188,6 +1257,16 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--spark-submit-bin'], dict(
                 help='spark-submit binary. You may include arguments.'
+            )),
+        ],
+    ),
+    spark_tmp_dir=dict(
+        cloud_role='launch',
+        combiner=combine_paths,
+        switches=[
+            (['--spark-tmp-dir'], dict(
+                help=('optional URI visible to Spark executors to use as our'
+                      ' temp directory.'),
             )),
         ],
     ),
@@ -1558,9 +1637,9 @@ def _add_job_args(parser, include_deprecated=True):
 
     parser.add_argument(
         '-r', '--runner', dest='runner', default=None,
-        choices=('local', 'hadoop', 'emr', 'inline', 'dataproc'),
-        help=('Where to run the job; one of dataproc, emr, hadoop, inline,'
-              ' or local'))
+        choices=sorted(_RUNNER_ALIASES),
+        help=('Where to run the job; one of: %s' % ', '.join(
+            sorted(_RUNNER_ALIASES))))
 
     parser.add_argument(
         '--step-output-dir', dest='step_output_dir', default=None,
@@ -1707,9 +1786,10 @@ def _optparse_kwargs_to_argparse(**kwargs):
 
     # translate type from string (optparse) to type (argparse)
     if kwargs.get('type') is not None:
-        if kwargs['type'] not in _OPTPARSE_TYPES:
-            raise ValueError('invalid option type: %r' % kwargs['type'])
-        kwargs['type'] = _OPTPARSE_TYPES[kwargs['type']]
+        if not isinstance(kwargs['type'], type):
+            if kwargs['type'] not in _OPTPARSE_TYPES:
+                raise ValueError('invalid option type: %r' % kwargs['type'])
+            kwargs['type'] = _OPTPARSE_TYPES[kwargs['type']]
 
     # opt_group was a mrjob-specific feature that we've abandoned
     if 'opt_group' in kwargs:

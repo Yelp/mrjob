@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2017 Yelp and Contributors
 # Copyright 2018 Google Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,14 +18,22 @@
 import getpass
 import os
 import os.path
+import sys
 from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
 from subprocess import PIPE
+from unittest import SkipTest
 
-from google.api_core.exceptions import InvalidArgument
-from google.api_core.exceptions import NotFound
-from google.api_core.exceptions import RequestRangeNotSatisfiable
+try:
+    from google.api_core.exceptions import InvalidArgument
+    from google.api_core.exceptions import NotFound
+    from google.api_core.exceptions import RequestRangeNotSatisfiable
+except ImportError:
+    if sys.version_info[:2] == (3, 4):
+        raise SkipTest('Google libraries are not supported on Python 3.4')
+    else:
+        raise
 
 import mrjob
 import mrjob.dataproc
@@ -65,12 +74,7 @@ from tests.py2 import mock
 from tests.py2 import patch
 from tests.sandbox import BasicTestCase
 from tests.sandbox import mrjob_conf_patcher
-
-# used to match command lines
-if PY2:
-    PYTHON_BIN = 'python'
-else:
-    PYTHON_BIN = 'python3'
+from tests.test_bin import PYTHON_BIN
 
 US_EAST_GCE_REGION = 'us-east1'
 EU_WEST_GCE_REGION = 'europe-west1'
@@ -384,7 +388,7 @@ class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
             runner.run()
             self.assertEqual(runner.get_image_version(),
                              _DEFAULT_IMAGE_VERSION)
-            self.assertEqual(runner.get_hadoop_version(), '2.7.2')
+            self.assertEqual(runner.get_hadoop_version(), '2.9.2')
 
     def test_image_0_1(self):
         self._assert_cloud_hadoop_version('0.1', '2.7.1')
@@ -399,8 +403,12 @@ class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
         # regression test for #1428
         self._assert_cloud_hadoop_version('1.0.11', '2.7.2')
 
+    def test_image_1_2(self):
+        # regression test for #1428
+        self._assert_cloud_hadoop_version('1.2', '2.8.5')
+
     def test_future_proofing(self):
-        self._assert_cloud_hadoop_version('5.0', '2.7.2')
+        self._assert_cloud_hadoop_version('5.0', '2.9.2')
 
     def _assert_cloud_hadoop_version(self, image_version, hadoop_version):
         with self.make_runner('--image-version', image_version) as runner:
@@ -413,7 +421,7 @@ class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
             runner.run()
             self.assertEqual(runner.get_image_version(),
                              _DEFAULT_IMAGE_VERSION)
-            self.assertEqual(runner.get_hadoop_version(), '2.7.2')
+            self.assertEqual(runner.get_hadoop_version(), '2.9.2')
 
 
 class AvailabilityZoneConfigTestCase(MockGoogleTestCase):
@@ -501,8 +509,10 @@ class GCEClusterConfigTestCase(MockGoogleTestCase):
 
 class ClusterPropertiesTestCase(MockGoogleTestCase):
 
+    MRJOB_CONF_CONTENTS = None
+
     def _get_cluster_properties(self, *args):
-        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job = MRWordCount(['--no-conf', '-r', 'dataproc'] + list(args))
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -533,9 +543,7 @@ class ClusterPropertiesTestCase(MockGoogleTestCase):
             b"      'dataproc:dataproc.allow.zero.workers': true\n"
             b"      'hdfs:dfs.namenode.handler.count': 40\n")
 
-        self.mrjob_conf_patcher.stop()
         props = self._get_cluster_properties('-c', conf_path)
-        self.mrjob_conf_patcher.start()
 
         self.assertEqual(props['dataproc:dataproc.allow.zero.workers'], 'true')
         self.assertEqual(props['hdfs:dfs.namenode.handler.count'], '40')
@@ -643,6 +651,7 @@ class RegionAndZoneOptsTestCase(MockGoogleTestCase):
 
 
 class TmpBucketTestCase(MockGoogleTestCase):
+
     def assert_new_tmp_bucket(self, location, **runner_kwargs):
         """Assert that if we create an DataprocJobRunner with the given keyword
         args, it'll create a new tmp bucket with the given location
@@ -651,9 +660,10 @@ class TmpBucketTestCase(MockGoogleTestCase):
         existing_buckets = set(self.mock_gcs_fs)
 
         runner = DataprocJobRunner(conf_paths=[], **runner_kwargs)
+        runner._upload_local_files()
 
         bucket_name, path = parse_gcs_uri(runner._cloud_tmp_dir)
-        runner._create_fs_tmp_bucket(bucket_name, location=location)
+        runner._upload_local_files()
 
         self.assertTrue(bucket_name.startswith('mrjob-'))
         self.assertNotIn(bucket_name, existing_buckets)
@@ -664,7 +674,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         self.assertEqual(current_bucket.location, location.upper())
 
         # Verify that we setup bucket lifecycle rules of 28-day retention
-        first_lifecycle_rule = current_bucket.lifecycle_rules[0]
+        first_lifecycle_rule = list(current_bucket.lifecycle_rules)[0]
         self.assertEqual(first_lifecycle_rule['action'], dict(type='Delete'))
         self.assertEqual(first_lifecycle_rule['condition'],
                          dict(age=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS))
@@ -1651,6 +1661,22 @@ class SetUpSSHTunnelTestCase(MockGoogleTestCase):
 
         self.assertEqual(args[:4], ['/path/to/gcloud', '-v', 'compute', 'ssh'])
 
+    def test_empty_gcloud_bin_means_default(self):
+        job = MRWordCount(
+            ['-r', 'dataproc', '--ssh-tunnel', '--gcloud-bin', ''])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+        args_tuple, kwargs = self.mock_Popen.call_args
+        args = args_tuple[0]
+
+        self.assertEqual(kwargs, dict(stdin=PIPE, stdout=PIPE, stderr=PIPE))
+
+        self.assertEqual(args[:3], ['gcloud', 'compute', 'ssh'])
+
     def test_missing_gcloud_bin(self):
         self.mock_Popen.side_effect = OSError(2, 'No such file or directory')
 
@@ -2045,17 +2071,17 @@ class CloudPartSizeTestCase(MockGoogleTestCase):
     def test_default(self):
         runner = DataprocJobRunner()
 
-        self.assertEqual(runner._fs_chunk_size(), 100 * 1024 * 1024)
+        self.assertEqual(runner._upload_part_size(), 100 * 1024 * 1024)
 
     def test_float(self):
         runner = DataprocJobRunner(cloud_part_size_mb=0.25)
 
-        self.assertEqual(runner._fs_chunk_size(), 256 * 1024)
+        self.assertEqual(runner._upload_part_size(), 256 * 1024)
 
     def test_zero(self):
         runner = DataprocJobRunner(cloud_part_size_mb=0)
 
-        self.assertEqual(runner._fs_chunk_size(), None)
+        self.assertEqual(runner._upload_part_size(), None)
 
     def test_multipart_upload(self):
         job = MRWordCount(
@@ -2242,8 +2268,10 @@ class HadoopStreamingJarTestCase(MockGoogleTestCase):
 
 class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
 
+    MRJOB_CONF_CONTENTS = None
+
     def _get_project_id_and_gce_config(self, *args):
-        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job = MRWordCount(['--no-conf', '-r', 'dataproc'] + list(args))
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -2330,10 +2358,8 @@ class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
             'mrjob.conf',
             b'runners:\n  dataproc:\n    subnet: default')
 
-        self.mrjob_conf_patcher.stop()
         project_id, gce_config = self._get_project_id_and_gce_config(
             '-c', conf_path, '--network', 'test')
-        self.mrjob_conf_patcher.start()
 
         self.assertEqual(
             gce_config.network_uri,
@@ -2346,10 +2372,8 @@ class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
             'mrjob.conf',
             b'runners:\n  dataproc:\n    network: default')
 
-        self.mrjob_conf_patcher.stop()
         project_id, gce_config = self._get_project_id_and_gce_config(
             '-c', conf_path, '--subnet', 'test')
-        self.mrjob_conf_patcher.start()
 
         self.assertEqual(
             gce_config.subnetwork_uri,

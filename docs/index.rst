@@ -31,7 +31,7 @@ and begin reading the tutorial below.
 
         This documentation is for |release|, which is currently in
         development. Documentation for the stable version of mrjob is hosted
-        at `http://pythonhosted.org/mrjob <http://pythonhosted.org/mrjob>`_.
+        at `https://mrjob.readthedocs.io/en/stable <https://mrjob.readthedocs.io/en/stable>`_.
 
 .. toctree::
     :maxdepth: 3

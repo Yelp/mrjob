@@ -1,5 +1,5 @@
-# Copyright 2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2017-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -128,7 +128,7 @@ class MRJobFileOptionsTestCase(SandboxedTestCase):
 
     def test_with_input_file_option(self):
         mr_job = MRCustomFileOptionJob(
-            ['-r', 'inline', '--platform_file', self.input_file_path])
+            ['-r', 'inline', '--platform-file', self.input_file_path])
         mr_job.sandbox(stdin=BytesIO(b'1\n'))
 
         with mr_job.make_runner() as runner:
@@ -165,7 +165,7 @@ class MRCustomFileOptionJob(MRJob):
 
     def configure_args(self):
         super(MRCustomFileOptionJob, self).configure_args()
-        self.add_file_arg('--platform_file')
+        self.add_file_arg('--platform-file')
 
     def mapper_init(self):
         with open(self.options.platform_file) as f:
@@ -203,7 +203,8 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             self.assertGreater(runner.counters()[0]['count']['combiners'], 2)
 
         self.assertEqual(sorted(results),
-                         [(input_path, 3), (input_gz_path, 1)])
+                         [('file://' + input_path, 3),
+                          ('file://' + input_gz_path, 1)])
 
     def _extra_expected_local_files(self, runner):
         """A list of additional local files expected, as tuples
@@ -276,7 +277,8 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             sorted(expected_local_files))
         self.assertEqual(results['mapreduce.job.id'], runner._job_key)
 
-        self.assertEqual(results['mapreduce.map.input.file'], input_gz_path)
+        self.assertEqual(results['mapreduce.map.input.file'],
+                         'file://' + input_gz_path)
         self.assertEqual(results['mapreduce.map.input.length'],
                          str(input_gz_size))
         self.assertEqual(results['mapreduce.map.input.start'], '0')

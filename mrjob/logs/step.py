@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015-2017 Yelp
 # Copyright 2018 Yelp and Google, Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +22,6 @@ import re
 import logging
 from logging import getLogger
 
-from mrjob.py2 import to_unicode
 from .ids import _add_implied_job_id
 from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
@@ -205,12 +205,12 @@ def _interpret_emr_step_stderr(fs, matches):
     return {}
 
 
-def _yield_lines_from_pty_or_pipe(stderr):
-    """Yield lines from a PTY or pipe, converting to unicode and gracefully
-    handling errno.EIO"""
+def _eio_to_eof(pty_master):
+    """Yield lines from a PTY, gracefully handling an ``IOError`` with
+    ``errno == EIO`` as end-of-file."""
     try:
-        for line in stderr:
-            yield to_unicode(line)
+        for line in pty_master:
+            yield line
     except IOError as e:
         # this is just the PTY's way of saying goodbye
         if e.errno == errno.EIO:
@@ -218,18 +218,15 @@ def _yield_lines_from_pty_or_pipe(stderr):
         else:
             raise
 
-# TODO: could factor out _yield_lines_from_pty_or_pipe() and just have
-# this method take a sequence of lines
-def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
-    """Parse stderr from the ``hadoop jar`` command. Works like
-    :py:func:`_parse_step_syslog` (same return format)  with a few extra
-    features to handle the output of the ``hadoop jar`` command on the fly:
 
-    - Converts ``bytes`` lines to ``str``
+def _interpret_hadoop_jar_command_stderr(lines, record_callback=None):
+    """Parse *lines* from the ``hadoop jar`` command's stderr (lines can be
+    either bytes or unicode). Works like :py:func:`_parse_step_syslog` (same
+    return format) with a few extra features to handle the output of the
+    ``hadoop jar`` command on the fly:
+
     - Pre-filters non-log4j stuff from Hadoop Streaming so it doesn't
       get treated as part of a multi-line message
-    - Handles "stderr" from a PTY (including treating EIO as EOF and
-      pre-filtering stdout lines from Hadoop Streaming)
     - Optionally calls *record_callback* for each log4j record (see
       :py:func:`~mrjob.logs.log4j._parse_hadoop_log4j_records`).
     """
@@ -238,8 +235,7 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
 
     def yield_records():
         for record in _parse_hadoop_log4j_records(
-                _yield_lines_from_pty_or_pipe(stderr),
-                pre_filter=pre_filter):
+                lines, pre_filter=pre_filter):
             if record_callback:
                 record_callback(record)
             yield record

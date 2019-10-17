@@ -1,6 +1,7 @@
 # Copyright 2009-2015 Yelp and Contributors
 # Copyright 2016-2017 Yelp
 # Copyright 2018 Google Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,10 +29,7 @@ try:
         'install_requires': [
             'boto3>=1.4.6',
             'botocore>=1.6.0',
-            'PyYAML>=3.08',
-            'google-cloud-dataproc>=0.2.0',
-            'google-cloud-logging>=1.5.0',
-            'google-cloud-storage>=1.9.0',
+            'PyYAML>=3.10',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
@@ -44,9 +42,19 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # grpcio 1.11.0 and 1.12.0 seem not to compile with PyPy
-    if hasattr(sys, 'pypy_version_info'):
-        setuptools_kwargs['install_requires'].append('grpcio<=1.10.0')
+    # Google libs don't install on Python 3.4. Which is fine, the only
+    # reason we support Python 3.4 at all is to support earlier
+    # AMIs on EMR. See #2090
+    if sys.version_info[0] == 2 or sys.version_info >= (3, 5):
+        setuptools_kwargs['install_requires'].extend([
+            'google-cloud-dataproc>=0.3.0',
+            'google-cloud-logging>=1.9.0',
+            'google-cloud-storage>=1.13.1',
+        ])
+
+        # grpcio 1.11.0 and 1.12.0 seem not to compile with PyPy
+        if hasattr(sys, 'pypy_version_info'):
+            setuptools_kwargs['install_requires'].append('grpcio<=1.10.0')
 
     # rapidjson exists on Python 3 only
     if sys.version_info >= (3, 0):
@@ -56,6 +64,9 @@ try:
 except ImportError:
     from distutils.core import setup
     setuptools_kwargs = {}
+
+with open('README.rst') as f:
+    long_description = f.read()
 
 setup(
     author='David Marin',
@@ -73,6 +84,7 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: System :: Distributed Computing',
     ],
     description='Python MapReduce framework',
@@ -84,7 +96,7 @@ setup(
         ]
     ),
     license='Apache',
-    long_description=open('README.rst').read(),
+    long_description=long_description,
     name='mrjob',
     packages=[
         'mrjob',
@@ -93,11 +105,13 @@ setup(
         'mrjob.examples.mr_travelling_salesman',
         'mrjob.fs',
         'mrjob.logs',
+        'mrjob.spark',
         'mrjob.tools',
         'mrjob.tools.emr',
     ],
     package_data={
         'mrjob': ['bootstrap/*.sh'],
+        'mrjob.examples': ['*.txt', '*.jar', '*.rb'],
         'mrjob.examples.mr_postfix_bounce': ['*.json'],
         'mrjob.examples.mr_travelling_salesman': ['example_graphs/*.json'],
     },

@@ -1,5 +1,6 @@
 # Copyright 2009-2011 Yelp
 # Copyright 2013 David Marin
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +26,7 @@ class MRCountingJob(MRJob):
                 MRStep(mapper=self.mapper)]
 
     def mapper(self, _, value):
-        self.increment_counter('group', 'counter_name', 1)
+        self.increment_counter(group='group', counter='counter_name', amount=1)
         yield _, value
 
 

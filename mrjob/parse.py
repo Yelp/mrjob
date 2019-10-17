@@ -72,7 +72,7 @@ def parse_s3_uri(uri):
 
 
 def to_uri(path_or_uri):
-    """If *path_or_uri* is not a URI already, convert it to a ``file:///`
+    """If *path_or_uri* is not a URI already, convert it to a ``file:///``
     URI."""
     if is_uri(path_or_uri):
         return path_or_uri

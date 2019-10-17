@@ -44,6 +44,9 @@ Job placement
 
     Geographic region to run jobs in (e.g.  ``us-central-1``).
 
+    If mrjob create a temporary bucket, it will be created in this region as
+    well.
+
     If you set region, you do not need to set :mrjob-opt:`zone`; a zone
     will be chosen for you automatically.
 
@@ -64,6 +67,10 @@ Job placement
    ``'default'``). Specifying *subnet* rather than :mrjob-opt:`network` will
    ensure that your cluster only has access to one specific geographic
    :mrjob-opt:`region`, rather than the entire VPC.
+
+   .. versionchanged:: 0.6.8
+
+      ``--subnet ''`` un-sets the subnet on EMR (used to be ignored).
 
    .. versionchanged:: 0.6.3
 
@@ -94,15 +101,9 @@ Number and type of instances
     :switch: --instance-type
     :type: :ref:`string <data-type-string>`
     :set: cloud
-    :default: ``m1.medium`` (usually) on EMR, ``n1-standard-1`` on Dataproc
+    :default: ``m4.large`` or ``m5.xlarge`` on EMR, ``n1-standard-1`` on Dataproc
 
     Type of instance that runs your Hadoop tasks.
-
-    On Amazon EMR, mrjob picks the cheapest instance type that will work at
-    all. This is ``m1.medium``, with two exceptions:
-
-    * ``m1.large`` if you're running Spark (see :mrjob-opt:`bootstrap_spark`)
-    * ``m1.small`` if you're running on the (deprecated) 2.x AMIs
 
     Once you've tested a job and want to run it at scale, it's usually a good
     idea to use instances larger than the default. For EMR, see
@@ -120,9 +121,23 @@ Number and type of instances
     coordinating tasks, not running them. Use :mrjob-opt:`master_instance_type`
     instead.
 
+    .. versionchanged:: 0.6.11
+
+       Default on EMR is ``m5.xlarge`` on AMI version 5.13.0 and later, ``m4.large`` on earlier versions
+
+    .. versionchanged:: 0.6.10
+
+       Default on EMR is now ``m5.xlarge``
+
+    .. versionchanged:: 0.6.6
+
+       Default on EMR was ``m4.large``
+
     .. versionchanged:: 0.5.6
 
-       Used to default to ``m1.medium`` in all cases.
+       On EMR, defaulted to ``m1.large`` if running Spark, ``m1.small`` if
+       running on the (deprecated) 2.x AMIs, and ``m1.medium`` otherwise
+       (``m1.medium`` was previously the default in all cases).
 
     .. versionchanged:: 0.5.4
 
@@ -254,7 +269,7 @@ Cluster software configuration
     :switch: --image-version
     :type: :ref:`string <data-type-string>`
     :set: cloud
-    :default: ``'5.8.0'`` on EMR, ``'1.0'`` on Dataproc
+    :default: ``'5.27.0'`` on EMR, ``'1.0'`` on Dataproc
 
     Machine image version to use. This controls which Hadoop
     version(s) are available and which version of Python is installed, among
@@ -272,9 +287,21 @@ Cluster software configuration
     You can use this instead of :mrjob-opt:`release_label` on EMR, even for
     4.x+ AMIs; mrjob will just prepend ``emr-`` to form the release label.
 
+    .. versionchanged:: 0.6.11
+
+       Default on EMR is now ``5.27.0``
+
+    .. versionchanged:: 0.6.5
+
+       Default on EMR is now ``5.16.0``
+
+    .. versionchanged:: 0.6.0
+
+       Default on EMR is now ``5.8.0``
+
     .. versionchanged:: 0.5.7
 
-       Default on EMR used to be ``'3.11.0'``.
+       Default on EMR is now ``4.8.2`` (used to be ``'3.11.0'``).
 
     .. versionchanged:: 0.5.4
 
@@ -391,6 +418,12 @@ Cluster software configuration
               LogUri: null  # !clear works too
               SupportedProducts:
               - mapr-m3
+
+    .. versionchanged:: 0.6.8
+
+       You may use a *name* with dots in it to set (or unset) nested
+       properties. For example:
+       ``--extra-cluster-param Instances.EmrManagedMasterSecurityGroup=sg-foo``.
 
     .. versionadded:: 0.6.0
 

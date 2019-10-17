@@ -1,4 +1,5 @@
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +24,15 @@ class MRRot13Lib(MRJob):
     OUTPUT_PROTOCOL = RawValueProtocol
 
     def mapper(self, _, line):
-        from rot13lib.text import encode
+        # . isn't in sys.path on EMR for some reason
+        import sys
+        sys.path.append('.')
+        try:
+            from rot13lib.text import encode
+
+            encode(line)
+        finally:
+            sys.path.pop()
 
         yield None, encode(line)
 

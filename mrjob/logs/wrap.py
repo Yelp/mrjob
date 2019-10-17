@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2016 Yelp
-# Copyright 2017 Yelp
+# Copyright 2015-2017 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ from mrjob.py2 import to_unicode
 from mrjob.util import to_lines
 
 from .ids import _sort_by_recency
+from .ids import _sort_for_spark
 
 log = getLogger(__name__)
 
@@ -38,7 +39,7 @@ def _cat_log_lines(fs, path):
         log.warning("couldn't cat() %s: %r" % (path, e))
 
 
-def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
+def _ls_logs(fs, log_dir_stream, matcher, is_spark=False, **kwargs):
     """Return a list matches against log files. Used to implement
     ``_ls_*_logs()`` functions.
 
@@ -85,7 +86,12 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
 
             if matches:
                 matched = True
-                matches = _sort_by_recency(matches)
+
+                if is_spark:
+                    matches = _sort_for_spark(matches)
+                else:
+                    matches = _sort_by_recency(matches)
+
                 for match in matches:
                     yield match
 

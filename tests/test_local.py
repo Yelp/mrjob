@@ -2,6 +2,7 @@
 # Copyright 2013 David Marin and Lyft
 # Copyright 2015-2017 Yelp
 # Copyright 2018 Yelp and Contributors
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,6 +44,7 @@ from mrjob.examples.mr_sparkaboom import MRSparKaboom
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.local import _sort_lines_in_memory
+from mrjob.parse import is_uri
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import safeeval
@@ -58,8 +60,8 @@ from tests.mr_filter_job import MRFilterJob
 from tests.mr_group import MRGroup
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_just_a_jar import MRJustAJar
-from tests.mr_null_spark import MRNullSpark
 from tests.mr_sort_and_group import MRSortAndGroup
+from tests.mr_spark_os_walk import MRSparkOSWalk
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
@@ -896,6 +898,25 @@ class SortBinTestCase(SandboxedTestCase):
 
         self.assertEqual(sort_args[:2], ['sort', '-r'])
 
+    def test_empty_sort_bin_means_default(self):
+        job = MRGroup(['-r', 'local', '--sort-bin', ''])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbuffaloes\nbears'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                sorted(job.parse_output(runner.cat_output())),
+                [('a', ['apples']), ('b', ['buffaloes', 'bears'])])
+
+        self.assertTrue(self.check_call.called)
+        self.assertFalse(self._sort_lines_in_memory.called)
+
+        sort_args = self.check_call.call_args[0][0]
+        self.assertEqual(sort_args[:6],
+                         ['sort', '-t', '\t', '-k', '1,1', '-s'])
+
     def test_sort_in_memory_on_windows(self):
         self.start(patch('platform.system', return_value='Windows'))
 
@@ -1126,4 +1147,43 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
         self.assertEqual(counts, dict(
             blue=1, fish=4, one=1, red=1, two=1))
 
-    # TODO: add a Spark JAR to the repo, so we can test it
+    def test_upload_files_with_rename(self):
+        fish_path = self.makefile('fish', b'salmon')
+        fowl_path = self.makefile('fowl', b'goose')
+
+        job = MRSparkOSWalk(['-r', 'local',
+                             '--files',
+                             '%s#ghoti,%s' % (fish_path, fowl_path)])
+        job.sandbox()
+
+        file_sizes = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # check working dir mirror
+            wd_mirror = runner._wd_mirror()
+            self.assertIsNotNone(wd_mirror)
+            self.assertFalse(is_uri(wd_mirror))
+
+            self.assertTrue(os.path.exists(wd_mirror))
+            # only files which needed to be renamed should be in wd_mirror
+            self.assertTrue(os.path.exists(os.path.join(wd_mirror, 'ghoti')))
+            self.assertFalse(os.path.exists(os.path.join(wd_mirror, 'fish')))
+            self.assertFalse(os.path.exists(os.path.join(wd_mirror, 'fowl')))
+
+            for line in to_lines(runner.cat_output()):
+                path, size = safeeval(line)
+                file_sizes[path] = size
+
+        # check that files were uploaded to working dir
+        self.assertIn('fowl', file_sizes)
+        self.assertEqual(file_sizes['fowl'], 5)
+
+        self.assertIn('ghoti', file_sizes)
+        self.assertEqual(file_sizes['ghoti'], 6)
+
+        # fish was uploaded as "ghoti"
+        self.assertNotIn('fish', file_sizes)
+
+        # TODO: add a Spark JAR to the repo, so we can test it

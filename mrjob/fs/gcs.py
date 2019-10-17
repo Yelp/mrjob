@@ -2,6 +2,7 @@
 # Copyright 2016 Google Inc.
 # Copyright 2017 Yelp
 # Copyright 2018 Google Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +27,7 @@ from mrjob.runner import GLOB_RE
 
 try:
     import google.api_core.exceptions
+    import google.auth.exceptions
     import google.cloud.storage.client
 except ImportError:
     google = None
@@ -52,16 +54,34 @@ def _path_glob_to_parsed_gcs_uri(path_glob):
 
 
 class GCSFilesystem(Filesystem):
-    """Filesystem for Google Cloud Storage (GCS) URIs. Typically you will get
-    one of these via
-    ``DataprocJobRunner().fs``, composed with
-    :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
-    :py:class:`~mrjob.fs.local.LocalFilesystem`.
+    """Filesystem for Google Cloud Storage (GCS) URIs
+
+    :param local_tmp_dir: deprecated, does nothing, do not use
+    :param credentials: an optional
+                        :py:class:`google.auth.credentials.Credentials`, used
+                        to initialize the storage client
+    :param project_id: an optional project ID, used to initialize the storage
+                       client
+    :param part_size: Part size for multi-part uploading, in bytes, or ``None``
+    :param location: Default location to use when creating a bucket
+    :param object_ttl_days: Default object expiry for newly created buckets
+
+    .. versionchanged:: 0.6.8
+
+       deprecated *local_tmp_dir*, added *part_size*, *location*,
+       *object_ttl_days*
     """
-    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None):
+    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None,
+                 part_size=None, location=None, object_ttl_days=None):
         self._credentials = credentials
-        self._local_tmp_dir = local_tmp_dir
         self._project_id = project_id
+        self._part_size = part_size
+        self._location = location
+        self._object_ttl_days = object_ttl_days
+
+        if local_tmp_dir is not None:
+            log.warning('local_tmp_dir does nothing and will be removed'
+                        'in v0.7.0')
 
     @property
     def client(self):
@@ -161,10 +181,16 @@ class GCSFilesystem(Filesystem):
             start = end
 
     def mkdir(self, dest):
-        """Make a directory. This does nothing on GCS because there are
-        no directories.
+        """Does not actually create a directory on GCS (because GCS doesn't
+        have directories), but creates the underlying bucket if it does not
+        exist already.
         """
-        pass
+        bucket_name, base_name = parse_gcs_uri(dest)
+
+        try:
+            self.get_bucket(bucket_name)
+        except google.api_core.exceptions.NotFound:
+            self.create_bucket(bucket_name)
 
     def exists(self, path_glob):
         """Does the given path exist?
@@ -191,24 +217,27 @@ class GCSFilesystem(Filesystem):
 
         self._blob(dest_uri).upload_from_string(b'')
 
-    def put(self, src_path, dest_uri, part_size_mb=None, chunk_size=None):
+    def put(self, src_path, dest_uri, chunk_size=None):
         """Uploads a local file to a specific destination.
 
-        *chunk_size* is a deprecated alias for *part_size_mb* and will
-        be removed in v0.7.0.
+        *chunk_size* is a deprecated alias for *part_size*
+        (in the constructor) and will be removed in v0.7.0.
+
+        .. versionchanged:: 0.6.8 deprecated *chunk_size*
         """
-        # support old name for *part_size_mb*
+        part_size = self._part_size
+
+        # support old way of setting *part_size* at call time
         if chunk_size:
-            log.warning('chunk_size is a deprecated alias for part_size_mb'
-                        ' and will be removed in v0.7.0')
-        if part_size_mb is None:
-            part_size_mb = chunk_size
+            log.warning('chunk_size is deprecated and will be removed in'
+                        ' v0.7.0 (set part_size at init time).')
+            part_size = chunk_size
 
         old_blob = self._get_blob(dest_uri)
         if old_blob:
             raise IOError('File already exists: %s' % dest_uri)
 
-        self._blob(dest_uri, chunk_size=part_size_mb).upload_from_filename(
+        self._blob(dest_uri, chunk_size=part_size).upload_from_filename(
             src_path)
 
     def get_all_bucket_names(self, prefix=None):
@@ -238,19 +267,23 @@ class GCSFilesystem(Filesystem):
         and time-to-live."""
         bucket = self.client.bucket(name)
 
-        # as of google-cloud 0.32.0, there isn't a direct way to set location
-        if location:
-            bucket._changes.add('location')
-            bucket._properties['location'] = location
+        if location is None:
+            location = self._location
+        elif not location:
+            location = None  # leave a way to use the API default
 
-        bucket.create()
+        bucket.create(location=location)
 
-        bucket.lifecycle_rules = [
-            dict(
-                action=dict(type='Delete'),
-                condition=dict(age=object_ttl_days)
-            )
-        ]
+        if object_ttl_days is None:
+            object_ttl_days = self._object_ttl_days
+
+        if object_ttl_days:
+            bucket.lifecycle_rules = [
+                dict(
+                    action=dict(type='Delete'),
+                    condition=dict(age=object_ttl_days)
+                )
+            ]
 
     def delete_bucket(self, bucket):
         raise NotImplementedError(
@@ -296,3 +329,7 @@ def parse_gcs_uri(uri):
         raise ValueError('Invalid GCS URI: %s' % uri)
 
     return components.netloc, components.path[1:]
+
+
+def _is_permanent_google_error(self, ex):
+    return isinstance(ex, google.auth.exceptions.DefaultCredentialsError)

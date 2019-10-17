@@ -1,4 +1,5 @@
 # Copyright 2015-2017 Yelp and Contributors
+# Copyright 2019 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +25,27 @@ class MockClientMeta(object):
         self.region_name = region_name
 
 
+class MockPageIterator(object):
+
+    def __init__(self, method, result_key, page_size, **kwargs):
+        self.method = method
+        self.result_key = result_key
+        self.page_size = page_size
+        self.kwargs = kwargs
+
+    def _make_request(self):
+        return self.method(**self.kwargs)
+
+    def __iter__(self):
+        result = self._make_request()
+
+        values = result[self.result_key]
+
+        for page_start in range(0, len(values), self.page_size):
+            page = values[page_start:page_start + self.page_size]
+            yield combine_dicts(result, {self.result_key: page})
+
+
 class MockPaginator(object):
     """Mock botocore paginators.
 
@@ -32,15 +54,10 @@ class MockPaginator(object):
     break them into pages.
     """
     def __init__(self, method, result_key, page_size):
-        self.result_key = result_key
         self.method = method
+        self.result_key = result_key
         self.page_size = page_size
 
     def paginate(self, **kwargs):
-        result = self.method(**kwargs)
-
-        values = result[self.result_key]
-
-        for page_start in range(0, len(values), self.page_size):
-            page = values[page_start:page_start + self.page_size]
-            yield combine_dicts(result, {self.result_key: page})
+        return MockPageIterator(self.method, self.result_key,
+                                self.page_size, **kwargs)

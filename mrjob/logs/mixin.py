@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Yelp and Contributors
-# Copyright 2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2017-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,11 +36,10 @@ from mrjob.logs.errors import _pick_error
 from mrjob.logs.errors import _pick_error_attempt_ids
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _ls_history_logs
+from mrjob.logs.spark import _interpret_spark_logs
 from mrjob.logs.task import _interpret_task_logs
-from mrjob.logs.task import _interpret_spark_task_logs
 from mrjob.logs.task import _ls_task_logs
 from mrjob.logs.task import _ls_spark_task_logs
-from mrjob.step import _is_spark_step_type
 
 log = getLogger(__name__)
 
@@ -99,7 +98,7 @@ class LogInterpretationMixin(object):
     def _pick_counters(self, log_interpretation, step_type):
         """Pick counters from our log interpretation, interpreting
         history logs if need be."""
-        if _is_spark_step_type(step_type):
+        if self._step_type_uses_spark(step_type):
             return {}
 
         counters = _pick_counters(log_interpretation)
@@ -118,19 +117,35 @@ class LogInterpretationMixin(object):
 
     def _pick_error(self, log_interpretation, step_type):
         """Pick probable cause of failure (only call this if job fails)."""
+        logs_needed = self._logs_needed_to_pick_error(step_type)
+
         if self._read_logs() and not all(
-                log_type in log_interpretation for
-                log_type in ('step', 'history', 'task')):
+                log_type in log_interpretation for log_type in logs_needed):
             log.info('Scanning logs for probable cause of failure...')
-            self._interpret_step_logs(log_interpretation, step_type)
-            self._interpret_history_log(log_interpretation)
 
-            error_attempt_ids = _pick_error_attempt_ids(log_interpretation)
+            if 'step' in logs_needed:
+                self._interpret_step_logs(log_interpretation, step_type)
 
-            self._interpret_task_logs(
-                log_interpretation, step_type, error_attempt_ids)
+            if 'history' in logs_needed:
+                self._interpret_history_log(log_interpretation)
+
+            if 'task' in logs_needed:
+                error_attempt_ids = _pick_error_attempt_ids(log_interpretation)
+
+                self._interpret_task_logs(
+                    log_interpretation, step_type, error_attempt_ids)
 
         return _pick_error(log_interpretation)
+
+    def _logs_needed_to_pick_error(self, step_type):
+        """We don't need all the logs when interpreting Spark steps"""
+        if self._step_type_uses_spark(step_type):
+            if self._spark_deploy_mode() == 'cluster':
+                return ('step', 'task')
+            else:
+                return ('step',)
+        else:
+            return ('step', 'history', 'task')
 
     ### stuff that should just work ###
 
@@ -215,8 +230,8 @@ class LogInterpretationMixin(object):
                     log.warning("Can't fetch task logs; missing job ID")
                 return
 
-        if _is_spark_step_type(step_type):
-            interpret_func = _interpret_spark_task_logs
+        if self._step_type_uses_spark(step_type):
+            interpret_func = _interpret_spark_logs
         else:
             interpret_func = _interpret_task_logs
 
@@ -240,7 +255,7 @@ class LogInterpretationMixin(object):
         if not self._read_logs():
             return
 
-        if _is_spark_step_type(step_type):
+        if self._step_type_uses_spark(step_type):
             ls_func = _ls_spark_task_logs
         else:
             ls_func = _ls_task_logs
@@ -263,7 +278,7 @@ class LogInterpretationMixin(object):
         """Utility for logging counters (if any) for a step."""
         step_type = self._get_step(step_num)['type']
 
-        if not _is_spark_step_type(step_type):
+        if not self._step_type_uses_spark(step_type):
             counters = self._pick_counters(
                 log_interpretation, step_type)
             if counters:

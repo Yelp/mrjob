@@ -149,3 +149,23 @@ Cluster configuration
    by passing ``num_instances`` to this option).
 
    .. versionadded:: 0.6.3
+
+Other rarely used options
+=========================
+
+.. mrjob-opt::
+    :config: gcloud_bin
+    :switch: --gcloud-bin
+    :type: :ref:`command <data-type-command>`
+    :set: dataproc
+    :default: ``'gcloud'``
+
+    Path to the gcloud binary; may include switches (e.g.  ``'gcloud -v'`` or
+    ``['gcloud', '-v']``). Defaults to :command:`gcloud`.
+
+    Used only as a way to create an SSH tunnel to the Resource Manager.
+
+    .. versionchanged:: 0.6.8
+
+       Setting this to an empty value (``--gcloud-bin ''``) instructs mrjob to
+       use the default (used to disable SSH).

@@ -1,6 +1,6 @@
 # Copyright 2009-2016 Yelp and Contributors
-# Copyright 2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2017-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -340,6 +340,35 @@ def save_cwd():
 
 
 @contextmanager
+def save_sys_std():
+    """Context manager that saves the current values of `sys.stdin`,
+    `sys.stdout`, and `sys.stderr`, and flushes these filehandles before
+    and after switching them out."""
+
+    stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
+
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+        yield
+
+        # at this point, sys.stdout/stderr may have been patched. Don't
+        # raise an exception if flush() fails
+        try:
+            sys.stdout.flush()
+        except:
+            pass
+
+        try:
+            sys.stderr.flush()
+        except:
+            pass
+    finally:
+        sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
+
+
+@contextmanager
 def save_sys_path():
     """Context manager that saves sys.path and restores it after execution."""
     original_sys_path = list(sys.path)
@@ -522,13 +551,7 @@ def zip_dir(dir, out_path, filter=None, prefix=''):
     if not filter:
         filter = lambda path: True
 
-    def create_zip_file():
-        try:
-            return ZipFile(out_path, mode='w', compression=ZIP_DEFLATED)
-        except RuntimeError:  # zlib not available
-            return ZipFile(out_path, mode='w', compression=ZIP_STORED)
-
-    with create_zip_file() as zip_file:
+    with _create_zip_file(out_path) as zip_file:
         for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
             for filename in filenames:
                 path = os.path.join(dirpath, filename)
@@ -539,3 +562,11 @@ def zip_dir(dir, out_path, filter=None, prefix=''):
                     real_path = os.path.realpath(path)
                     path_in_zip_file = os.path.join(prefix, rel_path)
                     zip_file.write(real_path, arcname=path_in_zip_file)
+
+
+# this is also used by spark runner
+def _create_zip_file(path):
+    try:
+        return ZipFile(path, mode='w', compression=ZIP_DEFLATED)
+    except RuntimeError:  # zlib not available
+        return ZipFile(path, mode='w', compression=ZIP_STORED)

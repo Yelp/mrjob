@@ -1,7 +1,7 @@
 # Copyright 2012 Yelp
 # Copyright 2013 David Marin
-# Copyright 2015-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2015-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -446,9 +446,12 @@ class WorkingDirManagerTestCase(BasicTestCase):
         wd = WorkingDirManager()
         self.assertEqual(wd.name_to_path('archive'), {})
         self.assertEqual(wd.name_to_path('file'), {})
+        self.assertEqual(wd.name_to_path(), {})
         self.assertEqual(wd.paths(), set())
+        self.assertEqual(wd.paths('archive'), set())
+        self.assertEqual(wd.paths('file'), set())
 
-    def test_simple(self):
+    def test_basic(self):
         wd = WorkingDirManager()
         wd.add('archive', 's3://bucket/path/to/baz.tar.gz')
         wd.add('file', 'foo/bar.py')
@@ -456,9 +459,16 @@ class WorkingDirManagerTestCase(BasicTestCase):
                          {'bar.py': 'foo/bar.py'})
         self.assertEqual(wd.name_to_path('archive'),
                          {'baz.tar.gz': 's3://bucket/path/to/baz.tar.gz'})
+        self.assertEqual(wd.name_to_path(),
+                         {'bar.py': 'foo/bar.py',
+                          'baz.tar.gz': 's3://bucket/path/to/baz.tar.gz'})
         self.assertEqual(
             wd.paths(),
-            set(['foo/bar.py', 's3://bucket/path/to/baz.tar.gz']))
+            {'foo/bar.py', 's3://bucket/path/to/baz.tar.gz'})
+        self.assertEqual(
+            wd.paths('archive'), {'s3://bucket/path/to/baz.tar.gz'})
+        self.assertEqual(
+            wd.paths('file'), {'foo/bar.py'})
 
     def test_explicit_name_collision(self):
         wd = WorkingDirManager()
@@ -479,7 +489,7 @@ class WorkingDirManagerTestCase(BasicTestCase):
         self.assertEqual(wd.name_to_path('file'),
                          {'qux.py': 'foo/bar.py',
                           'bar.py': 'foo/bar.py'})
-        self.assertEqual(wd.paths(), set(['foo/bar.py']))
+        self.assertEqual(wd.paths(), {'foo/bar.py'})
 
     def test_cant_give_same_path_different_types(self):
         wd = WorkingDirManager()

@@ -2,6 +2,7 @@
 # Copyright 2015 Yelp
 # Copyright 2017 Yelp
 # Copyright 2018 Contributors
+# Copyright 2019 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@
 """Wrappers for gracefully retrying on error."""
 import logging
 import time
+from functools import partial
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +26,7 @@ log = logging.getLogger(__name__)
 _DEFAULT_BACKOFF = 15
 _DEFAULT_MULTIPLIER = 1.5
 _DEFAULT_MAX_TRIES = 10
+_DEFAULT_MAX_BACKOFF = 1200  # 20 minutes
 
 
 class RetryWrapper(object):
@@ -38,7 +41,9 @@ class RetryWrapper(object):
     def __init__(self, wrapped, retry_if,
                  backoff=_DEFAULT_BACKOFF,
                  multiplier=_DEFAULT_MULTIPLIER,
-                 max_tries=_DEFAULT_MAX_TRIES):
+                 max_tries=_DEFAULT_MAX_TRIES,
+                 max_backoff=_DEFAULT_MAX_BACKOFF,
+                 unwrap_methods=()):
         """
         Wrap the given object
 
@@ -54,6 +59,12 @@ class RetryWrapper(object):
         :type max_tries: int
         :param max_tries: how many tries we get. ``0`` means to keep trying
                           forever
+        :type max_backoff: float
+        :param max_backoff: cap the backoff at this number of seconds
+        :type unwrap_methods: sequence
+        :param unwrap_methods: names of methods to call with this object as
+                               *self* rather than retrying on transient
+                               errors (e.g. methods that return a paginator)
         """
         self.__wrapped = wrapped
 
@@ -69,11 +80,18 @@ class RetryWrapper(object):
 
         self.__max_tries = max_tries
 
+        self.__max_backoff = max_backoff
+
+        self.__unwrap_methods = set(unwrap_methods)
+
     def __getattr__(self, name):
         """The glue that makes functions retriable, and returns other
         attributes from the wrapped object as-is."""
         x = getattr(self.__wrapped, name)
-        if hasattr(x, '__call__'):
+
+        if name in self.__unwrap_methods:
+            return partial(x.__func__, self)
+        elif hasattr(x, '__call__'):
             return self.__wrap_method_with_call_and_maybe_retry(x)
         else:
             return x
@@ -97,6 +115,7 @@ class RetryWrapper(object):
                         time.sleep(backoff)
                         tries += 1
                         backoff *= self.__multiplier
+                        backoff = min(backoff, self.__max_backoff)
                     else:
                         raise
 

@@ -1,7 +1,7 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 David Marin
-# Copyright 2015-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2015-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -313,12 +313,11 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not check path %s" % path_glob)
 
-    def put(self, src, path, part_size_mb=None):
+    def put(self, src, path):
         # don't inadvertently support cp syntax
         if path.endswith('/'):
             raise ValueError('put() destination may not be a directory')
 
-        # ignore part_size_mb, not supported by `hadoop fs`
         self.invoke_hadoop(['fs', '-put', src, path])
 
     def rm(self, path_glob):

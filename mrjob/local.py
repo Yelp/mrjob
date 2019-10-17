@@ -2,6 +2,7 @@
 # Copyright 2009-2013 Yelp and Contributors
 # Copyright 2015-2017 Yelp
 # Copyright 2018 Yelp and Contributors
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,8 +26,6 @@ from functools import partial
 from multiprocessing import Pool
 from subprocess import CalledProcessError
 from subprocess import check_call
-from subprocess import Popen
-from subprocess import PIPE
 
 try:
     import pty
@@ -35,14 +34,11 @@ except ImportError:
     pty = None
 
 from mrjob.bin import MRJobBinRunner
-from mrjob.logs.errors import _format_error
-from mrjob.logs.log4j import _parse_hadoop_log4j_records
-from mrjob.logs.step import _log_line_from_driver
+from mrjob.logs.errors import _log_probable_cause_of_failure
+from mrjob.logs.errors import _pick_error
 from mrjob.logs.step import _log_log4j_record
-from mrjob.logs.step import _yield_lines_from_pty_or_pipe
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.py2 import string_types
-from mrjob.py2 import to_unicode
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import _sort_lines_in_memory
 from mrjob.step import StepFailedException
@@ -80,6 +76,9 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
     It's rare to need to instantiate this class directly (see
     :py:meth:`~LocalMRJobRunner.__init__` for details).
 
+    .. versionadded:: 0.6.8
+
+       can run Spark steps as well, on the ``local-cluster`` Spark master.
     """
     alias = 'local'
 
@@ -118,64 +117,25 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             task_type, step_num, task_num,
             args, num_steps)
 
-    # TODO: this is similar to _run_job_in_hadoop() (hadoop.py), and is
-    # probably useful to other runners with minor modifications
     def _run_step_on_spark(self, step, step_num):
         if self._opts['upload_archives']:
             log.warning('Spark master %r will probably ignore archives' %
                         self._spark_master())
 
-        step_args = self._args_for_spark_step(step_num)
+        spark_submit_args = self._args_for_spark_step(step_num)
 
         env = dict(os.environ)
         env.update(self._spark_cmdenv(step_num))
 
-        log.debug('> %s' % cmd_line(step_args))
-        log.debug('  with environment: %r' % sorted(env.items()))
-
-        def _log_line(line):
-            log.info('  %s' % to_unicode(line).strip('\r\n'))
-
-        # try to use a PTY if it's available
-        try:
-            pid, master_fd = pty.fork()
-        except (AttributeError, OSError):
-            # no PTYs, just use Popen
-
-            # user won't get much feedback for a while, so tell them
-            # spark-submit is running
-            log.debug('No PTY available, using Popen() to invoke spark-submit')
-
-            step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE, env=env)
-
-            for line in step_proc.stderr:
-                for record in _parse_hadoop_log4j_records(
-                        _yield_lines_from_pty_or_pipe(step_proc.stderr)):
-                    _log_log4j_record(record)
-
-            # there shouldn't be much output on STDOUT
-            for line in step_proc.stdout:
-                _log_line_from_driver(line)
-
-            step_proc.stdout.close()
-            step_proc.stderr.close()
-
-            returncode = step_proc.wait()
-        else:
-            # we have PTYs
-            if pid == 0:  # we are the child process
-                os.execvpe(step_args[0], step_args, env)
-            else:
-                log.debug('Invoking spark-submit via PTY')
-
-                with os.fdopen(master_fd, 'rb') as master:
-                    for record in _parse_hadoop_log4j_records(
-                            _yield_lines_from_pty_or_pipe(master)):
-                        _log_log4j_record(record)
-                    _, returncode = os.waitpid(pid, 0)
+        returncode, step_interpretation = self._run_spark_submit(
+            spark_submit_args, env, record_callback=_log_log4j_record)
 
         if returncode:
-            reason = str(CalledProcessError(returncode, step_args))
+            error = _pick_error(dict(step=step_interpretation))
+            if error:
+                _log_probable_cause_of_failure(log, error)
+
+            reason = str(CalledProcessError(returncode, spark_submit_args))
             raise StepFailedException(
                 reason=reason, step_num=step_num,
                 num_steps=self._num_steps())
@@ -227,10 +187,10 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
                 task_error = _parse_task_stderr(stderr)
                 if task_error:
                     task_error['path'] = stderr_path
-                    log.error('Cause of failure:\n\n%s\n\n' %
-                              _format_error(dict(
-                                  split=dict(path=input_path),
-                                  task_error=task_error)))
+                    error = dict(
+                        split=dict(path=input_path),
+                        task_error=task_error)
+                    _log_probable_cause_of_failure(log, error)
                     return
 
         # fallback if we can't find the error (e.g. the job does something
@@ -330,8 +290,7 @@ def _pickle_safe(func):
         raise Exception(repr(ex))  # we know this is pickleable
 
 
-        # other utilities
-
+# other utilities
 
 def _sort_lines_with_sort_bin(input_paths, output_path, sort_bin,
                               sort_values=False, tmp_dir=None):

@@ -87,7 +87,7 @@ options related to file uploading.
 
     .. versionchanged:: 0.5.7
 
-       This works with Spark as well.
+       This works with Spark on YARN as well.
 
     .. versionchanged:: 0.6.7
 
@@ -108,7 +108,7 @@ options related to file uploading.
     we copy by appending
     ``#nameinworkingdir`` to the path; otherwise we just use its name.
 
-    This works with Spark as well.
+    This works with Spark on YARN only.
 
     .. versionadded:: 0.5.8
 
@@ -137,7 +137,7 @@ options related to file uploading.
 
     On the command line::
 
-        --file file_1.txt --file file_2.sqlite
+        --files file_1.txt,file_2.sqlite
 
     .. versionchanged:: 0.5.7
 
@@ -146,6 +146,11 @@ options related to file uploading.
     .. versionchanged:: 0.6.7
 
        Deprecated :option:`--file` in favor of :option:`--files`
+
+    .. versionchanged:: 0.6.8
+
+       In Spark, can use ``#nameinworkingdir`` even when not on YARN.
+
 
 Temp files and cleanup
 ======================
@@ -324,11 +329,23 @@ Job execution context
     If you're on Python 2, this defaults to ``'python'`` (except on EMR
     AMIs prior to 4.3.0, where it will be ``'python2.7'``).
 
+    Likewise, if you're using PyPy, this defaults to ``'pypy'`` or ``'pypy3'``
+    depending on your version.
+
     This option also affects which Python binary is used for file locking in
     :mrjob-opt:`setup` scripts, so it might be useful to set even if you're
     using a non-Python :mrjob-opt:`interpreter` (deprecated). It's also
     used by :py:class:`~mrjob.emr.EMRJobRunner` to compile mrjob after
     bootstrapping it (see :mrjob-opt:`bootstrap_mrjob`).
+
+    .. versionchanged:: 0.6.10
+
+       added ``'pypy'`` and ``'pypy3'`` as possible defaults
+
+    .. note::
+
+       mrjob does not auto-install PyPy for you on EMR; see
+       :ref:`installing-pypy-on-emr` for how to do this
 
 .. mrjob-opt::
     :config: setup
@@ -370,13 +387,21 @@ Job execution context
     You may optionally put a ``/`` after *name* as well
     (e.g. ``cd src-tree/#/subdir``).
 
-    This works for Spark as well when running on YARN. The setup script
-    is run before every executor, but only run before the driver in
+    This works for Spark as well (except on the ``local[*]`` master,
+    where it doesn't make sense). The setup
+    script is run before every executor, but only run before the driver in
     cluster mode.
+
+    .. note::
+
+       Uploading archives and directories (e.g. ``src-tree/#``) to Spark's
+       working directory still only works on YARN.
 
     .. versionadded:: 0.5.8 support for directories (above)
 
-    .. versionadded:: 0.6.7 support for Spark on YARN
+    .. versionadded:: 0.6.7 support for Spark on YARN only
+
+    .. versionadded:: 0.6.8 full support for Spark
 
     For more details of parsing, see
     :py:func:`~mrjob.setup.parse_setup_cmd`.
@@ -412,6 +437,11 @@ Job execution context
     .. versionchanged:: 0.6.7
 
        Used to be :command:`sh -ex` on local and Hadoop runners
+
+    .. versionchanged:: 0.6.8
+
+       Setting this to an empty value (``--sh-bin ''``) means to use the
+       default (used to cause an error).
 
 .. mrjob-opt::
     :config: steps_interpreter

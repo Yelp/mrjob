@@ -1,5 +1,5 @@
-# Copyright 2009-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2009-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,10 +29,13 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
-from mrjob.local import LocalMRJobRunner
 from mrjob.job import MRJob
+from mrjob.local import LocalMRJobRunner
+from mrjob.parse import to_uri
 from mrjob.runner import MRJobRunner
+from mrjob.step import INPUT
 from mrjob.step import MRStep
+from mrjob.step import OUTPUT
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import to_lines
 
@@ -194,50 +197,99 @@ class TestJobName(BasicTestCase):
 
 class TestCatOutput(SandboxedTestCase):
 
-    # Test regression for #269
-    def test_cat_output(self):
-        a_dir_path = os.path.join(self.tmp_dir, 'a')
-        b_dir_path = os.path.join(self.tmp_dir, 'b')
-        l_dir_path = os.path.join(self.tmp_dir, '_logs')
-        os.mkdir(a_dir_path)
-        os.mkdir(b_dir_path)
-        os.mkdir(l_dir_path)
+    def setUp(self):
+        super(TestCatOutput, self).setUp()
 
-        a_file_path = os.path.join(a_dir_path, 'part-00000')
-        b_file_path = os.path.join(b_dir_path, 'part-00001')
-        c_file_path = os.path.join(self.tmp_dir, 'part-00002')
-        x_file_path = os.path.join(l_dir_path, 'log.xml')
-        y_file_path = os.path.join(self.tmp_dir, '_SUCCESS')
+        self.output_dir = os.path.join(self.tmp_dir, 'job_output')
+        os.mkdir(self.output_dir)
 
-        with open(a_file_path, 'w') as f:
-            f.write('A')
+        self.runner = InlineMRJobRunner(
+            conf_paths=[], output_dir=self.output_dir)
 
-        with open(b_file_path, 'w') as f:
-            f.write('B')
+    def test_empty(self):
+        self.assertEqual(list(self.runner.cat_output()), [])
 
-        with open(c_file_path, 'w') as f:
-            f.write('C')
+    def test_typical_output(self):
+        # actual output
+        self.makefile(os.path.join(self.output_dir, 'part-00000'),
+                      b'line0\n')
+        self.makefile(os.path.join(self.output_dir, 'part-00001'),
+                      b'line1\n')
 
-        with open(x_file_path, 'w') as f:
-            f.write('<XML XML XML/>')
+        # hidden .crc file
+        self.makefile(os.path.join(self.output_dir, '.crc.part-00000'),
+                      b'42\n')
 
-        with open(y_file_path, 'w') as f:
-            f.write('I win')
+        # hidden _SUCCESS file (ignore)
+        self.makefile(os.path.join(self.output_dir, '_SUCCESS'),
+                      b'such a relief!\n')
 
-        runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
-        self.assertEqual(sorted(to_lines(runner.cat_output())),
-                         [b'A', b'B', b'C'])
+        # hidden _logs dir
+        self.makefile(os.path.join(self.output_dir, '_logs', 'log.xml'),
+                      b'pretty much the usual\n')
+
+        self.assertEqual(sorted(to_lines(self.runner.cat_output())),
+                         [b'line0\n', b'line1\n'])
+
+    def test_output_in_subdirs(self):
+        # test for output being placed in subdirs, for example with nicknack
+        self.makefile(os.path.join(self.output_dir, 'a', 'part-00000'),
+                      b'line-a0\n')
+        self.makefile(os.path.join(self.output_dir, 'a', 'part-00001'),
+                      b'line-a1\n')
+
+        self.makefile(os.path.join(self.output_dir, 'b', 'part-00000'),
+                      b'line-b0\n')
+
+        self.makefile(os.path.join(self.output_dir, 'b', '.crc.part-00000'),
+                      b'42\n')
+
+        self.assertEqual(sorted(to_lines(self.runner.cat_output())),
+                         [b'line-a0\n', b'line-a1\n', b'line-b0\n'])
+
+    def test_read_all_non_hidden_files(self):
+        self.makefile(os.path.join(self.output_dir, 'baz'),
+                      b'qux\n')
+
+        self.makefile(os.path.join(self.output_dir, 'foo', 'bar'),
+                      b'baz\n')
+
+        self.assertEqual(sorted(to_lines(self.runner.cat_output())),
+                         [b'baz\n', b'qux\n'])
+
+    def test_empty_string_between_files(self):
+        self.makefile(os.path.join(self.output_dir, 'part-00000'), b'A')
+        self.makefile(os.path.join(self.output_dir, 'part-00001'), b'\n')
+        self.makefile(os.path.join(self.output_dir, 'part-00002'), b'C')
+
+        # order isn't guaranteed, but there should be 3 chunks separated
+        # by two empty strings
+        chunks = list(self.runner.cat_output())
+        self.assertEqual(len(chunks), 5)
+        self.assertEqual(chunks[1], b'')
+        self.assertEqual(chunks[3], b'')
+
+    def test_output_dir_not_considered_hidden(self):
+        output_dir = os.path.join(self.tmp_dir, '_hidden', '_output_dir')
+
+        self.makefile(os.path.join(output_dir, 'part-00000'),
+                      b'cats\n')
+
+        runner = InlineMRJobRunner(conf_paths=[], output_dir=output_dir)
+
+        self.assertEqual(sorted(to_lines(runner.stream_output())),
+                         [b'cats\n'])
 
     def test_deprecated_stream_output(self):
-        self.makefile('part-00000', contents=b'1\n2')
-        self.makefile('part-00001', contents=b'3\n4\n')
-
-        runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
+        self.makefile(os.path.join(self.output_dir, 'part-00000'),
+                      b'1\n2')
+        self.makefile(os.path.join(self.output_dir, 'part-00001'),
+                      b'3\n4\n')
 
         log = self.start(patch('mrjob.runner.log'))
 
         # should group output into lines, but not join across files
-        self.assertEqual(sorted(runner.stream_output()),
+        self.assertEqual(sorted(self.runner.stream_output()),
                          [b'1\n', b'2', b'3\n', b'4\n'])
 
         # should issue deprecation warning
@@ -380,6 +432,47 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
 
             output_uri_2 = runner._step_output_uri(2)
             self.assertEqual(output_uri_2, 'hdfs:///tmp/output')
+
+    def test_local_output_dir_and_step_output_dir(self):
+        input1_path = self.makefile('input1')
+        input2_path = self.makefile('input2')
+
+        output_dir = self.makedirs('output')
+        step_output_dir = self.makedirs('step_output')
+
+        # this has three steps, which lets us test step numbering
+        job = MRCountingJob([
+            '-r', 'local',
+            '--output-dir', output_dir,
+            '--step-output-dir', step_output_dir,
+            input1_path, input2_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._num_steps(), 3)
+
+            input_uris_0 = runner._step_input_uris(0)
+            self.assertEqual([os.path.basename(uri) for uri in input_uris_0],
+                             ['input1', 'input2'])
+            self.assertEqual([uri[:8] for uri in input_uris_0],
+                             ['file:///', 'file:///'])
+
+            output_uri_0 = runner._step_output_uri(0)
+            self.assertEqual(output_uri_0,
+                             to_uri(os.path.join(step_output_dir, '0000')))
+
+            input_uris_1 = runner._step_input_uris(1)
+            self.assertEqual(input_uris_1, [output_uri_0])
+
+            output_uri_1 = runner._step_output_uri(1)
+            self.assertEqual(output_uri_1,
+                             to_uri(os.path.join(step_output_dir, '0001')))
+
+            input_uris_2 = runner._step_input_uris(2)
+            self.assertEqual(input_uris_2, [output_uri_1])
+
+            output_uri_2 = runner._step_output_uri(2)
+            self.assertEqual(output_uri_2, to_uri(output_dir))
 
 
 class DirArchivePathTestCase(SandboxedTestCase):
@@ -896,7 +989,6 @@ class DeprecatedFileUploadArgsTestCase(SandboxedTestCase):
                 path='/tmp/.fooconf', name='dot-fooconf', type='file')])
 
         self.assertEqual(old_runner._extra_args, new_runner._extra_args)
-        self.assertEqual(old_runner._spark_files, new_runner._spark_files)
         self.assertEqual(old_runner._working_dir_mgr._name_to_typed_path,
                          new_runner._working_dir_mgr._name_to_typed_path)
 
@@ -1158,3 +1250,120 @@ class UnexpectedOptsWarningTestCase(SandboxedTestCase):
             self.assertIn('Unexpected option', warnings)
             self.assertIn('zone', warnings)
             self.assertIn('command line', warnings)
+
+
+class SparkScriptArgsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(SparkScriptArgsTestCase, self).setUp()
+
+        # don't bother with actual input/output URIs, which
+        # are tested elsewhere
+        def mock_interpolate_step_args(args, step_num):
+            def interpolate(arg):
+                if arg == INPUT:
+                    return '<step %d input>' % step_num
+                elif arg == OUTPUT:
+                    return '<step %d output>' % step_num
+                else:
+                    return arg
+
+            return [interpolate(arg) for arg in args]
+
+        self.start(patch(
+            'mrjob.bin.MRJobRunner._interpolate_step_args',
+            side_effect=mock_interpolate_step_args))
+
+        self.start(patch(
+            'mrjob.inline.InlineMRJobRunner._STEP_TYPES',
+            {'spark', 'spark_jar', 'spark_script', 'streaming'}))
+
+    def test_spark_mr_job(self):
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['--step-num=0',
+                 '--spark',
+                 '<step 0 input>',
+                 '<step 0 output>'])
+
+    def test_spark_passthrough_arg(self):
+        job = MRNullSpark(['--extra-spark-arg=--verbose'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['--step-num=0',
+                 '--spark',
+                 '--extra-spark-arg=--verbose',
+                 '<step 0 input>',
+                 '<step 0 output>'])
+
+    def test_spark_file_arg(self):
+        foo_path = self.makefile('foo')
+
+        job = MRNullSpark(['--extra-file', foo_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['--step-num=0',
+                 '--spark',
+                 '--extra-file',
+                 'foo',
+                 '<step 0 input>',
+                 '<step 0 output>'])
+
+            name_to_path = runner._working_dir_mgr.name_to_path('file')
+            self.assertIn('foo', name_to_path)
+            self.assertEqual(name_to_path['foo'], foo_path)
+
+    def test_spark_jar(self):
+        job = MRSparkJar(['--jar-arg', 'foo', '--jar-arg', 'bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['foo', 'bar'])
+
+    def test_spark_jar_interpolation(self):
+        job = MRSparkJar(['--jar-arg', OUTPUT, '--jar-arg', INPUT])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['<step 0 output>', '<step 0 input>'])
+
+    def test_spark_script(self):
+        job = MRSparkScript(['--script-arg', 'foo', '--script-arg', 'bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['foo', 'bar'])
+
+    def test_spark_script_interpolation(self):
+        job = MRSparkScript(['--script-arg', OUTPUT, '--script-arg', INPUT])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['<step 0 output>', '<step 0 input>'])
+
+    def test_streaming_step_not_okay(self):
+        job = MRTwoStepJob()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(
+                TypeError,
+                runner._spark_script_args, 0)

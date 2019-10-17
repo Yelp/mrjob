@@ -17,6 +17,7 @@ Reference
     runners-local.rst
     utils-parse.rst
     protocols.rst
+    runners-spark.rst
     utils-retry.rst
     runners-runner.rst
     step.rst

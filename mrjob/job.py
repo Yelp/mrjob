@@ -1,5 +1,6 @@
 # Copyright 2009-2017 Yelp and Contributors
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -305,6 +306,13 @@ class MRJob(MRJobLauncher):
     def spark(self, input_path, output_path):
         """Re-define this with Spark code to run. You can read input
         with *input_path* and output with *output_path*.
+
+        .. warning::
+
+           Prior to v0.6.8, to pass job methods into Spark
+           (``rdd.flatMap(self.some_method)``), you first had to call
+           :py:meth:`self.sandbox() <mrjob.job.MRJob.sandbox>`; otherwise
+           Spark would error because *self* was not serializable.
         """
         raise NotImplementedError
 
@@ -492,10 +500,11 @@ class MRJob(MRJobLauncher):
             return super(MRJob, self)._runner_class()
 
     def _runner_kwargs(self):
-        """If we're building an inline runner, include mrjob_cls in kwargs."""
+        """If we're building an inline or Spark runner,
+        include mrjob_cls in kwargs."""
         kwargs = super(MRJob, self)._runner_kwargs()
 
-        if self._runner_class().alias == 'inline':
+        if self._runner_class().alias in ('inline', 'spark'):
             kwargs = dict(mrjob_cls=self.__class__, **kwargs)
 
         # pass steps to runner (see #1845)
@@ -1064,8 +1073,8 @@ class MRJob(MRJobLauncher):
 
         .. versionchanged:: 0.6.6
 
-           re-defining this no longer clobbers command-line
-           ``--libjar`` options.
+           re-defining this no longer clobbers the command-line
+           ``--libjars`` option
         """
         script_dir = os.path.dirname(self.mr_job_script())
 
@@ -1169,7 +1178,7 @@ class MRJob(MRJobLauncher):
         (not the script). Note that the job runner will *always* expand
         environment variables and ``~`` in paths returned by this method.
 
-        You do not have to worry about inadvertently disabling ``--archive``;
+        You do not have to worry about inadvertently disabling ``--archives``;
         this switch is handled separately.
 
         .. versionadded:: 0.6.4
@@ -1185,7 +1194,7 @@ class MRJob(MRJobLauncher):
         (not the script). Note that the job runner will *always* expand
         environment variables and ``~`` in paths returned by this method.
 
-        You do not have to worry about inadvertently disabling ``--dir``;
+        You do not have to worry about inadvertently disabling ``--dirs``;
         this switch is handled separately.
 
         .. versionadded:: 0.6.4
@@ -1201,7 +1210,7 @@ class MRJob(MRJobLauncher):
         (not the script). Note that the job runner will *always* expand
         environment variables and ``~`` in paths returned by this method.
 
-        You do not have to worry about inadvertently disabling ``--file``;
+        You do not have to worry about inadvertently disabling ``--files``;
         this switch is handled separately.
 
         .. versionadded:: 0.6.4

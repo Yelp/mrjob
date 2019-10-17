@@ -24,6 +24,7 @@ from tempfile import mkdtemp
 from shutil import rmtree
 from unittest import TestCase
 from unittest import skipIf
+from warnings import filterwarnings
 
 try:
     import pyspark
@@ -32,9 +33,12 @@ except ImportError:
 
 import mrjob
 from mrjob import runner
+from mrjob.py2 import PY2
 from mrjob.util import NullHandler
 
 from tests.py2 import patch
+from tests.py2 import MagicMock
+from tests.py2 import ResourceWarning
 
 
 # simple config that also silences 'no config options for runner' logging
@@ -124,10 +128,7 @@ class EmptyMrjobConfTestCase(BasicTestCase):
         super(EmptyMrjobConfTestCase, self).setUp()
 
         if self.MRJOB_CONF_CONTENTS is not None:
-            self.mrjob_conf_patcher = mrjob_conf_patcher(
-                self.MRJOB_CONF_CONTENTS)
-            self.mrjob_conf_patcher.start()
-            self.addCleanup(self.mrjob_conf_patcher.stop)
+            self.start(mrjob_conf_patcher(self.MRJOB_CONF_CONTENTS))
 
 
 class SandboxedTestCase(EmptyMrjobConfTestCase):
@@ -189,20 +190,33 @@ class SingleSparkContextTestCase(BasicTestCase):
     def setUpClass(cls):
         super(SingleSparkContextTestCase, cls).setUpClass()
 
+        if not PY2:
+            # ignore Python 3 warnings about unclosed filehandles
+            filterwarnings('ignore', category=ResourceWarning)
+
         from pyspark import SparkContext
         cls.spark_context = SparkContext()
+
+        # move stop() so that scripts can't call it
+        cls.spark_context.really_stop = cls.spark_context.stop
+        cls.spark_context.stop = MagicMock()
 
         try:
             cls.spark_context.setLogLevel('FATAL')
         except:
             # tearDownClass() won't be called if there's an exception
-            cls.spark_context.stop()
+            cls.spark_context.really_stop()
             raise
 
     @classmethod
     def tearDownClass(cls):
-        cls.spark_context.stop()
+        if not PY2:
+            # ignore Python 3 warnings about unclosed filehandles
+            filterwarnings('ignore', category=ResourceWarning)
 
+        cls.spark_context.really_stop()
+
+        super(SingleSparkContextTestCase, cls).tearDownClass()
 
     def setUp(self):
         super(SingleSparkContextTestCase, self).setUp()

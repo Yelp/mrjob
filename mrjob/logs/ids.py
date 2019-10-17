@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2017 Yelp
-# Copyright 2018 Yelp
+# Copyright 2015-2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,14 +16,26 @@
 """Utility for handling IDs, especially sorting by recency."""
 
 
-# TODO: test these!
-
 def _sort_by_recency(ds):
     """Sort the given list/sequence of dicts containing IDs so that the
     most recent ones come first (e.g. to find the best error, or the best
     log file to look for an error in).
     """
     return sorted(ds, key=_time_sort_key, reverse=True)
+
+
+def _sort_for_spark(ds):
+    """Sort the given list/sequence of dicts in forward order by task/container
+    ID, with most recent attempts first. This is used for finding errors on
+    Spark, see #2056.
+    """
+    return (
+        sorted(
+            sorted(
+                sorted(
+                    ds, key=_attempt_num, reverse=True),
+                key=_container_num),
+            key=_step_sort_key, reverse=True))
 
 
 def _time_sort_key(d):
@@ -38,8 +50,6 @@ def _time_sort_key(d):
     container IDs are considered more "recent" than any task/attempt ID
     (these usually come from task logs).
     """
-    container_id = d.get('container_id') or ''
-
     # when parsing task syslogs on YARN, we may end up with
     # container_id and nothing else. container IDs match with job ID
     # but aren't directly comparable to task and attempt IDs
@@ -57,25 +67,104 @@ def _time_sort_key(d):
     #
     # in practice, errors don't have job or application ID attached to
     # them (and we're only sorting errors from the same job/application)
-    attempt_parts = (d.get('attempt_id') or
-                     d.get('task_id') or d.get('job_id') or
-                     d.get('application_id') or
-                     _to_job_id(container_id) or '').split('_')
-
-    timestamp_and_step = '_'.join(attempt_parts[1:3])
-    task_type = '_'.join(attempt_parts[3:4])
-    task_num = '_'.join(attempt_parts[4:5])
-    attempt_num = '_'.join(attempt_parts[5:6])
-
-    # numbers are 0-padded, so no need to convert anything to int
-    # also, 'm' (task type in attempt ID) sorts before 'r', which is
-    # what we want
     return (
-        timestamp_and_step,
-        container_id,
-        task_type,
-        attempt_num,
-        task_num)
+        _timestamp(d),
+        _step_num(d),
+        d.get('container_id') or '',
+        _task_type(d),
+        _attempt_num(d),
+        _task_num(d),
+    )
+
+
+def _step_sort_key(d):
+    """Sort by timestamp and step"""
+    return (
+        _timestamp(d),
+        _step_num(d),
+    )
+
+
+def _id_part(id, i):
+    """Get the ith part of some container ID, e.g.
+    container_1567013493699_0003_01_000002. If *id* is None
+    or too short, return ''"""
+    parts = (id or '').split('_')
+
+    if i >= len(parts):
+        return ''
+    else:
+        return parts[i]
+
+
+def _any_id(d):
+    return (d.get('attempt_id') or
+            d.get('task_id') or d.get('job_id') or
+            d.get('application_id') or
+            d.get('container_id'))
+
+
+# TODO: account for "epoch" from resource manager restarts. See:
+# https://hadoop.apache.org/docs/current/api/org/apache/hadoop/yarn/api/records/ContainerId.html  # noqa
+
+def _timestamp(d):
+    """cluster timestamp. the first number in any ID.
+
+    For example, in container_1567013493699_0003_01_000002, it's
+    1567013493699."""
+    return _id_part(_any_id(d), 1)
+
+
+def _step_num(d):
+    """Number that indicates this is the nth task to be launched on the
+    cluster. The second number in any ID.
+
+    For example, in container_1567013493699_0003_01_000002, it's 0003.
+    """
+    return _id_part(_any_id(d), 2)
+
+
+def _task_type(d):
+    """In task or attempt IDs, whether this is a map or reduce
+    (not used by Spark).
+
+    For example, in
+    attempt_201601081945_0005_m_000005_0, it's "m"
+    """
+    return _id_part(d.get('attempt_id') or d.get('task_id'), 3)
+
+
+def _task_num(d):
+    """In task or attempt IDs, a unique number for the individual
+    task within the map or reduce phase.
+
+    For example, in
+    task_201601081945_0005_m_000005, it's 000005
+    """
+    return _id_part(d.get('attempt_id') or d.get('task_id'), 4)
+
+
+def _container_num(d):
+    """In container IDs, a unique number for the task assigned to the
+    container. Could be a map, a reduce, or part of a Spark
+    task; YARN doesn't care.
+
+    For example, in container_1567013493699_0003_01_000002, it's 000002.
+    """
+    return _id_part(d.get('container_id'), 4)
+
+
+def _attempt_num(d):
+    """Which attempt this is for a particular task; typically tasks that
+    fail are retried one or two times. This applies to both attempt
+    and container IDs
+
+    In container_1567013493699_0003_01_000002, attempt num is 01
+
+    In attempt_201601081945_0005_m_000005_0, attempt num is 0
+    """
+    return (_id_part(d.get('attempt_id'), 5) or
+            _id_part(d.get('container_id'), 3))
 
 
 def _add_implied_task_id(d):
@@ -83,22 +172,24 @@ def _add_implied_task_id(d):
 
     Use this on errors.
     """
-    # NOTE: container IDs look similar to task IDs, but they're actually
-    # different. Each container contains one task attempt, so there are
-    # actually more container IDs than task IDs.
+    # NOTE: container IDs look similar to task IDs, but there's a single
+    # numbering system for both map and reduce tasks
     if d.get('attempt_id') and not d.get('task_id'):
         d['task_id'] = _attempt_id_to_task_id(
             d['attempt_id'])
 
 
-# TODO: pretty sure that application and job IDs match, but if not,
-# our code could probably live with that
 def _add_implied_job_id(d):
     """If *d* has *task_id* or *application_id* but not *job_id*,
     add it.
 
     (We don't infer application_id from job_id because application_id
     only exists on YARN)
+
+    .. note::
+
+       Don't use this with Spark, where job and application IDs don't
+       necessarily match.
     """
     if not d.get('job_id'):
         if d.get('task_id'):

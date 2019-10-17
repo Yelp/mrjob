@@ -1,4 +1,5 @@
 # Copyright 2018 Google Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,11 +14,19 @@
 # limitations under the License.
 """Limited mock of google-cloud-sdk for tests
 """
+import sys
 from io import BytesIO
+from unittest import SkipTest
 
-from google.cloud.logging.entries import StructEntry
-from google.cloud.logging.resource import Resource
-from google.oauth2.credentials import Credentials
+try:
+    from google.cloud.logging.entries import StructEntry
+    from google.cloud.logging.resource import Resource
+    from google.oauth2.credentials import Credentials
+except ImportError:
+    if sys.version_info[:2] == (3, 4):
+        raise SkipTest('Google libraries are not supported on Python 3.4')
+    else:
+        raise
 
 from mrjob.fs.gcs import parse_gcs_uri
 
@@ -58,8 +67,8 @@ class MockGoogleTestCase(SandboxedTestCase):
         # mock project ID, returned by mock google.auth.default()
         self.mock_project_id = 'mock-project-12345'
 
-        # Maps bucket name to a dictionary with the key
-        # *blobs*. *blobs* maps object name to
+        # Maps bucket name to a dictionary with the keys
+        # *blobs* and *location*. *blobs* maps object name to
         # a dictionary with the key *data*, which is
         # a bytestring.
         self.mock_gcs_fs = {}

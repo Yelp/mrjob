@@ -1,5 +1,6 @@
 # Copyright 2015-2017 Yelp
 # Copyright 2018 Yelp and Google Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import errno
-
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
@@ -290,28 +289,6 @@ class InterpretHadoopJarCommandStderrTestCase(BasicTestCase):
                     timestamp='',
                 ),
             ])
-
-    def test_treat_eio_as_eof(self):
-        def yield_lines():
-            yield ('15/12/11 13:33:11 INFO mapreduce.Job:'
-                   ' Running job: job_1449857544442_0002\n')
-            e = IOError()
-            e.errno = errno.EIO
-            raise e
-
-        self.assertEqual(
-            _interpret_hadoop_jar_command_stderr(yield_lines()),
-            dict(job_id='job_1449857544442_0002'))
-
-    def test_raise_other_io_errors(self):
-        def yield_lines():
-            yield ('15/12/11 13:33:11 INFO mapreduce.Job:'
-                   ' Running job: job_1449857544442_0002\n')
-            raise IOError
-
-        self.assertRaises(
-            IOError,
-            _interpret_hadoop_jar_command_stderr, yield_lines())
 
 
 class ParseIndentedCountersTestCase(BasicTestCase):

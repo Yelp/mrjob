@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Google Inc. and Yelp
 # Copyright 2017 Yelp
-# Copyright 2018 Google Inc.
+# Copyright 2018 Google Inc. and Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,10 +39,9 @@ from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import is_gcs_uri
-from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
-from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _log_probable_cause_of_failure
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _parse_task_syslog_records
@@ -68,7 +68,7 @@ _DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
 
 # default imageVersion to use on Dataproc. This may be updated with each
 # version of mrjob
-_DEFAULT_IMAGE_VERSION = '1.0'
+_DEFAULT_IMAGE_VERSION = '1.3'
 _DEFAULT_CHECK_CLUSTER_EVERY = 10.0
 _DEFAULT_CLOUD_FS_SYNC_SECS = 5.0
 _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS = 90
@@ -87,7 +87,10 @@ _STATE_MATCHER_ACTIVE = 1
 # for the full list.
 _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
     '0.1': '2.7.1',
-    '1.0': '2.7.2'
+    '1.0': '2.7.2',
+    '1.1': '2.7.7',
+    '1.2': '2.8.5',
+    '1.3': '2.9.2',
 }
 
 _HADOOP_STREAMING_JAR_URI = (
@@ -349,7 +352,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 check_cluster_every=_DEFAULT_CHECK_CLUSTER_EVERY,
                 cleanup=['CLUSTER', 'JOB', 'LOCAL_TMP'],
                 cloud_fs_sync_secs=_DEFAULT_CLOUD_FS_SYNC_SECS,
-                gcloud_bin=['gcloud'],
                 image_version=_DEFAULT_IMAGE_VERSION,
                 instance_type=_DEFAULT_INSTANCE_TYPE,
                 master_instance_type=_DEFAULT_INSTANCE_TYPE,
@@ -405,23 +407,20 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._fs is None:
             self._fs = CompositeFilesystem()
 
+            location = self._opts['region'] or _zone_to_region(
+                self._opts['zone'])
+
             self._fs.add_fs('gcs', GCSFilesystem(
                 credentials=self._credentials,
-                local_tmp_dir=self._get_local_tmp_dir(),
                 project_id=self._project_id,
+                part_size=self._upload_part_size(),
+                location=location,
+                object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS,
             ))
 
             self._fs.add_fs('local', LocalFilesystem())
 
         return self._fs
-
-    def _fs_chunk_size(self):
-        """Chunk size for cloud storage Blob objects. Currently
-        only used for uploading."""
-        if self._opts['cloud_part_size_mb']:
-            return int(self._opts['cloud_part_size_mb'] * 1024 * 1024)
-        else:
-            return None
 
     def _get_tmpdir(self, given_tmpdir):
         """Helper for _fix_tmpdir"""
@@ -476,7 +475,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._create_setup_wrapper_scripts()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
-        self._upload_local_files_to_fs()
+        self._upload_local_files()
+        self._wait_for_fs_sync()
 
     def _check_output_not_exists(self):
         """Verify the output path does not already exist. This avoids
@@ -513,7 +513,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._working_dir_mgr.paths():
+        for path in self._working_dir_mgr.paths('archive'):
             self._upload_mgr.add(path)
 
         if self._opts['hadoop_streaming_jar']:
@@ -522,47 +522,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for step in self._get_steps():
             if step.get('jar'):
                 self._upload_mgr.add(step['jar'])
-
-    def _upload_local_files_to_fs(self):
-        """Copy local files tracked by self._upload_mgr to FS."""
-        bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
-        self._create_fs_tmp_bucket(bucket_name)
-
-        log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
-
-        for path, gcs_uri in self._upload_mgr.path_to_uri().items():
-            log.debug('uploading %s -> %s' % (path, gcs_uri))
-
-            self.fs.put(path, gcs_uri, part_size_mb=self._fs_chunk_size())
-
-        self._wait_for_fs_sync()
-
-    def _create_fs_tmp_bucket(self, bucket_name, location=None):
-        """Create a temp bucket if missing
-
-        Tie the temporary bucket to the same region as the GCE job and set a
-        28-day TTL
-        """
-        # Return early if our bucket already exists
-        try:
-            self.fs.gcs.get_bucket(bucket_name)
-            return
-        except google.api_core.exceptions.NotFound:
-            pass
-
-        log.info('creating FS bucket %r' % bucket_name)
-
-        location = location or self._opts['region'] or _zone_to_region(
-            self._opts['zone'])
-
-        # NOTE - By default, we create a bucket in the same GCE region as our
-        # job (tmp buckets ONLY)
-        # https://cloud.google.com/storage/docs/bucket-locations
-        self.fs.gcs.create_bucket(
-            bucket_name, location=location,
-            object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS)
-
-        self._wait_for_fs_sync()
 
     ### Running the job ###
 
@@ -648,7 +607,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         hadoop_job = {}
 
         hadoop_job['args'] = (
-            self._interpolate_step_args(step['args'], step_num))
+            self._interpolate_jar_step_args(step['args'], step_num))
 
         jar_uri = self._upload_mgr.uri(step['jar'])
 
@@ -671,8 +630,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _launch_cluster(self):
         """Create an empty cluster on Dataproc, and set self._cluster_id to
         its ID."""
-        bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
-        self._create_fs_tmp_bucket(bucket_name)
+        self.fs.mkdir(self._job_tmpdir)
 
         # clusterName must be a match of
         # regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
@@ -811,8 +769,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if job_state == 'ERROR':
                 error = self._pick_error(log_interpretation, step_type)
                 if error:
-                    log.error('Probable cause of failure:\n\n%s\n\n' %
-                              _format_error(error))
+                    _log_probable_cause_of_failure(log, error)
 
             # we're done, will return at the end of this
             if job_state == 'DONE':
@@ -1334,17 +1291,15 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         return min(20.0, self._opts['check_cluster_every'])
 
     def _ssh_tunnel_args(self, bind_port):
-        if not self._opts['gcloud_bin']:
-            self._give_up_on_ssh_tunnel = True
-            return None
-
         if not self._cluster_id:
             return
+
+        gcloud_bin = self._opts['gcloud_bin'] or ['gcloud']
 
         cluster = self._get_cluster(self._cluster_id)
         zone = cluster.config.gce_cluster_config.zone_uri.split('/')[-1]
 
-        return self._opts['gcloud_bin'] + [
+        return gcloud_bin + [
             'compute', 'ssh',
             '--zone', zone,
             self._job_tracker_host(),

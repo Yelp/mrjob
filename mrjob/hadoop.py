@@ -1,6 +1,7 @@
 # Copyright 2009-2016 Yelp and Contributors
 # Copyright 2017 Yelp
 # Copyright 2018 Yelp and Google, Inc.
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,8 +36,9 @@ from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
-from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _log_probable_cause_of_failure
 from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.step import _eio_to_eof
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
 from mrjob.logs.step import _log_line_from_driver
@@ -170,9 +172,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         self._hadoop_streaming_jar = self._opts['hadoop_streaming_jar']
         self._searched_for_hadoop_streaming_jar = False
 
-        # Keep track of where the spark-submit binary is
-        self._spark_submit_bin = self._opts['spark_submit_bin']
-
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task' ('step' will always
         # be filled because it comes from the hadoop jar command output,
@@ -184,8 +183,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             super(HadoopJobRunner, self)._default_opts(),
             dict(
                 hadoop_tmp_dir='tmp/mrjob',
-                spark_deploy_mode='client',
-                spark_master='yarn',
             )
         )
 
@@ -197,8 +194,12 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         if self._fs is None:
             self._fs = CompositeFilesystem()
 
+            # don't pass [] to fs; this means not to use hadoop until
+            # fs.set_hadoop_bin() is called (used for running hadoop over SSH).
+            hadoop_bin = self._opts['hadoop_bin'] or None
+
             self._fs.add_fs('hadoop',
-                            HadoopFilesystem(self._opts['hadoop_bin']))
+                            HadoopFilesystem(hadoop_bin))
             self._fs.add_fs('local', LocalFilesystem())
 
         return self._fs
@@ -319,44 +320,11 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         for path in _FALLBACK_HADOOP_LOG_DIRS:
             yield path
 
-    def get_spark_submit_bin(self):
-        if not self._spark_submit_bin:
-            self._spark_submit_bin = self._find_spark_submit_bin()
-        return self._spark_submit_bin
-
-    def _find_spark_submit_bin(self):
-        # TODO: this is very similar to _find_hadoop_bin() (in fs)
-        for path in unique(self._spark_submit_bin_dirs()):
-            log.info('Looking for spark-submit binary in %s...' % (
-                path or '$PATH'))
-
-            spark_submit_bin = which('spark-submit', path=path)
-
-            if spark_submit_bin:
-                log.info('Found spark-submit binary: %s' % spark_submit_bin)
-                return [spark_submit_bin]
-        else:
-            log.info("Falling back to 'spark-submit'")
-            return ['spark-submit']
-
-    def _spark_submit_bin_dirs(self):
-        # $SPARK_HOME
-        spark_home = os.environ.get('SPARK_HOME')
-        if spark_home:
-            yield os.path.join(spark_home, 'bin')
-
-        yield None  # use $PATH
-
-        # some other places recommended by install docs (see #1366)
-        yield '/usr/lib/spark/bin'
-        yield '/usr/local/spark/bin'
-        yield '/usr/local/lib/spark/bin'
-
     def _run(self):
         self._find_binaries_and_jars()
         self._create_setup_wrapper_scripts()
         self._add_job_files_for_upload()
-        self._upload_local_files_to_hdfs()
+        self._upload_local_files()
         self._run_job_in_hadoop()
 
     def _find_binaries_and_jars(self):
@@ -369,7 +337,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         # this triggers looking for Hadoop binary
         self.get_hadoop_version()
 
-        if self._has_streaming_steps():
+        if self._has_hadoop_streaming_steps():
             self.get_hadoop_streaming_jar()
 
         if self._has_spark_steps():
@@ -378,23 +346,11 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._working_dir_mgr.paths():
+        for path in self._working_dir_mgr.paths('archive'):
             self._upload_mgr.add(path)
+
         for path in self._py_files():
             self._upload_mgr.add(path)
-
-    def _upload_local_files_to_hdfs(self):
-        """Copy files managed by self._upload_mgr to HDFS
-        """
-        self.fs.mkdir(self._upload_mgr.prefix)
-
-        log.info('Copying local files to %s...' % self._upload_mgr.prefix)
-        for path, uri in self._upload_mgr.path_to_uri().items():
-            self._upload_to_hdfs(path, uri)
-
-    def _upload_to_hdfs(self, path, target):
-        log.debug('  %s -> %s' % (path, target))
-        self.fs.hadoop.put(path, target)
 
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""
@@ -413,6 +369,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         for step_num, step in enumerate(self._get_steps()):
             self._warn_about_spark_archives(step)
 
+            step_type = step['type']
             step_args = self._args_for_step(step_num)
             env = _fix_env(self._env_for_step(step_num))
 
@@ -426,47 +383,14 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             log_interpretation = {}
             self._log_interpretations.append(log_interpretation)
 
-            # try to use a PTY if it's available
-            try:
-                pid, master_fd = pty.fork()
-            except (AttributeError, OSError):
-                # no PTYs, just use Popen
-
-                # user won't get much feedback for a while, so tell them
-                # Hadoop is running
-                log.debug('No PTY available, using Popen() to invoke Hadoop')
-
-                step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE, env=env)
-
-                step_interpretation = _interpret_hadoop_jar_command_stderr(
-                    step_proc.stderr,
-                    record_callback=_log_record_from_hadoop)
-
-                # there shouldn't be much output to STDOUT
-                for line in step_proc.stdout:
-                    _log_line_from_driver(to_unicode(line).strip('\r\n'))
-
-                step_proc.stdout.close()
-                step_proc.stderr.close()
-
-                returncode = step_proc.wait()
+            if self._step_type_uses_spark(step_type):
+                returncode, step_interpretation = self._run_spark_submit(
+                    step_args, env, record_callback=_log_log4j_record)
             else:
-                # we have PTYs
-                if pid == 0:  # we are the child process
-                    os.execvpe(step_args[0], step_args, env)
-                else:
-                    log.debug('Invoking Hadoop via PTY')
+                returncode, step_interpretation = self._run_hadoop(
+                    step_args, env, record_callback=_log_record_from_hadoop)
 
-                    with os.fdopen(master_fd, 'rb') as master:
-                        # reading from master gives us the subprocess's
-                        # stderr and stdout (it's a fake terminal)
-                        step_interpretation = (
-                            _interpret_hadoop_jar_command_stderr(
-                                master,
-                                record_callback=_log_record_from_hadoop))
-                        _, returncode = os.waitpid(pid, 0)
-
-            # make sure output_dir is filled
+            # make sure output_dir is filled (used for history log)
             if 'output_dir' not in step_interpretation:
                 step_interpretation['output_dir'] = (
                     self._step_output_uri(step_num))
@@ -475,13 +399,10 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
             self._log_counters(log_interpretation, step_num)
 
-            step_type = step['type']
-
             if returncode:
                 error = self._pick_error(log_interpretation, step_type)
                 if error:
-                    log.error('Probable cause of failure:\n\n%s\n' %
-                              _format_error(error))
+                    _log_probable_cause_of_failure(log, error)
 
                 # use CalledProcessError's well-known message format
                 reason = str(CalledProcessError(returncode, step_args))
@@ -489,15 +410,70 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
                     reason=reason, step_num=step_num,
                     num_steps=self._num_steps())
 
+    def _run_hadoop(self, hadoop_args, env, record_callback):
+        # try to use a PTY if it's available
+        try:
+            pid, master_fd = pty.fork()
+        except (AttributeError, OSError):
+            # no PTYs, just use Popen
+
+            # user won't get much feedback for a while, so tell them
+            # Hadoop is running
+            log.debug('No PTY available, using Popen() to invoke Hadoop')
+
+            step_proc = Popen(hadoop_args, stdout=PIPE, stderr=PIPE, env=env)
+
+            step_interpretation = _interpret_hadoop_jar_command_stderr(
+                step_proc.stderr,
+                record_callback=_log_record_from_hadoop)
+
+            # there shouldn't be much output to STDOUT
+            for line in step_proc.stdout:
+                _log_line_from_driver(to_unicode(line).strip('\r\n'))
+
+            step_proc.stdout.close()
+            step_proc.stderr.close()
+
+            returncode = step_proc.wait()
+        else:
+            # we have PTYs
+            if pid == 0:  # we are the child process
+                try:
+                    os.execvpe(hadoop_args[0], hadoop_args, env)
+                    # now we are no longer Python
+                except OSError as ex:
+                    # use _exit() so we don't do cleanup, etc. that's
+                    # the parent process's job
+                    os._exit(ex.errno)
+                finally:
+                    # if we got some other exception, still exit hard
+                    os._exit(-1)
+            else:
+                log.debug('Invoking Hadoop via PTY')
+
+                with os.fdopen(master_fd, 'rb') as master:
+                    # reading from master gives us the subprocess's
+                    # stderr and stdout (it's a fake terminal)
+                    step_interpretation = (
+                        _interpret_hadoop_jar_command_stderr(
+                            _eio_to_eof(master),
+                            record_callback=_log_record_from_hadoop))
+                    _, returncode = os.waitpid(pid, 0)
+
+        return returncode, step_interpretation
+
     def _warn_about_spark_archives(self, step):
         """If *step* is a Spark step, the *upload_archives* option is set,
         and *spark_master* is not ``'yarn'``, warn that *upload_archives*
         will be ignored by Spark."""
         if (_is_spark_step_type(step['type']) and
-                self._opts['spark_master'] != 'yarn' and
+                self._spark_master() != 'yarn' and
                 self._opts['upload_archives']):
             log.warning('Spark will probably ignore archives because'
-                        " spark_master is not set to 'yarn'")
+                        " spark_master is not 'yarn'")
+
+    def _spark_master(self):
+        return self._opts['spark_master'] or 'yarn'
 
     def _args_for_step(self, step_num):
         step = self._get_step(step_num)
@@ -542,7 +518,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
         if step.get('args'):
             args.extend(
-                self._interpolate_step_args(step['args'], step_num))
+                self._interpolate_jar_step_args(step['args'], step_num))
 
         return args
 

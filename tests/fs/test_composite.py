@@ -87,16 +87,7 @@ class CompositeFilesystemTestCase(BasicTestCase):
 
         fs.put('/path/to/file', 's3://walrus/file')
         self.s3_fs.put.assert_called_once_with(
-            '/path/to/file', 's3://walrus/file', None)
-
-    def test_forward_put_with_part_size(self):
-        fs = CompositeFilesystem()
-
-        fs.add_fs('s3', self.s3_fs)
-
-        fs.put('/path/to/file', 's3://walrus/file', part_size_mb=99999)
-        self.s3_fs.put.assert_called_once_with(
-            '/path/to/file', 's3://walrus/file', 99999)
+            '/path/to/file', 's3://walrus/file')
 
     def test_forward_fs_extensions(self):
         fs = CompositeFilesystem()

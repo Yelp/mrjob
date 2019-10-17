@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015-2016 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +16,8 @@
 """Parse the log4j syslog format used by Hadoop."""
 import re
 from logging import getLogger
+
+from mrjob.py2 import to_unicode
 
 # log line format output by hadoop jar command
 _HADOOP_LOG4J_LINE_RE = re.compile(
@@ -53,7 +56,8 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
     timestamp -- unparsed timestamp, e.g. '15/12/07 20:49:28',
         '2015-08-22 00:46:18,411'
 
-    Trailing \r and \n will be stripped from lines.
+    Lines will be converted to unicode, and trailing \r and \n will be stripped
+    from lines.
 
     If set, *pre_filter* will be applied to stripped lines. If it
     returns true, we'll return a fake record with message set to the line,
@@ -65,7 +69,8 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
     last_record = None
 
     for line_num, line in enumerate(lines):
-        line = line.rstrip('\r\n')
+        # convert from bytes to unicode, if needed, and strip trailing newlines
+        line = to_unicode(line).rstrip('\r\n')
 
         def fake_record():
             return dict(

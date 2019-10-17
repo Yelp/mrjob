@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Yelp
 # Copyright 2018 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Job that runs (trivial) streaming and spark steps."""
+from operator import add
 
 from mrjob.job import MRJob
 from mrjob.step import MRStep
@@ -22,11 +24,24 @@ from mrjob.step import SparkStep
 
 class MRStreamingAndSpark(MRJob):
 
-    def mapper(self):
-        return
+    def mapper(self, key, value):
+        # converts line to: null\t<JSON of value>
+        yield key, value
 
-    def spark(self):
-        pass
+    def spark(self, input_paths, output_path):
+        from pyspark import SparkContext
+
+        sc = SparkContext()
+
+        lines = sc.textFile(input_paths)
+
+        chars = lines.flatMap(lambda line: list(line))
+        chars_and_ones = chars.map(lambda c: (c, 1))
+        char_counts = chars_and_ones.reduceByKey(add)
+
+        output_lines = char_counts.map(lambda c_n: '%s %d' % c_n)
+
+        output_lines.saveAsTextFile(output_path)
 
     def steps(self):
         return[

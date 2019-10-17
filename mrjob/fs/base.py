@@ -1,5 +1,6 @@
 # Copyright 2009-2015 Yelp and Contributors
 # Copyright 2017 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -105,22 +106,23 @@ class Filesystem(object):
 
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already
-        exist).
+        exist). On cloud filesystems (e.g. S3), also create the corresponding
+        bucket as needed
 
         Corresponds roughly to: ``hadoop fs -mkdir -p path``
+
+        .. versionadded:: 0.6.8 creates buckets on cloud filesystems
         """
         raise NotImplementedError
 
-    def put(self, src, path, part_size_mb=None):
+    def put(self, src, path):
         """Upload a file on the local filesystem (*src*) to *path*.
         Like with :py:func:`shutil.copyfile`, *path* should be the full path
         of the new file, not a directory which should contain it.
 
-        You may optionally specify *part_size_mb*, the part size in megabytes
-        for multi-part uploading. Filesystems that do not support multi-part
-        uploading will ignore this.
-
         Corresponds roughly to ``hadoop fs -put src path``.
+
+        .. versionadded:: 0.6.8
         """
         raise NotImplementedError
 

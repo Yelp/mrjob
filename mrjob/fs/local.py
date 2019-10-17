@@ -38,14 +38,16 @@ class LocalFilesystem(Filesystem):
         return sum(os.path.getsize(path) for path in self.ls(path_glob))
 
     def ls(self, path_glob):
-        path_glob = _from_file_uri(path_glob)
-        for path in glob.glob(path_glob):
+        bare_path_glob = _from_file_uri(path_glob)
+        uri_scheme = path_glob[0:-len(bare_path_glob)]  # 'file:///' or ''
+
+        for path in glob.glob(bare_path_glob):
             if os.path.isdir(path):
                 for dirname, _, filenames in os.walk(path, followlinks=True):
                     for filename in filenames:
-                        yield os.path.join(dirname, filename)
+                        yield uri_scheme + os.path.join(dirname, filename)
             else:
-                yield path
+                yield uri_scheme + path
 
     def _cat_file(self, filename):
         filename = _from_file_uri(filename)

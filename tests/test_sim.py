@@ -341,7 +341,13 @@ class LocalFSTestCase(SandboxedTestCase):
         self.assertEqual(
             self.runner.fs.exists(os.path.join(self.tmp_dir, 'foo')), False)
 
-    def test_cant_handle_uris(self):
+    def test_can_handle_file_uris(self):
+        self.assertEqual(
+            self.runner.fs.exists(
+                'file://' + os.path.join(self.tmp_dir, 'foo')),
+            False)
+
+    def test_cant_handle_other_uris(self):
         self.assertRaises(IOError, self.runner.fs.ls, 's3://walrus/foo')
 
 
@@ -370,17 +376,16 @@ class DistributedCachePermissionsTestCase(SandboxedTestCase):
 class FSDoesntHandleURIsTestCase(SandboxedTestCase):
     # regression test for #1185
 
-    def test_no_uris(self):
+    # updated for #1986 (file:// URIs)
+    def test_file_uris_only(self):
         runner = InlineMRJobRunner()
 
         # sanity check
         foo_path = self.makefile('foo')
         bar_path = os.path.join(self.tmp_dir, 'bar')
         self.assertTrue(runner.fs.exists(foo_path))
-        self.assertFalse(runner.fs.exists(bar_path))
+        self.assertFalse(runner.fs.exists('file://' + bar_path))
 
-        # URI should raise IOError, not return False
+        # non-file:/// URI should raise IOError, not return False
         self.assertRaises(IOError,
                           runner.fs.exists, 's3://walrus/fish')
-        # and it's because we wrapped the local fs in CompositeFilesystem
-        self.assertFalse(runner.fs.local.exists('s3://walrus/fish'))

@@ -75,7 +75,10 @@ class LocalFSTestCase(SandboxedTestCase):
         # relative paths
         self.assertEqual(self.fs.can_handle_path('garden'), True)
 
-    def test_cant_handle_uris(self):
+    def test_can_handle_file_uris(self):
+        self.assertEqual(self.fs.can_handle_path('file:///dem/bitties'), True)
+
+    def test_cant_handle_other_uris(self):
         self.assertEqual(self.fs.can_handle_path('http://yelp.com/'), False)
 
     def test_du(self):
@@ -84,7 +87,7 @@ class LocalFSTestCase(SandboxedTestCase):
 
         self.assertEqual(self.fs.du(self.tmp_dir), 8)
         self.assertEqual(self.fs.du(data_path_1), 4)
-        self.assertEqual(self.fs.du(data_path_2), 4)
+        self.assertEqual(self.fs.du('file://' + data_path_2), 4)
 
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls(self.tmp_dir)), [])

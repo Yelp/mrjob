@@ -301,7 +301,7 @@ class SimMRJobRunner(MRJobRunner):
         self.fs.mkdir(cache_dir)
 
         for name, path in self._working_dir_mgr.name_to_path('file').items():
-
+            path = _from_file_uri(path)  # might start with file://
             dest = self._path_in_dist_cache_dir(name, step_num)
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copy(path, dest)
@@ -309,8 +309,9 @@ class SimMRJobRunner(MRJobRunner):
 
         for name, path in self._working_dir_mgr.name_to_path(
                 'archive').items():
-
+            path = _from_file_uri(path)  # might start with file://
             dest = self._path_in_dist_cache_dir(name, step_num)
+
             log.debug('unarchiving %s -> %s' % (path, dest))
             unarchive(path, dest)
             _chmod_u_rx(dest, recursive=True)

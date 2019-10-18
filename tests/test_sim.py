@@ -27,6 +27,7 @@ from mrjob.step import MRStep
 
 from tests.mr_group import MRGroup
 from tests.mr_no_mapper import MRNoMapper
+from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
@@ -374,7 +375,7 @@ class DistributedCachePermissionsTestCase(SandboxedTestCase):
         self.assertFalse(data_perms & stat.S_IXOTH)
 
 
-class FSDoesntHandleURIsTestCase(SandboxedTestCase):
+class FSOnlyHandlesFileURIsTestCase(SandboxedTestCase):
     # regression test for #1185
 
     # updated for #1986 (file:// URIs)
@@ -407,3 +408,25 @@ class FileURIsAsInputTestCase(SandboxedTestCase):
 
             self.assertEqual(dict(job.parse_output(runner.cat_output())),
                              dict(bat=1, cat=1, dog=3, rat=1))
+
+
+class FileUploadTestCase(SandboxedTestCase):
+
+    # SetupTestCase in test_bin.py covers a lot of this. added this test
+    # so we can ensure that sim runners correctly handle file URIs.
+    # Should probably make this more comprehensive, see #2114
+
+    def test_file_uris(self):
+        f1_path = self.makefile('f1', b'contents')
+        f2_uri = 'file://' + self.makefile('f2', b'stuff')
+
+        job = MROSWalkJob(['--files', '%s,%s' % (f1_path, f2_uri)])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            path_to_size = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(path_to_size.get('./f1'), 8)
+            self.assertEqual(path_to_size.get('./f2'), 5)

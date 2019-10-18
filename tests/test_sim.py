@@ -252,7 +252,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         working_dir = results['mapreduce.job.local.dir']
         self.assertEqual(working_dir,
                          join(runner._get_local_tmp_dir(),
-                                      'step', '000', 'mapper', '00000', 'wd'))
+                              'step', '000', 'mapper', '00000', 'wd'))
 
         self.assertEqual(results['mapreduce.job.cache.archives'], '')
 
@@ -434,7 +434,7 @@ class FileUploadTestCase(SandboxedTestCase):
 
     def test_archive_uris(self):
         qux_dir = self.makedirs('qux')
-        qux_bar = self.makefile(join(qux_dir, 'bar'), b'baz')
+        self.makefile(join(qux_dir, 'bar'), b'baz')
 
         qux_tar_gz = make_archive(join(self.tmp_dir, 'qux'), 'gztar', qux_dir)
         qux_tar_gz_uri = 'file://' + qux_tar_gz

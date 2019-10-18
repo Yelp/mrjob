@@ -36,6 +36,7 @@ from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
+from mrjob.fs.local import _from_file_uri
 from mrjob.logs.counters import _format_counters
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
@@ -300,7 +301,7 @@ class SimMRJobRunner(MRJobRunner):
         self.fs.mkdir(cache_dir)
 
         for name, path in self._working_dir_mgr.name_to_path('file').items():
-
+            path = _from_file_uri(path)  # might start with file://
             dest = self._path_in_dist_cache_dir(name, step_num)
             log.debug('copying %s -> %s' % (path, dest))
             shutil.copy(path, dest)
@@ -308,8 +309,9 @@ class SimMRJobRunner(MRJobRunner):
 
         for name, path in self._working_dir_mgr.name_to_path(
                 'archive').items():
-
+            path = _from_file_uri(path)  # might start with file://
             dest = self._path_in_dist_cache_dir(name, step_num)
+
             log.debug('unarchiving %s -> %s' % (path, dest))
             unarchive(path, dest)
             _chmod_u_rx(dest, recursive=True)
@@ -586,8 +588,11 @@ class SimMRJobRunner(MRJobRunner):
 
     def _input_paths_for_step(self, step_num):
         if step_num == 0:
-            return [path for input_path_glob in self._get_input_paths()
-                    for path in self.fs.ls(input_path_glob)]
+            return [
+                _from_file_uri(path)  # *path* could be a file:// URI
+                for input_path_glob in self._get_input_paths()
+                for path in self.fs.ls(input_path_glob)
+            ]
         else:
             return self.fs.ls(
                 join(self._output_dir_for_step(step_num - 1), 'part-*'))

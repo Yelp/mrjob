@@ -15,8 +15,8 @@
 from io import BytesIO
 import gzip
 import os
-import os.path
 import stat
+from os.path import join
 from shutil import make_archive
 
 from mrjob import conf
@@ -125,7 +125,7 @@ class MRJobFileOptionsTestCase(SandboxedTestCase):
     def setUp(self):
         super(MRJobFileOptionsTestCase, self).setUp()
 
-        self.input_file_path = os.path.join(self.tmp_dir, 'input_file.txt')
+        self.input_file_path = join(self.tmp_dir, 'input_file.txt')
         with open(self.input_file_path, 'wb') as f:
             f.write(b'2\n')
 
@@ -184,11 +184,11 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
     RUNNER = 'inline'
 
     def test_input_files(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
+        input_path = join(self.tmp_dir, 'input')
         with open(input_path, 'wb') as input_file:
             input_file.write(b'bar\nqux\nfoo\n')
 
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz_path = join(self.tmp_dir, 'input.gz')
         with gzip.GzipFile(input_gz_path, 'wb') as input_gz:
             input_gz.write(b'foo\n')
 
@@ -216,12 +216,12 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
 
     def test_jobconf_simulated_by_runner(self):
         # use a .gz file so there's only one split
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz_path = join(self.tmp_dir, 'input.gz')
         with gzip.GzipFile(input_gz_path, 'wb') as input_gz:
             input_gz.write(b'foo\n')
         input_gz_size = os.stat(input_gz_path)[stat.ST_SIZE]
 
-        upload_path = os.path.join(self.tmp_dir, 'upload')
+        upload_path = join(self.tmp_dir, 'upload')
         with open(upload_path, 'wb') as upload_file:
             upload_file.write(b'PAYLOAD')
 
@@ -251,7 +251,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
 
         working_dir = results['mapreduce.job.local.dir']
         self.assertEqual(working_dir,
-                         os.path.join(runner._get_local_tmp_dir(),
+                         join(runner._get_local_tmp_dir(),
                                       'step', '000', 'mapper', '00000', 'wd'))
 
         self.assertEqual(results['mapreduce.job.cache.archives'], '')
@@ -269,10 +269,10 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
 
         self.assertEqual(results['mapreduce.job.cache.local.archives'], '')
         expected_local_files = [
-            os.path.join(working_dir, 'mr_test_jobconf.py'),
-            os.path.join(working_dir, 'upload')
+            join(working_dir, 'mr_test_jobconf.py'),
+            join(working_dir, 'upload')
         ] + [
-            os.path.join(working_dir, name)
+            join(working_dir, name)
             for path, name in self._extra_expected_local_files(runner)
         ]
         self.assertEqual(
@@ -342,12 +342,12 @@ class LocalFSTestCase(SandboxedTestCase):
 
     def test_can_handle_paths(self):
         self.assertEqual(
-            self.runner.fs.exists(os.path.join(self.tmp_dir, 'foo')), False)
+            self.runner.fs.exists(join(self.tmp_dir, 'foo')), False)
 
     def test_can_handle_file_uris(self):
         self.assertEqual(
             self.runner.fs.exists(
-                'file://' + os.path.join(self.tmp_dir, 'foo')),
+                'file://' + join(self.tmp_dir, 'foo')),
             False)
 
     def test_cant_handle_other_uris(self):
@@ -385,7 +385,7 @@ class FSOnlyHandlesFileURIsTestCase(SandboxedTestCase):
 
         # sanity check
         foo_path = self.makefile('foo')
-        bar_path = os.path.join(self.tmp_dir, 'bar')
+        bar_path = join(self.tmp_dir, 'bar')
         self.assertTrue(runner.fs.exists(foo_path))
         self.assertFalse(runner.fs.exists('file://' + bar_path))
 
@@ -434,10 +434,9 @@ class FileUploadTestCase(SandboxedTestCase):
 
     def test_archive_uris(self):
         foo_dir = self.makedirs('foo')
-        foo_bar = self.makefile(os.path.join(foo_dir, 'bar'), b'baz')
+        foo_bar = self.makefile(join(foo_dir, 'bar'), b'baz')
 
-        foo_tar_gz = make_archive(
-            os.path.join(self.tmp_dir, 'foo'), 'gztar', foo_dir)
+        foo_tar_gz = make_archive(join(self.tmp_dir, 'foo'), 'gztar', foo_dir)
         foo_tar_gz_uri = 'file://' + foo_tar_gz
 
         job = MROSWalkJob(

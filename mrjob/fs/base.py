@@ -36,9 +36,13 @@ class Filesystem(object):
 
     * :py:class:`mrjob.fs.gcs.GCSFilesystem`: ``gs://``
     * :py:class:`mrjob.fs.hadoop.HadoopFilesystem`: ``hdfs://`` and other URIs
-    * :py:class:`mrjob.fs.local.LocalFilesystem`: ``/`` (non-URIs)
+    * :py:class:`mrjob.fs.local.LocalFilesystem`: paths and ``file://`` URIs
     * :py:class:`mrjob.fs.s3.S3Filesystem`: ``s3://``, ``s3a://``, ``s3n://``,
     * :py:class:`mrjob.fs.ssh.SSHFilesystem`: ``ssh://``
+
+    .. versionchanged:: 0.6.12
+
+       `LocalFilesystem` added support for ``file://`` URIs
     """
     # Note: currently, we're not very consistent about the names of arguments
     # to these methods in subclasses, which we'll fix in v0.7.0 (see #1979).

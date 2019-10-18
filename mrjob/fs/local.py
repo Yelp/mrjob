@@ -31,37 +31,46 @@ class LocalFilesystem(Filesystem):
     ``MRJobRunner().fs``.
     """
     def can_handle_path(self, path):
-        return not is_uri(path)
+        return path.startswith('file:///') or not is_uri(path)
 
     def du(self, path_glob):
+        path_glob = _from_file_uri(path_glob)
         return sum(os.path.getsize(path) for path in self.ls(path_glob))
 
     def ls(self, path_glob):
-        for path in glob.glob(path_glob):
+        bare_path_glob = _from_file_uri(path_glob)
+        uri_scheme = path_glob[0:-len(bare_path_glob)]  # 'file:///' or ''
+
+        for path in glob.glob(bare_path_glob):
             if os.path.isdir(path):
                 for dirname, _, filenames in os.walk(path, followlinks=True):
                     for filename in filenames:
-                        yield os.path.join(dirname, filename)
+                        yield uri_scheme + os.path.join(dirname, filename)
             else:
-                yield path
+                yield uri_scheme + path
 
     def _cat_file(self, filename):
+        filename = _from_file_uri(filename)
         with open(filename, 'rb') as f:
             for chunk in decompress(f, filename):
                 yield chunk
 
     def exists(self, path_glob):
+        path_glob = _from_file_uri(path_glob)
         return bool(glob.glob(path_glob))
 
     def mkdir(self, path):
+        path = _from_file_uri(path)
         if not os.path.isdir(path):
             os.makedirs(path)
 
     def put(self, src, path):
         """Copy a file from *src* to *path*"""
+        path = _from_file_uri(path)
         shutil.copyfile(src, path)
 
     def rm(self, path_glob):
+        path_glob = _from_file_uri(path_glob)
         for path in glob.glob(path_glob):
             if os.path.isdir(path):
                 log.debug('Recursively deleting %s' % path)
@@ -71,6 +80,7 @@ class LocalFilesystem(Filesystem):
                 os.remove(path)
 
     def touchz(self, path):
+        path = _from_file_uri(path)
         if os.path.isfile(path) and os.path.getsize(path) != 0:
             raise OSError('Non-empty file %r already exists!' % (path,))
 
@@ -88,5 +98,16 @@ class LocalFilesystem(Filesystem):
         return md5.hexdigest()
 
     def md5sum(self, path):
+        path = _from_file_uri(path)
         with open(path, 'rb') as f:
             return self._md5sum_file(f)
+
+
+def _from_file_uri(path_or_uri):
+    if is_uri(path_or_uri):
+        if path_or_uri.startswith('file:///'):
+            return path_or_uri[7:]  # keep last /
+        else:
+            raise ValueError('Not a file:/// URI')
+    else:
+        return path_or_uri

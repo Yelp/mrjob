@@ -4,6 +4,19 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.12:
+
+0.6.12
+------
+
+Updated the Dataproc's runner default :mrjob-opt:`image_version` to ``1.3``,
+as the old default, ``1.0`` no longer works.
+
+The local and inline runners can now handle ``file://`` URIs as input paths
+and as files/archives uploaded to the working directory. The local filesystem
+(available as ``runner.fs`` from all runners) can now handle ``file://``
+URIs as well.
+
 .. _v0.6.11:
 
 0.6.11

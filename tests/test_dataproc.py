@@ -388,7 +388,7 @@ class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
             runner.run()
             self.assertEqual(runner.get_image_version(),
                              _DEFAULT_IMAGE_VERSION)
-            self.assertEqual(runner.get_hadoop_version(), '2.7.2')
+            self.assertEqual(runner.get_hadoop_version(), '2.9.2')
 
     def test_image_0_1(self):
         self._assert_cloud_hadoop_version('0.1', '2.7.1')
@@ -403,8 +403,12 @@ class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
         # regression test for #1428
         self._assert_cloud_hadoop_version('1.0.11', '2.7.2')
 
+    def test_image_1_2(self):
+        # regression test for #1428
+        self._assert_cloud_hadoop_version('1.2', '2.8.5')
+
     def test_future_proofing(self):
-        self._assert_cloud_hadoop_version('5.0', '2.7.2')
+        self._assert_cloud_hadoop_version('5.0', '2.9.2')
 
     def _assert_cloud_hadoop_version(self, image_version, hadoop_version):
         with self.make_runner('--image-version', image_version) as runner:
@@ -417,7 +421,7 @@ class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
             runner.run()
             self.assertEqual(runner.get_image_version(),
                              _DEFAULT_IMAGE_VERSION)
-            self.assertEqual(runner.get_hadoop_version(), '2.7.2')
+            self.assertEqual(runner.get_hadoop_version(), '2.9.2')
 
 
 class AvailabilityZoneConfigTestCase(MockGoogleTestCase):

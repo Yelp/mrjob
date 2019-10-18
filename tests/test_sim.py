@@ -433,14 +433,14 @@ class FileUploadTestCase(SandboxedTestCase):
             self.assertEqual(path_to_size.get('./f2'), 5)
 
     def test_archive_uris(self):
-        foo_dir = self.makedirs('foo')
-        foo_bar = self.makefile(join(foo_dir, 'bar'), b'baz')
+        qux_dir = self.makedirs('qux')
+        qux_bar = self.makefile(join(qux_dir, 'bar'), b'baz')
 
-        foo_tar_gz = make_archive(join(self.tmp_dir, 'foo'), 'gztar', foo_dir)
-        foo_tar_gz_uri = 'file://' + foo_tar_gz
+        qux_tar_gz = make_archive(join(self.tmp_dir, 'qux'), 'gztar', qux_dir)
+        qux_tar_gz_uri = 'file://' + qux_tar_gz
 
         job = MROSWalkJob(
-            ['--archives', '%s#foo,%s#foo2' % (foo_tar_gz, foo_tar_gz_uri)])
+            ['--archives', '%s#qux,%s#qux2' % (qux_tar_gz, qux_tar_gz_uri)])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -448,5 +448,5 @@ class FileUploadTestCase(SandboxedTestCase):
 
             path_to_size = dict(job.parse_output(runner.cat_output()))
 
-            self.assertEqual(path_to_size.get('./foo/bar'), 3)
-            self.assertEqual(path_to_size.get('./foo2/bar'), 3)
+            self.assertEqual(path_to_size.get('./qux/bar'), 3)
+            self.assertEqual(path_to_size.get('./qux2/bar'), 3)

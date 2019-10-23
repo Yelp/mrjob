@@ -347,7 +347,7 @@ non-streaming steps.
 The Hadoop runner no longer has the :mrjob-opt:`bootstrap_spark` option,
 which did nothing.
 
-:mrjob-opt:`interpreter` and :mrjob-opt:`steps_interpreter` are deprecated,
+`interpreter` and `steps_interpreter` are deprecated,
 in anticipation in removing support for writing MRJobs in other
 programming languages.
 
@@ -1468,7 +1468,7 @@ Other changes
  - custom :mrjob-opt:`hadoop_streaming_jar`\ s are properly uploaded
  - :py:data:`~mrjob.runner.JOB` :mrjob-opt:`cleanup` on EMR is temporarily disabled
  - mrjob now follows symlinks when :py:meth:`~mrjob.fs.local.LocalFileSystem.ls`\ ing the local filesystem (beware recursive symlinks!)
- - The :mrjob-opt:`interpreter` option disables :mrjob-opt:`bootstrap_mrjob` by default (:mrjob-opt:`interpreter` is meant for non-Python jobs)
+ - The `interpreter` option disables :mrjob-opt:`bootstrap_mrjob` by default (`interpreter` is meant for non-Python jobs)
  - :ref:`cluster-pooling` now respects :mrjob-opt:`ec2_key_pair`
  - cluster self-termination (see :mrjob-opt:`max_hours_idle`) now respects non-streaming jobs
  - :py:class:`~mrjob.fs.local.LocalFilesystem` now rejects URIs rather than interpreting them as local paths

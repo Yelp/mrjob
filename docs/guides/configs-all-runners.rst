@@ -39,11 +39,10 @@ options related to file uploading.
     :switch: --bootstrap-mrjob, --no-bootstrap-mrjob
     :type: boolean
     :set: all
-    :default: (automatic)
+    :default: ``True``
 
     Should we automatically zip up the mrjob library and install it when we run
-    job? By default, we do unless :mrjob-opt:`interpreter` (deprecated)
-    is set.
+    job?
 
     Set this to ``False`` if you've already installed ``mrjob`` on your
     Hadoop cluster or install it by some other method.
@@ -265,26 +264,6 @@ Job execution context
         --cmdenv PYTHONPATH=$HOME/stuff,TZ=America/Los_Angeles
 
 .. mrjob-opt::
-    :config: interpreter
-    :switch: --interpreter
-    :type: :ref:`string <data-type-string>`
-    :set: all
-    :default: ``None``
-
-    .. deprecated:: 0.6.7
-
-       support for non-Python jobs is being phased out.
-
-    Non-Python command to launch your script with (e.g. ``'ruby'``).
-    This will also be used to query the script about steps unless you set
-    :mrjob-opt:`steps_interpreter`.
-
-    If you want to use an alternate Python command to run the job, use
-    :mrjob-opt:`python_bin`.
-
-    This takes precedence over :mrjob-opt:`python_bin`.
-
-.. mrjob-opt::
     :config: python_bin
     :switch: --python-bin
     :type: :ref:`command <data-type-command>`
@@ -303,8 +282,7 @@ Job execution context
     depending on your version.
 
     This option also affects which Python binary is used for file locking in
-    :mrjob-opt:`setup` scripts, so it might be useful to set even if you're
-    using a non-Python :mrjob-opt:`interpreter` (deprecated). It's also
+    :mrjob-opt:`setup` scripts. It's also
     used by :py:class:`~mrjob.emr.EMRJobRunner` to compile mrjob after
     bootstrapping it (see :mrjob-opt:`bootstrap_mrjob`).
 
@@ -406,20 +384,6 @@ Job execution context
     .. versionchanged:: 0.6.7
 
        Used to be :command:`sh -ex` on local and Hadoop runners
-
-.. mrjob-opt::
-    :config: steps_interpreter
-    :switch: --steps-interpreter
-    :type: :ref:`command <data-type-command>`
-    :set: all
-    :default: current Python interpreter
-
-    .. deprecated:: 0.6.7
-
-       support for non-Python jobs is being phased out.
-
-    Alternate (non-Python) command to use to query the job about
-    its steps. Usually it's good enough to set :mrjob-opt:`interpreter`.
 
 .. mrjob-opt::
     :config: task_python_bin

@@ -329,12 +329,6 @@ class InterpreterTestCase(BasicTestCase):
         self.assertEqual(runner._interpreter(), ['python', '-v'])
         self.assertEqual(runner._interpreter(steps=True), [sys.executable])
 
-    def test_steps_python_bin(self):
-        runner = MRJobBinRunner(steps_python_bin=['python', '-v'])
-        self.assertEqual(runner._python_bin(), [PYTHON_BIN])
-        self.assertEqual(runner._interpreter(), [PYTHON_BIN])
-        self.assertEqual(runner._interpreter(steps=True), ['python', '-v'])
-
     def test_task_python_bin(self):
         runner = MRJobBinRunner(task_python_bin=['python', '-v'])
         self.assertEqual(runner._python_bin(), [PYTHON_BIN])
@@ -343,8 +337,6 @@ class InterpreterTestCase(BasicTestCase):
                          [sys.executable])
 
     def test_empty_python_bin_means_default(self):
-        # interpreter and steps_python_bin opts are deprecated, so
-        # not bothering to test them
         runner = MRJobBinRunner(python_bin=[], task_python_bin=[])
 
         self.assertEqual(runner._python_bin(), [PYTHON_BIN])
@@ -367,12 +359,6 @@ class InterpreterTestCase(BasicTestCase):
     def test_interpreter_overrides_python_bin(self):
         runner = MRJobBinRunner(interpreter=['ruby'],
                                 python_bin=['python', '-v'])
-        self.assertEqual(runner._interpreter(), ['ruby'])
-        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
-
-    def test_interpreter_overrides_steps_python_bin(self):
-        runner = MRJobBinRunner(interpreter=['ruby'],
-                                steps_python_bin=['python', '-v'])
         self.assertEqual(runner._interpreter(), ['ruby'])
         self.assertEqual(runner._interpreter(steps=True), ['ruby'])
 

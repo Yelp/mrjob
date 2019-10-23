@@ -1313,17 +1313,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    steps_python_bin=dict(
-        combiner=combine_cmds,
-        deprecated=True,
-        switches=[
-            (['--steps-python-bin'], dict(
-                help=('Name/path of alternate python command to use to'
-                      ' query the job about its steps, if different from the'
-                      ' current Python interpreter.'),
-            )),
-        ],
-    ),
     subnet=dict(
         cloud_role='launch',
         switches=[

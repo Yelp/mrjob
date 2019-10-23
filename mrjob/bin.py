@@ -76,7 +76,6 @@ class MRJobBinRunner(MRJobRunner):
         'spark_args',
         'spark_submit_bin',
         'steps_interpreter',
-        'steps_python_bin',
         'task_python_bin',
     }
 
@@ -154,8 +153,7 @@ class MRJobBinRunner(MRJobRunner):
     def _interpreter(self, steps=False):
         if steps:
             return (self._opts['steps_interpreter'] or
-                    self._opts['interpreter'] or
-                    self._steps_python_bin())
+                    self._opts['interpreter'])
         else:
             return (self._opts['interpreter'] or
                     self._task_python_bin())
@@ -182,11 +180,6 @@ class MRJobBinRunner(MRJobRunner):
         """
         # python_bin isn't an option for inline runners
         return self._opts['python_bin'] or self._default_python_bin()
-
-    def _steps_python_bin(self):
-        """Python binary used to invoke job with ``--steps``"""
-        return (self._opts['steps_python_bin'] or
-                self._default_python_bin(local=True))
 
     def _task_python_bin(self):
         """Python binary used to invoke job with ``--mapper``,

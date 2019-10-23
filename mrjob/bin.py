@@ -169,12 +169,12 @@ class MRJobBinRunner(MRJobRunner):
 
     def _python_bin(self):
         """Python binary used for everything other than invoking the job.
-        For invoking jobs with ``--steps``, see :py:meth:`_steps_python_bin`,
-        and for everything else (e.g. ``--mapper``, ``--spark``), see
-        :py:meth:`_task_python_bin`, which defaults to this method if
-        :mrjob-opt:`task_python_bin` isn't set.
 
-        Other ways mrjob uses Python:
+        For running job tasks (e.g. ``--mapper``, ``--spark``), we use
+        :py:meth:`_task_python_bin`, which can be set to a different value
+        by setting :mrjob-opt:`task_python_bin`.
+
+        Ways mrjob uses Python other than running tasks:
          * file locking in setup wrapper scripts
          * finding site-packages dir to bootstrap mrjob on clusters
          * invoking ``cat.py`` in local mode

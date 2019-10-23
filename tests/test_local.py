@@ -50,7 +50,6 @@ from mrjob.util import cmd_line
 from mrjob.util import safeeval
 from mrjob.util import to_lines
 
-import tests.sr_wc
 from tests.examples.test_mr_phone_to_url import write_conversion_record
 from tests.job import run_job
 from tests.mr_cmd_job import MRCmdJob
@@ -994,26 +993,6 @@ class SortBinTestCase(SandboxedTestCase):
     def test_custom_local_tmp_dir(self):
         tmp_dir = self.makedirs('ephemera')
         self._test_environment_variables('--local-tmp-dir', tmp_dir)
-
-
-class InputFileArgsTestCase(SandboxedTestCase):
-    # test for #567: ensure that local runner doesn't need to pass
-    # file args to jobs
-
-    def test_no_file_args_required(self):
-        words1 = self.makefile('words1', b'kit and caboodle\n')
-        words2 = self.makefile('words2', b'baubles\nbangles and beads\n')
-
-        job = MRJobLauncher(
-            args=['-r', 'local', tests.sr_wc.__file__, words1, words2])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner.run()
-
-            lines = list(to_lines(runner.cat_output()))
-            self.assertEqual(len(lines), 1)
-            self.assertEqual(int(lines[0]), 7)
 
 
 class LocalInputManifestTestCase(InlineInputManifestTestCase):

@@ -388,11 +388,3 @@ class GCSFilesystemInitTestCase(MockGoogleTestCase):
 
         self.assertEqual(fs.client,
                          self.Client(project=project_id, credentials=creds))
-
-    def test_local_tmp_dir_is_deprecated_and_does_nothing(self):
-        fs = GCSFilesystem(local_tmp_dir=self.tmp_dir)
-        self.assertTrue(self.log.warning.called)
-
-        self.assertEqual(fs.client,
-                         self.Client(project=None, credentials=None))
-        self.assertFalse(hasattr(fs, '_local_tmp_dir'))

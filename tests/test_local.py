@@ -431,39 +431,6 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
                 sorted([b'1\tnull\n', b'1\t"bar"\n']))
 
 
-class StepsPythonBinTestCase(BasicTestCase):
-
-    def test_echo_as_steps_python_bin(self):
-        mr_job = MRTwoStepJob(
-            ['--steps', '--steps-python-bin', 'echo', '--no-conf',
-             '-r', 'local'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            assert isinstance(runner, LocalMRJobRunner)
-            # MRTwoStepJob populates _steps in the runner, so un-populate
-            # it here so that the runner actually tries to get the steps
-            # via subprocess
-            runner._steps = None
-            self.assertRaises(ValueError, runner._get_steps)
-
-    def test_echo_as_steps_interpreter(self):
-        import logging
-        logging.basicConfig()
-        mr_job = MRTwoStepJob(
-            ['--steps', '--steps-interpreter', 'echo', '--no-conf', '-r',
-             'local'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            assert isinstance(runner, LocalMRJobRunner)
-            # MRTwoStepJob populates _steps in the runner, so un-populate
-            # it here so that the runner actually tries to get the steps
-            # via subprocess
-            runner._steps = None
-            self.assertRaises(ValueError, runner._get_steps)
-
-
 class LocalBootstrapMrjobTestCase(BasicTestCase):
 
     def test_loading_bootstrapped_mrjob_library(self):

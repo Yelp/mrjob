@@ -278,14 +278,6 @@ _STEP_OPTS = dict(
             help='run Spark code',
         ),
     ),
-    show_steps=(
-        ['--steps'],
-        dict(
-            action='store_true',
-            help=('print the mappers, combiners, and reducers that this job'
-                  ' defines'),
-        ),
-    ),
     step_num=(
         ['--step-num'],
         dict(
@@ -296,8 +288,8 @@ _STEP_OPTS = dict(
     ),
 )
 
-# don't show these unless someone types --help --steps --deprecated
-_DEPRECATED_STEP_OPTS = {'show_steps'}
+# don't show these unless someone types --help -v --deprecated
+_DEPRECATED_STEP_OPTS = set()  # none at the moment
 
 # don't show these unless someone types --help --deprecated
 _DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
@@ -1604,7 +1596,7 @@ def _add_basic_args(parser):
         action='store_true', help='print more messages to stderr')
 
 
-def _add_job_args(parser, include_deprecated=True):
+def _add_job_args(parser, include_deprecated=True, include_steps=True):
 
     parser.add_argument(
         '--cat-output', dest='cat_output',
@@ -1670,15 +1662,8 @@ def _print_help_for_runner(opt_names, include_deprecated=False):
     help_parser.print_help()
 
 
-def _print_help_for_steps(include_deprecated=False):
-    help_parser = ArgumentParser(usage=SUPPRESS, add_help=False)
-
-    _add_step_args(help_parser, include_deprecated=include_deprecated)
-
-    help_parser.print_help()
-
-
-def _print_basic_help(option_parser, usage, include_deprecated=False):
+def _print_basic_help(option_parser, usage, include_deprecated=False,
+                      include_steps=False):
     """Print all help for the parser. Unlike similar functions, this needs a
     parser so that it can include custom options added by a
     :py:class:`~mrjob.job.MRJob`.
@@ -1686,7 +1671,8 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
     help_parser = ArgumentParser(usage=usage, add_help=False)
 
     _add_basic_args(help_parser)
-    _add_job_args(help_parser, include_deprecated=include_deprecated)
+    _add_job_args(help_parser, include_deprecated=include_deprecated,
+                  include_steps=include_steps)
 
     basic_dests = {action.dest for action in help_parser._actions}
 
@@ -1706,8 +1692,8 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
         if action.dest in _RUNNER_OPTS:
             continue
 
-        # this excludes options that are show with --help --steps
-        if action.dest in _STEP_OPTS:
+        # don't include steps if *include_steps* isn't set
+        if action.dest in _STEP_OPTS and not include_steps:
             continue
 
         # this excludes the ARGS option, which is already covered by usage
@@ -1722,9 +1708,10 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
     print()
     print('To see help for a specific runner, use --help -r <runner name>')
     print()
-    print('To see help for options that control what part of a job runs,'
-          ' use --help --steps')
-    print()
+    if not include_steps:
+        print('To include switches that control what part of a job runs,'
+              ' use --help -v')
+        print()
     if not include_deprecated:
         print('To include help for deprecated options, add --deprecated')
         print()

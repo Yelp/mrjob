@@ -176,7 +176,8 @@ class MRJobLauncher(object):
         else:
             _print_basic_help(self.arg_parser,
                               self._usage(),
-                              options.deprecated)
+                              options.deprecated,
+                              options.verbose)
 
     @classmethod
     def run(cls, args=_READ_ARGS_FROM_SYS_ARGV):

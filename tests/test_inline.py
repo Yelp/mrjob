@@ -133,7 +133,6 @@ class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):
 
 
 class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
-    # make sure file options get passed to --steps in inline mode
 
     def test_adding_2(self):
         mr_job = MRIncrementerJob(['-r', 'inline', '--times', '2'])

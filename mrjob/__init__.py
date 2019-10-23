@@ -138,4 +138,4 @@ __credits__ = [
     'drulludanni <drulludanni5@gmail.com>',
 ]
 
-__version__ = '0.6.12'
+__version__ = '0.7.0.dev0'

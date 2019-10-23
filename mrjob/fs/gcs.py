@@ -56,7 +56,6 @@ def _path_glob_to_parsed_gcs_uri(path_glob):
 class GCSFilesystem(Filesystem):
     """Filesystem for Google Cloud Storage (GCS) URIs
 
-    :param local_tmp_dir: deprecated, does nothing, do not use
     :param credentials: an optional
                         :py:class:`google.auth.credentials.Credentials`, used
                         to initialize the storage client
@@ -66,22 +65,22 @@ class GCSFilesystem(Filesystem):
     :param location: Default location to use when creating a bucket
     :param object_ttl_days: Default object expiry for newly created buckets
 
+    .. versionchanged:: 0.7.0
+
+       removed *local_tmp_dir*
+
     .. versionchanged:: 0.6.8
 
        deprecated *local_tmp_dir*, added *part_size*, *location*,
        *object_ttl_days*
     """
-    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None,
+    def __init__(self, credentials=None, project_id=None,
                  part_size=None, location=None, object_ttl_days=None):
         self._credentials = credentials
         self._project_id = project_id
         self._part_size = part_size
         self._location = location
         self._object_ttl_days = object_ttl_days
-
-        if local_tmp_dir is not None:
-            log.warning('local_tmp_dir does nothing and will be removed'
-                        'in v0.7.0')
 
     @property
     def client(self):

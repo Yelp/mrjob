@@ -1,6 +1,9 @@
 v0.7.0, 2019-10-?? -- fall cleaning
  * removed the following deprecated code:
    * useless local_tmp_dir arg to GCSFilesystem
+   * remove --steps option from job
+     * use --help -v to see help for --mapper etc.
+   * removed steps_python_bin option
    * TODO: remove interpreter option
      * removed mr_wc.rb from examples
 

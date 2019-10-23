@@ -326,13 +326,13 @@ class MRJobRunner(object):
 
         # check and store *steps*
         self._steps = None
-        if steps is None:
-            if not mr_job_script:
-                self._steps = []
-            # otherwise we'll load steps on-the-fly, see _load_steps()
-        else:
+        if steps:
             self._check_steps(steps)
             self._steps = copy.deepcopy(steps)
+        elif mr_job_script:
+            raise ValueError('Must set steps if mr_job_script is set')
+        else:
+            self._steps = []
 
         # this variable marks whether a cleanup has happened and this runner's
         # output stream is no longer available.

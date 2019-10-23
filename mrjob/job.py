@@ -676,6 +676,12 @@ class MRJob(MRJobLauncher):
         spark_method = step.spark
         spark_method(input_path, output_path)
 
+    def _steps_desc(self):
+        step_descs = []
+        for step_num, step in enumerate(self.steps()):
+            step_descs.append(step.description(step_num))
+        return step_descs
+
     @classmethod
     def mr_job_script(cls):
         """Path of this script. This returns the file containing

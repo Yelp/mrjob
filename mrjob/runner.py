@@ -801,32 +801,10 @@ class MRJobRunner(object):
             return 'no_user'
 
     def _get_steps(self):
-        """If *steps* was not set at init time, call the job script to
-        find out how many steps it has, and whether
-        there are mappers and reducers for each step. Validate its
-        output.
-
-        Returns output as described in :ref:`steps-format`.
+        """Returns ``self._steps``.
         """
-        if self._steps is None:
-            log.warning(
-                'querying jobs for steps is deprecated and'
-                ' will go away in v0.7.0')
-            steps = self._load_steps()
-            self._check_steps(steps)
-            self._steps = steps
-
+        # TODO: remove this
         return self._steps
-
-    def _load_steps(self):
-        """Ask job how many steps it has, and whether
-        there are mappers and reducers for each step.
-
-        Returns output as described in :ref:`steps-format`.
-
-        If this is called, you can assume self._script_path is set.
-        """
-        raise NotImplementedError
 
     def _check_steps(self, steps):
         """Look at the step definition (*steps*). If it is not supported by

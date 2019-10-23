@@ -149,36 +149,6 @@ class MRJobBinRunner(MRJobRunner):
 
         return opt_value
 
-    def _load_steps(self):
-        args = (self._executable(True) + ['--steps'] +
-                self._mr_job_extra_args(local=True))
-        log.debug('> %s' % cmd_line(args))
-
-        # add . to PYTHONPATH (in case mrjob isn't actually installed)
-        env = combine_local_envs(os.environ,
-                                 {'PYTHONPATH': os.path.abspath('.')})
-        steps_proc = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
-        stdout, stderr = steps_proc.communicate()
-
-        if steps_proc.returncode != 0:
-            raise Exception(
-                'error getting step information: \n%s' % stderr)
-
-        # on Python 3, convert stdout to str so we can json.loads() it
-        if not isinstance(stdout, str):
-            stdout = stdout.decode('utf_8')
-
-        try:
-            steps = json.loads(stdout)
-        except ValueError:
-            raise ValueError("Bad --steps response: \n%s" % stdout)
-
-        # verify that this is a proper step description
-        if not steps or not stdout:
-            raise ValueError('step description is empty!')
-
-        return steps
-
     ### interpreter/python binary ###
 
     def _interpreter(self, steps=False):

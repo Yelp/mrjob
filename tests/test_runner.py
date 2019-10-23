@@ -1085,18 +1085,6 @@ class PassStepsToRunnerTestCase(BasicTestCase):
 
             self.assertFalse(self.log.warning.called)
 
-    def test_load_steps(self):
-        job = MRWordCount()
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner._steps = None
-
-            runner.run()
-
-            self.assertTrue(runner._steps)
-            self.assertTrue(self.log.warning.called)
-
     def test_command_steps(self):
         job = MRCatsJob(['-r', 'local', '--num-cats', '3'])
         job.sandbox()

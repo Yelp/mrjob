@@ -282,8 +282,7 @@ Job execution context
     If you want to use an alternate Python command to run the job, use
     :mrjob-opt:`python_bin`.
 
-    This takes precedence over :mrjob-opt:`python_bin` and
-    :mrjob-opt:`steps_python_bin`.
+    This takes precedence over :mrjob-opt:`python_bin`.
 
 .. mrjob-opt::
     :config: python_bin
@@ -422,27 +421,6 @@ Job execution context
     Alternate (non-Python) command to use to query the job about
     its steps. Usually it's good enough to set :mrjob-opt:`interpreter`.
 
-    If you want to use an alternate Python command to get the job's steps,
-    use :mrjob-opt:`steps_python_bin`.
-
-    This takes precedence over :mrjob-opt:`steps_python_bin`.
-
-.. mrjob-opt::
-    :config: steps_python_bin
-    :switch: --steps-python-bin
-    :type: :ref:`command <data-type-command>`
-    :set: all
-    :default: (current Python interpreter)
-
-    .. deprecated:: 0.6.7
-
-       In most cases, runners no longer query jobs for steps, so this
-       does nothing.
-
-    Name/path of alternate python binary to use to query the job about its
-    steps. Rarely needed. If not set, we use ``sys.executable`` (the current
-    Python interpreter).
-
 .. mrjob-opt::
     :config: task_python_bin
     :switch: --task-python-bin
@@ -535,4 +513,3 @@ as a subprocess:
 * :mrjob-opt:`python_bin`
 * :mrjob-opt:`read_logs`
 * :mrjob-opt:`setup`
-* :mrjob-opt:`steps_python_bin`

@@ -332,7 +332,7 @@ shebangs (e.g. ``#!/bin/sh -ex``) on Linux.
 
 Runners no longer call :py:class:`~mrjob.job.MRJob`\s with ``--steps``;
 instead the job passes its step description to the runner on instantiation.
-``--steps`` and :mrjob-opt:`steps_python_bin` are now deprecated.
+``--steps`` and `steps_python_bin` are now deprecated.
 
 The Hadoop and EMR runner can now set ``SPARK_PYTHON`` and
 ``SPARK_DRIVER_PYTHON`` to different values if need be (e.g. to
@@ -1473,7 +1473,7 @@ Other changes
  - cluster self-termination (see :mrjob-opt:`max_hours_idle`) now respects non-streaming jobs
  - :py:class:`~mrjob.fs.local.LocalFilesystem` now rejects URIs rather than interpreting them as local paths
  - ``local`` and ``inline`` runners no longer have a default :mrjob-opt:`hadoop_version`, instead handling :mrjob-opt:`jobconf` in a version-agnostic way
- - :mrjob-opt:`steps_python_bin` now defaults to the current Python interpreter.
+ - `steps_python_bin` now defaults to the current Python interpreter.
  - minor changes to :py:mod:`mrjob.util`:
 
    - :py:func:`~mrjob.util.file_ext` takes filename, not path

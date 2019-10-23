@@ -170,7 +170,6 @@ single-process context, including:
 
  * :mrjob-opt:`python_bin`
  * :mrjob-opt:`setup`
- * :mrjob-opt:`steps_python_bin`
 
 The local runner *does* run multiple subprocesses concurrently, but it's
 not really meant as a replacement for Hadoop; it's just for testing!

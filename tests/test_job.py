@@ -822,7 +822,6 @@ class IsTaskTestCase(BasicTestCase):
         self.assertEqual(MRJob(['--reducer']).is_task(), True)
         self.assertEqual(MRJob(['--combiner']).is_task(), True)
         self.assertEqual(MRJob(['--spark']).is_task(), True)
-        self.assertEqual(MRJob(['--steps']).is_task(), False)
 
 
 class StepNumTestCase(BasicTestCase):
@@ -1314,16 +1313,18 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertIn('--max-output-files', output)
 
     def test_steps_help(self):
-        MRJob(['--help', '--steps'])
+        MRJob(['--help', '-v'])
         self.exit.assert_called_once_with(0)
 
         output = self.stdout.getvalue()
-        # step option
+        # step option included
         self.assertIn('--step-num', output)
 
-        # not step options
-        self.assertNotIn('--conf-path', output)
+        # runner option not included
         self.assertNotIn('--s3-endpoint', output)
+
+        # general job option also included
+        self.assertIn('--conf-path', output)
 
     def test_passthrough_options(self):
         MRCmdJob(['--help'])

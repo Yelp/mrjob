@@ -325,13 +325,8 @@ class MRJobRunner(object):
         self._hadoop_output_format = hadoop_output_format
 
         # check and store *steps*
-        self._steps = None
-        if steps is None:
-            if mr_job_script:
-                raise ValueError('must set steps if mr_job_script is set')
-            else:
-                self._steps = []
-        else:
+        self._steps = []
+        if steps:
             self._check_steps(steps)
             self._steps = copy.deepcopy(steps)
 

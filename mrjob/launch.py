@@ -188,7 +188,6 @@ class MRJobLauncher(object):
 
         Does one of:
 
-        * Print step information (:option:`--steps`). See :py:meth:`show_steps`
         * Run a mapper (:option:`--mapper`). See :py:meth:`run_mapper`
         * Run a combiner (:option:`--combiner`). See :py:meth:`run_combiner`
         * Run a reducer (:option:`--reducer`). See :py:meth:`run_reducer`

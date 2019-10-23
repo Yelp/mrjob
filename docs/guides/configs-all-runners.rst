@@ -451,7 +451,7 @@ Job execution context
     :default: same as :mrjob-opt:`python_bin`
 
     Name/path of alternate python binary to run the job (invoking it with
-    ``--mapper``, ``--spark`` or anything other than ``--steps``).
+    ``--mapper``, ``--reducer``, ``--spark``, etc.).
 
     In most cases, you're better off setting :mrjob-opt:`python_bin`, which
     this defaults to. This option exists mostly to support running tasks

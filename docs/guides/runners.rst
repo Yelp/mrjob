@@ -24,8 +24,6 @@ Internally, the general order of operations is:
 * Get a runner by calling :py:meth:`~mrjob.job.MRJob.make_runner` on your job
 * Call :py:meth:`~mrjob.runner.MRJobRunner.run` on your runner. This will:
 
-  * Run your job with :option:`--steps` to find out how many mappers/reducers
-    to run
   * Copy your job and supporting files to Hadoop
   * Instruct Hadoop to run your job with the appropriate
     :option:`--mapper`, :option:`--combiner`, :option:`--reducer`, and
@@ -182,14 +180,6 @@ work.
     with mr_job.make_runner() as runner:
         runner.run()
         # ... etc
-
-If you try to do this, mrjob will give you an error message similar or
-identical to this one:
-
-::
-
-    UsageError: make_runner() was called with --steps. This probably means you
-                tried to use it from __main__, which doesn't work.
 
 What you need to do instead is put your job in one file, and your run code in
 another. Here are two files that would correctly handle the above case.

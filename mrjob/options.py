@@ -863,11 +863,6 @@ _RUNNER_OPTS = dict(
     libjars=dict(
         combiner=combine_path_lists,
         switches=[
-            (['--libjar'], dict(
-                action='append',
-                help=('Deprecated. Like --libjars, but only takes a'
-                      ' single JAR.'),
-            )),
             (['--libjars'], dict(
                 action=_AppendCommaSeparatedItemsAction,
                 help=('Paths of JARs to pass to Hadoop with -libjars,'

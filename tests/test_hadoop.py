@@ -639,8 +639,6 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         add_mock_hadoop_output([b'1\t"qux"\n2\t"bar"\n',
                                 b'2\t"foo"\n5\tnull\n'])
 
-        # -libjar is now a supported feature. Maybe -verbose?
-
         mr_job = MRTwoStepJob([
             '-r', 'hadoop', '-v',
             '--no-conf', '--libjars', 'containsJars.jar',
@@ -719,7 +717,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertIn('-mapper', args)
             self.assertLess(args.index('-verbose'), args.index('-mapper'))
 
-        # make sure -libjar is set and comes before mapper
+        # make sure -libjars is set and comes before mapper
         for args in (step_0_args, step_1_args):
             self.assertIn('-libjars', args)
             self.assertIn('containsJars.jar', args)
@@ -1369,7 +1367,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
         job = MRWordCount(
             ['-r', self.RUNNER,
              '--cmdenv', 'FOO=bar',
-             '--hadoop-args=-libjar qux.jar',
+             '--hadoop-args=-libjars qux.jar',
              '-D', 'baz=qux'])
         job.HADOOP_INPUT_FORMAT = 'FooInputFormat'
         job.HADOOP_OUTPUT_FORMAT = 'BarOutputFormat'
@@ -1378,7 +1376,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
             hadoop_args = runner._hadoop_args_for_step(0)
             self.assertEqual(
                 hadoop_args[:4],
-                ['-D', 'baz=qux', '-libjar', 'qux.jar'])
+                ['-D', 'baz=qux', '-libjars', 'qux.jar'])
             self.assertEqual(len(hadoop_args), 10)
 
 

@@ -301,7 +301,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'ec2_key_pair',
         'ec2_key_pair_file',
         'emr_action_on_failure',
-        'emr_api_params',
         'emr_configurations',
         'emr_endpoint',
         'enable_emr_debugging',
@@ -373,10 +372,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if self._opts['image_id']:
                 log.warning('AMIs prior to 5.7.0 will probably not work'
                             ' with custom machine images')
-
-        if self._opts['emr_api_params'] is not None:
-            log.warning('emr_api_params is deprecated and does nothing.'
-                        ' Please use extra_cluster_params instead')
 
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.

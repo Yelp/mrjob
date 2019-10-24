@@ -606,18 +606,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    emr_api_params=dict(
-        cloud_role='launch',
-        deprecated=True,
-        switches=[
-            (['--emr-api-param'], dict(
-                help=('Does nothing. Use --extra-cluster-param instead'),
-            )),
-            (['--no-emr-api-param'], dict(
-                help=('Does nothing. Use --extra-cluster-param instead'),
-            )),
-        ],
-    ),
     emr_configurations=dict(
         cloud_role='launch',
         combiner=combine_lists,

@@ -70,12 +70,10 @@ _MANIFEST_INPUT_FORMAT = 'org.apache.hadoop.mapred.lib.NLineInputFormat'
 class MRJobBinRunner(MRJobRunner):
 
     OPT_NAMES = MRJobRunner.OPT_NAMES | {
-        'interpreter',
         'python_bin',
         'sh_bin',
         'spark_args',
         'spark_submit_bin',
-        'steps_interpreter',
         'task_python_bin',
     }
 
@@ -148,22 +146,7 @@ class MRJobBinRunner(MRJobRunner):
 
         return opt_value
 
-    ### interpreter/python binary ###
-
-    def _interpreter(self, steps=False):
-        if steps:
-            return (self._opts['steps_interpreter'] or
-                    self._opts['interpreter'])
-        else:
-            return (self._opts['interpreter'] or
-                    self._task_python_bin())
-
-    def _executable(self, steps=False):
-        if steps:
-            return self._interpreter(steps=True) + [self._script_path]
-        else:
-            return self._interpreter() + [
-                self._working_dir_mgr.name('file', self._script_path)]
+    ### python binary ###
 
     def _python_bin(self):
         """Python binary used for everything other than invoking the job.
@@ -212,7 +195,9 @@ class MRJobBinRunner(MRJobRunner):
     ### running MRJob scripts ###
 
     def _script_args_for_step(self, step_num, mrc, input_manifest=False):
-        args = self._executable() + self._args_for_task(step_num, mrc)
+        args = (self._task_python_bin() +
+                [self._working_dir_mgr.name('file', self._script_path)] +
+                self._args_for_task(step_num, mrc))
 
         if input_manifest and mrc == 'mapper':
             wrapper = self._manifest_setup_script_path

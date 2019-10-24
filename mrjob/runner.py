@@ -1078,7 +1078,7 @@ class MRJobRunner(object):
     def _bootstrap_mrjob(self):
         """Should we bootstrap mrjob?"""
         if self._opts['bootstrap_mrjob'] is None:
-            return self._opts['interpreter'] is None
+            return True
         else:
             return bool(self._opts['bootstrap_mrjob'])
 

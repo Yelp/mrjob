@@ -187,12 +187,6 @@ Options::
   --task-instance-type TASK_INSTANCE_TYPE
                         Type of GCE/EC2 task instance(s) to launch
   -v, --verbose         print more messages to stderr
-  --visible-to-all-users
-                        Make your cluster is visible to all IAM users on the
-                        same AWS account (the default)
-  --no-visible-to-all-users
-                        Hide your cluster from other IAM users on the same AWS
-                        account
   --zone ZONE           GCE zone/AWS availability zone to run Dataproc/EMR
                         jobs in.
 """

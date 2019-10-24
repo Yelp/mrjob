@@ -809,7 +809,7 @@ enough memory or disk space to run your job.
 
 Errors in bootstrapping scripts are no longer dumped as JSON.
 
-:mrjob-opt:`visible_to_all_users` is deprecated.
+`visible_to_all_users` is deprecated.
 
 Massive purge of deprecated code
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1462,7 +1462,7 @@ Other changes
 ^^^^^^^^^^^^^
 
  - mrjob now requires ``boto`` 2.35.0 or newer (chances are you're already doing this). Later 0.5.x releases of mrjob may require newer versions of ``boto``.
- - :mrjob-opt:`visible_to_all_users` now defaults to ``True``
+ - `visible_to_all_users` now defaults to ``True``
  - ``HadoopFilesystem.rm()`` uses ``-skipTrash``
  - new :mrjob-opt:`iam_endpoint` option
  - custom :mrjob-opt:`hadoop_streaming_jar`\ s are properly uploaded

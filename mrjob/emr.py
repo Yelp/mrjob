@@ -324,7 +324,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'subnet',
         'tags',
         'task_instance_bid_price',
-        'visible_to_all_users',
     }
 
     # supports everything (so far)
@@ -447,7 +446,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 pool_name='default',
                 pool_wait_minutes=0,
                 region=_DEFAULT_EMR_REGION,
-                visible_to_all_users=True,
             )
         )
 
@@ -1219,9 +1217,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         if self._opts['additional_emr_info']:
             kwargs['AdditionalInfo'] = self._opts['additional_emr_info']
-
-        kwargs['VisibleToAllUsers'] = bool(
-            self._opts['visible_to_all_users'])
 
         kwargs['JobFlowRole'] = self._instance_profile()
         kwargs['ServiceRole'] = self._service_role()

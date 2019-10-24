@@ -79,7 +79,6 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'tags': None,
                 'task_instance_bid_price': None,
                 'task_instance_type': None,
-                'visible_to_all_users': None,
                 'zone': None,
             })
 

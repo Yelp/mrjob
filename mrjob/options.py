@@ -1343,22 +1343,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    visible_to_all_users=dict(
-        cloud_role='launch',
-        deprecated=True,
-        switches=[
-            (['--visible-to-all-users'], dict(
-                action='store_true',
-                help=('Make your cluster is visible to all IAM users on the'
-                      ' same AWS account (the default)'),
-            )),
-            (['--no-visible-to-all-users'], dict(
-                action='store_false',
-                help=('Hide your cluster from other IAM users on the same AWS'
-                      ' account'),
-            )),
-        ],
-    ),
     zone=dict(
         cloud_role='launch',
         switches=[

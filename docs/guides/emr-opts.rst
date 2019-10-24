@@ -552,19 +552,3 @@ Other rarely used options
             tags:
               team: development
               project: mrjob
-
-.. mrjob-opt::
-    :config: visible_to_all_users
-    :switch: --visible-to-all-users, --no-visible-to-all-users
-    :type: boolean
-    :set: emr
-    :default: ``True``
-
-    If true (the default) EMR clusters will be visible to all IAM users.
-    Otherwise, the cluster will only be visible to the IAM user that created
-    it.
-
-    .. deprecated:: 0.6.0
-
-       Hiding clusters from other users on the same account is not very useful.
-       If you don't want to share pooled clusters, try :mrjob-opt:`pool_name`.

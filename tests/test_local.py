@@ -61,6 +61,7 @@ from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_spark_os_walk import MRSparkOSWalk
+from tests.mr_stdin_only import MRStdinOnly
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
@@ -1132,3 +1133,22 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
         self.assertNotIn('fish', file_sizes)
 
         # TODO: add a Spark JAR to the repo, so we can test it
+
+
+class InputFileArgsTestCase(SandboxedTestCase):
+    # test for #567: ensure that local runner doesn't need to pass
+    # file args to jobs
+
+    def test_stdin_only(self):
+        input1 = self.makefile('input1', contents='cat cat cat cat cat')
+        input2 = self.makefile('input2', contents='dog dog dog')
+
+        job = MRStdinOnly(['-r', 'local', input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(output, dict(cat=5, dog=3))

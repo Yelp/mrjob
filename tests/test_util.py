@@ -27,7 +27,6 @@ from subprocess import Popen
 from mrjob.py2 import PY2
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
-from mrjob.util import parse_and_save_options
 from mrjob.util import random_identifier
 from mrjob.util import safeeval
 from mrjob.util import save_sys_std

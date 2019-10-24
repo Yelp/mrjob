@@ -64,18 +64,6 @@ CLEANUP_CHOICES = [
     'TMP',
 ]
 
-
-# map from optparse types to Python types
-_OPTPARSE_TYPES = dict(
-    choice=str,  # optparse only allows strings as choices
-    complex=complex,
-    float=float,
-    int=int,
-    long=int,
-    str=str,  # undocumented alias for 'string', see #1857
-    string=str,
-)
-
 # use to identify malformed JSON
 _PROBABLY_JSON_RE = re.compile(r'^\s*[\{\[\"].*$')
 
@@ -1682,42 +1670,6 @@ def _parse_raw_args(parser, args):
     raw_parser.parse_known_args(args)
 
     return results
-
-
-def _optparse_kwargs_to_argparse(**kwargs):
-    """Translate old keyword args to OptionParser.add_option() so they can be
-    passed to ArgumentParser.add_argument().
-
-    The two methods take almost identical arguments, so this is mostly a
-    matter of filtering.
-    """
-    if any(k.startswith('callback') for k in kwargs):
-        raise ValueError(
-            'mrjob does not emulate callback arguments to add_option(); please'
-            ' use argparse actions instead.')
-
-    # translate type from string (optparse) to type (argparse)
-    if kwargs.get('type') is not None:
-        if not isinstance(kwargs['type'], type):
-            if kwargs['type'] not in _OPTPARSE_TYPES:
-                raise ValueError('invalid option type: %r' % kwargs['type'])
-            kwargs['type'] = _OPTPARSE_TYPES[kwargs['type']]
-
-    # opt_group was a mrjob-specific feature that we've abandoned
-    if 'opt_group' in kwargs:
-        log.warning(
-            'ignoring opt_group keyword arg (mrjob no longer supports'
-            ' opt groups')
-        kwargs.pop('opt_group')
-
-    # convert %default -> %(default)s
-    if kwargs.get('help'):
-        kwargs['help'] = kwargs['help'].replace('%default', '%(default)s')
-
-    # pretty much everything else is the same. if people want to pass argparse
-    # kwargs through the old optparse interface (e.g. *action* or *required*)
-    # more power to 'em.
-    return kwargs
 
 
 def _alphabetize_actions(arg_parser):

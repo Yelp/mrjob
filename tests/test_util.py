@@ -16,7 +16,6 @@
 """Tests of all the amazing utilities in mrjob.util"""
 import bz2
 import gzip
-import optparse
 import os
 import shutil
 import sys
@@ -115,56 +114,6 @@ class FileExtTestCase(BasicTestCase):
         self.assertEqual(file_ext('README'), '')
         self.assertEqual(file_ext('README,v'), '')
         self.assertEqual(file_ext('README.txt,v'), '.txt,v')
-
-
-class ParseAndSaveOptionsTestCase(BasicTestCase):
-
-    def setUp(self):
-        self.setup_options()
-
-    def setup_options(self):
-        self.original_parser = optparse.OptionParser(
-            usage="don't", description='go away')
-        self.original_group = optparse.OptionGroup(self.original_parser, '?')
-        self.original_parser.add_option_group(self.original_group)
-
-        self.original_parser.add_option(
-            '-b', '--no-a', dest='a', action='store_false')
-        self.original_parser.add_option(
-            '-a', '--yes-a', dest='a', action='store_true', default=False)
-        self.original_group.add_option('-x', '--xx', dest='x', action='store')
-        self.original_group.add_option(
-            '-y', '--yy', dest='y', action='store', nargs=2)
-
-        self.new_parser = optparse.OptionParser()
-        self.new_group_1 = optparse.OptionGroup(self.new_parser, '?')
-        self.new_group_2 = optparse.OptionGroup(self.new_parser, '?')
-        self.new_parser.add_option_group(self.new_group_1)
-        self.new_parser.add_option_group(self.new_group_2)
-
-    def test_parse_and_save_simple(self):
-        args = ['x.py', '-b', '-a', '--no-a',
-                '-x', 'x', '-y', 'y', 'ynot', '-x', 'z']
-
-        self.assertEqual(
-            dict(parse_and_save_options(self.original_parser, args)),
-            {
-                'a': ['-b', '-a', '--no-a'],
-                'x': ['-x', 'x', '-x', 'z'],
-                'y': ['-y', 'y', 'ynot']
-            })
-
-    def test_parse_and_save_with_dashes(self):
-        args = ['x.py', '-b', '-a', '--no-a',
-                '-x', 'x', '-y', 'y', 'ynot', '-x', 'z',
-                '--', 'ignore', 'these', 'args']
-        self.assertEqual(
-            dict(parse_and_save_options(self.original_parser, args)),
-            {
-                'a': ['-b', '-a', '--no-a'],
-                'x': ['-x', 'x', '-x', 'z'],
-                'y': ['-y', 'y', 'ynot']
-            })
 
 
 class DeprecatedReadInputTestCase(SandboxedTestCase):

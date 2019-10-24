@@ -31,7 +31,6 @@ from mrjob.options import _RUNNER_OPTS
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_job_args
 from mrjob.options import _add_runner_args
-from mrjob.options import _optparse_kwargs_to_argparse
 from mrjob.options import _parse_raw_args
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
@@ -94,22 +93,9 @@ class MRJobLauncher(object):
         self._passthru_arg_dests = set()
         self._file_arg_dests = set()
 
-        # there is no equivalent in argparse
-        # remove this in v0.7.0
-        if hasattr(self, 'OPTION_CLASS'):
-            log.warning('OPTION_CLASS attribute is ignored; '
-                        'mrjob now uses argparse instead of optparse')
-
         self.arg_parser = ArgumentParser(usage=self._usage(),
                                          add_help=False)
         self.configure_args()
-
-        if (_im_func(self.configure_options) !=
-                _im_func(MRJobLauncher.configure_options)):
-            log.warning('configure_options() is deprecated and will be'
-                        ' removed in v0.7.0; please use configure_args()'
-                        ' instead.')
-            self.configure_options()
 
         # don't pass None to parse_args unless we're actually running
         # the MRJob script
@@ -128,13 +114,6 @@ class MRJobLauncher(object):
                 self.arg_parser.error = error
 
         self.load_args(self._cl_args)
-
-        if (_im_func(self.load_options) !=
-                _im_func(MRJobLauncher.load_options)):
-            log.warning('load_options() is deprecated and will be'
-                        ' removed in v0.7.0; please use load_args()'
-                        ' instead.')
-            self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See stdin, stdout, stderr properties and sandbox(), below.
@@ -416,78 +395,6 @@ class MRJobLauncher(object):
         loading args when we aren't running inside Hadoop Streaming.
         """
         return False
-
-    ### old optparse shims ###
-
-    @property
-    def args(self):
-        class_name = self.__class__.__name__
-        log.warning(
-            '%s.args is a deprecated alias for %s.options.args, and will'
-            ' be removed in v0.7.0' % (class_name, class_name))
-        return self.options.args
-
-    def configure_options(self):
-        """.. deprecated:: 0.6.0
-
-        Use `:py:meth:`configure_args` instead.
-        """
-        pass  # deprecation warning is in __init__()
-
-    def load_options(self, args):
-        """.. deprecated:: 0.6.0
-
-        Use `:py:meth:`load_args` instead.
-        """
-        pass  # deprecation warning is in __init__()
-
-    def add_file_option(self, *args, **kwargs):
-        """.. deprecated:: 0.6.0
-
-        Like :py:meth:`add_file_arg` except that it emulates the
-        old :py:mod:`optparse` interface (which is almost identical).
-
-        .. versionchanged:: 0.6.6
-
-           accepts ``type='str'`` (used to only accept ``type='string'``)
-        """
-        log.warning(
-            'add_file_option() is deprecated and will be removed in'
-            ' v0.7.0. Use add_file_arg() instead.')
-
-        self.add_file_arg(*args, **_optparse_kwargs_to_argparse(**kwargs))
-
-    def add_passthrough_option(self, *args, **kwargs):
-        """.. deprecated:: 0.6.0
-
-        Like :py:meth:`add_passthru_arg` except that it emulates the
-        old :py:mod:`optparse` interface (which is almost identical).
-
-        .. versionchanged:: 0.6.6
-
-           accepts ``type='str'`` (used to only accept ``type='string'``)
-        """
-        log.warning(
-            'add_passthrough_option() is deprecated and will be removed in'
-            ' v0.7.0. Use add_passthru_arg() instead.')
-
-        self.add_passthru_arg(*args, **_optparse_kwargs_to_argparse(**kwargs))
-
-    def pass_through_option(self, opt_str):
-        """.. deprecated:: 0.6.0
-
-        Like :py:meth:`pass_arg_through` except that it emulates the
-        old :py:mod:`optparse` interface (which is almost identical).
-
-        .. versionchanged:: 0.6.6
-
-           accepts ``type='str'`` (used to only accept ``type='string'``)
-        """
-        log.warning(
-            'pass_through_option() is deprecated and will be removed in'
-            ' v0.7.0. Use pass_arg_through() instead.')
-
-        self.pass_arg_through(opt_str)
 
     ### runners ###
 

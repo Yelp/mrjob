@@ -32,7 +32,6 @@ from contextlib import contextmanager
 from datetime import timedelta
 from distutils.spawn import find_executable
 from logging import getLogger
-from optparse import OptionParser
 from zipfile import ZIP_DEFLATED
 from zipfile import ZIP_STORED
 from zipfile import ZipFile
@@ -118,44 +117,6 @@ def log_to_stream(name=None, stream=None, format=None, level=None,
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
-
-
-def parse_and_save_options(option_parser, args):
-    """Return a map from option name (``dest``) to a list of the arguments
-    in *args* that correspond to that *dest*.
-
-    This won't modify *option_parser*.
-
-    .. deprecated:: 0.6.0
-    """
-    arg_map = {}
-
-    def sim_callback(option, opt_str, value, parser):
-        dest = option.dest
-        arg_map.setdefault(dest, [])
-
-        arg_map[dest].append(opt_str)
-        if isinstance(value, string_types):
-            arg_map[dest].append(value)
-        elif value:
-            arg_map[dest].extend(value)
-
-    sim_parser = OptionParser(add_help_option=False)
-
-    # optparse is no longer being maintained, so it's safe to access
-    # hidden methods and attributes
-    for option in option_parser._get_all_options():
-        sim_parser.add_option(
-            *(option._short_opts + option._long_opts),
-            dest=option.dest,
-            nargs=option.nargs,
-            action='callback',
-            type=('string' if option.type else None),
-            callback=sim_callback)
-
-    sim_parser.parse_args(args)
-
-    return arg_map
 
 
 def random_identifier():

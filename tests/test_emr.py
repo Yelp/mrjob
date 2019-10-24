@@ -671,28 +671,6 @@ class ExtraClusterParamsTestCase(MockBoto3TestCase):
             'subnet-ffffffff')
 
 
-class DeprecatedEMRAPIParamsTestCase(MockBoto3TestCase):
-
-    # emr_api_param is completely disabled
-
-    def setUp(self):
-        super(DeprecatedEMRAPIParamsTestCase, self).setUp()
-
-        self.log = self.start(patch('mrjob.emr.log'))
-
-    def test_param_set(self):
-        cluster = self.run_and_get_cluster('--emr-api-param', 'name=Dave')
-
-        self.assertTrue(self.log.warning.called)
-        self.assertNotEqual(cluster['Name'], 'Dave')
-
-    def test_param_unset(self):
-        cluster = self.run_and_get_cluster('--no-emr-api-param', 'log_uri')
-
-        self.assertTrue(self.log.warning.called)
-        self.assertIn('LogUri', cluster)
-
-
 class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
 
     def test_default(self):

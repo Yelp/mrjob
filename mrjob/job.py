@@ -76,8 +76,6 @@ class MRJob(MRJobLauncher):
         """
         super(MRJob, self).__init__(self.mr_job_script(), args)
 
-        self._warned_about_parse_output_line = False
-
     @classmethod
     def _usage(cls):
         return "%(prog)s [options] [input files]"
@@ -946,22 +944,6 @@ class MRJob(MRJobLauncher):
 
         for line in to_lines(chunks):
             yield read(line)
-
-    def parse_output_line(self, line):
-        """
-        Parse a line from the final output of this MRJob into
-        ``(key, value)``.
-
-        .. deprecated:: 0.6.0
-
-           Use :py:meth:`parse_output` instead.
-        """
-        if not self._warned_about_parse_output_line:
-            log.warning('parse_output_line() is deprecated and will be removed'
-                        ' in v0.7.0; use parse_output() instead.')
-            self._warned_about_parse_output_line = True
-
-        return self.output_protocol().read(line)
 
     ### Hadoop Input/Output Formats ###
 

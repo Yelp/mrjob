@@ -449,11 +449,11 @@ class LocalBootstrapMrjobTestCase(BasicTestCase):
 
                 runner.run()
 
-                output = list(to_lines(runner.cat_output()))
+                output = list(mr_job.parse_output((runner.cat_output())))
                 self.assertEqual(len(output), 1)
 
                 # script should load mrjob from its working dir
-                _, script_mrjob_dir = mr_job.parse_output_line(output[0])
+                _, script_mrjob_dir = output[0]
 
                 self.assertNotEqual(our_mrjob_dir, script_mrjob_dir)
                 self.assertTrue(script_mrjob_dir.startswith(local_tmp_dir))

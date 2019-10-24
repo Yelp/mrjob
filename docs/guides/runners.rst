@@ -139,23 +139,12 @@ You instantiate the :py:class:`~mrjob.job.MRJob`, use a context manager to
 create the runner, run the job, and cat its output, parsing that output with
 the job's output protocol.
 
-:py:meth:`~mrjob.job.MRJob.parse_output` and :py:meth:`~mrjob.job.MRJob.cat_output` were introduced in version 0.6.0. In previous versions of mrjob, you'd iterate line by line instead, like this:
-
-.. code-block:: python
-
-    ...
-        for line in runner.stream_output():
-            key, value = mr_job.parse_output_line(line)
-            ... # do something with the parsed output
-
 Further reference:
 
 * :py:meth:`~mrjob.job.MRJob.make_runner`
 * :py:meth:`~mrjob.runner.MRJobRunner.run`
 * :py:meth:`~mrjob.job.MRJob.parse_output`
 * :py:meth:`~mrjob.runner.MRJobRunner.cat_output`
-* :py:meth:`~mrjob.job.MRJob.parse_output_line`
-* :py:meth:`~mrjob.runner.MRJobRunner.stream_output`
 
 Limitations
 ^^^^^^^^^^^

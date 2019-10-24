@@ -150,16 +150,10 @@ Options::
                         to do this for task instances).
   --master-instance-type MASTER_INSTANCE_TYPE
                         Type of GCE/EC2 master instance to launch
-  --max-hours-idle MAX_HOURS_IDLE
-                        Please use --max-mins-idle instead
   --max-mins-idle MAX_MINS_IDLE
                         If we create a cluster, have it automatically
                         terminate itself after it's been idle this many
                         minutes
-  --mins-to-end-of-hour MINS_TO_END_OF_HOUR
-                        If --max-mins-idle is set, control how close to the
-                        end of an hour the cluster can automatically terminate
-                        itself (default is 5 minutes)
   --num-core-instances NUM_CORE_INSTANCES
                         Total number of core instances to launch
   --num-task-instances NUM_TASK_INSTANCES

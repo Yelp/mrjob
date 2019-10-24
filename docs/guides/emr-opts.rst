@@ -504,19 +504,6 @@ Other rarely used options
     :default: AWS default
 
 .. mrjob-opt::
-    :config: mins_to_end_of_hour
-    :switch: --mins-to-end-of-hour
-    :type: float
-    :set: emr
-    :default: 5.0
-
-    .. deprecated:: 0.6.0
-
-        This option was created back when EMR billed by the full hour, and
-        does nothing as of v0.6.0. If using versions prior to v0.6.0, it's
-        recommended you set this to 60.0 to effectively disable this feature.
-
-.. mrjob-opt::
     :config: ssh_bin
     :switch: --ssh-bin
     :type: :ref:`command <data-type-command>`

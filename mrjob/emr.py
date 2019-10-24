@@ -312,7 +312,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
-        'mins_to_end_of_hour',
         'pool_clusters',
         'pool_name',
         'pool_wait_minutes',

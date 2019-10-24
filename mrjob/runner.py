@@ -120,7 +120,7 @@ class MRJobRunner(object):
     ### methods to call from your batch script ###
 
     def __init__(self, mr_job_script=None, conf_paths=None,
-                 extra_args=None, file_upload_args=None,
+                 extra_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
                  sort_values=None, stdin=None, steps=None,
@@ -141,13 +141,6 @@ class MRJobRunner(object):
         :param extra_args: a list of extra cmd-line arguments to pass to the
                            mr_job script. This is a hook to allow jobs to take
                            additional arguments.
-        :param file_upload_args: a list of tuples of ``('--ARGNAME', path)``.
-                                 The file at the given path will be uploaded
-                                 to the local directory of the mr_job script
-                                 when it runs, and then passed into the script
-                                 with ``--ARGNAME``. Useful for passing in
-                                 SQLite DBs and other configuration files to
-                                 your job.
         :type hadoop_input_format: str
         :param hadoop_input_format: name of an optional Hadoop ``InputFormat``
                                     class. Passed to Hadoop along with your
@@ -267,15 +260,6 @@ class MRJobRunner(object):
                 if extra_arg.get('type') != 'file':
                     raise NotImplementedError
                 self._working_dir_mgr.add(**extra_arg)
-
-        # extra file arguments to our job
-        if file_upload_args:
-            log.warning('file_upload_args is deprecated and will be removed'
-                        ' in v0.6.0. Pass dicts to extra_args instead.')
-            for arg, path in file_upload_args:
-                arg_file = parse_legacy_hash_path('file', path)
-                self._working_dir_mgr.add(**arg_file)
-                self._extra_args.extend([arg, arg_file])
 
         # set up uploading
         for hash_path in self._opts['upload_files']:

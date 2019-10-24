@@ -911,16 +911,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    max_hours_idle=dict(
-        cloud_role='launch',
-        deprecated=True,
-        switches=[
-            (['--max-hours-idle'], dict(
-                help='Please use --max-mins-idle instead',
-                type=float,
-            )),
-        ],
-    ),
     # Spark runner only, only passed in on the command line (see #2040)
     max_output_files=dict(
         switches=[
@@ -929,18 +919,6 @@ _RUNNER_OPTS = dict(
                       ' streaming job on Spark; just runs rdd.coalesce()'
                       ' before outputting files'),
                 type=int,
-            )),
-        ],
-    ),
-    mins_to_end_of_hour=dict(
-        cloud_role='launch',
-        deprecated=True,
-        switches=[
-            (['--mins-to-end-of-hour'], dict(
-                help=("If --max-mins-idle is set, control how close to the"
-                      " end of an hour the cluster can automatically"
-                      " terminate itself (default is 5 minutes)"),
-                type=float,
             )),
         ],
     ),

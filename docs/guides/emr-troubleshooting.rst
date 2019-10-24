@@ -17,16 +17,10 @@ Using persistent clusters
 When troubleshooting a job, it can be convenient to use a persistent cluster
 to avoid having to wait for bootstrapping every run.
 
-.. warning::
-
-   Make sure you either use the ``--max-hours-idle`` option or have
-   :command:`mrjob terminate-idle-clusters` in your crontab, or you will
-   billed for unused CPU time on any clusters you forget to terminate.
-
 First, use the :command:`mrjob create-cluster` to create a
 persistent cluster::
 
-    $ mrjob create-cluster --max-hours-idle 1
+    $ mrjob create-cluster
     Using configs in /Users/davidmarin/.mrjob.conf
     Using s3://mrjob-35cdec11663cb1cb/tmp/ as our temp dir on S3
     Creating persistent cluster to run several jobs in...

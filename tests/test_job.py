@@ -1246,8 +1246,8 @@ class PrintHelpTestCase(SandboxedTestCase):
         # a runner option, but not for EMR
         self.assertNotIn('--gcp-project', output)
 
-        # deprecated options
-        self.assertNotIn('--max-hours-idle', output)
+        # deprecated options (none as of v0.7.0, probably more to come)
+        #self.assertNotIn('--some-deprecated-switch', output)
 
     def test_deprecated_runner_help(self):
         MRJob(['--help', '-r', 'emr', '--deprecated'])
@@ -1264,8 +1264,8 @@ class PrintHelpTestCase(SandboxedTestCase):
         # a runner option, but not for EMR
         self.assertNotIn('--gcp-project', output)
 
-        # deprecated options
-        self.assertIn('--max-hours-idle', output)
+        # deprecated options (none as of v0.7.0, probably more to come)
+        #self.assertIn('--some-deprecated-switch', output)
 
     def test_runner_help_works_for_all_runners(self):
         for alias in _RUNNER_ALIASES:
@@ -1318,7 +1318,6 @@ class RunnerKwargsTestCase(BasicTestCase):
     NON_OPTION_KWARGS = set([
         'conf_paths',
         'extra_args',
-        'file_upload_args',
         'hadoop_input_format',
         'hadoop_output_format',
         'input_paths',

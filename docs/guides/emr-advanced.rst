@@ -70,18 +70,12 @@ In some cases, it may be useful to have more fine-grained control than
 :ref:`cluster-pooling` provides; for example, to run several related jobs
 on the same cluster.
 
-.. warning::
-
-   If you do this on mrjob versions prior to 0.6.0, make sure to set
-   :mrjob-opt:`max_hours_idle`, or your manually created clusters will
-   run forever, costing you money.
-
 :py:mod:`mrjob` includes a utility to create persistent clusters without
 running a job. For example, this command will create a cluster with 12 EC2
 instances (1 master and 11 core), taking all other options from
 :py:mod:`mrjob.conf`::
 
-    $ mrjob create-cluster --num-core-instances=11 --max-hours-idle 1
+    $ mrjob create-cluster --num-core-instances=11
     ...
     j-CLUSTERID
 

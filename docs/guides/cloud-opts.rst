@@ -533,20 +533,3 @@ Auto-termination
        of 10 minutes between when the idle termination daemon launches
        and when it may first terminate the cluster, to allow Hadoop to
        accept your first job.
-
-    .. versionchanged:: 0.6.0
-
-       All clusters launched by mrjob now auto-terminate when idle. In previous
-       versions, you needed to set :mrjob-opt:`max_hours_idle`, set this
-       option explicitly, or use :ref:`terminate-idle-clusters`.
-
-.. mrjob-opt::
-    :config: max_hours_idle
-    :switch: --max-hours-idle
-    :type: float
-    :set: cloud
-    :default: None
-
-    .. deprecated:: 0.6.0
-
-        Use :mrjob-opt:`max_mins_idle` instead.

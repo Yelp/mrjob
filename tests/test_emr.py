@@ -2000,22 +2000,6 @@ class MaxMinsIdleTestCase(MockBoto3TestCase):
             runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['900'])
 
-    def test_deprecated_max_hours_idle(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '16.5'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['990'])
-
-    def test_deprecated_mins_to_end_of_hour_does_nothing(self):
-        mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '10'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['600'])
-
     def test_use_integer(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '60.00006'])
         mr_job.sandbox()
@@ -2026,14 +2010,6 @@ class MaxMinsIdleTestCase(MockBoto3TestCase):
 
     def test_bootstrap_script_is_actually_installed(self):
         self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
-
-    def test_deprecated_max_hours_idle_works(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['3600'])
 
 
 class TestCatFallback(MockBoto3TestCase):

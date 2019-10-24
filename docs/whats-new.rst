@@ -744,7 +744,7 @@ The :mrjob-opt:`extra_cluster_params` option allows you to pass arbitrary
 JSON to the API at cluster create time (in Dataproc and EMR). The old
 `emr_api_params` option is deprecated and disabled.
 
-:mrjob-opt:`max_hours_idle` has been replaced with :mrjob-opt:`max_mins_idle`
+`max_hours_idle` has been replaced with :mrjob-opt:`max_mins_idle`
 (the old option is deprecated but still works). The default is 10 minutes.
 Due to a bug, smaller numbers of minutes might cause the cluster to terminate
 before the job runs.
@@ -762,7 +762,7 @@ bills by the second. This means that :ref:`cluster-pooling` is no longer
 a cost-saving strategy, though developers might find it handy to reduce
 wait times when testing.
 
-The :mrjob-opt:`mins_to_end_of_hour` option no longer makes sense, and
+The `mins_to_end_of_hour` option no longer makes sense, and
 has been deprecated and disabled.
 
 :ref:`audit-emr-usage` has been updated to use billing by the second
@@ -833,7 +833,7 @@ Python 2.6 and 3.3 are no longer supported.
 rather than crashing.
 
 Since `Amazon no longer bills by the full hour <https://aws.amazon.com/about-aws/whats-new/2017/10/amazon-emr-now-supports-per-second-billing/>`__,
-the :mrjob-opt:`mins_to_end_of_hour` option now defaults to 60, effectively
+the `mins_to_end_of_hour` option now defaults to 60, effectively
 disabling it.
 
 When mrjob passes an environment dictionary to subprocesses, it ensures
@@ -1011,7 +1011,7 @@ and ``~``.
 
 The :ref:`terminate-idle-clusters` tool now works with all step types,
 including Spark. (It's still recommended that you rely on the
-:mrjob-opt:`max_hours_idle` option rather than this tool.)
+`max_hours_idle` option rather than this tool.)
 
 mrjob now works in Anaconda3 Jupyter Notebook.
 
@@ -1094,7 +1094,7 @@ Pooling and idle cluster self-termination
 
 This release resolves a long-standing EMR API race condition that made it
 difficult to use :ref:`cluster-pooling` and idle cluster
-self-termination (see :mrjob-opt:`max_hours_idle`) together. Now if your
+self-termination (see `max_hours_idle`) together. Now if your
 pooled job unknowingly runs on a cluster that was in the process of shutting
 down, it will detect that and re-launch the job on a different cluster.
 
@@ -1204,7 +1204,7 @@ existed on some VPC setups.
 Uploaded files will no longer be given names starting with ``_`` or ``.``,
 since Hadoop's input processing treats these files as "hidden".
 
-The EMR idle cluster self-termination script (see :mrjob-opt:`max_hours_idle`)
+The EMR idle cluster self-termination script (see `max_hours_idle`)
 now only runs on the master node.
 
 The :ref:`audit-emr-usage` command-line tool should no longer constantly
@@ -1470,7 +1470,7 @@ Other changes
  - mrjob now follows symlinks when :py:meth:`~mrjob.fs.local.LocalFileSystem.ls`\ ing the local filesystem (beware recursive symlinks!)
  - The `interpreter` option disables :mrjob-opt:`bootstrap_mrjob` by default (`interpreter` is meant for non-Python jobs)
  - :ref:`cluster-pooling` now respects :mrjob-opt:`ec2_key_pair`
- - cluster self-termination (see :mrjob-opt:`max_hours_idle`) now respects non-streaming jobs
+ - cluster self-termination (see `max_hours_idle`) now respects non-streaming jobs
  - :py:class:`~mrjob.fs.local.LocalFilesystem` now rejects URIs rather than interpreting them as local paths
  - ``local`` and ``inline`` runners no longer have a default :mrjob-opt:`hadoop_version`, instead handling :mrjob-opt:`jobconf` in a version-agnostic way
  - `steps_python_bin` now defaults to the current Python interpreter.
@@ -1665,12 +1665,12 @@ in memory, such as:
 * Running a window of fixed length over an arbitrary amount of sorted
   values (e.g. a 24-hour window over timestamped log data).
 
-The :mrjob-opt:`max_hours_idle` option allows you to spin up EMR job flows
+The `max_hours_idle` option allows you to spin up EMR job flows
 that will terminate themselves after being idle for a certain amount of time,
 in a way that optimizes EMR/EC2's full-hour billing model.
 
 For development (not production), we now recommend always using
-:ref:`job flow pooling <cluster-pooling>`, with :mrjob-opt:`max_hours_idle`
+:ref:`job flow pooling <cluster-pooling>`, with `max_hours_idle`
 enabled. Update your :ref:`mrjob.conf <mrjob.conf>` like this:
 
 .. code-block:: yaml
@@ -1682,7 +1682,7 @@ enabled. Update your :ref:`mrjob.conf <mrjob.conf>` like this:
 
 .. warning::
 
-   If you enable pooling *without* :mrjob-opt:`max_hours_idle` (or
+   If you enable pooling *without* `max_hours_idle` (or
    cronning :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows`), pooled job
    flows will stay active forever, costing you money!
 

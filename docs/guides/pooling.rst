@@ -13,11 +13,6 @@ additional jobs, and eventually shut itself down after it has been idle
 for a certain amount of time (by default, ten minutes; see
 :mrjob-opt:`max_mins_idle`).
 
-.. warning::
-
-   When using cluster pooling prior to v0.6.0, make sure to set
-   :mrjob-opt:`max_hours_idle`, or your cluster will never shut down.
-
 .. note::
 
    Pooling is a way to reduce latency, not to save money. Though

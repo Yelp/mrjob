@@ -545,7 +545,7 @@ class MRJobLauncher(object):
                 extra_args.append(option_string)
                 extra_args.append(parse_legacy_hash_path('file', args[0]))
             elif dest in self._passthru_arg_dests:
-                # special case for --hadoop-arg=-verbose etc.
+                # special case for --hadoop-args=-verbose etc.
                 if (option_string and len(args) == 1 and
                         args[0].startswith('-')):
                     extra_args.append('%s=%s' % (option_string, args[0]))

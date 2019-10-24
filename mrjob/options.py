@@ -720,12 +720,6 @@ _RUNNER_OPTS = dict(
     hadoop_extra_args=dict(
         combiner=combine_lists,
         switches=[
-            (['--hadoop-arg'], dict(
-                action='append',
-                deprecated=True,
-                help=('Deprecated. Like --hadoop-args, but only takes one'
-                      ' argument at a time.'),
-            )),
             (['--hadoop-args'], dict(
                 action=_AppendArgsAction,
                 help=('One or more arguments to pass to the hadoop binary.'
@@ -1057,12 +1051,6 @@ _RUNNER_OPTS = dict(
     py_files=dict(
         combiner=combine_path_lists,
         switches=[
-            (['--py-file'], dict(
-                action='append',
-                deprecated=True,
-                help=('Deprecated. Like --py-files, but only'
-                      ' takes a single file.')
-            )),
             (['--py-files'], dict(
                 action=_AppendCommaSeparatedItemsAction,
                 help=('.zip or .egg files to add to PYTHONPATH,'
@@ -1199,12 +1187,6 @@ _RUNNER_OPTS = dict(
     spark_args=dict(
         combiner=combine_lists,
         switches=[
-            (['--spark-arg'], dict(
-                action='append',
-                deprecated=True,
-                help=('Deprecated. Like --spark-args, but only takes one'
-                      ' argument at a time.'),
-            )),
             (['--spark-args'], dict(
                 action=_AppendArgsAction,
                 help=('One or more arguments to pass to spark-submit'
@@ -1374,11 +1356,6 @@ _RUNNER_OPTS = dict(
                       ' different name to each directory (e.g. '
                       '"foo-libs.zip#lib,bar.tar.gz#bar")'),
             )),
-            (['--archive'], dict(
-                action='append',
-                deprecated=True,
-                help='Deprecated. Like --archives, but only takes one file.',
-            )),
         ],
     ),
     upload_dirs=dict(
@@ -1391,11 +1368,6 @@ _RUNNER_OPTS = dict(
                       '#<name> to each directory to assign a different name'
                       ' (e.g. "foo#lib,bar#local-bar")'),
             )),
-            (['--dir'], dict(
-                action='append',
-                deprecated=True,
-                help='Deprecated. Like --dirs, but only takes one directory.'
-            )),
         ],
     ),
     upload_files=dict(
@@ -1407,11 +1379,6 @@ _RUNNER_OPTS = dict(
                       ' separated by commas. Use "#"'
                       ' to assign a different name to each file (e.g. '
                       '"foo.db#bar.db")'),
-            )),
-            (['--file'], dict(
-                action='append',
-                deprecated=True,
-                help='Deprecated. Like --files, but only takes one file.'
             )),
         ],
     ),

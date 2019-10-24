@@ -1381,14 +1381,6 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
                 ['-D', 'baz=qux', '-libjar', 'qux.jar'])
             self.assertEqual(len(hadoop_args), 10)
 
-    def test_deprecated_hadoop_arg_switch(self):
-        job = MRWordCount(['-r', self.RUNNER,
-                           '--hadoop-arg=-libjar',
-                           '--hadoop-arg=qux.jar'])
-        with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_args_for_step(0),
-                             ['-libjar', 'qux.jar'])
-
 
 class LibjarsTestCase(MockHadoopTestCase):
 

@@ -811,16 +811,6 @@ class PyFilesTestCase(GenericLocalRunnerTestCase):
                 [egg1_path, egg2_path, runner._create_mrjob_zip()]
             )
 
-    def test_deprecated_py_file_switch(self):
-        egg1_path = self.makefile('dragon.egg')
-
-        job = MRNullSpark(['-r', 'local', '--no-bootstrap-mrjob',
-                           '--py-file', egg1_path])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(runner._py_files(), [egg1_path])
-
     def test_no_bootstrap_mrjob(self):
         job = MRNullSpark(['-r', 'local',
                            '--no-bootstrap-mrjob'])

@@ -216,21 +216,17 @@ class GCSFilesystem(Filesystem):
 
         self._blob(dest_uri).upload_from_string(b'')
 
-    def put(self, src_path, dest_uri, chunk_size=None):
+    def put(self, src_path, dest_uri):
         """Uploads a local file to a specific destination.
 
-        *chunk_size* is a deprecated alias for *part_size*
-        (in the constructor) and will be removed in v0.7.0.
+        .. versionchanged::
+
+           0.7.0 removed *chunk_size* arg (use *part_size*
+           in the constructor)
 
         .. versionchanged:: 0.6.8 deprecated *chunk_size*
         """
         part_size = self._part_size
-
-        # support old way of setting *part_size* at call time
-        if chunk_size:
-            log.warning('chunk_size is deprecated and will be removed in'
-                        ' v0.7.0 (set part_size at init time).')
-            part_size = chunk_size
 
         old_blob = self._get_blob(dest_uri)
         if old_blob:

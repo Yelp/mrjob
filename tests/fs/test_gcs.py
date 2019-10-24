@@ -328,19 +328,6 @@ class GCSFSTestCase(MockGoogleTestCase):
             fs.put(local_path, dest)
             blob_meth.assert_called_once_with(dest, chunk_size=12345)
 
-    def test_put_chunk_size(self):
-        local_path = self.makefile('foo', contents=b'bar')
-        dest = 'gs://bar-files/foo'
-        self.storage_client().bucket('bar-files').create()
-
-        with patch.object(GCSFilesystem, '_blob') as blob_meth:
-            with patch('mrjob.fs.gcs.log') as log:
-
-                self.fs.put(local_path, dest, chunk_size=99999)
-                blob_meth.assert_called_once_with(dest, chunk_size=99999)
-
-                self.assertTrue(log.warning.called)
-
     def test_rm(self):
         self.put_gcs_multi({
             'gs://walrus/foo': b''

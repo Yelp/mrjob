@@ -21,6 +21,7 @@ v0.7.0, 2019-10-?? -- fall cleaning
    * file_upload_args kwarg to runner constructor
    * max_hours_idle and mins_to_end_of_hour options
    * visible_to_all_users opt
+   * mrjob.util.read_file() and mrjob.util.read_input()
 
 
 v0.6.12, 2019-10-23 -- unbreak Google

@@ -81,10 +81,6 @@ Options available to hadoop and emr runners
 
     Extra arguments to pass to hadoop streaming.
 
-    .. versionchanged:: 0.6.6
-
-       Deprecated :option:`--hadoop-arg` in favor of :option:`--hadoop-args`
-
 .. mrjob-opt::
     :config: hadoop_streaming_jar
     :switch: --hadoop-streaming-jar
@@ -178,10 +174,6 @@ Options available to hadoop and emr runners
        :mrjob-opt:`spark_master` and :mrjob-opt:`spark_deploy_mode`.
        Other runners don't allow you to set these because they can only
        handle the defaults.
-
-    .. versionchanged:: 0.6.6
-
-       Deprecated :option:`--spark-arg` in favor of :option:`--spark-args`
 
 
 Options available to hadoop runner only

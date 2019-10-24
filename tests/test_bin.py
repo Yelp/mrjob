@@ -1330,22 +1330,6 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 ]
             )
 
-    def test_deprecated_spark_arg_switch(self):
-        job = MRNullSpark(['-r', 'spark',
-                           '--spark-arg=--name',
-                           '--spark-arg=Dave'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_submit_args(0), [
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
-                    '--name', 'Dave',
-                ]
-            )
-
     def test_job_spark_args(self):
         # --extra-spark-arg is a passthrough option for MRNullSpark
         job = MRNullSpark(['-r', 'spark',

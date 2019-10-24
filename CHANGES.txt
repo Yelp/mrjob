@@ -6,7 +6,7 @@ v0.7.0, 2019-10-?? -- fall cleaning
    * steps_python_bin option
    * interpreter and steps_interpreter options
      * removed mr_wc.rb from examples
-   * --archive, --dir, --file, --libjar, --py-file
+   * --archive, --dir, --file, --hadoop-arg, --libjar, --py-file, --spark-arg
 
 v0.6.12, 2019-10-23 -- unbreak Google
  * default image_version on Dataproc is now 1.3 (#2110)

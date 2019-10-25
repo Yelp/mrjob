@@ -36,9 +36,6 @@ from argparse import ArgumentTypeError
 from mrjob.cat import decompress
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
-from mrjob.launch import _im_func
-from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
-from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_job_args

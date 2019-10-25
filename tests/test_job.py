@@ -1773,7 +1773,7 @@ class SparkJobMethodsTestCase(SandboxedTestCase, SingleSparkContextTestCase):
         # ensure that we aren't sandboxing the job. This used to be
         # the way we made Spark jobs serializable; see #2039
         self.job_sandbox = self.start(
-            patch('mrjob.launch.MRJobLauncher.sandbox'))
+            patch('mrjob.job.MRJob.sandbox'))
 
     def test_job_can_be_pickled_and_unpicked(self):
         job = MRJob()

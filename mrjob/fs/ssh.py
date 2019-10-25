@@ -179,8 +179,8 @@ class SSHFilesystem(Filesystem):
     def du(self, path_glob):
         raise IOError()  # not implemented
 
-    def ls(self, uri_glob):
-        m = _SSH_URI_RE.match(uri_glob)
+    def ls(self, path_glob):
+        m = _SSH_URI_RE.match(path_glob)
         addr = m.group('hostname')
         path_to_ls = m.group('filesystem_path')
 
@@ -196,19 +196,19 @@ class SSHFilesystem(Filesystem):
     def md5sum(self, path):
         raise IOError()  # not implemented
 
-    def _cat_file(self, filename):
-        m = _SSH_URI_RE.match(filename)
+    def _cat_file(self, path):
+        m = _SSH_URI_RE.match(path)
         addr = m.group('hostname')
-        path = m.group('filesystem_path')
+        fs_path = m.group('filesystem_path')
 
-        p = self._ssh_launch(addr, ['cat', path])
+        p = self._ssh_launch(addr, ['cat', fs_path])
 
-        for chunk in decompress(p.stdout, path):
+        for chunk in decompress(p.stdout, fs_path):
             yield chunk
 
         self._ssh_finish_run(p)
 
-    def mkdir(self, dest):
+    def mkdir(self, path):
         raise IOError()  # not implemented
 
     def exists(self, path_glob):
@@ -221,7 +221,7 @@ class SSHFilesystem(Filesystem):
     def rm(self, path_glob):
         raise IOError()  # not implemented
 
-    def touchz(self, dest):
+    def touchz(self, path):
         raise IOError()  # not implemented
 
     def use_sudo_over_ssh(self, sudo=True):

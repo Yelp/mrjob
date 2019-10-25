@@ -153,8 +153,8 @@ class GCSFilesystem(Filesystem):
             raise IOError('Object %r does not exist' % (path,))
         return binascii.hexlify(b64decode(blob.md5_hash)).decode('ascii')
 
-    def _cat_file(self, gcs_uri):
-        return decompress(self._cat_blob(gcs_uri), gcs_uri)
+    def _cat_file(self, path):
+        return decompress(self._cat_blob(path), path)
 
     def _cat_blob(self, gcs_uri):
         """:py:meth:`cat_file`, minus decompression."""
@@ -179,12 +179,12 @@ class GCSFilesystem(Filesystem):
 
             start = end
 
-    def mkdir(self, dest):
+    def mkdir(self, path):
         """Does not actually create a directory on GCS (because GCS doesn't
         have directories), but creates the underlying bucket if it does not
         exist already.
         """
-        bucket_name, base_name = parse_gcs_uri(dest)
+        bucket_name, base_name = parse_gcs_uri(path)
 
         try:
             self.get_bucket(bucket_name)
@@ -208,15 +208,15 @@ class GCSFilesystem(Filesystem):
         for uri, blob in self._ls(path_glob):
             blob.delete()
 
-    def touchz(self, dest_uri):
+    def touchz(self, path):
         # check if already exists
-        old_blob = self._get_blob(dest_uri)
+        old_blob = self._get_blob(path)
         if old_blob:
-            raise IOError('Non-empty file %r already exists!' % (dest_uri,))
+            raise IOError('Non-empty file %r already exists!' % (path,))
 
-        self._blob(dest_uri).upload_from_string(b'')
+        self._blob(path).upload_from_string(b'')
 
-    def put(self, src_path, dest_uri):
+    def put(self, src, path):
         """Uploads a local file to a specific destination.
 
         .. versionchanged::
@@ -228,12 +228,11 @@ class GCSFilesystem(Filesystem):
         """
         part_size = self._part_size
 
-        old_blob = self._get_blob(dest_uri)
+        old_blob = self._get_blob(path)
         if old_blob:
-            raise IOError('File already exists: %s' % dest_uri)
+            raise IOError('File already exists: %s' % path)
 
-        self._blob(dest_uri, chunk_size=part_size).upload_from_filename(
-            src_path)
+        self._blob(path, chunk_size=part_size).upload_from_filename(src)
 
     def get_all_bucket_names(self, prefix=None):
         """Yield the names of all buckets associated with this client.

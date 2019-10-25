@@ -145,6 +145,6 @@ class Filesystem(object):
         """
         raise NotImplementedError
 
-    def md5sum(self, path_glob):
-        """Generate the md5 sum of the file at ``path``"""
+    def md5sum(self, path):
+        """Generate the md5 sum of the file at *path*"""
         raise NotImplementedError

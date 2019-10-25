@@ -168,12 +168,12 @@ class S3Filesystem(Filesystem):
             raise IOError('Key %r does not exist' % (path,))
         return k.e_tag.strip('"')
 
-    def _cat_file(self, filename):
+    def _cat_file(self, path):
         # stream lines from the s3 key
-        s3_key = self._get_s3_key(filename)
+        s3_key = self._get_s3_key(path)
         body = s3_key.get()['Body']
 
-        return decompress(body, filename)
+        return decompress(body, path)
 
     def exists(self, path_glob):
         """Does the given path exist?
@@ -184,12 +184,12 @@ class S3Filesystem(Filesystem):
         # just fall back on _ls(); it's smart
         return any(self._ls(path_glob))
 
-    def mkdir(self, dest):
+    def mkdir(self, path):
         """Make a directory. This doesn't actually create directories on S3
         (because there is no such thing), but it will create the corresponding
         bucket if it doesn't exist.
         """
-        bucket_name, key_name = parse_s3_uri(dest)
+        bucket_name, key_name = parse_s3_uri(path)
 
         client = self.make_s3_client()
 
@@ -222,10 +222,10 @@ class S3Filesystem(Filesystem):
             log.debug('deleting ' + uri)
             key.delete()
 
-    def touchz(self, dest):
+    def touchz(self, path):
         """Make an empty file in the given location. Raises an error if
         a non-empty file already exists in that location."""
-        key = self._get_s3_key(dest)
+        key = self._get_s3_key(path)
 
         data = None
         try:
@@ -236,7 +236,7 @@ class S3Filesystem(Filesystem):
                 raise
 
         if data and data['ContentLength'] != 0:
-            raise OSError('Non-empty file %r already exists!' % (dest,))
+            raise OSError('Non-empty file %r already exists!' % (path,))
 
         key.put(Body=b'')
 

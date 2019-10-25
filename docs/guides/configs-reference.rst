@@ -56,8 +56,6 @@ These options can be set by overriding your job's
 :py:meth:`~mrjob.job.MRJob.configure_args` to call the appropriate method:
 
 .. |extra_args| replace:: :py:meth:`extra_args <mrjob.runner.MRJobRunner.__init__>`
-.. |file_upload_args| replace:: :py:meth:`file_upload_args <mrjob.runner.MRJobRunner.__init__>`
-
 .. |add_passthru_arg| replace:: :py:meth:`~mrjob.job.MRJob.add_passthru_arg`
 .. |add_file_arg| replace:: :py:meth:`~mrjob.job.MRJob.add_file_arg`
 
@@ -65,7 +63,6 @@ These options can be set by overriding your job's
 Option                 Method                   Default
 ====================== ======================== ========
 *extra_args*           |add_passthru_arg|       ``[]``
-*file_upload_args*     |add_file_arg|           ``[]``
 ====================== ======================== ========
 
 All of the above can be passed as keyword arguments to
@@ -94,7 +91,7 @@ In addition, it ignores *hadoop_input_format*, *hadoop_output_format*,
 :py:class:`~mrjob.inline.InlineMRJobRunner` works like
 :py:class:`~mrjob.local.LocalMRJobRunner`, only it also ignores
 *bootstrap_mrjob*, *cmdenv*, *python_bin*,
-*steps_python_bin*, *upload_archives*, and *upload_files*.
+*upload_archives*, and *upload_files*.
 
 
 Additional options for :py:class:`~mrjob.dataproc.DataprocJobRunner`

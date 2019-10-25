@@ -39,8 +39,6 @@ Options::
                         us-west-1.elasticmapreduce.amazonaws.com). Default is
                         to infer this from region.
   -h, --help            show this help message and exit
-  --max-hours-idle MAX_HOURS_IDLE
-                        Please use --max-mins-idle instead.
   --max-mins-idle MAX_MINS_IDLE
                         Max number of minutes a cluster can go without
                         bootstrapping, running a step, or having a new step
@@ -51,8 +49,6 @@ Options::
   --max-mins-locked MAX_MINS_LOCKED
                         Max number of minutes a cluster can be locked while
                         idle.
-  --mins-to-end-of-hour MINS_TO_END_OF_HOUR
-                        Deprecated, does nothing.
   --pool-name POOL_NAME
                         Only terminate clusters in the given named pool.
   --pooled-only         Only terminate pooled clusters
@@ -97,16 +93,7 @@ def main(cl_args=None):
     MRJob.set_up_logging(quiet=options.quiet,
                          verbose=options.verbose)
 
-    # max_hours_idle -> max_mins_idle
     max_mins_idle = options.max_mins_idle
-    if max_mins_idle is None and options.max_hours_idle is not None:
-        log.warning('--max-hours-idle is deprecated and will be removed'
-                    ' in v0.7.0. Please use --max-mins-idle instead.')
-        max_mins_idle = options.max_hours_idle * 60
-
-    if options.mins_to_end_of_hour is not None:
-        log.warning('--mins-to-end-of-hour is deprecated as of v0.6.0'
-                    ' and does nothing')
 
     _maybe_terminate_clusters(
         dry_run=options.dry_run,
@@ -123,8 +110,7 @@ def main(cl_args=None):
 
 def _runner_kwargs(options):
     kwargs = options.__dict__.copy()
-    for unused_arg in ('quiet', 'verbose', 'max_mins_idle', 'max_hours_idle',
-                       'mins_to_end_of_hour',
+    for unused_arg in ('quiet', 'verbose', 'max_mins_idle',
                        'max_mins_locked', 'unpooled_only',
                        'pooled_only', 'pool_name', 'dry_run'):
         del kwargs[unused_arg]
@@ -356,10 +342,6 @@ def _make_arg_parser():
     arg_parser = ArgumentParser(usage=usage, description=description)
 
     arg_parser.add_argument(
-        '--max-hours-idle', dest='max_hours_idle',
-        default=None, type=float,
-        help=('Please use --max-mins-idle instead.'))
-    arg_parser.add_argument(
         '--max-mins-idle', dest='max_mins_idle',
         default=None, type=float,
         help=('Max number of minutes a cluster can go without bootstrapping,'
@@ -371,10 +353,6 @@ def _make_arg_parser():
         '--max-mins-locked', dest='max_mins_locked',
         default=_DEFAULT_MAX_MINUTES_LOCKED, type=float,
         help='Max number of minutes a cluster can be locked while idle.')
-    arg_parser.add_argument(
-        '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
-        default=None, type=float,
-        help=('Deprecated, does nothing.'))
     arg_parser.add_argument(
         '--unpooled-only', dest='unpooled_only', action='store_true',
         default=False,

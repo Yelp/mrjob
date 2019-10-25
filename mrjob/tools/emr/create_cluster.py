@@ -90,10 +90,6 @@ Options::
   --emr-action-on-failure EMR_ACTION_ON_FAILURE
                         Action to take when a step fails (e.g.
                         TERMINATE_CLUSTER, CANCEL_AND_WAIT, CONTINUE)
-  --emr-api-param EMR_API_PARAMS
-                        Does nothing. Use --extra-cluster-param instead
-  --no-emr-api-param EMR_API_PARAMS
-                        Does nothing. Use --extra-cluster-param instead
   --emr-configuration EMR_CONFIGURATIONS
                         Configuration to use on 4.x AMIs as a JSON-encoded
                         dict; see http://docs.aws.amazon.com/ElasticMapReduce/
@@ -150,16 +146,10 @@ Options::
                         to do this for task instances).
   --master-instance-type MASTER_INSTANCE_TYPE
                         Type of GCE/EC2 master instance to launch
-  --max-hours-idle MAX_HOURS_IDLE
-                        Please use --max-mins-idle instead
   --max-mins-idle MAX_MINS_IDLE
                         If we create a cluster, have it automatically
                         terminate itself after it's been idle this many
                         minutes
-  --mins-to-end-of-hour MINS_TO_END_OF_HOUR
-                        If --max-mins-idle is set, control how close to the
-                        end of an hour the cluster can automatically terminate
-                        itself (default is 5 minutes)
   --num-core-instances NUM_CORE_INSTANCES
                         Total number of core instances to launch
   --num-task-instances NUM_TASK_INSTANCES
@@ -193,12 +183,6 @@ Options::
   --task-instance-type TASK_INSTANCE_TYPE
                         Type of GCE/EC2 task instance(s) to launch
   -v, --verbose         print more messages to stderr
-  --visible-to-all-users
-                        Make your cluster is visible to all IAM users on the
-                        same AWS account (the default)
-  --no-visible-to-all-users
-                        Hide your cluster from other IAM users on the same AWS
-                        account
   --zone ZONE           GCE zone/AWS availability zone to run Dataproc/EMR
                         jobs in.
 """

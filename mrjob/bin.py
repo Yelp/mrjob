@@ -70,13 +70,10 @@ _MANIFEST_INPUT_FORMAT = 'org.apache.hadoop.mapred.lib.NLineInputFormat'
 class MRJobBinRunner(MRJobRunner):
 
     OPT_NAMES = MRJobRunner.OPT_NAMES | {
-        'interpreter',
         'python_bin',
         'sh_bin',
         'spark_args',
         'spark_submit_bin',
-        'steps_interpreter',
-        'steps_python_bin',
         'task_python_bin',
     }
 
@@ -149,62 +146,16 @@ class MRJobBinRunner(MRJobRunner):
 
         return opt_value
 
-    def _load_steps(self):
-        args = (self._executable(True) + ['--steps'] +
-                self._mr_job_extra_args(local=True))
-        log.debug('> %s' % cmd_line(args))
-
-        # add . to PYTHONPATH (in case mrjob isn't actually installed)
-        env = combine_local_envs(os.environ,
-                                 {'PYTHONPATH': os.path.abspath('.')})
-        steps_proc = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
-        stdout, stderr = steps_proc.communicate()
-
-        if steps_proc.returncode != 0:
-            raise Exception(
-                'error getting step information: \n%s' % stderr)
-
-        # on Python 3, convert stdout to str so we can json.loads() it
-        if not isinstance(stdout, str):
-            stdout = stdout.decode('utf_8')
-
-        try:
-            steps = json.loads(stdout)
-        except ValueError:
-            raise ValueError("Bad --steps response: \n%s" % stdout)
-
-        # verify that this is a proper step description
-        if not steps or not stdout:
-            raise ValueError('step description is empty!')
-
-        return steps
-
-    ### interpreter/python binary ###
-
-    def _interpreter(self, steps=False):
-        if steps:
-            return (self._opts['steps_interpreter'] or
-                    self._opts['interpreter'] or
-                    self._steps_python_bin())
-        else:
-            return (self._opts['interpreter'] or
-                    self._task_python_bin())
-
-    def _executable(self, steps=False):
-        if steps:
-            return self._interpreter(steps=True) + [self._script_path]
-        else:
-            return self._interpreter() + [
-                self._working_dir_mgr.name('file', self._script_path)]
+    ### python binary ###
 
     def _python_bin(self):
         """Python binary used for everything other than invoking the job.
-        For invoking jobs with ``--steps``, see :py:meth:`_steps_python_bin`,
-        and for everything else (e.g. ``--mapper``, ``--spark``), see
-        :py:meth:`_task_python_bin`, which defaults to this method if
-        :mrjob-opt:`task_python_bin` isn't set.
 
-        Other ways mrjob uses Python:
+        For running job tasks (e.g. ``--mapper``, ``--spark``), we use
+        :py:meth:`_task_python_bin`, which can be set to a different value
+        by setting :mrjob-opt:`task_python_bin`.
+
+        Ways mrjob uses Python other than running tasks:
          * file locking in setup wrapper scripts
          * finding site-packages dir to bootstrap mrjob on clusters
          * invoking ``cat.py`` in local mode
@@ -212,11 +163,6 @@ class MRJobBinRunner(MRJobRunner):
         """
         # python_bin isn't an option for inline runners
         return self._opts['python_bin'] or self._default_python_bin()
-
-    def _steps_python_bin(self):
-        """Python binary used to invoke job with ``--steps``"""
-        return (self._opts['steps_python_bin'] or
-                self._default_python_bin(local=True))
 
     def _task_python_bin(self):
         """Python binary used to invoke job with ``--mapper``,
@@ -249,7 +195,9 @@ class MRJobBinRunner(MRJobRunner):
     ### running MRJob scripts ###
 
     def _script_args_for_step(self, step_num, mrc, input_manifest=False):
-        args = self._executable() + self._args_for_task(step_num, mrc)
+        args = (self._task_python_bin() +
+                [self._working_dir_mgr.name('file', self._script_path)] +
+                self._args_for_task(step_num, mrc))
 
         if input_manifest and mrc == 'mapper':
             wrapper = self._manifest_setup_script_path

@@ -280,21 +280,6 @@ class TestCatOutput(SandboxedTestCase):
         self.assertEqual(sorted(to_lines(runner.stream_output())),
                          [b'cats\n'])
 
-    def test_deprecated_stream_output(self):
-        self.makefile(os.path.join(self.output_dir, 'part-00000'),
-                      b'1\n2')
-        self.makefile(os.path.join(self.output_dir, 'part-00001'),
-                      b'3\n4\n')
-
-        log = self.start(patch('mrjob.runner.log'))
-
-        # should group output into lines, but not join across files
-        self.assertEqual(sorted(self.runner.stream_output()),
-                         [b'1\n', b'2', b'3\n', b'4\n'])
-
-        # should issue deprecation warning
-        self.assertEqual(log.warning.call_count, 1)
-
 
 class CheckInputPathsTestCase(SandboxedTestCase):
 
@@ -973,28 +958,6 @@ class OptDebugPrintoutTestCase(ConfigFilesTestCase):
         self.assertIn("'dave'", debug)
 
 
-class DeprecatedFileUploadArgsTestCase(SandboxedTestCase):
-
-    def setUp(self):
-        super(DeprecatedFileUploadArgsTestCase, self).setUp()
-
-        self.log = self.start(patch('mrjob.runner.log'))
-
-    def test_deprecated_file_upload_args(self):
-        old_runner = InlineMRJobRunner(
-            file_upload_args=[('--foo-config', '/tmp/.fooconf#dot-fooconf')])
-
-        new_runner = InlineMRJobRunner(
-            extra_args=['--foo-config', dict(
-                path='/tmp/.fooconf', name='dot-fooconf', type='file')])
-
-        self.assertEqual(old_runner._extra_args, new_runner._extra_args)
-        self.assertEqual(old_runner._working_dir_mgr._name_to_typed_path,
-                         new_runner._working_dir_mgr._name_to_typed_path)
-
-        self.assertTrue(self.log.warning.called)
-
-
 # job that improperly uses mapper_raw on a step other than the first
 class MRPhoneToURLToPhoneToURL(MRPhoneToURL):
     def steps(self):
@@ -1084,18 +1047,6 @@ class PassStepsToRunnerTestCase(BasicTestCase):
             runner.run()
 
             self.assertFalse(self.log.warning.called)
-
-    def test_load_steps(self):
-        job = MRWordCount()
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner._steps = None
-
-            runner.run()
-
-            self.assertTrue(runner._steps)
-            self.assertTrue(self.log.warning.called)
 
     def test_command_steps(self):
         job = MRCatsJob(['-r', 'local', '--num-cats', '3'])

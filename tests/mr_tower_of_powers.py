@@ -60,13 +60,6 @@ class MRTowerOfPowers(MRJob):
     def steps(self):
         return [MRStep(mapper=self.mapper, reducer=self.reducer)] * self.n
 
-    def show_steps(self):
-        # when we invoke the job with --steps, it should
-        # be reading from the original version of n_file
-        assert self.options.n_file == os.environ['LOCAL_N_FILE_PATH']
-
-        super(MRTowerOfPowers, self).show_steps()
-
 
 if __name__ == '__main__':
     MRTowerOfPowers.run()

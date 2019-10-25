@@ -76,7 +76,6 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         'instance_type',
         'master_instance_type',
         'max_mins_idle',
-        'max_hours_idle',
         'num_core_instances',
         'num_task_instances',
         'region',
@@ -154,16 +153,6 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
             if not isinstance(opts['cloud_part_size_mb'],
                               (integer_types, float)):
                 raise TypeError('cloud_part_size_mb must be a number')
-
-        # patch max_hours_idle into max_mins_idle (see #1663)
-        if opts.get('max_hours_idle') is not None:
-            log.warning(
-                'max_hours_idle is deprecated and will be removed in v0.7.0.' +
-                (' Please use max_mins_idle instead'
-                 if opts.get('max_mins_idle') is None else ''))
-
-            if opts.get('max_mins_idle') is None:
-                opts['max_mins_idle'] = opts['max_hours_idle'] * 60
 
         return opts
 

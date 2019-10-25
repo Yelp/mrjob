@@ -734,21 +734,3 @@ class DeprecatedSwitchesTestCase(SandboxedTestCase):
 
         self.log = self.start(
             patch('mrjob.tools.emr.terminate_idle_clusters.log'))
-
-    def test_deprecated_max_hours_idle(self):
-        main(['--max-hours-idle', '2'])
-
-        self.assertEqual(
-            self._maybe_terminate_clusters.call_args[1]['max_mins_idle'],
-            120)
-
-        self.assertTrue(self.log.warning.called)
-
-    def test_deprecated_mins_to_end_of_hour(self):
-        main(['--mins-to-end-of-hour', '5'])
-
-        self.assertNotIn(
-            'mins_to_end_of_hour',
-            self._maybe_terminate_clusters.call_args[1])
-
-        self.assertTrue(self.log.warning.called)

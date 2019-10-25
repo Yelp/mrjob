@@ -52,13 +52,6 @@ log = getLogger(__name__)
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
 #: * ``'TMP'``: delete local, HDFS, and cloud storage temp files, but not logs
-#:
-#: .. versionchanged:: 0.5.0
-#:
-#:     - ``LOCAL_TMP`` used to be ``LOCAL_SCRATCH``
-#:     - ``HADOOP_TMP`` is new (and used to be covered by ``LOCAL_SCRATCH``)
-#:     - ``CLOUD_TMP`` used to be ``REMOTE_SCRATCH``
-#:
 CLEANUP_CHOICES = [
     'ALL',
     'CLOUD_TMP',
@@ -70,18 +63,6 @@ CLEANUP_CHOICES = [
     'NONE',
     'TMP',
 ]
-
-
-# map from optparse types to Python types
-_OPTPARSE_TYPES = dict(
-    choice=str,  # optparse only allows strings as choices
-    complex=complex,
-    float=float,
-    int=int,
-    long=int,
-    str=str,  # undocumented alias for 'string', see #1857
-    string=str,
-)
 
 # use to identify malformed JSON
 _PROBABLY_JSON_RE = re.compile(r'^\s*[\{\[\"].*$')
@@ -110,7 +91,7 @@ def _default_to(namespace, dest, value):
 
 class _KeyValueAction(Action):
     """action for KEY=VALUE pairs"""
-    # used for --cmdenv, --emr-api-param, and more
+    # used for --cmdenv, --jobconf, and more
 
     def __call__(self, parser, namespace, value, option_string=None):
         try:
@@ -285,14 +266,6 @@ _STEP_OPTS = dict(
             help='run Spark code',
         ),
     ),
-    show_steps=(
-        ['--steps'],
-        dict(
-            action='store_true',
-            help=('print the mappers, combiners, and reducers that this job'
-                  ' defines'),
-        ),
-    ),
     step_num=(
         ['--step-num'],
         dict(
@@ -303,8 +276,8 @@ _STEP_OPTS = dict(
     ),
 )
 
-# don't show these unless someone types --help --steps --deprecated
-_DEPRECATED_STEP_OPTS = {'show_steps'}
+# don't show these unless someone types --help -v --deprecated
+_DEPRECATED_STEP_OPTS = set()  # none at the moment
 
 # don't show these unless someone types --help --deprecated
 _DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
@@ -633,18 +606,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    emr_api_params=dict(
-        cloud_role='launch',
-        deprecated=True,
-        switches=[
-            (['--emr-api-param'], dict(
-                help=('Does nothing. Use --extra-cluster-param instead'),
-            )),
-            (['--no-emr-api-param'], dict(
-                help=('Does nothing. Use --extra-cluster-param instead'),
-            )),
-        ],
-    ),
     emr_configurations=dict(
         cloud_role='launch',
         combiner=combine_lists,
@@ -735,12 +696,6 @@ _RUNNER_OPTS = dict(
     hadoop_extra_args=dict(
         combiner=combine_lists,
         switches=[
-            (['--hadoop-arg'], dict(
-                action='append',
-                deprecated=True,
-                help=('Deprecated. Like --hadoop-args, but only takes one'
-                      ' argument at a time.'),
-            )),
             (['--hadoop-args'], dict(
                 action=_AppendArgsAction,
                 help=('One or more arguments to pass to the hadoop binary.'
@@ -863,15 +818,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    interpreter=dict(
-        combiner=combine_cmds,
-        deprecated=True,
-        switches=[
-            (['--interpreter'], dict(
-                help='Non-python command to run your script, e.g. "ruby".',
-            )),
-        ],
-    ),
     jobconf=dict(
         combiner=combine_jobconfs,
         switches=[
@@ -893,11 +839,6 @@ _RUNNER_OPTS = dict(
     libjars=dict(
         combiner=combine_path_lists,
         switches=[
-            (['--libjar'], dict(
-                action='append',
-                help=('Deprecated. Like --libjars, but only takes a'
-                      ' single JAR.'),
-            )),
             (['--libjars'], dict(
                 action=_AppendCommaSeparatedItemsAction,
                 help=('Paths of JARs to pass to Hadoop with -libjars,'
@@ -958,16 +899,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    max_hours_idle=dict(
-        cloud_role='launch',
-        deprecated=True,
-        switches=[
-            (['--max-hours-idle'], dict(
-                help='Please use --max-mins-idle instead',
-                type=float,
-            )),
-        ],
-    ),
     # Spark runner only, only passed in on the command line (see #2040)
     max_output_files=dict(
         switches=[
@@ -976,18 +907,6 @@ _RUNNER_OPTS = dict(
                       ' streaming job on Spark; just runs rdd.coalesce()'
                       ' before outputting files'),
                 type=int,
-            )),
-        ],
-    ),
-    mins_to_end_of_hour=dict(
-        cloud_role='launch',
-        deprecated=True,
-        switches=[
-            (['--mins-to-end-of-hour'], dict(
-                help=("If --max-mins-idle is set, control how close to the"
-                      " end of an hour the cluster can automatically"
-                      " terminate itself (default is 5 minutes)"),
-                type=float,
             )),
         ],
     ),
@@ -1081,12 +1000,6 @@ _RUNNER_OPTS = dict(
     py_files=dict(
         combiner=combine_path_lists,
         switches=[
-            (['--py-file'], dict(
-                action='append',
-                deprecated=True,
-                help=('Deprecated. Like --py-files, but only'
-                      ' takes a single file.')
-            )),
             (['--py-files'], dict(
                 action=_AppendCommaSeparatedItemsAction,
                 help=('.zip or .egg files to add to PYTHONPATH,'
@@ -1223,12 +1136,6 @@ _RUNNER_OPTS = dict(
     spark_args=dict(
         combiner=combine_lists,
         switches=[
-            (['--spark-arg'], dict(
-                action='append',
-                deprecated=True,
-                help=('Deprecated. Like --spark-args, but only takes one'
-                      ' argument at a time.'),
-            )),
             (['--spark-args'], dict(
                 action=_AppendArgsAction,
                 help=('One or more arguments to pass to spark-submit'
@@ -1318,27 +1225,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    steps_interpreter=dict(
-        combiner=combine_cmds,
-        deprecated=True,
-        switches=[
-            (['--steps-interpreter'], dict(
-                help=("Non-Python command to use to query the job about its"
-                      " steps, if different from --interpreter."),
-            )),
-        ],
-    ),
-    steps_python_bin=dict(
-        combiner=combine_cmds,
-        deprecated=True,
-        switches=[
-            (['--steps-python-bin'], dict(
-                help=('Name/path of alternate python command to use to'
-                      ' query the job about its steps, if different from the'
-                      ' current Python interpreter.'),
-            )),
-        ],
-    ),
     subnet=dict(
         cloud_role='launch',
         switches=[
@@ -1419,11 +1305,6 @@ _RUNNER_OPTS = dict(
                       ' different name to each directory (e.g. '
                       '"foo-libs.zip#lib,bar.tar.gz#bar")'),
             )),
-            (['--archive'], dict(
-                action='append',
-                deprecated=True,
-                help='Deprecated. Like --archives, but only takes one file.',
-            )),
         ],
     ),
     upload_dirs=dict(
@@ -1436,11 +1317,6 @@ _RUNNER_OPTS = dict(
                       '#<name> to each directory to assign a different name'
                       ' (e.g. "foo#lib,bar#local-bar")'),
             )),
-            (['--dir'], dict(
-                action='append',
-                deprecated=True,
-                help='Deprecated. Like --dirs, but only takes one directory.'
-            )),
         ],
     ),
     upload_files=dict(
@@ -1452,27 +1328,6 @@ _RUNNER_OPTS = dict(
                       ' separated by commas. Use "#"'
                       ' to assign a different name to each file (e.g. '
                       '"foo.db#bar.db")'),
-            )),
-            (['--file'], dict(
-                action='append',
-                deprecated=True,
-                help='Deprecated. Like --files, but only takes one file.'
-            )),
-        ],
-    ),
-    visible_to_all_users=dict(
-        cloud_role='launch',
-        deprecated=True,
-        switches=[
-            (['--visible-to-all-users'], dict(
-                action='store_true',
-                help=('Make your cluster is visible to all IAM users on the'
-                      ' same AWS account (the default)'),
-            )),
-            (['--no-visible-to-all-users'], dict(
-                action='store_false',
-                help=('Hide your cluster from other IAM users on the same AWS'
-                      ' account'),
             )),
         ],
     ),
@@ -1611,7 +1466,7 @@ def _add_basic_args(parser):
         action='store_true', help='print more messages to stderr')
 
 
-def _add_job_args(parser, include_deprecated=True):
+def _add_job_args(parser, include_deprecated=True, include_steps=True):
 
     parser.add_argument(
         '--cat-output', dest='cat_output',
@@ -1677,15 +1532,8 @@ def _print_help_for_runner(opt_names, include_deprecated=False):
     help_parser.print_help()
 
 
-def _print_help_for_steps(include_deprecated=False):
-    help_parser = ArgumentParser(usage=SUPPRESS, add_help=False)
-
-    _add_step_args(help_parser, include_deprecated=include_deprecated)
-
-    help_parser.print_help()
-
-
-def _print_basic_help(option_parser, usage, include_deprecated=False):
+def _print_basic_help(option_parser, usage, include_deprecated=False,
+                      include_steps=False):
     """Print all help for the parser. Unlike similar functions, this needs a
     parser so that it can include custom options added by a
     :py:class:`~mrjob.job.MRJob`.
@@ -1693,7 +1541,8 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
     help_parser = ArgumentParser(usage=usage, add_help=False)
 
     _add_basic_args(help_parser)
-    _add_job_args(help_parser, include_deprecated=include_deprecated)
+    _add_job_args(help_parser, include_deprecated=include_deprecated,
+                  include_steps=include_steps)
 
     basic_dests = {action.dest for action in help_parser._actions}
 
@@ -1713,8 +1562,8 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
         if action.dest in _RUNNER_OPTS:
             continue
 
-        # this excludes options that are show with --help --steps
-        if action.dest in _STEP_OPTS:
+        # don't include steps if *include_steps* isn't set
+        if action.dest in _STEP_OPTS and not include_steps:
             continue
 
         # this excludes the ARGS option, which is already covered by usage
@@ -1729,9 +1578,10 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
     print()
     print('To see help for a specific runner, use --help -r <runner name>')
     print()
-    print('To see help for options that control what part of a job runs,'
-          ' use --help --steps')
-    print()
+    if not include_steps:
+        print('To include switches that control what part of a job runs,'
+              ' use --help -v')
+        print()
     if not include_deprecated:
         print('To include help for deprecated options, add --deprecated')
         print()
@@ -1770,42 +1620,6 @@ def _parse_raw_args(parser, args):
     raw_parser.parse_known_args(args)
 
     return results
-
-
-def _optparse_kwargs_to_argparse(**kwargs):
-    """Translate old keyword args to OptionParser.add_option() so they can be
-    passed to ArgumentParser.add_argument().
-
-    The two methods take almost identical arguments, so this is mostly a
-    matter of filtering.
-    """
-    if any(k.startswith('callback') for k in kwargs):
-        raise ValueError(
-            'mrjob does not emulate callback arguments to add_option(); please'
-            ' use argparse actions instead.')
-
-    # translate type from string (optparse) to type (argparse)
-    if kwargs.get('type') is not None:
-        if not isinstance(kwargs['type'], type):
-            if kwargs['type'] not in _OPTPARSE_TYPES:
-                raise ValueError('invalid option type: %r' % kwargs['type'])
-            kwargs['type'] = _OPTPARSE_TYPES[kwargs['type']]
-
-    # opt_group was a mrjob-specific feature that we've abandoned
-    if 'opt_group' in kwargs:
-        log.warning(
-            'ignoring opt_group keyword arg (mrjob no longer supports'
-            ' opt groups')
-        kwargs.pop('opt_group')
-
-    # convert %default -> %(default)s
-    if kwargs.get('help'):
-        kwargs['help'] = kwargs['help'].replace('%default', '%(default)s')
-
-    # pretty much everything else is the same. if people want to pass argparse
-    # kwargs through the old optparse interface (e.g. *action* or *required*)
-    # more power to 'em.
-    return kwargs
 
 
 def _alphabetize_actions(arg_parser):

@@ -32,7 +32,6 @@ from contextlib import contextmanager
 from datetime import timedelta
 from distutils.spawn import find_executable
 from logging import getLogger
-from optparse import OptionParser
 from zipfile import ZIP_DEFLATED
 from zipfile import ZIP_STORED
 from zipfile import ZipFile
@@ -120,158 +119,9 @@ def log_to_stream(name=None, stream=None, format=None, level=None,
     logger.addHandler(handler)
 
 
-def parse_and_save_options(option_parser, args):
-    """Return a map from option name (``dest``) to a list of the arguments
-    in *args* that correspond to that *dest*.
-
-    This won't modify *option_parser*.
-
-    .. deprecated:: 0.6.0
-    """
-    arg_map = {}
-
-    def sim_callback(option, opt_str, value, parser):
-        dest = option.dest
-        arg_map.setdefault(dest, [])
-
-        arg_map[dest].append(opt_str)
-        if isinstance(value, string_types):
-            arg_map[dest].append(value)
-        elif value:
-            arg_map[dest].extend(value)
-
-    sim_parser = OptionParser(add_help_option=False)
-
-    # optparse is no longer being maintained, so it's safe to access
-    # hidden methods and attributes
-    for option in option_parser._get_all_options():
-        sim_parser.add_option(
-            *(option._short_opts + option._long_opts),
-            dest=option.dest,
-            nargs=option.nargs,
-            action='callback',
-            type=('string' if option.type else None),
-            callback=sim_callback)
-
-    sim_parser.parse_args(args)
-
-    return arg_map
-
-
 def random_identifier():
     """A random 16-digit hex string."""
     return '%016x' % random.randint(0, 2 ** 64 - 1)
-
-
-def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
-    """Yields lines from a file, possibly decompressing it based on file
-    extension.
-
-    Currently we handle compressed files with the extensions ``.gz`` and
-    ``.bz2``.
-
-    :param string path: file path. Need not be a path on the local filesystem
-                        (URIs are okay) as long as you specify *fileobj* too.
-    :param fileobj: file object to read from. Need not be seekable. If this
-                    is omitted, we ``open(path)``.
-    :param yields_lines: Does iterating over *fileobj* yield lines (like
-                         file objects are supposed to)? If not, set this to
-                         ``False`` (useful for objects that correspond
-                         to objects on cluster filesystems)
-    :param cleanup: Optional callback to call with no arguments when EOF is
-                    reached or an exception is thrown.
-
-    .. deprecated:: 0.6.0
-    """
-    log.warning('read_file() is deprecated and will be removed in v0.7.0.'
-                ' Try mrjob.cat.decompress() and mrjob.util.to_lines()')
-
-    # sometimes values declared in the ``try`` block aren't accessible from the
-    # ``finally`` block. not sure why.
-    f = None
-    try:
-        # open path if we need to
-        if fileobj is None:
-            f = open(path, 'rb')
-        else:
-            f = fileobj
-
-        decompressed_f = decompress(f, path)
-
-        if decompressed_f is f and yields_lines:
-            # this could be important; iterating over to_lines(f) is about 8x
-            # slower than iterating over f
-            lines = f
-        else:
-            lines = to_lines(decompressed_f)
-
-        for line in lines:
-            yield line
-    finally:
-        try:
-            if f and f is not fileobj:
-                f.close()
-        finally:
-            if cleanup:
-                cleanup()
-
-
-def read_input(path, stdin=None):
-    """Stream input the way Hadoop would.
-
-    - Resolve globs (``foo_*.gz``).
-    - Decompress ``.gz`` and ``.bz2`` files.
-    - If path is ``'-'``, read from stdin
-    - If path is a directory, recursively read its contents.
-
-    You can redefine *stdin* for ease of testing. *stdin* can actually be
-    any iterable that yields lines (e.g. a list).
-
-    .. deprecated:: 0.6.0
-    """
-    log.warning('read_input() is deprecated and will be removed in v0.7.0.'
-                ' Try mrjob.cat.decompress() and mrjob.util.to_lines()')
-
-    for line in _read_input(path, stdin=stdin):
-        yield line
-
-
-def _read_input(path, stdin=None):
-    """Helper function for _read_input() (to avoid getting recursive
-    deprecation warnings)"""
-    if stdin is None:
-        stdin = sys.stdin
-
-    # handle '-' (special case)
-    if path == '-':
-        for line in stdin:
-            yield line
-        return
-
-    # resolve globs
-    paths = glob.glob(path)
-    if not paths:
-        raise IOError(2, 'No such file or directory: %r' % path)
-    elif len(paths) > 1:
-        for path in paths:
-            for line in read_input(path, stdin=stdin):
-                yield line
-        return
-    else:
-        path = paths[0]
-
-    # recurse through directories
-    if os.path.isdir(path):
-        for dirname, _, filenames in os.walk(path, followlinks=True):
-            for filename in filenames:
-                for line in read_input(os.path.join(dirname, filename),
-                                       stdin=stdin):
-                    yield line
-        return
-
-    # read from files
-    for line in read_file(path):
-        yield line
 
 
 # Thanks to http://lybniz2.sourceforge.net/safeeval.html for

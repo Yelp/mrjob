@@ -50,7 +50,6 @@ from mrjob.util import cmd_line
 from mrjob.util import safeeval
 from mrjob.util import to_lines
 
-import tests.sr_wc
 from tests.examples.test_mr_phone_to_url import write_conversion_record
 from tests.job import run_job
 from tests.mr_cmd_job import MRCmdJob
@@ -62,6 +61,7 @@ from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_spark_os_walk import MRSparkOSWalk
+from tests.mr_stdin_only import MRStdinOnly
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
@@ -388,8 +388,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
         # "echo" is a pretty poor substitute for Python, but it
         # should be available on most systems
         mr_job = MRTwoStepJob(
-            ['--python-bin', 'echo', '--steps-python-bin', sys.executable,
-             '--no-conf', '-r', 'local'])
+            ['--python-bin', 'echo', '--no-conf', '-r', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -432,39 +431,6 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
                 sorted([b'1\tnull\n', b'1\t"bar"\n']))
 
 
-class StepsPythonBinTestCase(BasicTestCase):
-
-    def test_echo_as_steps_python_bin(self):
-        mr_job = MRTwoStepJob(
-            ['--steps', '--steps-python-bin', 'echo', '--no-conf',
-             '-r', 'local'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            assert isinstance(runner, LocalMRJobRunner)
-            # MRTwoStepJob populates _steps in the runner, so un-populate
-            # it here so that the runner actually tries to get the steps
-            # via subprocess
-            runner._steps = None
-            self.assertRaises(ValueError, runner._get_steps)
-
-    def test_echo_as_steps_interpreter(self):
-        import logging
-        logging.basicConfig()
-        mr_job = MRTwoStepJob(
-            ['--steps', '--steps-interpreter', 'echo', '--no-conf', '-r',
-             'local'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            assert isinstance(runner, LocalMRJobRunner)
-            # MRTwoStepJob populates _steps in the runner, so un-populate
-            # it here so that the runner actually tries to get the steps
-            # via subprocess
-            runner._steps = None
-            self.assertRaises(ValueError, runner._get_steps)
-
-
 class LocalBootstrapMrjobTestCase(BasicTestCase):
 
     def test_loading_bootstrapped_mrjob_library(self):
@@ -484,11 +450,11 @@ class LocalBootstrapMrjobTestCase(BasicTestCase):
 
                 runner.run()
 
-                output = list(to_lines(runner.cat_output()))
+                output = list(mr_job.parse_output((runner.cat_output())))
                 self.assertEqual(len(output), 1)
 
                 # script should load mrjob from its working dir
-                _, script_mrjob_dir = mr_job.parse_output_line(output[0])
+                _, script_mrjob_dir = output[0]
 
                 self.assertNotEqual(our_mrjob_dir, script_mrjob_dir)
                 self.assertTrue(script_mrjob_dir.startswith(local_tmp_dir))
@@ -996,26 +962,6 @@ class SortBinTestCase(SandboxedTestCase):
         self._test_environment_variables('--local-tmp-dir', tmp_dir)
 
 
-class InputFileArgsTestCase(SandboxedTestCase):
-    # test for #567: ensure that local runner doesn't need to pass
-    # file args to jobs
-
-    def test_no_file_args_required(self):
-        words1 = self.makefile('words1', b'kit and caboodle\n')
-        words2 = self.makefile('words2', b'baubles\nbangles and beads\n')
-
-        job = MRJobLauncher(
-            args=['-r', 'local', tests.sr_wc.__file__, words1, words2])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner.run()
-
-            lines = list(to_lines(runner.cat_output()))
-            self.assertEqual(len(lines), 1)
-            self.assertEqual(int(lines[0]), 7)
-
-
 class LocalInputManifestTestCase(InlineInputManifestTestCase):
 
     RUNNER = 'local'
@@ -1187,3 +1133,22 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
         self.assertNotIn('fish', file_sizes)
 
         # TODO: add a Spark JAR to the repo, so we can test it
+
+
+class InputFileArgsTestCase(SandboxedTestCase):
+    # test for #567: ensure that local runner doesn't need to pass
+    # file args to jobs
+
+    def test_stdin_only(self):
+        input1 = self.makefile('input1', contents='cat cat cat cat cat')
+        input2 = self.makefile('input2', contents='dog dog dog')
+
+        job = MRStdinOnly(['-r', 'local', input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            output = dict(job.parse_output(runner.cat_output()))
+
+            self.assertEqual(output, dict(cat=5, dog=3))

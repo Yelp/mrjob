@@ -15,7 +15,7 @@ Bytes vs. strings
 
 The following things are bytes in any version of Python (which means you need to use the ``bytes`` type and/or ``b'...'`` constant in Python 3):
  - data read or written by :ref:`job-protocols`
- - lines yielded by :py:meth:`~mrjob.runner.MRJobRunner.cat_output`/:py:meth:`~mrjob.runner.MRJobRunner.stream_output`
+ - lines yielded by :py:meth:`~mrjob.runner.MRJobRunner.cat_output`
  - anything read from :py:meth:`~mrjob.fs.base.Filesystem.cat`
 
 The :py:attr:`~mrjob.job.MRJob.stdin`, :py:attr:`~mrjob.job.MRJob.stdout`, and :py:attr:`~mrjob.job.MRJob.stderr` attributes of :py:class:`~mrjob.job.MRJob`\ s are always bytestreams (so, for example, ``self.stderr`` defaults to ``sys.stderr.buffer`` in Python 3).

@@ -366,7 +366,7 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self._assert_prints_runner_help(
             ['-h', '-r', 'emr', '--deprecated'],
             'emr',
-            expect_switches=['--region', '--py-file'],
+            expect_switches=['--region'],
             # we don't actually mention --deprecated in runner help
             dont_expect_switches=['--hadoop-bin', '--deprecated'])
 

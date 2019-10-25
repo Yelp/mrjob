@@ -120,7 +120,7 @@ class MRJobRunner(object):
     ### methods to call from your batch script ###
 
     def __init__(self, mr_job_script=None, conf_paths=None,
-                 extra_args=None, file_upload_args=None,
+                 extra_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
                  sort_values=None, stdin=None, steps=None,
@@ -141,13 +141,6 @@ class MRJobRunner(object):
         :param extra_args: a list of extra cmd-line arguments to pass to the
                            mr_job script. This is a hook to allow jobs to take
                            additional arguments.
-        :param file_upload_args: a list of tuples of ``('--ARGNAME', path)``.
-                                 The file at the given path will be uploaded
-                                 to the local directory of the mr_job script
-                                 when it runs, and then passed into the script
-                                 with ``--ARGNAME``. Useful for passing in
-                                 SQLite DBs and other configuration files to
-                                 your job.
         :type hadoop_input_format: str
         :param hadoop_input_format: name of an optional Hadoop ``InputFormat``
                                     class. Passed to Hadoop along with your
@@ -268,15 +261,6 @@ class MRJobRunner(object):
                     raise NotImplementedError
                 self._working_dir_mgr.add(**extra_arg)
 
-        # extra file arguments to our job
-        if file_upload_args:
-            log.warning('file_upload_args is deprecated and will be removed'
-                        ' in v0.6.0. Pass dicts to extra_args instead.')
-            for arg, path in file_upload_args:
-                arg_file = parse_legacy_hash_path('file', path)
-                self._working_dir_mgr.add(**arg_file)
-                self._extra_args.extend([arg, arg_file])
-
         # set up uploading
         for hash_path in self._opts['upload_files']:
             uf = parse_legacy_hash_path('file', hash_path,
@@ -325,12 +309,8 @@ class MRJobRunner(object):
         self._hadoop_output_format = hadoop_output_format
 
         # check and store *steps*
-        self._steps = None
-        if steps is None:
-            if not mr_job_script:
-                self._steps = []
-            # otherwise we'll load steps on-the-fly, see _load_steps()
-        else:
+        self._steps = []
+        if steps:
             self._check_steps(steps)
             self._steps = copy.deepcopy(steps)
 
@@ -531,10 +511,6 @@ class MRJobRunner(object):
         Like Hadoop input formats, we ignore files and subdirectories whose
         names start with ``"_"`` or ``"."`` (e.g. ``_SUCCESS``, ``_logs/``,
         ``.part-00000.crc``.
-
-        .. versionadded:: 0.6.0
-
-           In previous versions, you'd use :py:meth:`stream_output`.
 
         .. versionchanged:: 0.6.8
 
@@ -805,32 +781,10 @@ class MRJobRunner(object):
             return 'no_user'
 
     def _get_steps(self):
-        """If *steps* was not set at init time, call the job script to
-        find out how many steps it has, and whether
-        there are mappers and reducers for each step. Validate its
-        output.
-
-        Returns output as described in :ref:`steps-format`.
+        """Returns ``self._steps``.
         """
-        if self._steps is None:
-            log.warning(
-                'querying jobs for steps is deprecated and'
-                ' will go away in v0.7.0')
-            steps = self._load_steps()
-            self._check_steps(steps)
-            self._steps = steps
-
+        # TODO: remove this
         return self._steps
-
-    def _load_steps(self):
-        """Ask job how many steps it has, and whether
-        there are mappers and reducers for each step.
-
-        Returns output as described in :ref:`steps-format`.
-
-        If this is called, you can assume self._script_path is set.
-        """
-        raise NotImplementedError
 
     def _check_steps(self, steps):
         """Look at the step definition (*steps*). If it is not supported by
@@ -1108,7 +1062,7 @@ class MRJobRunner(object):
     def _bootstrap_mrjob(self):
         """Should we bootstrap mrjob?"""
         if self._opts['bootstrap_mrjob'] is None:
-            return self._opts['interpreter'] is None
+            return True
         else:
             return bool(self._opts['bootstrap_mrjob'])
 

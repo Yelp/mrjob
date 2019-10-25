@@ -76,8 +76,6 @@ Job placement
 
       Works on Google Cloud Dataproc as well as AWS Elastic MapReduce.
 
-   .. versionadded:: 0.5.3
-
 .. mrjob-opt::
     :config: zone
     :switch: --zone
@@ -88,10 +86,6 @@ Job placement
     Zone within a specific geographic region to run your job in.
 
     If you set this, you do not neet to set :mrjob-opt:`region`.
-
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *aws_availability_zone*
 
 Number and type of instances
 ----------------------------
@@ -127,21 +121,13 @@ Number and type of instances
 
     .. versionchanged:: 0.6.10
 
-       Default on EMR is now ``m5.xlarge``
+       Default on EMR changed to ``m5.xlarge``
 
     .. versionchanged:: 0.6.6
 
-       Default on EMR was ``m4.large``
-
-    .. versionchanged:: 0.5.6
-
-       On EMR, defaulted to ``m1.large`` if running Spark, ``m1.small`` if
-       running on the (deprecated) 2.x AMIs, and ``m1.medium`` otherwise
-       (``m1.medium`` was previously the default in all cases).
-
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *ec2_instance_type*.
+       Default on EMR changed to ``m4.large``. Was previously `m1.large`` if
+       running Spark, ``m1.small`` if running on the (deprecated) 2.x AMIs,
+       and ``m1.medium`` otherwise
 
 .. mrjob-opt::
     :config: core_instance_type
@@ -154,11 +140,6 @@ Number and type of instances
     nodes; these nodes run tasks and host HDFS. Usually you just want to use
     :mrjob-opt:`instance_type`.
 
-    .. versionchanged:: 0.5.4
-
-       This replaces the `ec2_core_instance_type` and
-       `ec2_slave_instance_type` options.
-
 .. mrjob-opt::
     :config: num_core_instances
     :switch: --num-core-instances
@@ -170,10 +151,6 @@ Number and type of instances
     host HDFS. This is in addition to the single master instance.
 
     On Google Cloud Dataproc, this must be at least 2.
-
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *num_ec2_core_instances*.
 
 .. mrjob-opt::
     :config: master_instance_type
@@ -195,10 +172,6 @@ Number and type of instances
     deprecated 2.x AMIs), which is usually adequate for all but the largest
     jobs.
 
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *ec2_master_instance_type*.
-
 .. mrjob-opt::
     :config: task_instance_type
     :switch: --task-instance-type
@@ -210,10 +183,6 @@ Number and type of instances
     (secondary worker) Hadoop nodes;
     these nodes run tasks but do not host HDFS. Usually you just want to use
     :mrjob-opt:`instance_type`.
-
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *ec2_task_instance_type*.
 
 .. mrjob-opt::
     :config: num_task_instances
@@ -228,11 +197,6 @@ Number and type of instances
     You must have at least one core instance (see
     :mrjob-opt:`num_core_instances`) to run task instances; otherwise
     there's nowhere to host HDFS.
-
-    .. versionchanged:: 0.5.4
-
-       This used to be called *num_ec2_task_instances*.
-
 
 Cluster software configuration
 ------------------------------
@@ -297,24 +261,7 @@ Cluster software configuration
 
     .. versionchanged:: 0.6.5
 
-       Default on EMR is now ``5.16.0``
-
-    .. versionchanged:: 0.6.0
-
-       Default on EMR is now ``5.8.0``
-
-    .. versionchanged:: 0.5.7
-
-       Default on EMR is now ``4.8.2`` (used to be ``'3.11.0'``).
-
-    .. versionchanged:: 0.5.4
-
-       This used to be called *ami_version*.
-
-    .. warning::
-
-       The deprecated *ami_version* alias for this option is completely
-       ignored by mrjob 0.5.4 (it works in later 0.5.x versions).
+       Default on EMR is now ``5.16.0`` (was ``5.8.0``)
 
     .. warning::
 
@@ -365,12 +312,6 @@ Cluster software configuration
 
    The only reason to set this to ``False`` is if you want to customize
    Python/pip installation using :mrjob-opt:`bootstrap`.
-
-   .. versionadded:: 0.5.0
-
-   .. versionchanged:: 0.5.4
-
-      no longer installs Python 3 on AMI version 4.6.0+ by default
 
 .. mrjob-opt::
     :config: extra_cluster_params
@@ -429,12 +370,6 @@ Cluster software configuration
        properties. For example:
        ``--extra-cluster-param Instances.EmrManagedMasterSecurityGroup=sg-foo``.
 
-    .. versionadded:: 0.6.0
-
-       This replaces the old `emr_api_params` option, which only worked
-       with :py:mod:`boto` 2.
-
-
 Monitoring your job
 -------------------
 
@@ -451,10 +386,6 @@ Monitoring your job
 
        When the EMR client encounters a transient error, it will wait at
        least this many seconds before trying again.
-
-    .. versionchanged:: 0.5.4
-
-       This used to be called *check_emr_status_every*
 
 .. mrjob-opt::
     :config: ssh_tunnel
@@ -479,10 +410,6 @@ Monitoring your job
     .. versionchanged:: 0.6.3
 
        Enabled on Google Cloud Dataproc
-
-    .. versionchanged:: 0.5.0
-
-       This option used to be named *ssh_tunnel_to_job_tracker*.
 
 .. mrjob-opt::
     :config: ssh_tunnel_is_open
@@ -527,10 +454,6 @@ Cloud Filesystem
     consistency? This is typically less than a second, but the default is 5
     seconds to be safe.
 
-    .. versionchanged:: 0.5.4
-
-       This used to be called *s3_sync_wait_time*
-
 .. mrjob-opt::
    :config: cloud_part_size_mb
    :switch: --cloud-part-size-mb
@@ -558,10 +481,6 @@ Cloud Filesystem
       Enabled on Google Cloud Storage. This used to be called
       *cloud_upload_part_size*.
 
-   .. versionchanged:: 0.5.4
-
-      This used to be called *s3_upload_part_size*.
-
 .. mrjob-opt::
     :config: cloud_tmp_dir
     :switch: --cloud-tmp-dir
@@ -576,14 +495,6 @@ Cloud Filesystem
     ``mrjob-`` and which matches :mrjob-opt:`region`. If it can't find
     one, it creates one with a random name. This option is then set to `tmp/`
     in this bucket (e.g. ``s3://mrjob-01234567890abcdef/tmp/``).
-
-    .. versionchanged:: 0.5.4
-
-       This used to be called *s3_tmp_dir*.
-
-    .. versionchanged:: 0.5.0
-
-       This used to be called *s3_scratch_uri*.
 
 Auto-termination
 ----------------
@@ -622,20 +533,3 @@ Auto-termination
        of 10 minutes between when the idle termination daemon launches
        and when it may first terminate the cluster, to allow Hadoop to
        accept your first job.
-
-    .. versionchanged:: 0.6.0
-
-       All clusters launched by mrjob now auto-terminate when idle. In previous
-       versions, you needed to set :mrjob-opt:`max_hours_idle`, set this
-       option explicitly, or use :ref:`terminate-idle-clusters`.
-
-.. mrjob-opt::
-    :config: max_hours_idle
-    :switch: --max-hours-idle
-    :type: float
-    :set: cloud
-    :default: None
-
-    .. deprecated:: 0.6.0
-
-        Use :mrjob-opt:`max_mins_idle` instead.

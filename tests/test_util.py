@@ -16,7 +16,6 @@
 """Tests of all the amazing utilities in mrjob.util"""
 import bz2
 import gzip
-import optparse
 import os
 import shutil
 import sys
@@ -28,10 +27,7 @@ from subprocess import Popen
 from mrjob.py2 import PY2
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
-from mrjob.util import parse_and_save_options
 from mrjob.util import random_identifier
-from mrjob.util import read_file
-from mrjob.util import read_input
 from mrjob.util import safeeval
 from mrjob.util import save_sys_std
 from mrjob.util import to_lines
@@ -115,146 +111,6 @@ class FileExtTestCase(BasicTestCase):
         self.assertEqual(file_ext('README'), '')
         self.assertEqual(file_ext('README,v'), '')
         self.assertEqual(file_ext('README.txt,v'), '.txt,v')
-
-
-class ParseAndSaveOptionsTestCase(BasicTestCase):
-
-    def setUp(self):
-        self.setup_options()
-
-    def setup_options(self):
-        self.original_parser = optparse.OptionParser(
-            usage="don't", description='go away')
-        self.original_group = optparse.OptionGroup(self.original_parser, '?')
-        self.original_parser.add_option_group(self.original_group)
-
-        self.original_parser.add_option(
-            '-b', '--no-a', dest='a', action='store_false')
-        self.original_parser.add_option(
-            '-a', '--yes-a', dest='a', action='store_true', default=False)
-        self.original_group.add_option('-x', '--xx', dest='x', action='store')
-        self.original_group.add_option(
-            '-y', '--yy', dest='y', action='store', nargs=2)
-
-        self.new_parser = optparse.OptionParser()
-        self.new_group_1 = optparse.OptionGroup(self.new_parser, '?')
-        self.new_group_2 = optparse.OptionGroup(self.new_parser, '?')
-        self.new_parser.add_option_group(self.new_group_1)
-        self.new_parser.add_option_group(self.new_group_2)
-
-    def test_parse_and_save_simple(self):
-        args = ['x.py', '-b', '-a', '--no-a',
-                '-x', 'x', '-y', 'y', 'ynot', '-x', 'z']
-
-        self.assertEqual(
-            dict(parse_and_save_options(self.original_parser, args)),
-            {
-                'a': ['-b', '-a', '--no-a'],
-                'x': ['-x', 'x', '-x', 'z'],
-                'y': ['-y', 'y', 'ynot']
-            })
-
-    def test_parse_and_save_with_dashes(self):
-        args = ['x.py', '-b', '-a', '--no-a',
-                '-x', 'x', '-y', 'y', 'ynot', '-x', 'z',
-                '--', 'ignore', 'these', 'args']
-        self.assertEqual(
-            dict(parse_and_save_options(self.original_parser, args)),
-            {
-                'a': ['-b', '-a', '--no-a'],
-                'x': ['-x', 'x', '-x', 'z'],
-                'y': ['-y', 'y', 'ynot']
-            })
-
-
-class DeprecatedReadInputTestCase(SandboxedTestCase):
-
-    def setUp(self):
-        super(DeprecatedReadInputTestCase, self).setUp()
-        self.start(patch('mrjob.util.log'))
-
-    @classmethod
-    def setUpClass(cls):
-        cls.setup_tmpdir_with_beaver_data()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.delete_tmpdir()
-
-    # we're going to put the same data in every file, so we don't
-    # have to worry about ordering
-    BEAVER_DATA = b'Beavers mate for life.\n'
-
-    @classmethod
-    def setup_tmpdir_with_beaver_data(self):
-        self.tmpdir = tempfile.mkdtemp()
-
-        def write_beaver_data_and_close(f):
-            f.write(self.BEAVER_DATA)
-            f.close()
-
-        write_beaver_data_and_close(
-            open(os.path.join(self.tmpdir, 'beavers.txt'), 'wb'))
-        write_beaver_data_and_close(
-            gzip.GzipFile(os.path.join(self.tmpdir, 'beavers.gz'), 'wb'))
-        write_beaver_data_and_close(
-            bz2.BZ2File(os.path.join(self.tmpdir, 'beavers.bz2'), 'wb'))
-
-        os.mkdir(os.path.join(self.tmpdir, 'beavers'))
-        write_beaver_data_and_close(
-            open(os.path.join(self.tmpdir, 'beavers/README.txt'), 'wb'))
-
-    @classmethod
-    def delete_tmpdir(self):
-        shutil.rmtree(self.tmpdir)
-
-    def test_stdin(self):
-        lines = read_input('-', stdin=BytesIO(self.BEAVER_DATA))
-        self.assertEqual(list(lines), [self.BEAVER_DATA])
-
-    def test_stdin_can_be_iterator(self):
-        lines = read_input('-', stdin=[self.BEAVER_DATA] * 5)
-        self.assertEqual(list(lines), [self.BEAVER_DATA] * 5)
-
-    def test_normal_file(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers'))
-        self.assertEqual(list(lines), [self.BEAVER_DATA])
-
-    def test_gz_file(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers.gz'))
-        self.assertEqual(list(lines), [self.BEAVER_DATA])
-
-    def test_bz2_file(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers.bz2'))
-        self.assertEqual(list(lines), [self.BEAVER_DATA])
-
-    def test_glob(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers.*'))
-        self.assertEqual(list(lines), [self.BEAVER_DATA] * 3)
-
-    def test_dir(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers/'))
-        self.assertEqual(list(lines), [self.BEAVER_DATA])
-
-    def test_dir_recursion(self):
-        lines = read_input(self.tmpdir)
-        self.assertEqual(list(lines), [self.BEAVER_DATA] * 4)
-
-    def test_glob_including_dir(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers*'))
-        self.assertEqual(list(lines), [self.BEAVER_DATA] * 4)
-
-    def test_bad_path(self):
-        # read_input is a generator, so we won't get an error
-        # until we try to read from it
-        self.assertRaises(IOError, list,
-                          read_input(os.path.join(self.tmpdir, 'lions')))
-
-    def test_bad_glob(self):
-        # read_input is a generator, so we won't get an error
-        # until we try to read from it
-        self.assertRaises(IOError, list,
-                          read_input(os.path.join(self.tmpdir, 'lions*')))
 
 
 class SafeEvalTestCase(BasicTestCase):
@@ -432,109 +288,6 @@ class OnlyReadWrapper(object):
 
     def read(self, *args, **kwargs):
         return self.fp.read(*args, **kwargs)
-
-
-class DeprecatedReadFileTestCase(SandboxedTestCase):
-
-    def setUp(self):
-        super(DeprecatedReadFileTestCase, self).setUp()
-        self.start(patch('mrjob.util.log'))
-
-    def test_read_uncompressed_file(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'wb') as input_file:
-            input_file.write(b'bar\nfoo\n')
-
-        output = []
-        for line in read_file(input_path):
-            output.append(line)
-
-        self.assertEqual(output, [b'bar\n', b'foo\n'])
-
-    def test_read_uncompressed_file_from_fileobj(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'wb') as input_file:
-            input_file.write(b'bar\nfoo\n')
-
-        output = []
-        with open(input_path, 'rb') as f:
-            for line in read_file(input_path, fileobj=f):
-                output.append(line)
-
-        self.assertEqual(output, [b'bar\n', b'foo\n'])
-
-    def test_read_gz_file(self):
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'wb')
-        input_gz.write(b'foo\nbar\n')
-        input_gz.close()
-
-        output = []
-        for line in read_file(input_gz_path):
-            output.append(line)
-
-        self.assertEqual(output, [b'foo\n', b'bar\n'])
-
-    def test_read_bz2_file(self):
-        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'wb')
-        input_bz2.write(b'bar\nbar\nfoo\n')
-        input_bz2.close()
-
-        output = []
-        for line in read_file(input_bz2_path):
-            output.append(line)
-
-        self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
-
-    def test_read_large_bz2_file(self):
-        # catch incorrect use of bz2 library (Issue #814)
-
-        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'wb')
-
-        # can't just repeat same value, because we need the file to be
-        # compressed! 50000 lines is too few to catch the bug.
-        with random_seed(0):
-            for _ in range(100000):
-                input_bz2.write((random_identifier() + '\n').encode('ascii'))
-            input_bz2.close()
-
-        # now expect to read back the same bytes
-        with random_seed(0):
-            num_lines = 0
-            for line in read_file(input_bz2_path):
-                self.assertEqual(line,
-                                 (random_identifier() + '\n').encode('ascii'))
-                num_lines += 1
-
-            self.assertEqual(num_lines, 100000)
-
-    def test_read_gz_file_from_fileobj(self):
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'wb')
-        input_gz.write(b'foo\nbar\n')
-        input_gz.close()
-
-        output = []
-        with open(input_gz_path, 'rb') as f:
-            for line in read_file(input_gz_path, fileobj=OnlyReadWrapper(f)):
-                output.append(line)
-
-        self.assertEqual(output, [b'foo\n', b'bar\n'])
-
-    def test_read_bz2_file_from_fileobj(self):
-        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'wb')
-        input_bz2.write(b'bar\nbar\nfoo\n')
-        input_bz2.close()
-
-        output = []
-        with open(input_bz2_path, 'rb') as f:
-            for line in read_file(input_bz2_path, fileobj=OnlyReadWrapper(f)):
-                output.append(line)
-
-        self.assertEqual(output, [b'bar\n', b'bar\n', b'foo\n'])
 
 
 class RandomIdentifierTestCase(BasicTestCase):

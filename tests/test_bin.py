@@ -163,15 +163,6 @@ class BootstrapMRJobTestCase(BasicTestCase):
         runner = MRJobBinRunner(conf_paths=[], bootstrap_mrjob=False)
         self.assertEqual(runner._bootstrap_mrjob(), False)
 
-    def test_interpreter(self):
-        runner = MRJobBinRunner(conf_paths=[], interpreter=['ruby'])
-        self.assertEqual(runner._bootstrap_mrjob(), False)
-
-    def test_bootstrap_mrjob_overrides_interpreter(self):
-        runner = MRJobBinRunner(
-            conf_paths=[], interpreter=['ruby'], bootstrap_mrjob=True)
-        self.assertEqual(runner._bootstrap_mrjob(), True)
-
 
 class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
 
@@ -314,67 +305,28 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
             )
 
 
-class InterpreterTestCase(BasicTestCase):
+class TaskPythonBinTestCase(BasicTestCase):
 
     def test_default(self):
         runner = MRJobBinRunner()
         self.assertEqual(runner._python_bin(), [PYTHON_BIN])
-        self.assertEqual(runner._interpreter(), [PYTHON_BIN])
-        self.assertEqual(runner._interpreter(steps=True),
-                         [sys.executable])
+        self.assertEqual(runner._task_python_bin(), [PYTHON_BIN])
 
     def test_python_bin(self):
         runner = MRJobBinRunner(python_bin=['python', '-v'])
         self.assertEqual(runner._python_bin(), ['python', '-v'])
-        self.assertEqual(runner._interpreter(), ['python', '-v'])
-        self.assertEqual(runner._interpreter(steps=True), [sys.executable])
-
-    def test_steps_python_bin(self):
-        runner = MRJobBinRunner(steps_python_bin=['python', '-v'])
-        self.assertEqual(runner._python_bin(), [PYTHON_BIN])
-        self.assertEqual(runner._interpreter(), [PYTHON_BIN])
-        self.assertEqual(runner._interpreter(steps=True), ['python', '-v'])
+        self.assertEqual(runner._task_python_bin(), ['python', '-v'])
 
     def test_task_python_bin(self):
         runner = MRJobBinRunner(task_python_bin=['python', '-v'])
         self.assertEqual(runner._python_bin(), [PYTHON_BIN])
-        self.assertEqual(runner._interpreter(), ['python', '-v'])
-        self.assertEqual(runner._interpreter(steps=True),
-                         [sys.executable])
+        self.assertEqual(runner._task_python_bin(), ['python', '-v'])
 
     def test_empty_python_bin_means_default(self):
-        # interpreter and steps_python_bin opts are deprecated, so
-        # not bothering to test them
         runner = MRJobBinRunner(python_bin=[], task_python_bin=[])
 
         self.assertEqual(runner._python_bin(), [PYTHON_BIN])
-        self.assertEqual(runner._interpreter(), [PYTHON_BIN])
-        self.assertEqual(runner._interpreter(steps=True),
-                         [sys.executable])
-
-    def test_interpreter(self):
-        runner = MRJobBinRunner(interpreter=['ruby'])
-        self.assertEqual(runner._interpreter(), ['ruby'])
-        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
-
-    def test_steps_interpreter(self):
-        # including whether steps_interpreter overrides interpreter
-        runner = MRJobBinRunner(interpreter=['ruby', '-v'],
-                                steps_interpreter=['ruby'])
-        self.assertEqual(runner._interpreter(), ['ruby', '-v'])
-        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
-
-    def test_interpreter_overrides_python_bin(self):
-        runner = MRJobBinRunner(interpreter=['ruby'],
-                                python_bin=['python', '-v'])
-        self.assertEqual(runner._interpreter(), ['ruby'])
-        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
-
-    def test_interpreter_overrides_steps_python_bin(self):
-        runner = MRJobBinRunner(interpreter=['ruby'],
-                                steps_python_bin=['python', '-v'])
-        self.assertEqual(runner._interpreter(), ['ruby'])
-        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
+        self.assertEqual(runner._task_python_bin(), [PYTHON_BIN])
 
 
 class RenderSubstepTestCase(SandboxedTestCase):
@@ -453,27 +405,6 @@ class RenderSubstepTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._render_substep(0, mrc),
                 None
-            )
-
-    def test_respects_interpreter_method(self):
-        # _interpreter() method is extensively tested; just
-        # verify that we use it
-        job = MRTwoStepJob(['-r', 'local'])
-        job.sandbox()
-
-        def mock_interpreter(steps=False):
-            if steps:
-                return [sys.executable]  # so _get_steps() works
-            else:
-                return ['run-my-task']
-
-        self.start(patch('mrjob.bin.MRJobBinRunner._interpreter',
-                         side_effect=mock_interpreter))
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._render_substep(0, 'mapper'),
-                'run-my-task mr_two_step_job.py --step-num=0 --mapper'
             )
 
     def test_setup_wrapper_script(self):
@@ -879,16 +810,6 @@ class PyFilesTestCase(GenericLocalRunnerTestCase):
                 runner._py_files(),
                 [egg1_path, egg2_path, runner._create_mrjob_zip()]
             )
-
-    def test_deprecated_py_file_switch(self):
-        egg1_path = self.makefile('dragon.egg')
-
-        job = MRNullSpark(['-r', 'local', '--no-bootstrap-mrjob',
-                           '--py-file', egg1_path])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(runner._py_files(), [egg1_path])
 
     def test_no_bootstrap_mrjob(self):
         job = MRNullSpark(['-r', 'local',
@@ -1374,24 +1295,6 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 ]
             )
 
-    def test_deprecated_libjar_switch(self):
-        fake_libjar = self.makefile('fake_lib.jar')
-
-        job = MRNullSpark(
-            ['-r', 'spark', '--libjar', fake_libjar])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_submit_args(0),
-                [
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--jars', fake_libjar,
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
-                ]
-            )
-
     def test_libjar_paths_override(self):
         job = MRNullSpark(['-r', 'spark'])
         job.sandbox()
@@ -1420,22 +1323,6 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0),
                 [
-                    '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
-                    '--deploy-mode', 'client',
-                    '--name', 'Dave',
-                ]
-            )
-
-    def test_deprecated_spark_arg_switch(self):
-        job = MRNullSpark(['-r', 'spark',
-                           '--spark-arg=--name',
-                           '--spark-arg=Dave'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--master', 'local[*]',
                     '--deploy-mode', 'client',

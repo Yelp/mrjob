@@ -32,7 +32,6 @@ from mrjob.launch import MRJobLauncher
 from mrjob.launch import _im_func
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.options import _add_step_args
-from mrjob.options import _print_help_for_steps
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.py2 import integer_types
@@ -76,8 +75,6 @@ class MRJob(MRJobLauncher):
         ``python -m mrjob.job --help``
         """
         super(MRJob, self).__init__(self.mr_job_script(), args)
-
-        self._warned_about_parse_output_line = False
 
     @classmethod
     def _usage(cls):
@@ -435,7 +432,6 @@ class MRJob(MRJobLauncher):
 
         Does one of:
 
-        * Print step information (:option:`--steps`). See :py:meth:`show_steps`
         * Run a mapper (:option:`--mapper`). See :py:meth:`run_mapper`
         * Run a combiner (:option:`--combiner`). See :py:meth:`run_combiner`
         * Run a reducer (:option:`--reducer`). See :py:meth:`run_reducer`
@@ -448,16 +444,7 @@ class MRJob(MRJobLauncher):
     def execute(self):
         # MRJob does Hadoop Streaming stuff, or defers to its superclass
         # (MRJobLauncher) if not otherwise instructed
-        if self.options.show_steps:
-            log_stream = codecs.getwriter('utf_8')(self.stderr)
-
-            self.set_up_logging(quiet=self.options.quiet,
-                                verbose=self.options.verbose,
-                                stream=log_stream)
-
-            self.show_steps()
-
-        elif self.options.run_mapper:
+        if self.options.run_mapper:
             self.run_mapper(self.options.step_num)
 
         elif self.options.run_combiner:
@@ -479,8 +466,7 @@ class MRJob(MRJobLauncher):
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
         bad_words = (
-            '--steps', '--mapper', '--reducer', '--combiner', '--step-num',
-            '--spark')
+            '--mapper', '--reducer', '--combiner', '--step-num', '--spark')
         for w in bad_words:
             if w in sys.argv:
                 raise UsageError("make_runner() was called with %s. This"
@@ -688,25 +674,6 @@ class MRJob(MRJobLauncher):
         spark_method = step.spark
         spark_method(input_path, output_path)
 
-    def show_steps(self):
-        """Print information about how many steps there are, and whether
-        they contain a mapper or reducer. Job runners (see
-        :doc:`guides/runners`) use this to determine how Hadoop should call
-        this script.
-
-        Called from :py:meth:`run`. You'd probably only want to call this
-        directly from automated tests.
-        """
-        log.warning('--steps is deprecated and going away in v0.7.0')
-
-        # json only uses strings, but self.stdout only accepts bytes
-        steps_json = json.dumps(self._steps_desc())
-        if not isinstance(steps_json, bytes):
-            steps_json = steps_json.encode('utf_8')
-
-        self.stdout.write(steps_json)
-        self.stdout.write(b'\n')
-
     def _steps_desc(self):
         step_descs = []
         for step_num, step in enumerate(self.steps()):
@@ -902,13 +869,6 @@ class MRJob(MRJobLauncher):
                 self.options.run_reducer or
                 self.options.run_spark)
 
-    def _print_help(self, options):
-        """Implement --help --steps"""
-        if options.show_steps:
-            _print_help_for_steps(include_deprecated=self.options.deprecated)
-        else:
-            super(MRJob, self)._print_help(options)
-
     ### protocols ###
 
     def input_protocol(self):
@@ -985,22 +945,6 @@ class MRJob(MRJobLauncher):
         for line in to_lines(chunks):
             yield read(line)
 
-    def parse_output_line(self, line):
-        """
-        Parse a line from the final output of this MRJob into
-        ``(key, value)``.
-
-        .. deprecated:: 0.6.0
-
-           Use :py:meth:`parse_output` instead.
-        """
-        if not self._warned_about_parse_output_line:
-            log.warning('parse_output_line() is deprecated and will be removed'
-                        ' in v0.7.0; use parse_output() instead.')
-            self._warned_about_parse_output_line = True
-
-        return self.output_protocol().read(line)
-
     ### Hadoop Input/Output Formats ###
 
     #: Optional name of an optional Hadoop ``InputFormat`` class, e.g.
@@ -1055,8 +999,6 @@ class MRJob(MRJobLauncher):
     #:
     #: If you require more sophisticated behavior, try overriding
     #: :py:meth:`libjars`.
-    #:
-    #: .. versionadded:: 0.5.3
     LIBJARS = []
 
     def libjars(self):
@@ -1068,8 +1010,6 @@ class MRJob(MRJobLauncher):
 
         Note that ``~`` and environment variables in paths will always be
         expanded by the job runner (see :mrjob-opt:`libjars`).
-
-        .. versionadded:: 0.5.3
 
         .. versionchanged:: 0.6.6
 

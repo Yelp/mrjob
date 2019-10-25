@@ -459,38 +459,6 @@ class EbsRootVolumeGBTestCase(MockBoto3TestCase):
             self.assertRaises(ParamValidationError, self.run_and_get_cluster)
 
 
-class VisibleToAllUsersTestCase(MockBoto3TestCase):
-
-    def test_defaults(self):
-        cluster = self.run_and_get_cluster()
-        self.assertEqual(cluster['VisibleToAllUsers'], True)
-
-    def test_no_visible(self):
-        cluster = self.run_and_get_cluster('--no-visible-to-all-users')
-        self.assertEqual(cluster['VisibleToAllUsers'], False)
-
-    def test_visible(self):
-        cluster = self.run_and_get_cluster('--visible-to-all-users')
-        self.assertEqual(cluster['VisibleToAllUsers'], True)
-
-    def test_force_to_bool(self):
-        VISIBLE_MRJOB_CONF = {'runners': {'emr': {
-            'check_cluster_every': 0.00,
-            'cloud_fs_sync_secs': 0.00,
-            'visible_to_all_users': 1,  # should be True
-        }}}
-
-        with mrjob_conf_patcher(VISIBLE_MRJOB_CONF):
-            cluster = self.run_and_get_cluster()
-            self.assertEqual(cluster['VisibleToAllUsers'], True)
-
-    def test_mock_boto3_does_not_force_to_bool(self):
-        # make sure that mrjob is converting to bool, not mock_boto3
-        self.assertRaises(ParamValidationError,
-                          self.run_and_get_cluster,
-                          '--extra-cluster-param', 'VisibleToAllUsers=1')
-
-
 class SubnetTestCase(MockBoto3TestCase):
 
     def test_defaults(self):
@@ -701,28 +669,6 @@ class ExtraClusterParamsTestCase(MockBoto3TestCase):
         self.assertEqual(
             cluster['Ec2InstanceAttributes']['Ec2SubnetId'],
             'subnet-ffffffff')
-
-
-class DeprecatedEMRAPIParamsTestCase(MockBoto3TestCase):
-
-    # emr_api_param is completely disabled
-
-    def setUp(self):
-        super(DeprecatedEMRAPIParamsTestCase, self).setUp()
-
-        self.log = self.start(patch('mrjob.emr.log'))
-
-    def test_param_set(self):
-        cluster = self.run_and_get_cluster('--emr-api-param', 'name=Dave')
-
-        self.assertTrue(self.log.warning.called)
-        self.assertNotEqual(cluster['Name'], 'Dave')
-
-    def test_param_unset(self):
-        cluster = self.run_and_get_cluster('--no-emr-api-param', 'log_uri')
-
-        self.assertTrue(self.log.warning.called)
-        self.assertIn('LogUri', cluster)
 
 
 class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
@@ -2000,22 +1946,6 @@ class MaxMinsIdleTestCase(MockBoto3TestCase):
             runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['900'])
 
-    def test_deprecated_max_hours_idle(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '16.5'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['990'])
-
-    def test_deprecated_mins_to_end_of_hour_does_nothing(self):
-        mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '10'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['600'])
-
     def test_use_integer(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '60.00006'])
         mr_job.sandbox()
@@ -2026,14 +1956,6 @@ class MaxMinsIdleTestCase(MockBoto3TestCase):
 
     def test_bootstrap_script_is_actually_installed(self):
         self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
-
-    def test_deprecated_max_hours_idle_works(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['3600'])
 
 
 class TestCatFallback(MockBoto3TestCase):
@@ -5108,27 +5030,6 @@ class UsesSparkTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertTrue(runner._uses_spark())
             self.assertTrue(runner._opts['bootstrap_spark'])
-
-    def test_ignores_new_supported_products_api_param(self):
-        job = MRTwoStepJob(['-r', 'emr',
-                            '--emr-api-param',
-                            'NewSupportedProducts.member.1.Name=spark'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertFalse(runner._uses_spark())
-            self.assertFalse(runner._has_spark_application())
-
-    def test_ignores_application_api_param(self):
-        job = MRTwoStepJob(['-r', 'emr',
-                            '--image-version', '4.0.0',
-                            '--emr-api-param',
-                            'Application.member.1.Name=Spark'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertFalse(runner._uses_spark())
-            self.assertFalse(runner._has_spark_application())
 
 
 class SparkPyFilesTestCase(MockBoto3TestCase):

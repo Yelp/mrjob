@@ -81,10 +81,6 @@ Options available to hadoop and emr runners
 
     Extra arguments to pass to hadoop streaming.
 
-    .. versionchanged:: 0.6.6
-
-       Deprecated :option:`--hadoop-arg` in favor of :option:`--hadoop-args`
-
 .. mrjob-opt::
     :config: hadoop_streaming_jar
     :switch: --hadoop-streaming-jar
@@ -124,8 +120,6 @@ Options available to hadoop and emr runners
 
    ``~`` and environment variables within paths will be resolved based on the
    local environment.
-
-   .. versionadded:: 0.5.3
 
    .. versionchanged:: 0.6.7
 
@@ -180,12 +174,6 @@ Options available to hadoop and emr runners
        :mrjob-opt:`spark_master` and :mrjob-opt:`spark_deploy_mode`.
        Other runners don't allow you to set these because they can only
        handle the defaults.
-
-    .. versionadded:: 0.5.7
-
-    .. versionchanged:: 0.6.6
-
-       Deprecated :option:`--spark-arg` in favor of :option:`--spark-args`
 
 
 Options available to hadoop runner only
@@ -245,12 +233,6 @@ Options available to hadoop runner only
    * ``/var/log/hadoop``
    * ``/mnt/var/log/hadoop``
 
-   .. versionadded:: 0.5.0
-
-   .. versionchanged:: 0.5.3
-
-       Added paths in ``/var/log`` and ``/mnt/var/log/hadoop-yarn``
-
 .. mrjob-opt::
     :config: hadoop_tmp_dir
     :switch: --hadoop-tmp-dir
@@ -260,10 +242,6 @@ Options available to hadoop runner only
 
     Scratch space on HDFS. This path does not need to be fully qualified with
     ``hdfs://`` URIs because it's understood that it has to be on HDFS.
-
-    .. versionchanged:: 0.5.0
-
-       This option used to be named ``hdfs_scratch_dir``.
 
 .. mrjob-opt::
     :config: spark_deploy_mode
@@ -310,8 +288,6 @@ Options available to hadoop runner only
     * ``/usr/local/lib/spark/bin``
 
     If all else fails, we just use ``spark-submit`` and hope for the best.
-
-    .. versionadded:: 0.5.7
 
     .. versionchanged:: 0.6.8
 

@@ -49,10 +49,6 @@ about setting these options.
     supposed to be secret! Use the environment variable
     :envvar:`AWS_SESSION_TOKEN` instead.
 
-    .. versionchanged:: 0.5.10
-
-       this used to be called *aws_security_token*.
-
 .. mrjob-opt::
     :config: ec2_key_pair
     :switch: --ec2-key-pair
@@ -201,10 +197,6 @@ of instance configuration you use.
     instances at this bid price.  You usually only want to set bid price for
     task instances.
 
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *ec2_core_instance_bid_price*.
-
 .. mrjob-opt::
     :config: master_instance_bid_price
     :switch: --master-instance-bid-price
@@ -216,10 +208,6 @@ of instance configuration you use.
     instance at this bid price. You usually only want to set bid price for
     task instances unless the master instance is your only instance.
 
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *ec2_master_instance_bid_price*.
-
 .. mrjob-opt::
     :config: task_instance_bid_price
     :switch: --task-instance-bid-price
@@ -230,10 +218,6 @@ of instance configuration you use.
     When specified and not "0", this creates the master Hadoop node as a spot
     instance at this bid price.  (You usually only want to set bid price for
     task instances.)
-
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *ec2_task_instance_bid_price*.
 
 .. mrjob-opt::
     :config: ebs_root_volume_gb
@@ -270,12 +254,6 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
 
    See `Applications <http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-release-components.html>`_ in the EMR docs for more details.
 
-   .. versionadded:: 0.5.2
-
-   .. versionchanged:: 0.5.9
-
-      This used to be called *emr_applications*.
-
    .. versionchanged:: 0.6.7
 
       Added :option:`--applications` switch
@@ -305,8 +283,6 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
    Install Spark on the cluster. This works on AMI version 3.x and later.
 
    By default, we automatically install Spark only if our job has Spark steps.
-
-   .. versionadded:: 0.5.7
 
    In case you're curious, here's how mrjob determines you're using Spark:
 
@@ -343,8 +319,6 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
 
     See `Configuring Applications <http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html>`_ in the EMR docs for more details.
 
-    .. versionadded:: 0.5.3
-
     .. versionchanged:: 0.6.11
 
        ``!clear`` tag works. Later config dicts will overwrite earlier ones
@@ -368,8 +342,6 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
 
     .. _`Differences Introduced in 4.x`:
         http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-release-differences.html
-
-    .. versionadded:: 0.5.0
 
 Monitoring your job
 -------------------
@@ -400,17 +372,6 @@ Cluster pooling
     S3 to "lock" the cluster and ensure that the job is not scheduled behind
     another job. If no suitable cluster is `WAITING`, create a new pooled
     cluster.
-
-    .. warning::
-
-       If you use this in mrjob versions prior to 0.6.0, make sure to set
-       :mrjob-opt:`max_hours_idle` too, or your pooled clusters will run
-       (costing you money) forever.
-
-    .. versionchanged:: 0.5.4
-
-       Pooling now gracefully recovers from joining a cluster that was
-       in the process of shutting down (see :mrjob-opt:`max_hours_idle`).
 
 .. mrjob-opt::
     :config: pool_name
@@ -447,10 +408,6 @@ See also :mrjob-opt:`cloud_tmp_dir`, :mrjob-opt:`cloud_part_size_mb`
     Where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for
     your cluster will go into a subdirectory, e.g.
     ``s3://yourbucket/logs/j-CLUSTERID/``.
-
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *s3_log_uri*
 
 API Endpoints
 -------------
@@ -546,24 +503,6 @@ Other rarely used options
     :set: emr
     :default: AWS default
 
-    .. deprecated:: 0.5.4
-
-       Prepend ``file://`` and pass that to :mrjob-opt:`hadoop_streaming_jar`
-       instead.
-
-.. mrjob-opt::
-    :config: mins_to_end_of_hour
-    :switch: --mins-to-end-of-hour
-    :type: float
-    :set: emr
-    :default: 5.0
-
-    .. deprecated:: 0.6.0
-
-        This option was created back when EMR billed by the full hour, and
-        does nothing as of v0.6.0. If using versions prior to v0.6.0, it's
-        recommended you set this to 60.0 to effectively disable this feature.
-
 .. mrjob-opt::
     :config: ssh_bin
     :switch: --ssh-bin
@@ -613,23 +552,3 @@ Other rarely used options
             tags:
               team: development
               project: mrjob
-
-    .. versionchanged:: 0.5.4
-
-       This option used to be named *emr_tags*
-
-.. mrjob-opt::
-    :config: visible_to_all_users
-    :switch: --visible-to-all-users, --no-visible-to-all-users
-    :type: boolean
-    :set: emr
-    :default: ``True``
-
-    If true (the default) EMR clusters will be visible to all IAM users.
-    Otherwise, the cluster will only be visible to the IAM user that created
-    it.
-
-    .. deprecated:: 0.6.0
-
-       Hiding clusters from other users on the same account is not very useful.
-       If you don't want to share pooled clusters, try :mrjob-opt:`pool_name`.

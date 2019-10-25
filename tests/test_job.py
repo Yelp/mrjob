@@ -160,39 +160,6 @@ class ParseOutputTestCase(BasicTestCase):
              (None, b'five\n')])
 
 
-class ParseOutputLine(SandboxedTestCase):
-
-    def setUp(self):
-        super(ParseOutputLine, self).setUp()
-
-        self.log = self.start(patch('mrjob.job.log'))
-
-    def test_default_protocol(self):
-        job = MRJob()
-
-        self.assertEqual(
-            job.parse_output_line(b'1\t2\n'),
-            (1, 2))
-
-    def test_bytes_value_protocol(self):
-        job = MRJob()
-        job.OUTPUT_PROTOCOL = BytesValueProtocol
-
-        self.assertEqual(
-            job.parse_output_line(b'one two\n'),
-            (None, b'one two\n'))
-
-    def test_deprecation_warning(self):
-        job = MRJob()
-
-        job.parse_output_line(b'1\t2\n')
-        self.assertEqual(self.log.warning.call_count, 1)
-
-        # only warn once
-        job.parse_output_line(b'3\t4\n')
-        self.assertEqual(self.log.warning.call_count, 1)
-
-
 class NoTzsetTestCase(BasicTestCase):
 
     def setUp(self):
@@ -822,7 +789,6 @@ class IsTaskTestCase(BasicTestCase):
         self.assertEqual(MRJob(['--reducer']).is_task(), True)
         self.assertEqual(MRJob(['--combiner']).is_task(), True)
         self.assertEqual(MRJob(['--spark']).is_task(), True)
-        self.assertEqual(MRJob(['--steps']).is_task(), False)
 
 
 class StepNumTestCase(BasicTestCase):
@@ -1280,8 +1246,8 @@ class PrintHelpTestCase(SandboxedTestCase):
         # a runner option, but not for EMR
         self.assertNotIn('--gcp-project', output)
 
-        # deprecated options
-        self.assertNotIn('--max-hours-idle', output)
+        # deprecated options (none as of v0.7.0, probably more to come)
+        #self.assertNotIn('--some-deprecated-switch', output)
 
     def test_deprecated_runner_help(self):
         MRJob(['--help', '-r', 'emr', '--deprecated'])
@@ -1298,8 +1264,8 @@ class PrintHelpTestCase(SandboxedTestCase):
         # a runner option, but not for EMR
         self.assertNotIn('--gcp-project', output)
 
-        # deprecated options
-        self.assertIn('--max-hours-idle', output)
+        # deprecated options (none as of v0.7.0, probably more to come)
+        #self.assertIn('--some-deprecated-switch', output)
 
     def test_runner_help_works_for_all_runners(self):
         for alias in _RUNNER_ALIASES:
@@ -1314,16 +1280,18 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertIn('--max-output-files', output)
 
     def test_steps_help(self):
-        MRJob(['--help', '--steps'])
+        MRJob(['--help', '-v'])
         self.exit.assert_called_once_with(0)
 
         output = self.stdout.getvalue()
-        # step option
+        # step option included
         self.assertIn('--step-num', output)
 
-        # not step options
-        self.assertNotIn('--conf-path', output)
+        # runner option not included
         self.assertNotIn('--s3-endpoint', output)
+
+        # general job option also included
+        self.assertIn('--conf-path', output)
 
     def test_passthrough_options(self):
         MRCmdJob(['--help'])
@@ -1350,7 +1318,6 @@ class RunnerKwargsTestCase(BasicTestCase):
     NON_OPTION_KWARGS = set([
         'conf_paths',
         'extra_args',
-        'file_upload_args',
         'hadoop_input_format',
         'hadoop_output_format',
         'input_paths',
@@ -1749,18 +1716,6 @@ class UploadAttrsTestCase(SandboxedTestCase):
             run_job(MRRot13Lib(), b'The quick brown fox'),
             {None: 'Gur dhvpx oebja sbk\n'}
         )
-
-    def test_deprecated_archive_dir_file_switches(self):
-        job = MRJob(['--archive', 'stuff.zip',
-                     '--dir', 'foo',
-                     '--file', 'foo/bar.txt'])
-
-        self.assertEqual(
-            job._runner_kwargs()['upload_archives'], ['stuff.zip'])
-        self.assertEqual(
-            job._runner_kwargs()['upload_dirs'], ['foo'])
-        self.assertEqual(
-            job._runner_kwargs()['upload_files'], ['foo/bar.txt'])
 
 
 # SingleSparkContextTestCase is skipped if there's no pyspark

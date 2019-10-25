@@ -189,11 +189,6 @@ class InlineMRJobRunner(SimMRJobRunner):
             log.error('\nError while reading from %s:\n' %
                       self._error_while_reading_from)
 
-    def _load_steps(self):
-        """Get step descriptions without calling a subprocess."""
-        job_args = ['--steps'] + self._mr_job_extra_args(local=True)
-        return self._mrjob_cls(args=job_args)._steps_desc()
-
     def _spark_executors_have_own_wd(self):
         return True  # because we fake it
 

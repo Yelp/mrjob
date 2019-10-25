@@ -301,7 +301,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'ec2_key_pair',
         'ec2_key_pair_file',
         'emr_action_on_failure',
-        'emr_api_params',
         'emr_configurations',
         'emr_endpoint',
         'enable_emr_debugging',
@@ -312,7 +311,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
-        'mins_to_end_of_hour',
         'pool_clusters',
         'pool_name',
         'pool_wait_minutes',
@@ -325,7 +323,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'subnet',
         'tags',
         'task_instance_bid_price',
-        'visible_to_all_users',
     }
 
     # supports everything (so far)
@@ -370,16 +367,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                         ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
         elif not version_gte(self._opts['image_version'], '2.4.3'):
             log.warning("AMIs prior to 2.4.3 probably will not work because"
-                        " they don't support Python 2.7. Use a later AMI"
-                        " version or mrjob v0.5.11")
+                        " they don't support Python 2.7.")
         elif not self._image_version_gte('5.7.0'):
             if self._opts['image_id']:
                 log.warning('AMIs prior to 5.7.0 will probably not work'
                             ' with custom machine images')
-
-        if self._opts['emr_api_params'] is not None:
-            log.warning('emr_api_params is deprecated and does nothing.'
-                        ' Please use extra_cluster_params instead')
 
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
@@ -449,7 +441,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 pool_name='default',
                 pool_wait_minutes=0,
                 region=_DEFAULT_EMR_REGION,
-                visible_to_all_users=True,
             )
         )
 
@@ -1221,9 +1212,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         if self._opts['additional_emr_info']:
             kwargs['AdditionalInfo'] = self._opts['additional_emr_info']
-
-        kwargs['VisibleToAllUsers'] = bool(
-            self._opts['visible_to_all_users'])
 
         kwargs['JobFlowRole'] = self._instance_profile()
         kwargs['ServiceRole'] = self._service_role()
@@ -2723,10 +2711,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def get_image_version(self):
         """Get the version of the AMI that our cluster is running, or ``None``.
-
-        .. versionchanged:: 0.5.4
-
-           This used to be called :py:meth:`get_ami_version`
         """
         return self._get_cluster_info('image_version')
 

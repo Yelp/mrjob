@@ -11,7 +11,8 @@ dist: xenial
 before_install:
   - sudo apt-get install openjdk-8-jdk
 install:
-  - "pip install ."
+  - "pip install -e .[aws]"
+  - "pip install -e .[google]"
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
   - "pip install pyspark || true"

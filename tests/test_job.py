@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit testing of MRJob."""
+import inspect
+import logging
 import os
 import sys
 import time
@@ -41,27 +43,32 @@ from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
 from mrjob.protocol import StandardJSONProtocol
+from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import SparkStep
+from mrjob.step import StepFailedException
 from mrjob.util import safeeval
 from mrjob.util import to_lines
 
 from tests.job import run_job
-from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_cmd_job import MRCmdJob
+from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_no_runner import MRNoRunner
 from tests.mr_rot13lib import MRRot13Lib
+from tests.mr_runner import MRRunner
 from tests.mr_sort_values import MRSortValues
 from tests.mr_spark_method_wordcount import MRSparkMethodWordcount
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_upload_attrs_job import MRUploadAttrsJob
-from tests.py2 import Mock
 from tests.py2 import MagicMock
+from tests.py2 import Mock
 from tests.py2 import patch
 from tests.sandbox import BasicTestCase
 from tests.sandbox import EmptyMrjobConfTestCase
+from tests.sandbox import mrjob_pythonpath
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
 
@@ -72,7 +79,42 @@ except ImportError:
     pyspark = None
 
 
+def _mock_context_mgr(m, return_value):
+    m.return_value.__enter__.return_value = return_value
+
 # These can't be invoked as a separate script, but they don't need to be
+
+
+class MRCustomJob(MRJob):
+
+    def configure_args(self):
+        super(MRCustomJob, self).configure_args()
+
+        self.add_passthru_arg(
+            '--foo-size', '-F', type=int, dest='foo_size', default=5)
+        self.add_passthru_arg(
+            '--bar-name', '-B', dest='bar_name', default=None)
+        self.add_passthru_arg(
+            '--enable-baz-mode', '-M', action='store_true', dest='baz_mode',
+            default=False)
+        self.add_passthru_arg(
+            '--disable-quuxing', '-Q', action='store_false', dest='quuxing',
+            default=True)
+        self.add_passthru_arg(
+            '--pill-type', '-T', choices=(['red', 'blue']),
+            default='blue')
+        self.add_passthru_arg(
+            '--planck-constant', '-C', type=float, default=6.626068e-34)
+        self.add_passthru_arg(
+            '--extra-special-arg', '-S', action='append',
+            dest='extra_special_args', default=[])
+
+        self.pass_arg_through('--runner')
+
+        self.add_file_arg('--foo-config', dest='foo_config', default=None)
+        self.add_file_arg('--accordian-file', dest='accordian_files',
+                          action='append', default=[])
+
 
 class MRBoringJob(MRJob):
     """It's a boring job, but somebody had to do it."""
@@ -1782,3 +1824,342 @@ class IntermixedArgsTestCase(SandboxedTestCase):
                 output = dict(job.parse_output(runner.cat_output()))
 
                 self.assertEqual(output, dict(chars=46, words=9, lines=3))
+
+
+class LaunchJobTestCase(SandboxedTestCase):
+
+    def _make_launcher(self, *args):
+        """Make a launcher, add a mock runner (``launcher.mock_runner``), and
+        set it up so that ``launcher.make_runner().__enter__()`` returns
+        ``launcher.mock_runner()``.
+        """
+        launcher = MRJob(args=['--no-conf', ''] + list(args))
+        launcher.sandbox()
+
+        launcher.mock_runner = Mock()
+        launcher.mock_runner.cat_output.return_value = [b'a line\n']
+
+        launcher.make_runner = MagicMock()  # include __enter__
+        launcher.make_runner.return_value.__enter__.return_value = (
+            launcher.mock_runner)
+
+        return launcher
+
+    def test_output(self):
+        launcher = self._make_launcher()
+
+        launcher.run_job()
+
+        self.assertEqual(launcher.stdout.getvalue(), b'a line\n')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
+
+    def test_no_cat_output(self):
+        launcher = self._make_launcher('--no-cat-output')
+
+        launcher.run_job()
+
+        self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
+
+    def test_output_dir_implies_no_cat_output(self):
+        launcher = self._make_launcher('--output-dir', self.tmp_dir)
+
+        launcher.run_job()
+
+        self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
+
+    def test_output_dir_with_explicit_cat_output(self):
+        launcher = self._make_launcher(
+            '--output-dir', self.tmp_dir, '--cat-output')
+
+        launcher.run_job()
+
+        self.assertEqual(launcher.stdout.getvalue(), b'a line\n')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
+
+    def test_exit_on_step_failure(self):
+        launcher = self._make_launcher()
+        launcher.mock_runner.run.side_effect = StepFailedException
+
+        self.assertRaises(SystemExit, launcher.run_job)
+
+        self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertIn(b'Step failed', launcher.stderr.getvalue())
+
+    def test_pass_through_other_exceptions(self):
+        launcher = self._make_launcher()
+        launcher.mock_runner.run.side_effect = OSError
+
+        self.assertRaises(OSError, launcher.run_job)
+
+        self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
+
+
+class CommandLineArgsTestCase(BasicTestCase):
+
+    def test_shouldnt_exit_when_invoked_as_object(self):
+        self.assertRaises(ValueError, MRJob, args=['--quux', 'baz'])
+
+    def test_should_exit_when_invoked_as_script(self):
+        args = [sys.executable, inspect.getsourcefile(MRJob),
+                '--quux', 'baz']
+
+        # add . to PYTHONPATH (in case mrjob isn't actually installed)
+        env = combine_envs(os.environ,
+                           {'PYTHONPATH': mrjob_pythonpath()})
+        proc = Popen(args, stderr=PIPE, stdout=PIPE, env=env)
+        _, err = proc.communicate()
+        self.assertEqual(proc.returncode, 2, err)
+
+    def test_custom_key_value_option_parsing(self):
+        # simple example
+        mr_job = MRJob(args=['--cmdenv', 'FOO=bar', ''])
+        self.assertEqual(mr_job.options.cmdenv, {'FOO': 'bar'})
+
+        # trickier example
+        mr_job = MRJob(args=[
+            '--cmdenv', 'FOO=bar',
+            '--cmdenv', 'FOO=baz',
+            '--cmdenv', 'BAZ=qux=quux'])
+        self.assertEqual(mr_job.options.cmdenv,
+                         {'FOO': 'baz', 'BAZ': 'qux=quux'})
+
+        # must have KEY=VALUE
+        self.assertRaises(ValueError, MRJob,
+                          args=['--cmdenv', 'FOO', ''])
+
+    def test_passthrough_options_defaults(self):
+        mr_job = MRCustomJob(args=[])
+
+        self.assertEqual(mr_job.options.foo_size, 5)
+        self.assertEqual(mr_job.options.bar_name, None)
+        self.assertEqual(mr_job.options.baz_mode, False)
+        self.assertEqual(mr_job.options.quuxing, True)
+        self.assertEqual(mr_job.options.pill_type, 'blue')
+        self.assertEqual(mr_job.options.planck_constant, 6.626068e-34)
+        self.assertEqual(mr_job.options.extra_special_args, [])
+        self.assertEqual(mr_job.options.runner, None)
+        # should include all --protocol options
+        # should include default value of --num-items
+        # should use long option names (--protocol, not -p)
+        # shouldn't include --limit because it's None
+        # items should be in the order they were instantiated
+        self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [])
+
+    def test_explicit_passthrough_options(self):
+        mr_job = MRCustomJob(args=[
+            '-v',
+            '--foo-size=9',
+            '--bar-name', 'Alembic',
+            '--enable-baz-mode', '--disable-quuxing',
+            '--pill-type', 'red',
+            '--planck-constant', '1',
+            '--planck-constant', '42',
+            '--extra-special-arg', 'you',
+            '--extra-special-arg', 'me',
+            '--runner', 'inline',
+        ])
+
+        self.assertEqual(mr_job.options.foo_size, 9)
+        self.assertEqual(mr_job.options.bar_name, 'Alembic')
+        self.assertEqual(mr_job.options.baz_mode, True)
+        self.assertEqual(mr_job.options.quuxing, False)
+        self.assertEqual(mr_job.options.pill_type, 'red')
+        self.assertEqual(mr_job.options.planck_constant, 42)
+        self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
+        self.assertEqual(
+            mr_job._non_option_kwargs()['extra_args'],
+            [
+                '--foo-size', '9',
+                '--bar-name', 'Alembic',
+                '--enable-baz-mode',
+                '--disable-quuxing',
+                '--pill-type', 'red',
+                '--planck-constant', '1',
+                '--planck-constant', '42',
+                '--extra-special-arg', 'you',
+                '--extra-special-arg', 'me',
+                '--runner', 'inline',
+            ]
+        )
+
+    def test_explicit_passthrough_options_short(self):
+        mr_job = MRCustomJob(args=[
+            '-v',
+            '-F9', '-BAlembic', '-MQ', '-T', 'red', '-C1', '-C42',
+            '--extra-special-arg', 'you',
+            '--extra-special-arg', 'me',
+            '-r', 'inline',
+        ])
+
+        self.assertEqual(mr_job.options.foo_size, 9)
+        self.assertEqual(mr_job.options.bar_name, 'Alembic')
+        self.assertEqual(mr_job.options.baz_mode, True)
+        self.assertEqual(mr_job.options.quuxing, False)
+        self.assertEqual(mr_job.options.pill_type, 'red')
+        self.assertEqual(mr_job.options.planck_constant, 42)
+        self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
+        self.assertEqual(
+            mr_job._non_option_kwargs()['extra_args'],
+            # order is preserved, but args are separated from switches
+            [
+                '-F', '9',
+                '-B', 'Alembic',
+                '-M', '-Q',
+                '-T', 'red',
+                '-C', '1',
+                '-C', '42',
+                '--extra-special-arg', 'you',
+                '--extra-special-arg', 'me',
+                '-r', 'inline',
+            ]
+        )
+
+    def test_bad_custom_options(self):
+        self.assertRaises(ValueError,
+                          MRCustomJob,
+                          args=['--planck-constant', 'c'])
+        self.assertRaises(ValueError, MRCustomJob,
+                          args=['--pill-type=green'])
+
+    def test_bad_option_types(self):
+        mr_job = MRJob(args=[])
+        self.assertRaises(
+            ValueError, mr_job.add_passthru_arg,
+            '--stop-words', dest='stop_words', type='set', default=None)
+        self.assertRaises(
+            ValueError, mr_job.add_passthru_arg,
+            '--leave-a-msg', dest='leave_a_msg', action='callback',
+            default=None)
+
+    def test_incorrect_option_types(self):
+        self.assertRaises(ValueError, MRJob, args=['--cmdenv', 'cats'])
+        self.assertRaises(ValueError, MRJob,
+                          args=['--ssh-bind-ports', 'athens'])
+
+    def test_default_file_options(self):
+        mr_job = MRCustomJob(args=[])
+        self.assertEqual(mr_job.options.foo_config, None)
+        self.assertEqual(mr_job.options.accordian_files, [])
+        self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [])
+
+    def test_explicit_file_options(self):
+        mr_job = MRCustomJob(args=[
+            '--foo-config', '/tmp/.fooconf#dot-fooconf',
+            '--foo-config', '/etc/fooconf',
+            '--accordian-file', 'WeirdAl.mp3',
+            '--accordian-file', '/home/dave/JohnLinnell.ogg'])
+        self.assertEqual(mr_job.options.foo_config, '/etc/fooconf')
+        self.assertEqual(mr_job.options.accordian_files, [
+            'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
+        self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [
+            '--foo-config', dict(
+                path='/tmp/.fooconf', name='dot-fooconf', type='file'),
+            '--foo-config', dict(
+                path='/etc/fooconf', name=None, type='file'),
+            '--accordian-file', dict(
+                path='WeirdAl.mp3', name=None, type='file'),
+            '--accordian-file', dict(
+                path='/home/dave/JohnLinnell.ogg', name=None, type='file')
+        ])
+
+    def test_str_type_with_file_arg(self):
+        # regression test for #1858
+        class MRGoodFileArgTypeJob(MRJob):
+            def configure_args(self):
+                super(MRGoodFileArgTypeJob, self).configure_args()
+                self.add_file_arg(
+                    '--bibliophile', dest='bibliophiles', type=str)
+
+        mr_job = MRGoodFileArgTypeJob(
+            args=['--bibliophile', '/var/bookworm'])
+
+        self.assertEqual(mr_job.options.bibliophiles, '/var/bookworm')
+
+    def test_no_conf_overrides(self):
+        mr_job = MRCustomJob(args=['-c', 'blah.conf', '--no-conf'])
+        self.assertEqual(mr_job.options.conf_paths, [])
+
+    def test_no_conf_overridden(self):
+        mr_job = MRCustomJob(args=['--no-conf', '-c', 'blah.conf'])
+        self.assertEqual(mr_job.options.conf_paths, ['blah.conf'])
+
+
+class TestToolLogging(BasicTestCase):
+    """ Verify the behavior of logging configuration for CLI tools
+    """
+    def test_default_options(self):
+        with patch.object(sys, 'stderr', StringIO()) as stderr:
+            MRJob.set_up_logging()
+            log = logging.getLogger('__main__')
+            log.info('INFO')
+            log.debug('DEBUG')
+            self.assertEqual(stderr.getvalue(), 'INFO\n')
+
+    def test_verbose(self):
+        with patch.object(sys, 'stderr', StringIO()) as stderr:
+            MRJob.set_up_logging(verbose=True)
+            log = logging.getLogger('__main__')
+            log.info('INFO')
+            log.debug('DEBUG')
+            self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
+
+
+class TestPassThroughRunner(BasicTestCase):
+
+    def get_value(self, job):
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for _, value in job.parse_output(runner.cat_output()):
+                return value
+
+    def test_no_pass_through(self):
+        self.assertEqual(self.get_value(MRNoRunner()), None)
+        self.assertEqual(self.get_value(MRNoRunner(['-r', 'inline'])), None)
+        self.assertEqual(self.get_value(MRNoRunner(['-r', 'local'])), None)
+
+    def test_pass_through(self):
+        self.assertEqual(self.get_value(MRRunner()), None)
+        self.assertEqual(self.get_value(MRRunner(['-r', 'inline'])), 'inline')
+        self.assertEqual(self.get_value(MRRunner(['-r', 'local'])), 'local')
+
+
+class StdStreamTestCase(BasicTestCase):
+
+    def test_normal_python(self):
+        job = MRJob()
+
+        if PY2:
+            self.assertEqual(job.stdin, sys.stdin)
+            self.assertEqual(job.stdout, sys.stdout)
+            self.assertEqual(job.stderr, sys.stderr)
+        else:
+            self.assertEqual(job.stdin, sys.stdin.buffer)
+            self.assertEqual(job.stdout, sys.stdout.buffer)
+            self.assertEqual(job.stderr, sys.stderr.buffer)
+
+    def test_python3_jupyter_notebook(self):
+        # regression test for #1441
+
+        # this test actually works on any Python platform, since we use mocks
+        mock_stdin = Mock()
+        mock_stdin.buffer = Mock()
+
+        mock_stdout = Mock()
+        del mock_stdout.buffer
+
+        mock_stderr = Mock()
+        del mock_stderr.buffer
+
+        with patch.multiple(sys, stdin=mock_stdin,
+                            stdout=mock_stdout, stderr=mock_stderr):
+            job = MRJob()
+
+            self.assertEqual(job.stdin, mock_stdin.buffer)
+            self.assertEqual(job.stdout, mock_stdout)
+            self.assertEqual(job.stderr, mock_stderr)

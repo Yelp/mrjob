@@ -49,10 +49,10 @@ class LocalFilesystem(Filesystem):
             else:
                 yield uri_scheme + path
 
-    def _cat_file(self, filename):
-        filename = _from_file_uri(filename)
-        with open(filename, 'rb') as f:
-            for chunk in decompress(f, filename):
+    def _cat_file(self, path):
+        path = _from_file_uri(path)
+        with open(path, 'rb') as f:
+            for chunk in decompress(f, path):
                 yield chunk
 
     def exists(self, path_glob):

@@ -156,5 +156,5 @@ class CompositeFilesystem(Filesystem):
     def touchz(self, path):
         return self._do('touchz', path)
 
-    def md5sum(self, path_glob):
-        return self._do('md5sum', path_glob)
+    def md5sum(self, path):
+        return self._do('md5sum', path)

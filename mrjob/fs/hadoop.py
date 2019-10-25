@@ -261,14 +261,14 @@ class HadoopFilesystem(Filesystem):
             else:
                 yield hdfs_prefix + path
 
-    def _cat_file(self, filename):
+    def _cat_file(self, path):
         # stream from HDFS
-        cat_args = self.get_hadoop_bin() + ['fs', '-cat', filename]
+        cat_args = self.get_hadoop_bin() + ['fs', '-cat', path]
         log.debug('> %s' % cmd_line(cat_args))
 
         cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
 
-        for chunk in decompress(cat_proc.stdout, filename):
+        for chunk in decompress(cat_proc.stdout, path):
             yield chunk
 
         # this does someties happen; see #1396
@@ -281,7 +281,7 @@ class HadoopFilesystem(Filesystem):
         returncode = cat_proc.wait()
 
         if returncode != 0:
-            raise IOError("Could not stream %s" % filename)
+            raise IOError("Could not stream %s" % path)
 
     def mkdir(self, path):
         version = self.get_hadoop_version()
@@ -337,8 +337,8 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not rm %s" % path_glob)
 
-    def touchz(self, dest):
+    def touchz(self, path):
         try:
-            self.invoke_hadoop(['fs', '-touchz', dest])
+            self.invoke_hadoop(['fs', '-touchz', path])
         except CalledProcessError:
-            raise IOError("Could not touchz %s" % dest)
+            raise IOError("Could not touchz %s" % path)

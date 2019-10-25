@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mrjob import cmd
-from mrjob import launch
 from mrjob.tools import diagnose
 from mrjob.tools import spark_submit
 from mrjob.tools.emr import audit_usage

@@ -1491,7 +1491,7 @@ def _add_job_args(parser, include_deprecated=True, include_steps=True):
         'and must be empty')
 
     parser.add_argument(
-        '-r', '--runner', dest='runner', default=None,
+        '-r', '--runner', dest='runner',
         choices=sorted(_RUNNER_ALIASES),
         help=('Where to run the job; one of: %s' % ', '.join(
             sorted(_RUNNER_ALIASES))))

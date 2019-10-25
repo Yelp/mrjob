@@ -70,7 +70,7 @@ def main(args=None):
 @_command('run', 'Run a job')
 def _run(args):
     from mrjob.launch import MRJobLauncher
-    MRJobLauncher(args=args, from_cl=True).run_job()
+    MRJobLauncher(args=args[1:], from_cl=True, script_path=args[0]).run_job()
 
 
 @_command('audit-emr-usage', 'Audit EMR usage')

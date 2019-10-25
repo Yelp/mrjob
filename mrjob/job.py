@@ -23,41 +23,76 @@ import inspect
 import itertools
 import json
 import logging
+import os
 import os.path
 import sys
+import time
+from io import BytesIO
+from argparse import ArgumentParser
+from argparse import ArgumentTypeError
+
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.cat import decompress
-from mrjob.launch import MRJobLauncher
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_lists
 from mrjob.launch import _im_func
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
+from mrjob.launch import MRJobLauncher
+from mrjob.local import LocalMRJobRunner
+from mrjob.options import _add_basic_args
+from mrjob.options import _add_job_args
+from mrjob.options import _add_runner_args
 from mrjob.options import _add_step_args
+from mrjob.options import _parse_raw_args
+from mrjob.options import _print_basic_help
+from mrjob.options import _print_help_for_runner
+from mrjob.options import _RUNNER_OPTS
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
+from mrjob.runner import _runner_class
+from mrjob.setup import parse_legacy_hash_path
+from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.step import MRStep
 from mrjob.step import SparkStep
-from mrjob.step import _JOB_STEP_FUNC_PARAMS
+from mrjob.step import StepFailedException
 from mrjob.util import expand_path
+from mrjob.util import log_to_null
+from mrjob.util import log_to_stream
 from mrjob.util import to_lines
 
-
 log = logging.getLogger(__name__)
+
+# sentinel value; used when running MRJob as a script
+_READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
 
 class UsageError(Exception):
     pass
 
 
-class MRJob(MRJobLauncher):
+def _im_func(f):
+    """Wrapper to get at the underlying function belonging to a method.
+
+    Python 2 is slightly different because classes have "unbound methods"
+    which wrap the underlying function, whereas on Python 3 they're just
+    functions. (Methods work the same way on both versions.)
+    """
+    # "im_func" is the old Python 2 name for __func__
+    if hasattr(f, '__func__'):
+        return f.__func__
+    else:
+        return f
+
+
+
+class MRJob(object):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
 
-    # script path is whatever file our subclass of MRJob is in
-    _FIRST_ARG_IS_SCRIPT_PATH = False
-
-    def __init__(self, args=None):
+    def __init__(self, args=None, from_cl=False, script_path=None):
         """Entry point for running your job from other Python code.
 
         You can pass in command-line arguments, and the job will act the same
@@ -73,12 +108,173 @@ class MRJob(MRJobLauncher):
 
         For a full list of command-line arguments, run:
         ``python -m mrjob.job --help``
-        """
-        super(MRJob, self).__init__(self.mr_job_script(), args)
 
-    @classmethod
-    def _usage(cls):
-        return "%(prog)s [options] [input files]"
+        :param args: Command line arguments
+        :param from_cl: If not using sys.argv but still comming from the
+                        command line (as opposed to a script, e.g. from
+                        mrjob.cmd), don't override the option parser error
+                        function (exit instead of throwing ValueError).
+        :param script_path: Optional alternate path to MRJob script
+        """
+        if script_path is None:
+            script_path = self.mr_job_script()
+        self._script_path = script_path
+
+        self._from_cl = from_cl  # for `mrjob run`
+
+        # make sure we respect the $TZ (time zone) environment variable
+        if hasattr(time, 'tzset'):
+            time.tzset()
+
+        # argument dests for args to pass through
+        self._passthru_arg_dests = set()
+        self._file_arg_dests = set()
+
+        self.arg_parser = ArgumentParser(usage=self._usage(),
+                                         add_help=False)
+        self.configure_args()
+
+        # don't pass None to parse_args unless we're actually running
+        # the MRJob script
+        if args is _READ_ARGS_FROM_SYS_ARGV:
+            self._cl_args = sys.argv[1:]
+        else:
+            # don't pass sys.argv to self.arg_parser, and have it
+            # raise an exception on error rather than printing to stderr
+            # and exiting.
+            self._cl_args = args or []
+
+            def error(msg):
+                raise ValueError(msg)
+
+            if not from_cl:
+                self.arg_parser.error = error
+
+        self.load_args(self._cl_args)
+
+        # Make it possible to redirect stdin, stdout, and stderr, for testing
+        # See stdin, stdout, stderr properties and sandbox(), below.
+        self._stdin = None
+        self._stdout = None
+        self._stderr = None
+
+    # by default, self.stdin, self.stdout, and self.stderr are sys.std*.buffer
+    # if it exists, and otherwise sys.std* otherwise (they should always deal
+    # with bytes, not Unicode).
+    #
+    # *buffer* is pretty much a Python 3 thing, though some platforms
+    # (notably Jupyterhub) don't have it. See #1441
+
+    @property
+    def stdin(self):
+        return self._stdin or getattr(sys.stdin, 'buffer', sys.stdin)
+
+    @property
+    def stdout(self):
+        return self._stdout or getattr(sys.stdout, 'buffer', sys.stdout)
+
+    @property
+    def stderr(self):
+        return self._stderr or getattr(sys.stderr, 'buffer', sys.stderr)
+
+    def _usage(self):
+        if self._from_cl:
+            return "%(prog)s [options] [input files]"
+        else:
+            return ("mrjob run [script path--help]"
+                    " [options] [input files]")
+
+    def _print_help(self, options):
+        """Print help for this job. This will either print runner
+        or basic help. Override to allow other kinds of help."""
+        if options.runner:
+            _print_help_for_runner(
+                self._runner_opt_names_for_help(), options.deprecated)
+        else:
+            _print_basic_help(self.arg_parser,
+                              self._usage(),
+                              options.deprecated,
+                              options.verbose)
+
+    def _runner_opt_names_for_help(self):
+        opts = set(self._runner_class().OPT_NAMES)
+
+        if self.options.runner == 'spark':
+            # specific to Spark runner, but command-line only, so it doesn't
+            # appear in SparkMRJobRunner.OPT_NAMES (see #2040)
+            opts.add('max_output_files')
+
+        return opts
+
+    def _non_option_kwargs(self):
+        """Keyword arguments to runner constructor that can't be set
+        in mrjob.conf.
+
+        These should match the (named) arguments to
+        :py:meth:`~mrjob.runner.MRJobRunner.__init__`.
+        """
+        # build extra_args
+        raw_args = _parse_raw_args(self.arg_parser, self._cl_args)
+
+        extra_args = []
+
+        for dest, option_string, args in raw_args:
+            if dest in self._file_arg_dests:
+                extra_args.append(option_string)
+                extra_args.append(parse_legacy_hash_path('file', args[0]))
+            elif dest in self._passthru_arg_dests:
+                # special case for --hadoop-args=-verbose etc.
+                if (option_string and len(args) == 1 and
+                        args[0].startswith('-')):
+                    extra_args.append('%s=%s' % (option_string, args[0]))
+                else:
+                    if option_string:
+                        extra_args.append(option_string)
+                    extra_args.extend(args)
+
+        # max_output_files is added by _add_runner_args() but can only
+        # be set from the command line, so we add it here (see #2040)
+        return dict(
+            conf_paths=self.options.conf_paths,
+            extra_args=extra_args,
+            hadoop_input_format=self.hadoop_input_format(),
+            hadoop_output_format=self.hadoop_output_format(),
+            input_paths=self.options.args,
+            max_output_files=self.options.max_output_files,
+            mr_job_script=self._script_path,
+            output_dir=self.options.output_dir,
+            partitioner=self.partitioner(),
+            stdin=self.stdin,
+            step_output_dir=self.options.step_output_dir,
+        )
+
+    def _kwargs_from_switches(self, keys):
+        return dict(
+            (key, getattr(self.options, key))
+            for key in keys if hasattr(self.options, key)
+        )
+
+    def _job_kwargs(self):
+        """Keyword arguments to the runner class that can be specified
+        by the job/launcher itself."""
+        # use the most basic combiners; leave magic like resolving paths
+        # and blanking out jobconf values to the runner
+        return dict(
+            # command-line has the final say on jobconf and libjars
+            jobconf=combine_dicts(
+                self.jobconf(), self.options.jobconf),
+            libjars=combine_lists(
+                self.libjars(), self.options.libjars),
+            partitioner=self.partitioner(),
+            sort_values=self.sort_values(),
+            # TODO: should probably put self.options last below for consistency
+            upload_archives=combine_lists(
+                self.options.upload_archives, self.archives()),
+            upload_dirs=combine_lists(
+                self.options.upload_dirs, self.dirs()),
+            upload_files=combine_lists(
+                self.options.upload_files, self.files()),
+        )
 
     ### Defining one-step streaming jobs ###
 
@@ -441,6 +637,59 @@ class MRJob(MRJobLauncher):
         mr_job = cls(args=_READ_ARGS_FROM_SYS_ARGV)
         mr_job.execute()
 
+    def run_job(self):
+        """Run the all steps of the job, logging errors (and debugging output
+        if :option:`--verbose` is specified) to STDERR and streaming the
+        output to STDOUT.
+
+        Called from :py:meth:`run`. You'd probably only want to call this
+        directly from automated tests.
+        """
+        # self.stderr is strictly binary, need to wrap it so it's possible
+        # to log to it in Python 3
+        log_stream = codecs.getwriter('utf_8')(self.stderr)
+
+        self.set_up_logging(quiet=self.options.quiet,
+                            verbose=self.options.verbose,
+                            stream=log_stream)
+
+        with self.make_runner() as runner:
+            try:
+                runner.run()
+            except StepFailedException as e:
+                # no need for a runner stacktrace if step failed; runners will
+                # log more useful information anyway
+                log.error(str(e))
+                sys.exit(1)
+
+            if self._should_cat_output():
+                for chunk in runner.cat_output():
+                    self.stdout.write(chunk)
+                self.stdout.flush()
+
+    @classmethod
+    def set_up_logging(cls, quiet=False, verbose=False, stream=None):
+        """Set up logging when running from the command line. This is also
+        used by the various command-line utilities.
+
+        :param bool quiet: If true, don't log. Overrides *verbose*.
+        :param bool verbose: If true, set log level to ``DEBUG`` (default is
+                             ``INFO``)
+        :param bool stream: Stream to log to (default is ``sys.stderr``)
+        """
+        if quiet:
+            log_to_null(name='mrjob')
+            log_to_null(name='__main__')
+        else:
+            log_to_stream(name='mrjob', debug=verbose, stream=stream)
+            log_to_stream(name='__main__', debug=verbose, stream=stream)
+
+    def _should_cat_output(self):
+        if self.options.cat_output is None:
+            return not self.options.output_dir
+        else:
+            return self.options.cat_output
+
     def execute(self):
         # MRJob does Hadoop Streaming stuff, or defers to its superclass
         # (MRJobLauncher) if not otherwise instructed
@@ -457,7 +706,7 @@ class MRJob(MRJobLauncher):
             self.run_spark(self.options.step_num)
 
         else:
-            super(MRJob, self).execute()
+            self.run_job()
 
     def make_runner(self):
         """Make a runner based on command-line arguments, so we can
@@ -473,22 +722,22 @@ class MRJob(MRJobLauncher):
                                  " probably means you tried to use it from"
                                  " __main__, which doesn't work." % w)
 
-        return super(MRJob, self).make_runner()
+        return self._runner_class()(**self._runner_kwargs())
 
     def _runner_class(self):
         """Runner class as indicated by ``--runner``. Defaults to ``'inline'``.
         """
-        if not self.options.runner or self.options.runner == 'inline':
-            from mrjob.inline import InlineMRJobRunner
-            return InlineMRJobRunner
-
-        else:
-            return super(MRJob, self)._runner_class()
+        return _runner_class(self.options.runner or 'inline')
 
     def _runner_kwargs(self):
         """If we're building an inline or Spark runner,
         include mrjob_cls in kwargs."""
-        kwargs = super(MRJob, self)._runner_kwargs()
+        kwargs = combine_dicts(
+            self._non_option_kwargs(),
+            # don't screen out irrelevant opts (see #1898)
+            self._kwargs_from_switches(set(_RUNNER_OPTS)),
+            self._job_kwargs(),
+        )
 
         if self._runner_class().alias in ('inline', 'spark'):
             kwargs = dict(mrjob_cls=self.__class__, **kwargs)
@@ -854,9 +1103,127 @@ class MRJob(MRJobLauncher):
                 self.pass_arg_through(...)
                 ...
         """
-        super(MRJob, self).configure_args()
+        self.arg_parser.add_argument(
+            dest='args', nargs='*',
+            help=('input paths to read (or stdin if not set). If --spark'
+                  ' is set, the input and output path for the spark job.'))
 
+        _add_basic_args(self.arg_parser)
+        _add_job_args(self.arg_parser)
+        _add_runner_args(self.arg_parser)
         _add_step_args(self.arg_parser, include_deprecated=True)
+
+    def load_args(self, args):
+        """Load command-line options into ``self.options`` and
+        ``self._script_path``.
+
+        Called from :py:meth:`__init__()` after :py:meth:`configure_args`.
+
+        :type args: list of str
+        :param args: a list of command line arguments. ``None`` will be
+                     treated the same as ``[]``.
+
+        Re-define if you want to post-process command-line arguments::
+
+            def load_args(self, args):
+                super(MRYourJob, self).load_args(args)
+
+                self.stop_words = self.options.stop_words.split(',')
+                ...
+        """
+        if hasattr(self.arg_parser, 'parse_intermixed_args'):
+            # restore old optparse behavior on Python 3.7+. See #1701
+            self.options = self.arg_parser.parse_intermixed_args(args)
+        else:
+            self.options = self.arg_parser.parse_args(args)
+
+        if self.options.help:
+            self._print_help(self.options)
+            sys.exit(0)
+
+    def add_file_arg(self, *args, **kwargs):
+        """Add a command-line option that sends an external file
+        (e.g. a SQLite DB) to Hadoop::
+
+             def configure_args(self):
+                super(MRYourJob, self).configure_args()
+                self.add_file_arg('--scoring-db', help=...)
+
+        This does the right thing: the file will be uploaded to the working
+        dir of the script on Hadoop, and the script will be passed the same
+        option, but with the local name of the file in the script's working
+        directory.
+
+        .. note::
+
+           If you pass a file to a job, best practice is to lazy-load its
+           contents (e.g. make a method that opens the file the first time
+           you call it) rather than loading it in your job's constructor or
+           :py:meth:`load_args`. Not only is this more efficient, it's
+           necessary if you want to run your job in a Spark executor
+           (because the file may not be in the same place in a Spark driver).
+
+        .. note::
+
+           We suggest against sending Berkeley DBs to your job, as
+           Berkeley DB is not forwards-compatible (so a Berkeley DB that you
+           construct on your computer may not be readable from within
+           Hadoop). Use SQLite databases instead. If all you need is an on-disk
+           hash table, try out the :py:mod:`sqlite3dbm` module.
+
+        .. versionchanged:: 0.6.6
+
+           now accepts explicit ``type=str``
+
+        .. versionchanged:: 0.6.8
+
+           fully supported on Spark, including ``local[*]`` master
+        """
+        if kwargs.get('type') not in (None, str):
+            raise ArgumentTypeError(
+                'file options must take strings')
+
+        if kwargs.get('action') not in (None, 'append', 'store'):
+            raise ArgumentTypeError(
+                "file options must use the actions 'store' or 'append'")
+
+        pass_opt = self.arg_parser.add_argument(*args, **kwargs)
+
+        self._file_arg_dests.add(pass_opt.dest)
+
+    def add_passthru_arg(self, *args, **kwargs):
+        """Function to create options which both the job runner
+        and the job itself respect (we use this for protocols, for example).
+
+        Use it like you would use
+        :py:func:`argparse.ArgumentParser.add_argument`::
+
+            def configure_args(self):
+                super(MRYourJob, self).configure_args()
+                self.add_passthru_arg(
+                    '--max-ngram-size', type=int, default=4, help='...')
+
+        If you want to pass files through to the mapper/reducer, use
+        :py:meth:`add_file_arg` instead.
+
+        If you want to pass through a built-in option (e.g. ``--runner``, use
+        :py:meth:`pass_arg_through` instead.
+        """
+        pass_opt = self.arg_parser.add_argument(*args, **kwargs)
+
+        self._passthru_arg_dests.add(pass_opt.dest)
+
+    def pass_arg_through(self, opt_str):
+        """Pass the given argument through to the job."""
+
+        # _actions is hidden but the interface appears to be stable,
+        # and there's no non-hidden interface we can use
+        for action in self.arg_parser._actions:
+            if opt_str in action.option_strings or opt_str == action.dest:
+                self._passthru_arg_dests.add(action.dest)
+                break
+        else:
+            raise ValueError('unknown arg: %s', opt_str)
 
     def is_task(self):
         """True if this is a mapper, combiner, reducer, or Spark script.
@@ -1237,6 +1604,69 @@ class MRJob(MRJobLauncher):
         of consistency, but you could override it if you wanted to make
         secondary sort configurable."""
         return self.SORT_VALUES
+
+    ### Testing ###
+
+    def sandbox(self, stdin=None, stdout=None, stderr=None):
+        """Redirect stdin, stdout, and stderr for automated testing.
+
+        You can set stdin, stdout, and stderr to file objects. By
+        default, they'll be set to empty ``BytesIO`` objects.
+        You can then access the job's file handles through ``self.stdin``,
+        ``self.stdout``, and ``self.stderr``. See :ref:`testing` for more
+        information about testing.
+
+        You may call sandbox multiple times (this will essentially clear
+        the file handles).
+
+        ``stdin`` is empty by default. You can set it to anything that yields
+        lines::
+
+            mr_job.sandbox(stdin=BytesIO(b'some_data\\n'))
+
+        or, equivalently::
+
+            mr_job.sandbox(stdin=[b'some_data\\n'])
+
+        For convenience, this sandbox() returns self, so you can do::
+
+            mr_job = MRJobClassToTest().sandbox()
+
+        Simple testing example::
+
+            mr_job = MRYourJob.sandbox()
+            self.assertEqual(list(mr_job.reducer('foo', ['a', 'b'])), [...])
+
+        More complex testing example::
+
+            from BytesIO import BytesIO
+
+            from mrjob.parse import parse_mr_job_stderr
+            from mrjob.protocol import JSONProtocol
+
+            mr_job = MRYourJob(args=[...])
+
+            fake_input = '"foo"\\t"bar"\\n"foo"\\t"baz"\\n'
+            mr_job.sandbox(stdin=BytesIO(fake_input))
+
+            mr_job.run_reducer(link_num=0)
+
+            self.assertEqual(mrjob.stdout.getvalue(), ...)
+            self.assertEqual(parse_mr_job_stderr(mr_job.stderr), ...)
+
+        .. note::
+
+           If you are using Spark, it's recommended you only pass in
+           :py:class:`io.BytesIO` or other serializable alternatives to file
+           objects. *stdin*, *stdout*, and *stderr* get stored as job
+           attributes, which means if they aren't serializable, neither
+           is the job instance or its methods.
+        """
+        self._stdin = stdin or BytesIO()
+        self._stdout = stdout or BytesIO()
+        self._stderr = stderr or BytesIO()
+
+        return self
 
 
 if __name__ == '__main__':

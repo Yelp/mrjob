@@ -91,7 +91,7 @@ def _default_to(namespace, dest, value):
 
 class _KeyValueAction(Action):
     """action for KEY=VALUE pairs"""
-    # used for --cmdenv, --emr-api-param, and more
+    # used for --cmdenv, --jobconf, and more
 
     def __call__(self, parser, namespace, value, option_string=None):
         try:

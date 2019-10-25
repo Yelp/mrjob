@@ -5031,27 +5031,6 @@ class UsesSparkTestCase(MockBoto3TestCase):
             self.assertTrue(runner._uses_spark())
             self.assertTrue(runner._opts['bootstrap_spark'])
 
-    def test_ignores_new_supported_products_api_param(self):
-        job = MRTwoStepJob(['-r', 'emr',
-                            '--emr-api-param',
-                            'NewSupportedProducts.member.1.Name=spark'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertFalse(runner._uses_spark())
-            self.assertFalse(runner._has_spark_application())
-
-    def test_ignores_application_api_param(self):
-        job = MRTwoStepJob(['-r', 'emr',
-                            '--image-version', '4.0.0',
-                            '--emr-api-param',
-                            'Application.member.1.Name=Spark'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertFalse(runner._uses_spark())
-            self.assertFalse(runner._has_spark_application())
-
 
 class SparkPyFilesTestCase(MockBoto3TestCase):
 

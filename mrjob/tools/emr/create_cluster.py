@@ -90,10 +90,6 @@ Options::
   --emr-action-on-failure EMR_ACTION_ON_FAILURE
                         Action to take when a step fails (e.g.
                         TERMINATE_CLUSTER, CANCEL_AND_WAIT, CONTINUE)
-  --emr-api-param EMR_API_PARAMS
-                        Does nothing. Use --extra-cluster-param instead
-  --no-emr-api-param EMR_API_PARAMS
-                        Does nothing. Use --extra-cluster-param instead
   --emr-configuration EMR_CONFIGURATIONS
                         Configuration to use on 4.x AMIs as a JSON-encoded
                         dict; see http://docs.aws.amazon.com/ElasticMapReduce/

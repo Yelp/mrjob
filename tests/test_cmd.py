@@ -47,12 +47,6 @@ class CommandTestCase(BasicTestCase):
             cmd.main(args=['mrjob', cmd_name])
             m_main.assert_called_once_with([])
 
-    def test_run(self):
-        with patch.object(launch, 'MRJobLauncher') as m_launcher:
-            cmd.main(args=['mrjob', 'run', 'script.py'])
-            m_launcher.assert_called_once_with(
-                args=['script.py'], from_cl=True)
-
     def test_audit_usage(self):
         self._test_main_call(audit_usage, 'audit-emr-usage')
 

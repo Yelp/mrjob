@@ -92,7 +92,7 @@ class MRJob(object):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
 
-    def __init__(self, args=None, from_cl=False, script_path=None):
+    def __init__(self, args=None):
         """Entry point for running your job from other Python code.
 
         You can pass in command-line arguments, and the job will act the same
@@ -109,19 +109,8 @@ class MRJob(object):
         For a full list of command-line arguments, run:
         ``python -m mrjob.job --help``
 
-        :param args: Command line arguments
-        :param from_cl: If not using sys.argv but still comming from the
-                        command line (as opposed to a script, e.g. from
-                        mrjob.cmd), don't override the option parser error
-                        function (exit instead of throwing ValueError).
-        :param script_path: Optional alternate path to MRJob script
+        :param args: Arguments to your script (switches and input files)
         """
-        if script_path is None:
-            script_path = self.mr_job_script()
-        self._script_path = script_path
-
-        self._from_cl = from_cl  # for `mrjob run`
-
         # make sure we respect the $TZ (time zone) environment variable
         if hasattr(time, 'tzset'):
             time.tzset()
@@ -147,8 +136,7 @@ class MRJob(object):
             def error(msg):
                 raise ValueError(msg)
 
-            if not from_cl:
-                self.arg_parser.error = error
+            self.arg_parser.error = error
 
         self.load_args(self._cl_args)
 
@@ -178,11 +166,7 @@ class MRJob(object):
         return self._stderr or getattr(sys.stderr, 'buffer', sys.stderr)
 
     def _usage(self):
-        if self._from_cl:
-            return "%(prog)s [options] [input files]"
-        else:
-            return ("mrjob run [script path--help]"
-                    " [options] [input files]")
+        return "%(prog)s [options] [input files]"
 
     def _print_help(self, options):
         """Print help for this job. This will either print runner
@@ -241,7 +225,7 @@ class MRJob(object):
             hadoop_output_format=self.hadoop_output_format(),
             input_paths=self.options.args,
             max_output_files=self.options.max_output_files,
-            mr_job_script=self._script_path,
+            mr_job_script=self.mr_job_script(),
             output_dir=self.options.output_dir,
             partitioner=self.partitioner(),
             stdin=self.stdin,
@@ -1114,8 +1098,7 @@ class MRJob(object):
         _add_step_args(self.arg_parser, include_deprecated=True)
 
     def load_args(self, args):
-        """Load command-line options into ``self.options`` and
-        ``self._script_path``.
+        """Load command-line options into ``self.options``.
 
         Called from :py:meth:`__init__()` after :py:meth:`configure_args`.
 

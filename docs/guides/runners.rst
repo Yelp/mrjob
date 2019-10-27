@@ -15,9 +15,8 @@ you chose.
 
 Most of the time, you won't have any reason to construct a runner directly.
 Instead you'll invoke your Python script on the command line and it will make a
-runner automatically, you'll call ``mrjob run my_script`` to have the ``mrjob``
-command build a runner for your script (which may or may not be Python), or
-you'll write some sort of wrapper that calls ``my_job.make_runner()``.
+runner automatically or you'll write some sort of wrapper that calls
+``my_job.make_runner()``.
 
 Internally, the general order of operations is:
 

@@ -41,7 +41,6 @@ from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
 from mrjob.examples.mr_sparkaboom import MRSparKaboom
-from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.local import _sort_lines_in_memory
 from mrjob.parse import is_uri

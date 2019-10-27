@@ -41,14 +41,6 @@ report-long-jobs
 
     .. automodule:: mrjob.tools.emr.report_long_jobs
 
-run
-^^^
-
-    ``mrjob run (path to script or executable) [options]``
-
-    Run a job. While you can use this command to invoke your jobs, you
-    can just as easily call ``python my_job.py [options]``.
-
 s3-tmpwatch
 ^^^^^^^^^^^
 

@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mrjob import cmd
-from mrjob import launch
 from mrjob.tools import diagnose
 from mrjob.tools import spark_submit
 from mrjob.tools.emr import audit_usage
@@ -46,12 +45,6 @@ class CommandTestCase(BasicTestCase):
         with patch.object(module, 'main') as m_main:
             cmd.main(args=['mrjob', cmd_name])
             m_main.assert_called_once_with([])
-
-    def test_run(self):
-        with patch.object(launch, 'MRJobLauncher') as m_launcher:
-            cmd.main(args=['mrjob', 'run', 'script.py'])
-            m_launcher.assert_called_once_with(
-                args=['script.py'], from_cl=True)
 
     def test_audit_usage(self):
         self._test_main_call(audit_usage, 'audit-emr-usage')

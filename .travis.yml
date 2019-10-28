@@ -11,9 +11,10 @@ dist: xenial
 before_install:
   - sudo apt-get install openjdk-8-jdk
 install:
-  - "pip install ."
-  - "pip install ujson warcio"
-  - "pip install rapidjson || true"
+  - "pip install -e .[aws]"
+  - "pip install -e .[google]"
+  - "pip install simplejson ujson warcio"
+  - "pip install python-rapidjson || true"
   - "pip install pyspark || true"
   - "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64"
   - "export PATH=$JAVA_HOME/bin:$PATH"

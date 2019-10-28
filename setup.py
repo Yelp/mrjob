@@ -24,12 +24,15 @@ try:
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
         'extras_require': {
+            'aws': [
+                'boto3>=1.4.6',
+                'botocore>=1.6.0',
+            ],
+            'simplejson': ['simplejson'],
             'ujson': ['ujson'],
         },
         'install_requires': [
-            'boto3>=1.4.6',
-            'botocore>=1.6.0',
-            'PyYAML>=3.10',
+             'PyYAML>=3.10',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
@@ -46,20 +49,21 @@ try:
     # reason we support Python 3.4 at all is to support earlier
     # AMIs on EMR. See #2090
     if sys.version_info[0] == 2 or sys.version_info >= (3, 5):
-        setuptools_kwargs['install_requires'].extend([
+        setuptools_kwargs['extras_require']['google'] = [
             'google-cloud-dataproc>=0.3.0',
             'google-cloud-logging>=1.9.0',
             'google-cloud-storage>=1.13.1',
-        ])
+        ]
 
         # grpcio 1.11.0 and 1.12.0 seem not to compile with PyPy
         if hasattr(sys, 'pypy_version_info'):
-            setuptools_kwargs['install_requires'].append('grpcio<=1.10.0')
+            setuptools_kwargs['extras_require']['google'].append(
+                'grpcio<=1.10.0')
 
     # rapidjson exists on Python 3 only
     if sys.version_info >= (3, 0):
-        setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
-        setuptools_kwargs['tests_require'].append('rapidjson')
+        setuptools_kwargs['extras_require']['rapidjson'] = ['python-rapidjson']
+        setuptools_kwargs['tests_require'].append('python-rapidjson')
 
 except ImportError:
     from distutils.core import setup

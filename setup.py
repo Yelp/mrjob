@@ -28,6 +28,7 @@ try:
                 'boto3>=1.4.6',
                 'botocore>=1.6.0',
             ],
+            'simplejson': ['simplejson'],
             'ujson': ['ujson'],
         },
         'install_requires': [
@@ -61,8 +62,8 @@ try:
 
     # rapidjson exists on Python 3 only
     if sys.version_info >= (3, 0):
-        setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
-        setuptools_kwargs['tests_require'].append('rapidjson')
+        setuptools_kwargs['extras_require']['rapidjson'] = ['python-rapidjson']
+        setuptools_kwargs['tests_require'].append('python-rapidjson')
 
 except ImportError:
     from distutils.core import setup

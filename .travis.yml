@@ -13,7 +13,7 @@ before_install:
 install:
   - "pip install -e .[aws]"
   - "pip install -e .[google]"
-  - "pip install ujson warcio"
+  - "pip install simplejson ujson warcio"
   - "pip install rapidjson || true"
   - "pip install pyspark || true"
   - "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64"

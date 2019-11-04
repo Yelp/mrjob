@@ -1110,7 +1110,7 @@ class TestStepsWithoutMRJobScript(MockBoto3TestCase):
         runner.cleanup()
 
     def test_spark_step_without_mr_job_script(self):
-        steps = MRNullSpark()._steps_desc()
+        steps = MRNullSpark([])._steps_desc()
 
         # need to be able to call the script's spark() method
         self.assertRaises(ValueError,
@@ -1230,7 +1230,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
             {'spark', 'spark_jar', 'spark_script', 'streaming'}))
 
     def test_spark_mr_job(self):
-        job = MRNullSpark()
+        job = MRNullSpark([])
         job.sandbox()
 
         with job.make_runner() as runner:

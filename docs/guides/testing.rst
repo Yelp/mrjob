@@ -269,8 +269,3 @@ the job's output protocol using :py:meth:`~mrjob.job.MRJob.parse_output`::
 .. warning:: Do not let your tests depend on the input lines being processed in
              a certain order. Both mrjob and Hadoop divide input
              non-deterministically.
-
-.. note::
-
-   In mrjob versions prior to 0.6.0, you have to parse output line by line;
-   see :ref:`runners-programmatically` for an example.

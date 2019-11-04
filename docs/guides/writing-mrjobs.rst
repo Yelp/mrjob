@@ -237,7 +237,7 @@ lines containing the string "kitty"::
 
 
     if __name__ == '__main__':
-        KittyJob().run()
+        KittyJob.run()
 
 Step commands are run without a shell, so if you want to use pipes, etc, you'll
 need to run them in a subshell. For example:
@@ -304,7 +304,7 @@ Here's a job that tests filters using :command:`grep`::
 
 
     if __name__ == '__main__':
-        KittiesJob().run()
+        KittiesJob.run()
 
 The output of the job should always be ``0``, since every line that gets to
 :py:func:`test_for_kitty()` is filtered by :command:`grep` to have "kitty" in

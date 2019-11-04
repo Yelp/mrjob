@@ -58,7 +58,6 @@ from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_no_runner import MRNoRunner
 from tests.mr_rot13lib import MRRot13Lib
 from tests.mr_runner import MRRunner
-from tests.mr_sort_values import MRSortValues
 from tests.mr_spark_method_wordcount import MRSparkMethodWordcount
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
@@ -158,7 +157,7 @@ class MRInitJob(MRJob):
 class MRInitTestCase(EmptyMrjobConfTestCase):
 
     def test_mapper(self):
-        j = MRInitJob()
+        j = MRInitJob([])
         j.mapper_init()
         self.assertEqual(next(j.mapper(None, None)), (None, j.sum_amount))
 
@@ -181,7 +180,7 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
 class ParseOutputTestCase(BasicTestCase):
 
     def test_default_protocol(self):
-        job = MRJob()
+        job = MRJob([])
 
         data = iter([b'1\t2', b'\n{"3": ', b'4}\t"fi', b've"\n'])
         self.assertEqual(
@@ -189,7 +188,7 @@ class ParseOutputTestCase(BasicTestCase):
             [(1, 2), ({'3': 4}, 'five')])
 
     def test_bytes_value_protocol(self):
-        job = MRJob()
+        job = MRJob([])
         job.OUTPUT_PROTOCOL = BytesValueProtocol
 
         data = iter([b'one\nt', b'wo\nthree\n', b'four\nfive\n'])
@@ -221,13 +220,13 @@ class NoTzsetTestCase(BasicTestCase):
             time.tzset = self._real_time_tzset
 
     def test_init_does_not_require_tzset(self):
-        MRJob()
+        MRJob([])
 
 
 class CountersAndStatusTestCase(BasicTestCase):
 
     def test_counters_and_status(self):
-        mr_job = MRJob().sandbox()
+        mr_job = MRJob([]).sandbox()
 
         mr_job.increment_counter('Foo', 'Bar')
         mr_job.set_status('Initializing qux gradients...')
@@ -244,17 +243,17 @@ class CountersAndStatusTestCase(BasicTestCase):
                           'other': []})
 
     def test_unicode_set_status(self):
-        mr_job = MRJob().sandbox()
+        mr_job = MRJob([]).sandbox()
         # shouldn't raise an exception
         mr_job.set_status(u'💩')
 
     def test_unicode_counter(self):
-        mr_job = MRJob().sandbox()
+        mr_job = MRJob([]).sandbox()
         # shouldn't raise an exception
         mr_job.increment_counter(u'💩', 'x', 1)
 
     def test_negative_and_zero_counters(self):
-        mr_job = MRJob().sandbox()
+        mr_job = MRJob([]).sandbox()
 
         mr_job.increment_counter('Foo', 'Bar', -1)
         mr_job.increment_counter('Foo', 'Baz')
@@ -266,7 +265,7 @@ class CountersAndStatusTestCase(BasicTestCase):
                          {'Foo': {'Bar': -1, 'Baz': 0}, 'Qux': {'Quux': 0}})
 
     def test_bad_counter_amounts(self):
-        mr_job = MRJob().sandbox()
+        mr_job = MRJob([]).sandbox()
 
         self.assertRaises(TypeError,
                           mr_job.increment_counter, 'Foo', 'Bar', 'two')
@@ -276,7 +275,7 @@ class CountersAndStatusTestCase(BasicTestCase):
 
     def test_commas_in_counters(self):
         # commas should be replaced with semicolons
-        mr_job = MRJob().sandbox()
+        mr_job = MRJob([]).sandbox()
 
         mr_job.increment_counter('Bad items', 'a, b, c')
         mr_job.increment_counter('girl, interrupted', 'movie')
@@ -316,7 +315,7 @@ class ProtocolsTestCase(BasicTestCase):
                          [_im_func(g) for g in gs])
 
     def test_default_protocols(self):
-        mr_job = MRBoringJob()
+        mr_job = MRBoringJob([])
 
         self.assertMethodsEqual(
             mr_job.pick_protocols(0, 'mapper'),
@@ -637,7 +636,7 @@ class JobConfTestCase(BasicTestCase):
                    'false_value': False}
 
     def test_empty(self):
-        mr_job = MRJob()
+        mr_job = MRJob([])
 
         self.assertEqual(mr_job._runner_kwargs()['jobconf'], {})
 
@@ -655,12 +654,12 @@ class JobConfTestCase(BasicTestCase):
 
     def test_bool_options_are_unchanged(self):
         # translating True to 'true' is now handled in the runner
-        mr_job = self.MRBoolJobConfJob()
+        mr_job = self.MRBoolJobConfJob([])
         self.assertEqual(mr_job.jobconf()['true_value'], True)
         self.assertEqual(mr_job.jobconf()['false_value'], False)
 
     def test_jobconf_method(self):
-        mr_job = self.MRJobConfJob()
+        mr_job = self.MRJobConfJob([])
 
         self.assertEqual(mr_job._runner_kwargs()['jobconf'],
                          {'mapred.foo': 'garply',
@@ -679,7 +678,7 @@ class JobConfTestCase(BasicTestCase):
                           'mapred.qux': 'quux'})
 
     def test_redefined_jobconf_method(self):
-        mr_job = self.MRJobConfMethodJob()
+        mr_job = self.MRJobConfMethodJob([])
 
         self.assertEqual(mr_job._runner_kwargs()['jobconf'],
                          {'mapred.baz': 'bar'})
@@ -699,7 +698,7 @@ class JobConfTestCase(BasicTestCase):
 class LibjarsTestCase(BasicTestCase):
 
     def test_default(self):
-        job = MRJob()
+        job = MRJob([])
 
         self.assertEqual(job._runner_kwargs()['libjars'], [])
 
@@ -711,7 +710,7 @@ class LibjarsTestCase(BasicTestCase):
 
     def test_libjars_attr(self):
         with patch.object(MRJob, 'LIBJARS', ['/left/dora.jar']):
-            job = MRJob()
+            job = MRJob([])
 
             self.assertEqual(job._runner_kwargs()['libjars'],
                              ['/left/dora.jar'])
@@ -727,7 +726,7 @@ class LibjarsTestCase(BasicTestCase):
         job_dir = dirname(MRJob.mr_job_script())
 
         with patch.object(MRJob, 'LIBJARS', ['cookie.jar', '/left/dora.jar']):
-            job = MRJob()
+            job = MRJob([])
 
             self.assertEqual(
                 job._runner_kwargs()['libjars'],
@@ -739,7 +738,7 @@ class LibjarsTestCase(BasicTestCase):
         with patch.dict('os.environ', A='/path/to/a', B='b'):
             with patch.object(MRJob, 'LIBJARS',
                               ['$A/cookie.jar', '$B/honey.jar']):
-                job = MRJob()
+                job = MRJob([])
 
                 # libjars() peeks into envvars to figure out if the path
                 # is relative or absolute
@@ -756,17 +755,6 @@ class LibjarsTestCase(BasicTestCase):
                              ['honey.jar', 'cookie.jar'])
 
 
-class MRSortValuesAndMore(MRSortValues):
-    PARTITIONER = 'org.apache.hadoop.mapred.lib.HashPartitioner'
-
-    JOBCONF = {
-        'stream.num.map.output.key.fields': 3,
-        'mapred.output.key.comparator.class':
-        'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
-        'mapred.text.key.comparator.options': '-k1 -k2nr',
-    }
-
-
 class HadoopFormatTestCase(BasicTestCase):
 
     # MRHadoopFormatJob is imported above
@@ -781,7 +769,7 @@ class HadoopFormatTestCase(BasicTestCase):
             return 'mapred.EbcdicDb2EnterpriseXmlOutputFormat'
 
     def test_empty(self):
-        mr_job = MRJob()
+        mr_job = MRJob([])
 
         self.assertEqual(mr_job._runner_kwargs()['hadoop_input_format'],
                          None)
@@ -789,7 +777,7 @@ class HadoopFormatTestCase(BasicTestCase):
                          None)
 
     def test_hadoop_format_attributes(self):
-        mr_job = MRHadoopFormatJob()
+        mr_job = MRHadoopFormatJob([])
 
         self.assertEqual(mr_job._runner_kwargs()['hadoop_input_format'],
                          'mapred.FooInputFormat')
@@ -797,7 +785,7 @@ class HadoopFormatTestCase(BasicTestCase):
                          'mapred.BarOutputFormat')
 
     def test_hadoop_format_methods(self):
-        mr_job = self.MRHadoopFormatMethodJob()
+        mr_job = self.MRHadoopFormatMethodJob([])
 
         self.assertEqual(mr_job._runner_kwargs()['hadoop_input_format'],
                          'mapred.ReasonableInputFormat')
@@ -811,12 +799,12 @@ class PartitionerTestCase(BasicTestCase):
         PARTITIONER = 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
 
     def test_empty(self):
-        mr_job = MRJob()
+        mr_job = MRJob([])
 
         self.assertEqual(mr_job._runner_kwargs()['partitioner'], None)
 
     def test_partitioner_attr(self):
-        mr_job = self.MRPartitionerJob()
+        mr_job = self.MRPartitionerJob([])
 
         self.assertEqual(
             mr_job._runner_kwargs()['partitioner'],
@@ -826,7 +814,7 @@ class PartitionerTestCase(BasicTestCase):
 class IsTaskTestCase(BasicTestCase):
 
     def test_is_task(self):
-        self.assertEqual(MRJob().is_task(), False)
+        self.assertEqual(MRJob([]).is_task(), False)
         self.assertEqual(MRJob(['--mapper']).is_task(), True)
         self.assertEqual(MRJob(['--reducer']).is_task(), True)
         self.assertEqual(MRJob(['--combiner']).is_task(), True)
@@ -847,7 +835,7 @@ class StepNumTestCase(BasicTestCase):
                              b'null\t"foo"\n' + b'"foo"\tnull\n' +
                              b'null\t"bar"\n' + b'"bar"\tnull\n')
 
-        mapper0 = MRTwoStepJob()
+        mapper0 = MRTwoStepJob([])
         test_mapper0(mapper0, mapper0_input_lines)
 
         # --step-num=0 shouldn't actually be necessary
@@ -865,7 +853,7 @@ class StepNumTestCase(BasicTestCase):
             self.assertEqual(mr_job.stdout.getvalue(),
                              b'"bar"\t1\n' + b'"foo"\t1\n' + b'null\t2\n')
 
-        reducer0 = MRTwoStepJob()
+        reducer0 = MRTwoStepJob([])
         test_reducer0(reducer0, reducer0_input_lines)
 
         # --step-num=0 shouldn't actually be necessary
@@ -881,18 +869,18 @@ class StepNumTestCase(BasicTestCase):
             self.assertEqual(mr_job.stdout.getvalue(),
                              b'1\t"bar"\n' + b'1\t"foo"\n' + b'2\tnull\n')
 
-        mapper1 = MRTwoStepJob()
+        mapper1 = MRTwoStepJob([])
         test_mapper1(mapper1, mapper1_input_lines)
 
     def test_nonexistent_steps(self):
-        mr_job = MRTwoStepJob()
+        mr_job = MRTwoStepJob([])
         mr_job.sandbox()
         self.assertRaises(ValueError, mr_job.run_reducer, 1)
         self.assertRaises(ValueError, mr_job.run_mapper, 2)
         self.assertRaises(ValueError, mr_job.run_reducer, -1)
 
     def test_wrong_type_of_step(self):
-        mr_job = MRJob()
+        mr_job = MRJob([])
         mr_job.spark = MagicMock()
 
         self.assertRaises((TypeError, ValueError), mr_job.run_mapper)
@@ -1014,7 +1002,7 @@ class BadMainTestCase(BasicTestCase):
 
     def test_bad_main_catch(self):
         sys.argv.append('--mapper')
-        self.assertRaises(UsageError, MRBoringJob().make_runner)
+        self.assertRaises(UsageError, MRBoringJob([]).make_runner)
         sys.argv = sys.argv[:-1]
 
 
@@ -1034,7 +1022,7 @@ class ProtocolTypeTestCase(BasicTestCase):
     def test_attrs_should_be_classes(self):
         log = self.start(patch('mrjob.job.log'))
 
-        job = self.StrangeJob()
+        job = self.StrangeJob([])
         self.assertIsInstance(job.input_protocol(), JSONProtocol)
         self.assertIsInstance(job.internal_protocol(), JSONProtocol)
         self.assertIsInstance(job.output_protocol(), JSONProtocol)
@@ -1419,7 +1407,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         class TestJob(MRJob):
             FILES = ['sandbox.py', 'quiet.py#q.py']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1433,7 +1421,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         class TestJob(MRJob):
             FILES = [abspath(__file__)]
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1460,7 +1448,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         os.environ['ABSPATH'] = '/var/foo.db'
         os.environ['RELPATH'] = 'bar.txt'
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1475,7 +1463,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         class TestJob(MRJob):
             FILES = ['fs/test_s3.py']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1490,7 +1478,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         class TestJob(MRJob):
             FILES = ['fs/test_s3.py#test_s3.py']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1506,7 +1494,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def files(self):
                 return ['foo/bar.txt']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1518,7 +1506,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def files(self):
                 return '/var/foo.db'
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1530,7 +1518,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def files(self):
                 pass
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(job._runner_kwargs()['upload_files'], [])
 
@@ -1541,7 +1529,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def files(self):
                 return ['/var/foo.db']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1567,7 +1555,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         class TestJob(MRJob):
             DIRS = ['/tmp', 'fs', 'logs']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_dirs'],
@@ -1594,7 +1582,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def dirs(self):
                 return ['logs']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_dirs'],
@@ -1606,7 +1594,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def dirs(self):
                 return '/tmp'
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_dirs'],
@@ -1619,7 +1607,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def dirs(self):
                 pass
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(job._runner_kwargs()['upload_dirs'], [])
 
@@ -1630,7 +1618,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def dirs(self):
                 return ['/tmp']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_dirs'],
@@ -1653,7 +1641,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         class TestJob(MRJob):
             ARCHIVES = ['/tmp/dir.tar.gz', 'foo.zip']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_archives'],
@@ -1680,7 +1668,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def archives(self):
                 return ['logs.tar.gz']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_archives'],
@@ -1693,7 +1681,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def archives(self):
                 return '/tmp/dir.tar.gz'
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_archives'],
@@ -1706,7 +1694,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def archives(self):
                 pass
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(job._runner_kwargs()['upload_archives'], [])
 
@@ -1717,7 +1705,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             def archives(self):
                 return ['/tmp/dirs.tar.gz']
 
-        job = TestJob()
+        job = TestJob([])
 
         self.assertEqual(
             job._runner_kwargs()['upload_archives'],
@@ -1740,7 +1728,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
         # MRUploadAttrsJob uses FILES, DIRS, and ARCHIVES to upload
         # a static set of files
         self.assertEqual(
-            set(run_job(MRUploadAttrsJob())),
+            set(run_job(MRUploadAttrsJob([]))),
             {
                 '.',
                 './empty',
@@ -1755,7 +1743,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
 
     def test_use_dirs_to_import_code(self):
         self.assertEqual(
-            run_job(MRRot13Lib(), b'The quick brown fox'),
+            run_job(MRRot13Lib([]), b'The quick brown fox'),
             {None: 'Gur dhvpx oebja sbk\n'}
         )
 
@@ -1776,7 +1764,7 @@ class SparkJobMethodsTestCase(SandboxedTestCase, SingleSparkContextTestCase):
             patch('mrjob.job.MRJob.sandbox'))
 
     def test_job_can_be_pickled_and_unpicked(self):
-        job = MRJob()
+        job = MRJob([])
 
         pickled_job = pyspark.cloudpickle.dumps(job)
         pyspark.cloudpickle.loads(pickled_job)
@@ -2119,12 +2107,12 @@ class TestPassThroughRunner(BasicTestCase):
                 return value
 
     def test_no_pass_through(self):
-        self.assertEqual(self.get_value(MRNoRunner()), None)
+        self.assertEqual(self.get_value(MRNoRunner([])), None)
         self.assertEqual(self.get_value(MRNoRunner(['-r', 'inline'])), None)
         self.assertEqual(self.get_value(MRNoRunner(['-r', 'local'])), None)
 
     def test_pass_through(self):
-        self.assertEqual(self.get_value(MRRunner()), None)
+        self.assertEqual(self.get_value(MRRunner([])), None)
         self.assertEqual(self.get_value(MRRunner(['-r', 'inline'])), 'inline')
         self.assertEqual(self.get_value(MRRunner(['-r', 'local'])), 'local')
 
@@ -2132,7 +2120,7 @@ class TestPassThroughRunner(BasicTestCase):
 class StdStreamTestCase(BasicTestCase):
 
     def test_normal_python(self):
-        job = MRJob()
+        job = MRJob([])
 
         if PY2:
             self.assertEqual(job.stdin, sys.stdin)
@@ -2158,7 +2146,7 @@ class StdStreamTestCase(BasicTestCase):
 
         with patch.multiple(sys, stdin=mock_stdin,
                             stdout=mock_stdout, stderr=mock_stderr):
-            job = MRJob()
+            job = MRJob([])
 
             self.assertEqual(job.stdin, mock_stdin.buffer)
             self.assertEqual(job.stdout, mock_stdout)

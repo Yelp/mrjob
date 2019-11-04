@@ -1060,7 +1060,7 @@ class PassStepsToRunnerTestCase(BasicTestCase):
             self.assertFalse(self.log.warning.called)
 
     def test_no_steps(self):
-        job = MRJob()
+        job = MRJob([])
         job.sandbox()
 
         # it's possible to make a runner with the base MRJob, but it has
@@ -1138,7 +1138,7 @@ class TestStepsWithoutMRJobScript(MockBoto3TestCase):
 class UnsupportedStepsTestCase(MockBoto3TestCase):
 
     def test_base_classes_cant_have_steps(self):
-        steps = MRTwoStepJob()._steps_desc()
+        steps = MRTwoStepJob([])._steps_desc()
 
         self.assertRaises(NotImplementedError, MRJobRunner, steps=steps)
 
@@ -1311,7 +1311,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 ['<step 0 output>', '<step 0 input>'])
 
     def test_streaming_step_not_okay(self):
-        job = MRTwoStepJob()
+        job = MRTwoStepJob([])
         job.sandbox()
 
         with job.make_runner() as runner:

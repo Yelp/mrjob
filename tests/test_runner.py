@@ -277,7 +277,7 @@ class TestCatOutput(SandboxedTestCase):
 
         runner = InlineMRJobRunner(conf_paths=[], output_dir=output_dir)
 
-        self.assertEqual(sorted(to_lines(runner.stream_output())),
+        self.assertEqual(sorted(to_lines(runner.cat_output())),
                          [b'cats\n'])
 
 

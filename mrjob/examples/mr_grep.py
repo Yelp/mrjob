@@ -24,11 +24,10 @@ class MRGrepJob(MRJob):
 
         self.add_passthru_arg(
             '-e', '--expression',
+            required=True,
             help=( 'Expression to search for. Required.'))
 
     def mapper_cmd(self):
-        if self.options.expression is None:
-            raise ValueError("Must specify --expression")
         return cmd_line(['grep', '-e', self.options.expression])
 
 

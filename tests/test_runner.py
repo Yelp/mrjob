@@ -309,7 +309,7 @@ class CheckInputPathsTestCase(SandboxedTestCase):
             self.assertRaises(StopIteration, runner.run)
 
     def test_stdin_is_fine(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -323,7 +323,7 @@ class CheckInputPathsTestCase(SandboxedTestCase):
             runner.run()
 
     def test_check_input_paths_enabled_by_default(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         with job.make_runner() as runner:
             self.assertTrue(runner._opts['check_input_paths'])
 
@@ -333,7 +333,7 @@ class CheckInputPathsTestCase(SandboxedTestCase):
             self.assertFalse(runner._opts['check_input_paths'])
 
     def test_can_disable_check_input_paths_in_config(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         with mrjob_conf_patcher(
                 {'runners': {'inline': {'check_input_paths': False}}}):
             with job.make_runner() as runner:
@@ -343,7 +343,7 @@ class CheckInputPathsTestCase(SandboxedTestCase):
 class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
 
     def test_job_closed_on_cleanup(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         with job.make_runner() as runner:
             # do nothing
             self.assertFalse(runner._closed)
@@ -1038,7 +1038,7 @@ class PassStepsToRunnerTestCase(BasicTestCase):
         self.log = self.start(patch('mrjob.runner.log'))
 
     def test_job_passes_in_steps(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1085,7 +1085,7 @@ class TestStepsWithoutMRJobScript(MockBoto3TestCase):
 
     def test_classic_streaming_step_without_mr_job_script(self):
         # classic MRJob mappers and reducers require a MRJob script
-        steps = MRWordCount()._steps_desc()
+        steps = MRWordCount([])._steps_desc()
 
         self.assertRaises(ValueError,
                           LocalMRJobRunner,

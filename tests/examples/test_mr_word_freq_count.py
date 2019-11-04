@@ -22,7 +22,7 @@ from tests.sandbox import BasicTestCase
 class MRWordFreqCountTestCase(BasicTestCase):
 
     def test_empty(self):
-        self.assertEqual(run_job(MRWordFreqCount()), {})
+        self.assertEqual(run_job(MRWordFreqCount([])), {})
 
     def test_the_wheels_on_the_bus(self):
         RAW_INPUT = b"""
@@ -45,5 +45,5 @@ class MRWordFreqCountTestCase(BasicTestCase):
             u'wheels': 2,
         }
 
-        self.assertEqual(run_job(MRWordFreqCount(), RAW_INPUT),
+        self.assertEqual(run_job(MRWordFreqCount([]), RAW_INPUT),
                          EXPECTED_OUTPUT)

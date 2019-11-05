@@ -31,7 +31,8 @@ class MRGrepJob(MRJob):
         # grep will return exit status 1 if no matching lines are found
         return cmd_line([
             'sh', '-c',
-            'grep -e %s || true' % cmd_line([self.options.expression])])
+            'grep -e %s || RC=$?; if [ $RC -ne 1 ]; then (exit $RC); fi' % (
+                cmd_line([self.options.expression]))])
 
 
 if __name__ == '__main__':

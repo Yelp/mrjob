@@ -15,6 +15,7 @@ from io import BytesIO
 from unittest import skipIf
 
 from mrjob.examples.mr_grep import MRGrepJob
+from mrjob.step import StepFailedException
 from mrjob.util import to_lines
 from mrjob.util import which
 
@@ -25,6 +26,16 @@ class MRGrepJobTestCase(SandboxedTestCase):
 
     def test_requires_dash_e(self):
         self.assertRaises(ValueError, MRGrepJob, [])
+
+    @skipIf(not which('grep'), 'grep command not in path')
+    def test_bad_regex(self):
+        # make sure we don't swallow return codes from grep other
+        # than 1 (no matches found)
+        job = MRGrepJob(['-r', 'local', '-e', '****'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
 
     @skipIf(not which('grep'), 'grep command not in path')
     def test_filters(self):

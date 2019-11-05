@@ -277,7 +277,7 @@ class TestCatOutput(SandboxedTestCase):
 
         runner = InlineMRJobRunner(conf_paths=[], output_dir=output_dir)
 
-        self.assertEqual(sorted(to_lines(runner.stream_output())),
+        self.assertEqual(sorted(to_lines(runner.cat_output())),
                          [b'cats\n'])
 
 
@@ -309,7 +309,7 @@ class CheckInputPathsTestCase(SandboxedTestCase):
             self.assertRaises(StopIteration, runner.run)
 
     def test_stdin_is_fine(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -323,7 +323,7 @@ class CheckInputPathsTestCase(SandboxedTestCase):
             runner.run()
 
     def test_check_input_paths_enabled_by_default(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         with job.make_runner() as runner:
             self.assertTrue(runner._opts['check_input_paths'])
 
@@ -333,7 +333,7 @@ class CheckInputPathsTestCase(SandboxedTestCase):
             self.assertFalse(runner._opts['check_input_paths'])
 
     def test_can_disable_check_input_paths_in_config(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         with mrjob_conf_patcher(
                 {'runners': {'inline': {'check_input_paths': False}}}):
             with job.make_runner() as runner:
@@ -343,7 +343,7 @@ class CheckInputPathsTestCase(SandboxedTestCase):
 class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
 
     def test_job_closed_on_cleanup(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         with job.make_runner() as runner:
             # do nothing
             self.assertFalse(runner._closed)
@@ -1038,7 +1038,7 @@ class PassStepsToRunnerTestCase(BasicTestCase):
         self.log = self.start(patch('mrjob.runner.log'))
 
     def test_job_passes_in_steps(self):
-        job = MRWordCount()
+        job = MRWordCount([])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1060,7 +1060,7 @@ class PassStepsToRunnerTestCase(BasicTestCase):
             self.assertFalse(self.log.warning.called)
 
     def test_no_steps(self):
-        job = MRJob()
+        job = MRJob([])
         job.sandbox()
 
         # it's possible to make a runner with the base MRJob, but it has
@@ -1085,7 +1085,7 @@ class TestStepsWithoutMRJobScript(MockBoto3TestCase):
 
     def test_classic_streaming_step_without_mr_job_script(self):
         # classic MRJob mappers and reducers require a MRJob script
-        steps = MRWordCount()._steps_desc()
+        steps = MRWordCount([])._steps_desc()
 
         self.assertRaises(ValueError,
                           LocalMRJobRunner,
@@ -1110,7 +1110,7 @@ class TestStepsWithoutMRJobScript(MockBoto3TestCase):
         runner.cleanup()
 
     def test_spark_step_without_mr_job_script(self):
-        steps = MRNullSpark()._steps_desc()
+        steps = MRNullSpark([])._steps_desc()
 
         # need to be able to call the script's spark() method
         self.assertRaises(ValueError,
@@ -1138,7 +1138,7 @@ class TestStepsWithoutMRJobScript(MockBoto3TestCase):
 class UnsupportedStepsTestCase(MockBoto3TestCase):
 
     def test_base_classes_cant_have_steps(self):
-        steps = MRTwoStepJob()._steps_desc()
+        steps = MRTwoStepJob([])._steps_desc()
 
         self.assertRaises(NotImplementedError, MRJobRunner, steps=steps)
 
@@ -1230,7 +1230,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
             {'spark', 'spark_jar', 'spark_script', 'streaming'}))
 
     def test_spark_mr_job(self):
-        job = MRNullSpark()
+        job = MRNullSpark([])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1311,7 +1311,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 ['<step 0 output>', '<step 0 input>'])
 
     def test_streaming_step_not_okay(self):
-        job = MRTwoStepJob()
+        job = MRTwoStepJob([])
         job.sandbox()
 
         with job.make_runner() as runner:

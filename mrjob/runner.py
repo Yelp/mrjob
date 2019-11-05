@@ -555,18 +555,6 @@ class MRJobRunner(object):
             for chunk in self.fs._cat_file(filename):
                 yield chunk
 
-    def stream_output(self):
-        """Like :py:meth:`cat_output` except that it groups bytes into
-        lines. Equivalent to ``mrjob.util.to_lines(runner.cat_output())``.
-
-        .. deprecated:: 0.6.0
-        """
-        log.warning('stream_output() is deprecated and will be removed in'
-                    ' v0.7.0. use mrjob.util.to_lines(runner.cat_output())'
-                    ' instead.')
-
-        return to_lines(self.cat_output())
-
     def _cleanup_mode(self, mode=None):
         """Actual cleanup action to take based on various options"""
         if self._script_path and not self._ran_job:

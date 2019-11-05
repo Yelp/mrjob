@@ -100,8 +100,7 @@ class MRJob(object):
             with mr_job.make_runner() as runner:
                 ...
 
-        Passing in ``None`` is the same as passing in ``[]`` (if you want
-        to parse args from ``sys.argv``, call :py:meth:`MRJob.run`).
+        Passing in ``None`` is the same as passing in ``sys.argv[1:]``
 
         For a full list of command-line arguments, run:
         ``python -m mrjob.job --help``
@@ -120,15 +119,13 @@ class MRJob(object):
                                          add_help=False)
         self.configure_args()
 
-        # don't pass None to parse_args unless we're actually running
-        # the MRJob script
-        if args is _READ_ARGS_FROM_SYS_ARGV:
+        if args is None:
             self._cl_args = sys.argv[1:]
         else:
             # don't pass sys.argv to self.arg_parser, and have it
             # raise an exception on error rather than printing to stderr
             # and exiting.
-            self._cl_args = args or []
+            self._cl_args = args
 
             def error(msg):
                 raise ValueError(msg)
@@ -615,8 +612,7 @@ class MRJob(object):
         * Run the entire job. See :py:meth:`run_job`
         """
         # load options from the command line
-        mr_job = cls(args=_READ_ARGS_FROM_SYS_ARGV)
-        mr_job.execute()
+        cls().execute()
 
     def run_job(self):
         """Run the all steps of the job, logging errors (and debugging output

@@ -24,7 +24,7 @@ class MRBoomTestCase(BasicTestCase):
 
     def test_says_boom(self):
         try:
-            run_job(MRBoom(), b'some input')
+            run_job(MRBoom([]), b'some input')
         except Exception as ex:
             self.assertIn('BOOM', str(ex))
         else:

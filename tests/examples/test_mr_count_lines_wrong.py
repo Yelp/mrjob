@@ -20,7 +20,7 @@ from tests.sandbox import SandboxedTestCase
 class MRCountLinesWrongTestCase(SandboxedTestCase):
 
     def test_empty(self):
-        job = MRCountLinesWrong()
+        job = MRCountLinesWrong([])
         job.sandbox()
 
         with job.make_runner() as runner:

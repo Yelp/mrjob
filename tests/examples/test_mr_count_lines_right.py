@@ -20,7 +20,7 @@ from tests.sandbox import SandboxedTestCase
 class MRCountLinesRightTestCase(SandboxedTestCase):
 
     def test_empty(self):
-        self.assertEqual(run_job(MRCountLinesRight()), {None: 0})
+        self.assertEqual(run_job(MRCountLinesRight([])), {None: 0})
 
     def test_files(self):
         cat_file = self.makefile('cats.txt', b'cats are the best')

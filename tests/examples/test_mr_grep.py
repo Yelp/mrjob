@@ -24,7 +24,7 @@ from tests.sandbox import SandboxedTestCase
 class MRGrepJobTestCase(SandboxedTestCase):
 
     def test_requires_dash_e(self):
-        self.assertRaises(ValueError, MRGrepJob)
+        self.assertRaises(ValueError, MRGrepJob, [])
 
     @skipIf(not which('grep'), 'grep command not in path')
     def test_filters(self):
@@ -39,4 +39,4 @@ class MRGrepJobTestCase(SandboxedTestCase):
 
             output = list(to_lines(runner.cat_output()))
 
-            self.assertEqual(output, ['mary had a little lamb\n'] * 2)
+            self.assertEqual(output, [b'mary had a little lamb\n'] * 2)

@@ -220,7 +220,7 @@ sure our methods are behaving as expected::
     class MRInitTestCase(TestCase):
 
         def test_mapper(self):
-            j = MRInitJob()
+            j = MRInitJob([])
             j.mapper_init()
             self.assertEqual(j.mapper(None, None).next(), (None, j.sum_amount))
 
@@ -241,7 +241,7 @@ This example reads from **stdin** (hence the ``-`` parameter)::
         def test_init_funcs(self):
             num_inputs = 2
             stdin = BytesIO(b'x\n' * num_inputs)
-            mr_job = MRInitJob(['--no-conf', '-'])
+            mr_job = MRInitJob(['--no-conf'])
             mr_job.sandbox(stdin=stdin)
 
 To run the job without leaving temp files on your system, use the
@@ -269,8 +269,3 @@ the job's output protocol using :py:meth:`~mrjob.job.MRJob.parse_output`::
 .. warning:: Do not let your tests depend on the input lines being processed in
              a certain order. Both mrjob and Hadoop divide input
              non-deterministically.
-
-.. note::
-
-   In mrjob versions prior to 0.6.0, you have to parse output line by line;
-   see :ref:`runners-programmatically` for an example.

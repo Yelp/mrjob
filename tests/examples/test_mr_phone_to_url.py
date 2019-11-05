@@ -25,7 +25,7 @@ from tests.job import run_job
 class MRPhoneToURLTestCase(SandboxedTestCase):
 
     def test_empty(self):
-        self.assertEqual(run_job(MRPhoneToURL()), {})
+        self.assertEqual(run_job(MRPhoneToURL([])), {})
 
     def test_three_pages(self):
         wet1 = BytesIO()

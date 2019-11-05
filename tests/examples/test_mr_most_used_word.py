@@ -20,7 +20,7 @@ from tests.sandbox import BasicTestCase
 class MRMostUsedWordTestCase(BasicTestCase):
 
     def test_empty(self):
-        self.assertEqual(run_job(MRMostUsedWord()), {})
+        self.assertEqual(run_job(MRMostUsedWord([])), {})
 
     def test_ignore_stop_words(self):
         RAW_INPUT = b"""
@@ -33,5 +33,5 @@ class MRMostUsedWordTestCase(BasicTestCase):
             None: u'car',
         }
 
-        self.assertEqual(run_job(MRMostUsedWord(), RAW_INPUT),
+        self.assertEqual(run_job(MRMostUsedWord([]), RAW_INPUT),
                          EXPECTED_OUTPUT)

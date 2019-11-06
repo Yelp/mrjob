@@ -22,4 +22,8 @@ def run_job(job, raw_input=b''):
 
     with job.make_runner() as runner:
         runner.run()
-        return dict(job.parse_output(runner.cat_output()))
+        return {
+            tuple(k) if isinstance(k, list) else k: v
+            for k, v in
+            job.parse_output(runner.cat_output())
+        }

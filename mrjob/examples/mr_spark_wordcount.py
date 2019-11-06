@@ -39,7 +39,7 @@ class MRSparkWordcount(MRJob):
         sc.stop()
 
     def get_words(self, line):
-        return WORD_RE.findall(line)
+        return [w.lower() for w in WORD_RE.findall(line)]
 
 
 if __name__ == '__main__':

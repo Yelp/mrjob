@@ -31,7 +31,7 @@ class MRGrepJobTestCase(SandboxedTestCase):
     def test_bad_regex(self):
         # make sure we don't swallow return codes from grep other
         # than 1 (no matches found)
-        job = MRGrepJob(['-r', 'local', '-e', '****'])
+        job = MRGrepJob(['-r', 'local', '-e', '*]['])
         job.sandbox()
 
         with job.make_runner() as runner:

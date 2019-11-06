@@ -18,7 +18,11 @@ from mrjob.examples.mr_spark_most_used_word import MRSparkMostUsedWord
 from mrjob.step import StepFailedException
 
 from tests.sandbox import SandboxedTestCase
-from tests.sandbox import SingleSparkContextTestCase
+
+try:
+    import pyspark
+except ImportError:
+    pyspark = None
 
 CAR_JOKE = b'''\
      A Car Joke:
@@ -26,6 +30,7 @@ CAR_JOKE = b'''\
      When it turns into a driveway!
      '''
 
+@skipIf(pyspark is None, 'no pyspark module')
 class MRSparkMostUsedWordTestCase(SandboxedTestCase):
 
     def test_empty(self):

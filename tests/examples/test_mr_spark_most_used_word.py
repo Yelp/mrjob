@@ -11,11 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from io import BytesIO
 from unittest import skipIf
 
 from mrjob.examples.mr_spark_most_used_word import MRSparkMostUsedWord
+from mrjob.step import StepFailedException
 
-from tests.job import run_job
+from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
 
 CAR_JOKE = b'''\
@@ -24,10 +26,26 @@ CAR_JOKE = b'''\
      When it turns into a driveway!
      '''
 
-class MRSparkMostUsedWordTestCase(SingleSparkContextTestCase):
+class MRSparkMostUsedWordTestCase(SandboxedTestCase):
 
-    def test_stop_words_not_found_on_local_master(self):
-        from py4j.protocol import Py4JJavaError
+    def test_empty(self):
+        # this doesn't work on the inline runner because
+        # Spark doesn't have a working dir to upload stop_words.txt
+        # to. See below for what does and doesn't work in inline
+        # runner
+        job = MRSparkMostUsedWord(['-r', 'local'])
+        job.sandbox()
 
-        self.assertRaises(
-            Py4JJavaError, run_job, MRSparkMostUsedWord([]))
+        with job.make_runner() as runner:
+            # still doesn't work because you can't run max() on no records
+            self.assertRaises(StepFailedException, runner.run)
+
+    def test_car_joke(self):
+        job = MRSparkMostUsedWord(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(CAR_JOKE))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(b''.join(runner.cat_output()),
+                             b'"car"\n')

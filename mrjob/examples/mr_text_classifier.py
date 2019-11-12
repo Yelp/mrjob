@@ -49,11 +49,13 @@ appears in at least once.
 from collections import defaultdict
 import hashlib
 import math
+import posixpath
 import re
 
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 from mrjob.step import MRStep
+from mrjob.util import file_ext
 
 
 def encode_document(text, cats=None, id=None):
@@ -74,6 +76,28 @@ def encode_document(text, cats=None, id=None):
 
     return JSONValueProtocol.write(
         None, {'text': text, 'cats': cats, 'id': id}) + '\n'
+
+
+def parse_doc_filename(input_uri):
+    """Parse a filename like ``some_id-cat1-cat2-not_cat3.txt`` into
+    ``dict(id='some_id', cats=dict(cat1=True, cat2=True, cat3=False))``
+    """
+    # get filename without extension
+    name_with_ext = posixpath.basename(input_uri)
+    name = name_with_ext[:-len(file_ext(name_with_ext))]
+
+    parts = name.split('-')
+
+    doc_id = parts[0]
+    cats = {}
+
+    for part in parts[1:]:
+        if part.startswith('not_'):
+            cats[part[4:]] = False
+        else:
+            cats[part] = True
+
+    return dict(id=doc_id, cats=cats)
 
 
 def count_ngrams(text, max_ngram_size, stop_words):

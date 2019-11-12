@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from io import BytesIO
-
-from mrjob.examples.mr_spark_wordcount import MRSparkWordcount
+from mrjob.examples.mr_sparkaboom import MRSparKaboom
 from mrjob.util import to_lines
 
 from tests.sandbox import SingleSparkContextTestCase
 
 
-class MRSparkWordcountTestCase(SingleSparkContextTestCase):
+class MRSparkKaboomTestCase(SingleSparkContextTestCase):
 
     def test_empty(self):
-        job = MRSparkWordcount([])
+        # no lines means no KABOOM
+        job = MRSparKaboom([])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -32,21 +32,13 @@ class MRSparkWordcountTestCase(SingleSparkContextTestCase):
                 sorted(to_lines(runner.cat_output())),
                 [])
 
-    def test_count_words(self):
-        job = MRSparkWordcount([])
-        job.sandbox(
-            stdin=BytesIO(b'Mary had a little lamb\nlittle lamb\nlittle lamb'))
+    # this test is disabled because it's identical to test_spark_job_failure()
+    # in tests/test_inline.py
+    def _test_one_line(self):
+        from py4j.protocol import Py4JJavaError
+
+        job = MRSparKaboom(['-r', 'inline'])
+        job.sandbox(stdin=BytesIO(b'line\n'))
 
         with job.make_runner() as runner:
-            runner.run()
-
-            self.assertEqual(
-                sorted(to_lines(runner.cat_output())),
-                [
-                    b"('a', 1)\n",
-                    b"('had', 1)\n",
-                    b"('lamb', 3)\n",
-                    b"('little', 3)\n",
-                    b"('mary', 1)\n",
-                ]
-            )
+            self.assertRaises(Py4JJavaError, runner.run)

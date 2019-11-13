@@ -1,6 +1,7 @@
 # Copyright 2009-2010 Yelp
 # Copyright 2013 David Marin
 # Copyright 2017 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """A text classifier that uses a modified version of Naive Bayes that is not
 sensitive to document length.
 
@@ -72,7 +72,7 @@ def encode_document(text, cats=None, id=None):
     text = unicode(text)
     cats = dict((unicode(cat), bool(is_in_cat))
                 for cat, is_in_cat
-                in (cats or {}).iteritems())
+                in (cats or {}).items())
 
     return JSONValueProtocol.write(
         None, {'text': text, 'cats': cats, 'id': id}) + '\n'
@@ -171,7 +171,7 @@ class MRTextClassifier(MRJob):
         The documents themselves are passed through from step 1 to step 5.
         Ngram scoring information is passed through from step 4 to step 5.
         """
-        return [MRStep(mapper=self.parse_doc,
+        return [MRStep(mapper_raw=self.parse_doc,
                        reducer=self.count_ngram_freq),
                 MRStep(reducer=self.score_ngrams),
                 MRStep(reducer=self.score_documents_by_ngram),
@@ -214,7 +214,7 @@ class MRTextClassifier(MRJob):
                   " (don't use them to train the classifier) based on a SHA1"
                   " hash of their text"))
 
-    def load_options(self, args):
+    def load_args(self, args):
         """Parse stop_words option."""
         super(MRTextClassifier, self).load_options(args)
 
@@ -223,7 +223,7 @@ class MRTextClassifier(MRJob):
             self.stop_words.update(
                 s.strip().lower() for s in self.options.stop_words.split(','))
 
-    def parse_doc(self, _, doc):
+    def parse_doc(self, input_path, input_uri):
         """Mapper: parse documents and emit ngram information.
 
         Input: JSON-encoded documents (see :py:func:`encode_document`)
@@ -248,30 +248,27 @@ class MRTextClassifier(MRJob):
             in_test_set: boolean indicating if this doc is in the test set
             id: SHA1 hash of doc text (if not already filled)
         """
-        # only compute doc hash if we need it
-        if doc.get('id') is not None and self.options.no_test_set:
-            doc_hash = '0'  # don't need doc hash
-        else:
-            doc_hash = hashlib.sha1(doc['text'].encode('utf-8')).hexdigest()
+        # fill *id* and *cats*
+        doc = parse_doc_filename(input_uri)
 
-        # fill in ID if missing
-        if doc.get('id') is None:
-            doc['id'] = doc_hash
+        with open(input_path) as f:
+            text = f.read()
 
         # pick test/training docs
         if self.options.no_test_set:
             doc['in_test_set'] = False
         else:
+            doc_hash = hashlib.sha1(text.encode('utf-8')).hexdigest()
             doc['in_test_set'] = bool(int(doc_hash[-1], 16) % 2)
 
         # map from (n, ngram) to number of times it appears
         ngram_counts = count_ngrams(
-            doc['text'], self.options.max_ngram_size, self.stop_words)
+            text, self.options.max_ngram_size, self.stop_words)
 
         # yield the number of times the ngram appears in this doc
         # and the categories for this document, so we can train the classifier
         if not doc['in_test_set']:
-            for (n, ngram), count in ngram_counts.iteritems():
+            for (n, ngram), count in ngram_counts.items():
                 yield ('ngram', (n, ngram)), (count, doc['cats'])
 
         # yield the document itself, for safekeeping
@@ -328,7 +325,7 @@ class MRTextClassifier(MRJob):
 
         for count, cats in values:
             total_df += 1
-            for cat in cats.iteritems():
+            for cat in cats.items():
                 cat_to_df[cat] += 1
                 cat_to_tf[cat] += count
 
@@ -397,7 +394,7 @@ class MRTextClassifier(MRJob):
         # rigorous estimate, but it's good enough
         m = len(ngram_to_info)
 
-        for (n, ngram), info in ngram_to_info.iteritems():
+        for (n, ngram), info in ngram_to_info.items():
             # do this even for the special ANY ngram; it's useful
             # as a normalization factor.
             cat_to_df, cat_to_tf = info
@@ -408,7 +405,7 @@ class MRTextClassifier(MRJob):
             # calculate the probability of any given term being
             # this term for documents of each type
             cat_to_p = {}
-            for cat, t in cat_to_t.iteritems():
+            for cat, t in cat_to_t.items():
                 tf = cat_to_tf.get(cat) or 0
                 # use Laplace's rule of succession to estimate p. See:
                 # http://en.wikipedia.org/wiki/Rule_of_succession#Generalization_to_any_number_of_possibilities
@@ -548,18 +545,18 @@ class MRTextClassifier(MRJob):
 
         for (n, ngram), cat_to_score in ngrams_and_scores:
             tf = ngram_counts[(n, ngram)]
-            for cat, score in cat_to_score.iteritems():
+            for cat, score in cat_to_score.items():
                 cat_to_n_to_total_score[cat][n] += score * tf
 
         # average scores for each ngram size
         cat_to_score = {}
-        for cat, n_to_total_score in cat_to_n_to_total_score.iteritems():
+        for cat, n_to_total_score in cat_to_n_to_total_score.items():
             total_score_for_cat = 0
-            for n, total_score in n_to_total_score.iteritems():
+            for n, total_score in n_to_total_score.items():
                 total_t = ngram_counts[(n, None)]
                 total_score_for_cat += (
                     total_score /
-                    max(total_t, self.options.short_doc_threshold, 1))
+                    max(total_t, self.options.short_doc_threshold or 0, 1))
             cat_to_score[cat] = total_score_for_cat
 
         # add scores to the document, and get rid of ngram_counts
@@ -567,6 +564,7 @@ class MRTextClassifier(MRJob):
         del doc['ngram_counts']
 
         yield ('doc', doc_id), doc
+
 
 if __name__ == '__main__':
     MRTextClassifier.run()

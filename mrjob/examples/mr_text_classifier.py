@@ -216,7 +216,7 @@ class MRTextClassifier(MRJob):
 
     def load_args(self, args):
         """Parse stop_words option."""
-        super(MRTextClassifier, self).load_options(args)
+        super(MRTextClassifier, self).load_args(args)
 
         self.stop_words = set()
         if self.options.stop_words:

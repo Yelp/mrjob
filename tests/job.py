@@ -1,5 +1,6 @@
 # Copyright 2015 Yelp
 # Copyright 2017 Yelp
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +24,18 @@ def run_job(job, raw_input=b''):
     with job.make_runner() as runner:
         runner.run()
         return {
-            tuple(k) if isinstance(k, list) else k: v
+            to_dict_key(k): v
             for k, v in
             job.parse_output(runner.cat_output())
         }
+
+
+def to_dict_key(k):
+    """Recursively convert lists to tuples.
+
+    This only looks into lists, which seems to be good enough for testing
+    """
+    if isinstance(k, list):
+        return tuple(to_dict_key(item) for item in k)
+    else:
+        return k

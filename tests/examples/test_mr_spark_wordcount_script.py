@@ -16,6 +16,7 @@ from unittest import skipIf
 
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
 from mrjob.step import StepFailedException
+from mrjob.util import safeeval
 from mrjob.util import to_lines
 
 from tests.sandbox import SandboxedTestCase
@@ -57,13 +58,16 @@ class MRSparkMostUsedWordTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             runner.run()
 
+            output = sorted(
+                safeeval(line) for line in to_lines(runner.cat_output()))
+
             self.assertEqual(
-                sorted(to_lines(runner.cat_output())),
+                output,
                 [
-                    b"('a', 1)\n",
-                    b"('had', 1)\n",
-                    b"('lamb', 3)\n",
-                    b"('little', 3)\n",
-                    b"('mary', 1)\n",
+                    ('a', 1),
+                    ('had', 1),
+                    ('lamb', 3),
+                    ('little', 3),
+                    ('mary', 1),
                 ]
             )

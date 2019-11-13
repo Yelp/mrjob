@@ -22,9 +22,13 @@ generally you'd run one job to generate n-gram scores, put them in a sqlite
 database, and run a second job to score documents. But this is simple, and
 it works!
 
-This takes as its input documents encoded by encode_document() below. For each
-document, you specify its text, and whether it belongs or does not belong
-to one or more categories. You can also specify a unique ID for each document.
+This takes text files as its input. Each file's name should have the format
+```unique_id-cat_id_1-cat_id_2-etc.txt```, where ```unique_id``` is unique
+for this document, and ```cat_id_1``` etc. are categories the document
+is known to belong to. You may also use the form ```not_cat_id_3``` to
+indicate that a document is known *not* to belong to ```cat_id_3```. Document
+and category IDs may not contain the ```-``` or ```.``` characters. For
+examples, look in ```docs-to-classify/```.
 
 This job outputs the documents, with the field 'cat_to_score' filled in.
 Generally, positive scores indicate the document is in the category, and
@@ -56,26 +60,6 @@ from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 from mrjob.step import MRStep
 from mrjob.util import file_ext
-
-
-def encode_document(text, cats=None, id=None):
-    """Encode a document as a JSON so that MRTextClassifier can read it.
-
-    Args:
-    text -- the text of the document (as a unicode)
-    cats -- a dictionary mapping a category name (e.g. 'sports') to True if
-        the document is in the category, and False if it's not. None indicates
-        that we have no information about this documents' categories
-    id -- a unique ID for the document (any kind of JSON-able value should
-        work). If not specified, we'll auto-generate one.
-    """
-    text = unicode(text)
-    cats = dict((unicode(cat), bool(is_in_cat))
-                for cat, is_in_cat
-                in (cats or {}).items())
-
-    return JSONValueProtocol.write(
-        None, {'text': text, 'cats': cats, 'id': id}) + '\n'
 
 
 def parse_doc_filename(input_uri):
@@ -226,7 +210,8 @@ class MRTextClassifier(MRJob):
     def parse_doc(self, input_path, input_uri):
         """Mapper: parse documents and emit ngram information.
 
-        Input: JSON-encoded documents (see :py:func:`encode_document`)
+        Input: Text files whose name contains a unique document ID and
+        category information (see :py:func:`parse_doc_filename`).
 
         Output:
         ``('ngram', (n, ngram)), (count, cats)`` OR

@@ -19,3 +19,4 @@
 .coverage
 *,cover
 j-*
+.DS_Store

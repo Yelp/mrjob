@@ -52,7 +52,6 @@ from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.step import _is_spark_step_type
 from mrjob.step import _is_pyspark_step_type
-from mrjob.util import to_lines
 
 
 log = logging.getLogger(__name__)

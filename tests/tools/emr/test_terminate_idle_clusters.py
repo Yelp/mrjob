@@ -23,7 +23,6 @@ from mrjob.aws import _boto3_now
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
-from mrjob.tools.emr.terminate_idle_clusters import main
 from mrjob.tools.emr.terminate_idle_clusters import _maybe_terminate_clusters
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_bootstrapping
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_done

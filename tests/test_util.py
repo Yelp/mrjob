@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests of all the amazing utilities in mrjob.util"""
-import bz2
-import gzip
 import os
 import shutil
 import sys

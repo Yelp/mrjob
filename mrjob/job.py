@@ -21,7 +21,6 @@ for more information."""
 import codecs
 import inspect
 import itertools
-import json
 import logging
 import os
 import os.path
@@ -36,7 +35,6 @@ from argparse import ArgumentTypeError
 from mrjob.cat import decompress
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
-from mrjob.local import LocalMRJobRunner
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_job_args
 from mrjob.options import _add_runner_args

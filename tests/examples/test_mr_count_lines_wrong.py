@@ -13,7 +13,6 @@
 # limitations under the License.
 from mrjob.examples.mr_count_lines_wrong import MRCountLinesWrong
 
-from tests.job import run_job
 from tests.sandbox import SandboxedTestCase
 
 

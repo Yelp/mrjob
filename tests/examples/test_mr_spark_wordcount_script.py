@@ -15,7 +15,6 @@ from io import BytesIO
 from unittest import skipIf
 
 from mrjob.examples.mr_spark_wordcount_script import MRSparkScriptWordcount
-from mrjob.step import StepFailedException
 from mrjob.util import safeeval
 from mrjob.util import to_lines
 

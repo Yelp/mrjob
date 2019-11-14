@@ -15,10 +15,8 @@
 # limitations under the License.
 """Utility functions for MRJob
 """
-
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-import glob
 import logging
 import os
 import os.path
@@ -37,9 +35,8 @@ from zipfile import ZIP_STORED
 from zipfile import ZipFile
 from zipfile import is_zipfile
 
-from mrjob.cat import decompress
 from mrjob.py2 import PY2
-from mrjob.py2 import string_types
+
 
 log = getLogger(__name__)
 

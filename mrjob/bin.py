@@ -17,7 +17,6 @@
 """Abstract base class for all runners that execute binaries/scripts
 (that is, everything but inline mode).
 """
-import json
 import logging
 import os
 import os.path
@@ -44,7 +43,6 @@ import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
-from mrjob.conf import combine_local_envs
 from mrjob.logs.log4j import _parse_hadoop_log4j_records
 from mrjob.logs.spark import _parse_spark_log
 from mrjob.logs.step import _eio_to_eof

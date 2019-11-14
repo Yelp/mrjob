@@ -55,17 +55,6 @@ def _pool_hash_and_name(cluster):
     return tags.get('__mrjob_pool_hash'), tags.get('__mrjob_pool_name')
 
 
-def _legacy_pool_hash_and_name(bootstrap_actions):
-    """Get pool hash and name from a pre-v0.6.0 job."""
-    for ba in bootstrap_actions:
-        if ba['Name'] == 'master':
-            args = ba['Args']
-            if len(args) == 2 and args[0].startswith('pool-'):
-                return args[0][5:], args[1]
-
-    return None, None
-
-
 ### instance groups ###
 
 def _instance_groups_satisfy(actual_igs, requested_igs):

@@ -105,8 +105,6 @@ setup(
     packages=[
         'mrjob',
         'mrjob.examples',
-        'mrjob.examples.mr_postfix_bounce',
-        'mrjob.examples.mr_travelling_salesman',
         'mrjob.fs',
         'mrjob.logs',
         'mrjob.spark',
@@ -115,8 +113,7 @@ setup(
     ],
     package_data={
         'mrjob': ['bootstrap/*.sh'],
-        'mrjob.examples': ['*.txt', '*.jar', '*.rb'],
-        'mrjob.examples.mr_postfix_bounce': ['*.json'],
+        'mrjob.examples': ['*.txt', '*.jar', '*.rb', 'docs-to-classify/*.txt'],
         'mrjob.examples.mr_travelling_salesman': ['example_graphs/*.json'],
     },
     url='http://github.com/Yelp/mrjob',

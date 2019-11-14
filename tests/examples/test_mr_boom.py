@@ -11,26 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Simple example about what mapper_final() doesn't do.
+from mrjob.examples.mr_boom import MRBoom
 
-Referenced from docs/guides/testing.rst
-"""
-from mrjob.job import MRJob
-
-class MRCountLinesRight(MRJob):
-
-    def mapper_init(self):
-        self.num_lines = 0
-
-    def mapper(self, _, line):
-        self.num_lines += 1
-
-    def mapper_final(self):
-        yield None, self.num_lines
-
-    def reducer(self, key, values):
-        yield key, sum(values)
+from tests.job import run_job
+from tests.sandbox import BasicTestCase
 
 
-if __name__ == '__main__':
-    MRCountLinesRight.run()
+class MRBoomTestCase(BasicTestCase):
+
+    def test_goes_boom_with_no_input(self):
+        self.assertRaises(Exception, run_job, MRBoom())
+
+    def test_says_boom(self):
+        try:
+            run_job(MRBoom([]), b'some input')
+        except Exception as ex:
+            self.assertIn('BOOM', str(ex))
+        else:
+            raise AssertionError('no exception raised')

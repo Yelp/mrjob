@@ -37,7 +37,7 @@ def main():
     # lines.flatMap(WORD_RE.findall) doesn't work on Spark 1.6.2; apparently
     # it can't serialize instance methods?
     counts = (
-        lines.flatMap(lambda line: WORD_RE.findall(line))
+        lines.flatMap(lambda line: [w.lower() for w in WORD_RE.findall(line)])
         .map(lambda word: (word, 1))
         .reduceByKey(add))
 

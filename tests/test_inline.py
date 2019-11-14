@@ -281,11 +281,14 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
         self.assertEqual(counts, dict(
             blue=1, fish=4, one=1, red=1, two=1))
 
+    # this also serves as a unit test for MRSparKaboom. If you are going
+    # to delete this, please move it to tests/examples/test_mr_sparkaboom.py
+    # instead
     def test_spark_job_failure(self):
+        from py4j.protocol import Py4JJavaError
+
         job = MRSparKaboom(['-r', 'inline'])
         job.sandbox(stdin=BytesIO(b'line\n'))
-
-        from py4j.protocol import Py4JJavaError
 
         with job.make_runner() as runner:
             self.assertRaises(Py4JJavaError, runner.run)

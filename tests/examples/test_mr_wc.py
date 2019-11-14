@@ -11,26 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Simple example about what mapper_final() doesn't do.
+from mrjob.examples.mr_wc import MRWordCountUtility
 
-Referenced from docs/guides/testing.rst
-"""
-from mrjob.job import MRJob
-
-class MRCountLinesRight(MRJob):
-
-    def mapper_init(self):
-        self.num_lines = 0
-
-    def mapper(self, _, line):
-        self.num_lines += 1
-
-    def mapper_final(self):
-        yield None, self.num_lines
-
-    def reducer(self, key, values):
-        yield key, sum(values)
+from tests.job import run_job
+from tests.sandbox import BasicTestCase
 
 
-if __name__ == '__main__':
-    MRCountLinesRight.run()
+class MRWordCountUtilityTestCase(BasicTestCase):
+
+    def test_empty(self):
+        self.assertEqual(
+            run_job(MRWordCountUtility([])),
+            dict(chars=0, lines=0, words=0))
+
+    def test_two_lines(self):
+        RAW_INPUT = b'dog dog dog\ncat cat\n'
+
+        self.assertEqual(
+            run_job(MRWordCountUtility([]), RAW_INPUT),
+            dict(chars=20, words=5, lines=2))

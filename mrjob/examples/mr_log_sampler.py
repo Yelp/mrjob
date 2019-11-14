@@ -41,6 +41,9 @@ class MRLogSampler(MRJob):
     # record doesn't get Unicode-encoded
     INTERNAL_PROTOCOL = ReprProtocol
 
+    # random seed doesn't do any good unless we sort by it
+    SORT_VALUES = True
+
     def configure_args(self):
         super(MRLogSampler, self).configure_args()
         self.add_passthru_arg(
@@ -55,11 +58,11 @@ class MRLogSampler(MRJob):
                   " we'll pass every line to the reducer.")
         )
 
-    def load_options(self, args):
-        super(MRLogSampler, self).load_options(args)
+    def load_args(self, args):
+        super(MRLogSampler, self).load_args(args)
 
         if self.options.sample_size is None:
-            self.option_parser.error('You must specify the --sample-size')
+            self.arg_parser.error('You must specify the --sample-size')
         else:
             self.sample_size = self.options.sample_size
 
@@ -67,7 +70,7 @@ class MRLogSampler(MRJob):
         # probability for the mapper, so that the reducer doesn't have to
         # process all records. Otherwise, pass everything thru to the reducer.
         if self.options.expected_length is None:
-            self.sampling_probability = 1.
+            self.sampling_probability = 1
         else:
             # We should be able to bound this probability by using the binomial
             # distribution, but I haven't figured it out yet. So, let's just

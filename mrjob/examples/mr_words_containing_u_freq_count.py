@@ -1,5 +1,6 @@
 # Copyright 2016 Yelp
 # Copyright 2017 Yelp and Contributors
+# Copyright 2019 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,9 +21,12 @@ import re
 WORD_RE = re.compile(r"[\w']*u[\w']*", re.I)
 
 
-class MRVWordFreqCount(MRJob):
+class MRWordsContainingUFreqCount(MRJob):
 
     def mapper_pre_filter(self):
+        # no need to account for grep exiting with status 1 if no matches,
+        # since pre-filters are piped into another process. Compare to
+        # mr_grep.py
         return 'grep -i u'
 
     def mapper(self, _, line):
@@ -37,4 +41,4 @@ class MRVWordFreqCount(MRJob):
 
 
 if __name__ == '__main__':
-    MRVWordFreqCount.run()
+    MRWordsContainingUFreqCount.run()

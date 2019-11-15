@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mrjob.pool import _legacy_pool_hash_and_name
 from mrjob.pool import _pool_hash_and_name
 
 from tests.sandbox import BasicTestCase
@@ -47,92 +46,3 @@ class TestPoolHashAndName(BasicTestCase):
 
         self.assertEqual(_pool_hash_and_name(cluster),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
-
-
-class TestLegacyPoolHashAndName(BasicTestCase):
-
-    def test_empty(self):
-        actions = []
-
-        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))
-
-    def test_pooled_cluster(self):
-        actions = [
-            dict(
-                Args=['pool-0123456789abcdef0123456789abcdef', 'reflecting'],
-                Name='master',
-            ),
-        ]
-
-        self.assertEqual(_legacy_pool_hash_and_name(actions),
-                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
-
-    def test_pooled_cluster_with_other_bootstrap_actions(self):
-        actions = [
-            dict(Args=[], Name='action 0'),
-            dict(Args=[], Name='action 1'),
-            dict(
-                Args=['pool-0123456789abcdef0123456789abcdef', 'reflecting'],
-                Name='master',
-            ),
-        ]
-
-        self.assertEqual(_legacy_pool_hash_and_name(actions),
-                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
-
-    def test_pooled_cluster_with_max_mins_idle(self):
-        # max-mins-idle script is added AFTER the master bootstrap script,
-        # which was a problem when we just look at the last action
-        actions = [
-            dict(
-                Args=['pool-0123456789abcdef0123456789abcdef', 'reflecting'],
-                Name='master',
-            ),
-            dict(
-                Args=['900', '300'],
-                Name='idle timeout',
-            ),
-        ]
-
-        self.assertEqual(_legacy_pool_hash_and_name(actions),
-                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
-
-    def test_first_arg_doesnt_start_with_pool(self):
-        actions = [
-            dict(
-                Args=['cowsay', 'mrjob'],
-                Name='master',
-            ),
-        ]
-
-        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))
-
-    def test_too_many_args(self):
-        actions = [
-            dict(
-                Args=['cowsay', '-b', 'mrjob'],
-                Name='master',
-            ),
-        ]
-
-        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))
-
-    def test_too_few_args(self):
-        actions = [
-            dict(
-                Args=['pool-0123456789abcdef0123456789abcdef'],
-                Name='master',
-            ),
-        ]
-
-        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))
-
-    def test_bootstrap_action_isnt_named_master(self):
-        actions = [
-            dict(
-                Args=['pool-0123456789abcdef0123456789abcdef', 'reflecting'],
-                Name='apprentice',
-            ),
-        ]
-
-        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))

@@ -69,6 +69,7 @@ __credits__ = [
     'Matt Jones <matt@mhjones.org>',
     'Mike Kaplinskiy <mkaplinskiy@twitter.com>',
     'Kamil Kisiel <kamil@kamilkisiel.net>',
+    'Susannah Klaneček <suzil@protonmail.ch>',
     'Evan Klitzke <evan@eklitzke.org>',
     'Alex Konradi <alexkonradi@gmail.com>',
     'Nikolaos Koutsopoulos <nhk@mochimedia.com>',

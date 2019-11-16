@@ -1277,7 +1277,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--gcp-project', output)
 
         # deprecated options (none as of v0.7.0, probably more to come)
-        #self.assertNotIn('--some-deprecated-switch', output)
+        # self.assertNotIn('--some-deprecated-switch', output)  # noqa
 
     def test_deprecated_runner_help(self):
         MRJob(['--help', '-r', 'emr', '--deprecated'])
@@ -1295,7 +1295,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--gcp-project', output)
 
         # deprecated options (none as of v0.7.0, probably more to come)
-        #self.assertIn('--some-deprecated-switch', output)
+        # self.assertIn('--some-deprecated-switch', output)
 
     def test_runner_help_works_for_all_runners(self):
         for alias in _RUNNER_ALIASES:

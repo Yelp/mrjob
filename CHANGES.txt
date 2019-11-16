@@ -1,14 +1,37 @@
 v0.7.0, 2019-10-?? -- fall cleaning
  * moved support for AWS and Google Cloud to extras_require (#1935)
    * use e.g. `pip install mrjob[aws]`
+ * MRJob classes initialized without args read them from sys.argv (#2124)
+   * use SomeMRJob([]) to simulate running with no args (e.g. for tests)
+ * revamped and tested mrjob/examples/ (#2122)
+   * mr_grep.py no longer errors on no matches
+   * mr_log_sampler.py correctly randomizes lines
+   * mr_spark_wordcount.py is no longer case sensitive
+     * same with mr_spark_wordcount_script.py
+   * mr_text_classifier.py now reads text files directly, no need to encode
+     * public domain examples are in mrjob/examples/docs-to-classify
+   * renamed mr_words_containing_u_freq_count.py
+   * removed some examples that were difficult to test or maintain
+ * removed support for non-Python MRJobs (#2087)
+   * removed interpreter and steps_interpreter options (see below)
+   * removed the `mrjob run` command
+   * removed mr_wc.rb from mrjob/examples/
+   * merged the MRJobLauncher class back into MRJob
+ * mrjob audit-emr-usage no longer reads pre-v0.6.0 cluster pool names (#1815)
+ * filesystem methods now have consistent arg naming
  * removed the following deprecated code:
-   * useless local_tmp_dir arg to GCSFilesystem
-   * chunk_size arg to GCSFilesystem.put()
+   * runner options:
+     * emr_api_params
+     * interpreter
+     * max_hours_idle
+     * mins_to_end_of_hour
+     * steps_interpreter
+     * steps_python_bin
+     * visible_to_all_users
    * --steps switch from MRJobs (#2046)
      * use --help -v to see help for --mapper etc.
-   * steps_python_bin option
-   * interpreter and steps_interpreter options (#2087)
-     * removed mr_wc.rb from examples
+   * useless local_tmp_dir arg to GCSFilesystem
+   * chunk_size arg to GCSFilesystem.put()
    * --archive, --dir, --file, --hadoop-arg, --libjar, --py-file, --spark-arg
    * removed MRJob.parse_output_line()
    * removed runner.stream_output()
@@ -22,25 +45,8 @@ v0.7.0, 2019-10-?? -- fall cleaning
      * self.OPTION_CLASS
      * mrjob.util.parse_and_save_options()
    * file_upload_args kwarg to runner constructor
-   * max_hours_idle and mins_to_end_of_hour options
-   * visible_to_all_users opt
    * mrjob.util.read_file() and mrjob.util.read_input()
-   * emr_api_params opt
    * arguments to CompositeFilesystem constructor
-   * MRJobLauncher class (#2088)
-   * the `mrjob run` command
- * mrjob audit-emr-usage no longer reads pre-v0.6.0 cluster pool names (#1815)
- * MRJob classes initialized without args read them from sys.argv (#2124)
- * revamped and tested mrjob/examples/ (#2122)
-   * mr_grep.py no longer errors on no matches
-   * mr_log_sampler.py correctly randomizes lines
-   * mr_spark_wordcount.py is no longer case sensitive
-     * same with mr_spark_wordcount_script.py
-   * mr_text_classifier.py now reads text files directly, no need to encode
-     * public domain examples are in mrjob/examples/docs-to-classify
-   * renamed mr_words_containing_u_freq_count.py
-   * removed some examples that were difficult to test or maintain
- * filesystem methods now have consistent arg naming
 
 
 v0.6.12, 2019-10-23 -- unbreak Google

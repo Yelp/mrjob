@@ -1,4 +1,4 @@
-v0.7.0, 2019-10-?? -- fall cleaning
+v0.7.0, 2019-11-21 -- fall cleaning
  * removed the following deprecated code:
    * useless local_tmp_dir arg to GCSFilesystem
    * chunk_size arg to GCSFilesystem.put()

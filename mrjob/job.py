@@ -82,7 +82,6 @@ def _im_func(f):
         return f
 
 
-
 class MRJob(object):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""

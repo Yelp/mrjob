@@ -1,6 +1,11 @@
-v0.7.0, 2019-10-?? -- fall cleaning
+v0.7.0, 2019-10-18 -- fall cleaning
  * moved support for AWS and Google Cloud to extras_require (#1935)
    * use e.g. `pip install mrjob[aws]`
+ * removed support for non-Python MRJobs (#2087)
+   * removed interpreter and steps_interpreter options (see below)
+   * removed the `mrjob run` command
+   * removed mr_wc.rb from mrjob/examples/
+   * merged the MRJobLauncher class back into MRJob
  * MRJob classes initialized without args read them from sys.argv (#2124)
    * use SomeMRJob([]) to simulate running with no args (e.g. for tests)
  * revamped and tested mrjob/examples/ (#2122)
@@ -12,11 +17,6 @@ v0.7.0, 2019-10-?? -- fall cleaning
      * public domain examples are in mrjob/examples/docs-to-classify
    * renamed mr_words_containing_u_freq_count.py
    * removed some examples that were difficult to test or maintain
- * removed support for non-Python MRJobs (#2087)
-   * removed interpreter and steps_interpreter options (see below)
-   * removed the `mrjob run` command
-   * removed mr_wc.rb from mrjob/examples/
-   * merged the MRJobLauncher class back into MRJob
  * mrjob audit-emr-usage no longer reads pre-v0.6.0 cluster pool names (#1815)
  * filesystem methods now have consistent arg naming
  * removed the following deprecated code:

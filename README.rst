@@ -41,14 +41,13 @@ Some important features:
 Installation
 ------------
 
-From PyPI:
-
 ``pip install mrjob``
 
-From source:
+As of v0.7.0, Amazon Web Services and Google Cloud Services are optional
+depedencies. To use these, install with the ``aws`` and ``google`` targets,
+respectively. For example:
 
-``python setup.py install``
-
+``pip install mrjob[aws]``
 
 A Simple Map Reduce Job
 -----------------------

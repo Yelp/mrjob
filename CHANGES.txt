@@ -55,7 +55,7 @@ v0.7.0, 2019-10-18 -- fall cleaning
      * parse_and_save_options()
      * read_file()
      * read_input()
-    * filesystems:
+   * filesystems:
      * arguments to CompositeFilesystem constructor (use add_fs())
      * useless local_tmp_dir arg to GCSFilesystem constructor
      * chunk_size arg to GCSFilesystem.put()

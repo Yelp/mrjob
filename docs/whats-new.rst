@@ -4,6 +4,15 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.7.0:
+
+0.7.0
+-----
+
+Amazon Web Services (EMR/S3) and Google Cloud are now optional dependencies,
+``aws`` and ``google`` respectively. To use these
+
+
 .. _v0.6.12:
 
 0.6.12

@@ -25,6 +25,10 @@ Options::
   -c CONF_PATHS, --conf-path CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
+  --ec2-endpoint EC2_ENDPOINT
+                        Force mrjob to connect to EC2 on this endpoint (e.g.
+                        ec2.us-west-1.amazonaws.com). Default is to infer this
+                        from region.
   --ec2-key-pair-file EC2_KEY_PAIR_FILE
                         Path to file containing SSH key for EMR
   --emr-endpoint EMR_ENDPOINT

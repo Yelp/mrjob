@@ -103,6 +103,10 @@ class MRJob(object):
         ``python -m mrjob.job --help``
 
         :param args: Arguments to your script (switches and input files)
+
+        .. versionchanged:: 0.7.0
+
+           Previously, *args* set to ``None`` was equivalent to ``[]``.
         """
         # make sure we respect the $TZ (time zone) environment variable
         if hasattr(time, 'tzset'):

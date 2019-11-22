@@ -18,9 +18,11 @@ from os.path import join
 import mrjob
 from mrjob.examples.mr_text_classifier import MRTextClassifier
 from mrjob.examples.mr_text_classifier import parse_doc_filename
+from mrjob.protocol import StandardJSONProtocol
 
 from tests.job import run_job
 from tests.sandbox import BasicTestCase
+from tests.py2 import patch
 
 
 class ParseDocFileNameTestCase(BasicTestCase):
@@ -79,3 +81,18 @@ class MRTextClassifierTestCase(BasicTestCase):
 
         # the empty doc should only be something that appears with no input
         self.assertNotIn(('doc', ''), output)
+
+    def test_works_with_built_in_json_module(self):
+        # regression test: make sure we're not trying to serialize dict_items
+        self.start(patch.object(MRTextClassifier,
+                                'INTERNAL_PROTOCOL', StandardJSONProtocol))
+        self.start(patch.object(MRTextClassifier,
+                                'OUTPUT_PROTOCOL', StandardJSONProtocol))
+
+        docs_paths = glob(join(
+            dirname(mrjob.__file__), 'examples', 'docs-to-classify', '*'))
+
+        # use --min-df 1 because we have so few documents
+        job_args = ['--min-df', '1'] + docs_paths
+
+        run_job(MRTextClassifier(job_args))

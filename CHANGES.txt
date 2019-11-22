@@ -1,4 +1,4 @@
-v0.7.0, 2019-10-18 -- fall cleaning
+v0.7.0, 2019-10-22 -- fall cleaning
  * moved support for AWS and Google Cloud to extras_require (#1935)
    * use e.g. `pip install mrjob[aws]`
  * removed support for non-Python MRJobs (#2087)

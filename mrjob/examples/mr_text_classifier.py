@@ -139,7 +139,6 @@ DEFAULT_STOP_WORDS = [
 
 
 class MRTextClassifier(MRJob):
-    INPUT_PROTOCOL = JSONValueProtocol
 
     def steps(self):
         """Conceptually, the steps are:
@@ -258,7 +257,7 @@ class MRTextClassifier(MRJob):
                 yield ('ngram', (n, ngram)), (count, doc['cats'])
 
         # yield the document itself, for safekeeping
-        doc['ngram_counts'] = ngram_counts.items()
+        doc['ngram_counts'] = list(ngram_counts.items())
         yield ('doc', doc['id']), doc
 
     def count_ngram_freq(self, type_and_key, values):
@@ -320,7 +319,8 @@ class MRTextClassifier(MRJob):
             return
 
         yield (('global', None),
-               ((n, ngram), (cat_to_df.items(), cat_to_tf.items())))
+               ((n, ngram),
+                (list(cat_to_df.items()), list(cat_to_tf.items()))))
 
     def score_ngrams(self, type_and_key, values):
         """Reducer: Look at all ngrams together, and assign scores by

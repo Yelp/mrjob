@@ -9,9 +9,106 @@ For a complete list of changes, see `CHANGES.txt
 0.7.0
 -----
 
-Amazon Web Services (EMR/S3) and Google Cloud are now optional dependencies,
-``aws`` and ``google`` respectively. To use these
+AWS and Google are now optional dependencies
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Amazon Web Services (EMR/S3) and Google Cloud are now optional dependencies,
+``aws`` and ``google`` respectively. For example, to install mrjob with
+AWS support, run:
+
+.. code-block:: sh
+
+   pip install mrjob[aws]
+
+non-Python mrjobs are no longer supported
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Fully removed support for writing MRJob scripts in other languages and
+then running them with the mrjob library. (This capability so little used
+that chances are you never knew it existed.)
+
+As a result the `interpreter` and `steps_interpreter` options are gone,
+the :command:`mrjob run` subcommand is gone, and the `MRJobLauncher` class
+has been merged back into `MRJob`. Also removed ``mr_wc.rb`` from
+``mrjob/examples/``
+
+MRSomeJob() means read from sys.argv
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In prior versions, if you initialized a :py:class:`~mrjob.job.MRJob` subclass
+with no arguments (``MRSomeJob()``), that meant the same thing as passing in
+an empty argument list (``MRSomeJob(args=[])``). It now means to read *args*
+directly from ``sys.argv[1:]``.
+
+In practice, it's rare to see ``MRJob`` subclass intialized this way outside
+of test cases. Running a ``MRJob`` script directly, or initializing it
+with an argument list works this same as in previous versions.
+
+mrjob/examples/ love
+^^^^^^^^^^^^^^^^^^^^
+
+The `mrjob.examples package <https://github.com/Yelp/mrjob/tree/master/mrjob/examples>`__ has been updated. Some examples that were
+difficult to test or maintain were removed, and the remainder were tested
+and fixed if necessary.
+
+:py:mod:`mrjob.examples.mr_text_classifier` no longer needs you to encode
+documents in JSON format, and instead operates directly on text files with
+names like ``doc_id-cat_id_1-not_cat_id_2-etc.txt``. Try it out:
+
+.. code-block:: sh
+
+   python -m mrjob.examples.mr_text_classifier docs-to-classify/*.txt
+
+miscellanous tweaks
+^^^^^^^^^^^^^^^^^^^
+
+The :command:`mrjob audit-emr-usage` subcommand no longer attempts to read
+cluster pool names from clusters launched by mrjob v0.5.x.
+
+Method arguments in filesystem classes (in ``mrjob.fs``) are now consistenly
+named. This probably won't matter in practice, as
+``runner.fs <mrjob.runner.MRJobRunner.fs>`` is always a
+:py:class:`~mrjob.fs.composite.CompositeFilesystem` anyhow.
+
+removed deprecated code
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Check your deprecation warnings! Everything marked deprecated in
+mrjob v0.6.x has been removed.
+
+The following runner config options no longer exist: `emr_api_params`,
+`interpreter`, `max_hours_idle`, `mins_to_end_of_hour`, `steps_interpreter`,
+`steps_python_bin`, `visible_to_all_users`.
+
+The following singular switches have been removed in favor of their
+plural alternative (e.g. :command:`--archives`): :command:`--archive`,
+:command:`--dir`, :command:`--file`, :command:`--hadoop-arg`,
+:command:`--libjar`, :command:`--py-file`, :command:`--spark-arg`.
+
+The :command:`--steps` switch is gone. This means :command:`--help --steps`
+no longer works; use :command:`--help -v` to see help for :command:`--mapper`,
+etc.
+
+Support for simulating :mod:`optparse` has been removed from
+:py:class:`~mrjob.job.MRJob`. This includes ``add_file_option()``,
+``add_passthrough_option()``, ``configure_options()``, ``load_options()``,
+``pass_through_option()``, ``self.args``, ``self.OPTION_CLASS``.
+
+:py:meth:`mrjob.job.MRJobRunner.stream_output` and
+:py:meth:`mrjob.job.MRJob.parse_output_line` have been removed.
+
+The constructor for :py:class:`~mrjob.job.runner.MRJobRunner` no longer
+has a *file_upload_args* keyword argument.
+
+``parse_and_save_options()``, ``read_file()``, and ``read_input()`` have
+all been removed from :py:mod:`mrjob.util`.
+
+:py:class:`~mrjob.fs.composite.CompositeFilesystem` no longer takes filesystems
+as arguments to its constructor; use
+:py:meth:`~mrjob.fs.composite.CompositeFilesystem.add_fs`. The useless
+*local_tmp_dir* option to the :py:class:`~mrjob.fs.gcs.GCSFilesystem`
+constructor and the *chunk_size* arg to its
+:py:meth:`~mrjob.fs.gcs.GCSFilesystem.put` method have been removed.
 
 .. _v0.6.12:
 

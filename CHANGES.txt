@@ -38,9 +38,6 @@ v0.7.0, 2019-10-18 -- fall cleaning
      * --spark-arg
    * --steps switch from MRJobs (#2046)
      * use --help -v to see help for --mapper etc.
-   * MRJobRunner:
-     * file_upload_args kwarg to runner constructor
-     * stream_output()
    * MRJob:
      * optparse simulation:
        * add_file_option()
@@ -51,6 +48,9 @@ v0.7.0, 2019-10-18 -- fall cleaning
        * self.args
        * self.OPTION_CLASS
      * parse_output_line()
+   * MRJobRunner:
+     * file_upload_args kwarg to runner constructor
+     * stream_output()
    * mrjob.util:
      * parse_and_save_options()
      * read_file()

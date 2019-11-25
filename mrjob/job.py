@@ -700,6 +700,15 @@ class MRJob(object):
                                  " probably means you tried to use it from"
                                  " __main__, which doesn't work." % w)
 
+        runner_class = self._runner_class()
+        kwargs = self._runner_kwargs()
+
+        log.debug('making runner: %s(%s)' % (
+            runner_class.__name__,
+            ', '.join('%s=%s' % (k, v)
+                      for k, v in sorted(kwargs.items())
+                      if v not in (None, [], {}))))
+
         return self._runner_class()(**self._runner_kwargs())
 
     def _runner_class(self):

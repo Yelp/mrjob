@@ -319,7 +319,8 @@ class MRJobRunner(object):
 
     ### Options ####
 
-    def _default_opts(self):
+    @classmethod
+    def _default_opts(cls):
         try:
             owner = getpass.getuser()
         except:

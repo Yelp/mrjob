@@ -128,9 +128,10 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
     ### Options ###
 
-    def _default_opts(self):
+    @classmethod
+    def _default_opts(cls):
         return combine_dicts(
-            super(HadoopInTheCloudJobRunner, self)._default_opts(),
+            super(HadoopInTheCloudJobRunner, cls)._default_opts(),
             dict(
                 cloud_part_size_mb=_DEFAULT_CLOUD_PART_SIZE_MB,
                 max_mins_idle=_DEFAULT_MAX_MINS_IDLE,

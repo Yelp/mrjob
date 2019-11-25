@@ -178,9 +178,10 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         # others will be filled as needed)
         self._log_interpretations = []
 
-    def _default_opts(self):
+    @classmethod
+    def _default_opts(cls):
         return combine_dicts(
-            super(HadoopJobRunner, self)._default_opts(),
+            super(HadoopJobRunner, cls)._default_opts(),
             dict(
                 hadoop_tmp_dir='tmp/mrjob',
             )

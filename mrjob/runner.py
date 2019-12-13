@@ -901,6 +901,12 @@ class MRJobRunner(object):
         # note: local-cluster[...] master does in fact have working dirs
         return self._spark_master().split('[')[0] != 'local'
 
+    def _spark_supports_archives(self):
+        """Does spark-submit's --archives switch work on the given Spark
+        master? If not, we'll need to emulate archives in setup scripts.
+        """
+        return self._spark_master() == 'yarn'
+
     def _args_for_task(self, step_num, mrc):
         return [
             '--step-num=%d' % step_num,

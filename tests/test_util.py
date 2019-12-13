@@ -110,6 +110,11 @@ class FileExtTestCase(BasicTestCase):
         self.assertEqual(file_ext('README,v'), '')
         self.assertEqual(file_ext('README.txt,v'), '.txt,v')
 
+    def ignore_initial_dots(self):
+        self.assertEqual(file_ext('.emacs'), '')
+        self.assertEqual(file_ext('.mrjob.conf'), '.conf')
+        self.assertEqual(file_ext('...dots.txt'), '.txt')
+
 
 class SafeEvalTestCase(BasicTestCase):
 

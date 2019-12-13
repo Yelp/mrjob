@@ -1244,8 +1244,13 @@ class MRJobRunner(object):
 
         log.info('%s working dir files to %s...' %
                  ('uploading' if is_uri(wd_mirror) else 'copying', wd_mirror))
+
         for name, path in sorted(
                 self._working_dir_mgr.name_to_path('file').items()):
+            self._copy_file_to_wd_mirror(path, name)
+
+        for name, path in sorted(
+                self._working_dir_mgr.name_to_path('archive_file').items()):
             self._copy_file_to_wd_mirror(path, name)
 
     def _upload_part_size(self):

@@ -354,8 +354,11 @@ class WorkingDirManager(object):
     a path as both a file and an archive (though not mapped to the same name).
     """
     # dirs are not supported directly; runners need to archive them
-    # and add that archive
-    _SUPPORTED_TYPES = ('archive', 'file')
+    # and add that archive.
+    #
+    # archive_file is just a way of reserving a spot to copy an archive
+    # into, in case we need to un-archive it ourselves
+    _SUPPORTED_TYPES = ('archive', 'archive_file', 'file')
 
     def __init__(self):
         # map from paths added without a name to None or lazily chosen name
@@ -391,6 +394,11 @@ class WorkingDirManager(object):
         # otherwise, get ready to auto-name the file
         else:
             self._typed_path_to_auto_name.setdefault((type, path), None)
+
+        # reserve a name for the archive to be copied to, in case we need
+        # to un-archive it ourselves
+        if type == 'archive':
+            self.add('archive_file', path)
 
     def name(self, type, path, name=None):
         """Get the name for a path previously added to this

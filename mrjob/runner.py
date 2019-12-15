@@ -226,7 +226,7 @@ class MRJobRunner(object):
         # access/make this using self._get_local_tmp_dir()
         self._local_tmp_dir = None
 
-        self._working_dir_mgr = WorkingDirManager()
+        self._working_dir_mgr = WorkingDirManager(auto_add_archive_files=True)
 
         # mapping from dir to path for corresponding archive. we pick
         # paths during init(), but don't actually create the archives

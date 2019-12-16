@@ -612,7 +612,7 @@ class SetupTestCase(SandboxedTestCase):
 
         # foo.py should be there, and getsize() should be patched to return
         # double the number of bytes
-        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
+        self.assertEqual(path_to_size.get('./foo/foo.py'),
                          self.foo_py_size * 2)
 
     def test_python_dir_archive(self):
@@ -629,7 +629,7 @@ class SetupTestCase(SandboxedTestCase):
 
         # foo.py should be there, and getsize() should be patched to return
         # double the number of bytes
-        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
+        self.assertEqual(path_to_size.get('./foo/foo.py'),
                          self.foo_py_size * 2)
 
     def test_python_zip_file(self):

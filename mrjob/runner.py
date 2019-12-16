@@ -1424,7 +1424,7 @@ class MRJobRunner(object):
             if not name:
                 name = self._working_dir_mgr.name('archive', path)
 
-            file_archive_name = self._working_dir_mgr.name(
+            archive_file_name = self._working_dir_mgr.name(
                 'archive_file', path)
 
             uri = self._dest_in_wd_mirror(path, archive_file_name) or path

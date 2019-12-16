@@ -364,11 +364,10 @@ class WorkingDirManager(object):
     # into, in case we need to un-archive it ourselves
     _SUPPORTED_TYPES = ('archive', 'archive_file', 'file')
 
-    def __init__(self, auto_add_archive_files=False):
+    def __init__(self):
         # map from paths added without a name to None or lazily chosen name
         self._typed_path_to_auto_name = {}
         self._name_to_typed_path = {}
-        self._auto_add_archive_files = auto_add_archive_files
 
     def add(self, type, path, name=None):
         """Add a path as either a file or an archive, optionally
@@ -378,6 +377,11 @@ class WorkingDirManager(object):
         :param path: path/URI to add
         :param name: optional name that this path *must* be assigned, or
                      None to assign this file a name later.
+
+        if *type* is ``archive``, we'll also add *path* as an
+        auto-named ``archive_file``. This reserves space in the working dir
+        in case we need to copy the archive into the working dir and
+        un-archive it ourselves.
         """
         self._check_name(name)
         self._check_type(type)
@@ -402,7 +406,7 @@ class WorkingDirManager(object):
 
         # reserve a name for the archive to be copied to, in case we need
         # to un-archive it ourselves
-        if type == 'archive' and self._auto_add_archive_files:
+        if type == 'archive':
             self.add('archive_file', path)
 
     def name(self, type, path, name=None):

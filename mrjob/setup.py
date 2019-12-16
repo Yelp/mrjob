@@ -237,7 +237,7 @@ def parse_legacy_hash_path(type, path, must_name=None):
 
 
 def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False,
-                  strip_ext=False):
+                  strip_ext=False, add_ext=''):
     """Come up with a unique name for *path*.
 
     :param names_taken: a dictionary or set of names not to use.
@@ -246,6 +246,8 @@ def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False,
     :param unhide: make sure final name doesn't start with periods or
                    underscores
     :param strip_ext: if we propose a name, it shouldn't have a file extension
+    :param add_ext: if set to a string, add this to the end of any filename
+                    we propose. Should include the ``.``.
 
     If the proposed name is taken, we add a number to the end of the
     filename, keeping the extension the same. For example:
@@ -261,6 +263,9 @@ def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False,
 
     if strip_ext and not proposed_name:
         ext = ''
+
+    if add_ext and not proposed_name:
+        ext += add_ext
 
     if unhide:
         prefix = prefix.lstrip('.').lstrip('_')
@@ -442,9 +447,20 @@ class WorkingDirManager(object):
                 raise ValueError('%s %r was never added!' % (type, path))
 
         if not self._typed_path_to_auto_name[(type, path)]:
+            strip_ext = False
+            add_ext = ''
+
+            if type == 'archive':
+                # weird to have .tar.gz etc. in a directory name
+                strip_ext = True
+            elif type == 'archive_file':
+                # keep Spark from auto-untarring by adding .file
+                add_ext = '.file'
+
             name = name_uniquely(
                 path, names_taken=self._name_to_typed_path,
-                strip_ext=(type == 'archive'))
+                strip_ext=strip_ext, add_ext=add_ext)
+
             self._name_to_typed_path[name] = (type, path)
             self._typed_path_to_auto_name[(type, path)] = name
 

@@ -951,14 +951,15 @@ class MRJobBinRunner(MRJobRunner):
         return args
 
     def _spark_upload_args(self):
-        if self._spark_executors_have_own_wd():
-            return self._upload_args_helper(
-                '--files', None,
-                '--archives', None,
-                always_use_hash=False)
-        else:
+        if not self._spark_executors_have_own_wd():
             # don't bother, there's no working dir to upload to
             return []
+
+        return self._upload_args_helper(
+            '--files', None,
+            '--archives', None,
+            always_use_hash=False,
+            emulate_archives=self._emulate_archives_on_spark())
 
     def _spark_script_path(self, step_num):
         """The path of the spark script or JAR, used by

@@ -901,11 +901,11 @@ class MRJobRunner(object):
         # note: local-cluster[...] master does in fact have working dirs
         return self._spark_master().split('[')[0] != 'local'
 
-    def _spark_supports_archives(self):
-        """Does spark-submit's --archives switch work on the given Spark
-        master? If not, we'll need to emulate archives in setup scripts.
+    def _emulate_archives_on_spark(self):
+        """True if spark-submit's --archives doesn't work on the given Spark
+        master, which means we'll need to emulate archives in setup scripts.
         """
-        return self._spark_master() == 'yarn'
+        return self._spark_master() != 'yarn'
 
     def _args_for_task(self, step_num, mrc):
         return [
@@ -1355,21 +1355,31 @@ class MRJobRunner(object):
 
     def _upload_args_helper(
             self, files_opt_str, files, archives_opt_str, archives,
-            always_use_hash=True):
+            always_use_hash=True, emulate_archives=False):
         args = []
 
         file_hash_paths = list(
             self._file_arg_hash_paths(files,
                                       always_use_hash=always_use_hash))
+
+        # if emulating --archives, upload archives with files (we'll unpack
+        # them later with a setup script
+        if emulate_archives:
+            file_hash_paths.extend(
+                self._file_archive_hash_paths(archives))
+
+        # --files ...
         if file_hash_paths:
             args.append(files_opt_str)
             args.append(','.join(file_hash_paths))
 
-        archive_hash_paths = list(self._archive_arg_hash_paths(archives))
+        if not emulate_archives:
+            archive_hash_paths = list(self._archive_arg_hash_paths(archives))
 
-        if archive_hash_paths:
-            args.append(archives_opt_str)
-            args.append(','.join(archive_hash_paths))
+            # --archives ...
+            if archive_hash_paths:
+                args.append(archives_opt_str)
+                args.append(','.join(archive_hash_paths))
 
         return args
 
@@ -1395,6 +1405,31 @@ class MRJobRunner(object):
                 yield uri
             else:
                 yield '%s#%s' % (uri, name)
+
+    def _file_archive_hash_paths(self, named_paths=None):
+        """Helper function for the *upload_args methods. The names of
+        archives to pass to the ``--files`` switch of ``spark-submit``,
+        since we can't use ``--archives``.
+
+        The names in *named_paths* should be of the archive destination
+        (the 'archive' type in WorkingDirManager)
+        not of the filename we're going to copy the archive to before
+        unpacking it into its destination (the 'archive_file' type).
+        """
+        if named_paths is None:
+            named_paths = sorted(
+                self._working_dir_mgr.name_to_path('archive').items())
+
+        for name, path in named_paths:
+            if not name:
+                name = self._working_dir_mgr.name('archive', path)
+
+            file_archive_name = self._working_dir_mgr.name(
+                'archive_file', path)
+
+            uri = self._dest_in_wd_mirror(path, archive_file_name) or path
+
+            yield uri
 
     def _archive_arg_hash_paths(self, named_paths=None):
         """Helper function for the *upload_args methods. The names of all

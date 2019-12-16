@@ -1413,10 +1413,12 @@ class MRJobRunner(object):
             if not name:
                 name = self._working_dir_mgr.name('archive', path)
 
-            if self._upload_mgr:
-                uri = self._upload_mgr.uri(path)
-            else:
-                uri = path
+            # archives are uploaded to the working dir mirror by the
+            # name of the original archive file, not the dir it unpacks into
+            archive_file_name = self._working_dir_mgr.name(
+                'archive_file', path)
+
+            uri = self._dest_in_wd_mirror(path, archive_file_name) or path
 
             yield '%s#%s' % (uri, name)
 

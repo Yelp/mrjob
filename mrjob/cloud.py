@@ -336,8 +336,12 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                 uri = self._upload_mgr.uri(path)
                 ext = file_ext(basename(path))
 
+                archive_file_name = self._bootstrap_dir_mgr.name(
+                     'archive_file', path)
+
                 # copy file to tmp dir
-                quoted_archive_path = '$__mrjob_TMP/%s' % pipes.quote(name)
+                quoted_archive_path = '$__mrjob_TMP/%s' % pipes.quote(
+                    archive_file_name)
 
                 out.append('  %s %s %s' % (
                     cp_to_local, pipes.quote(uri), quoted_archive_path))

@@ -465,6 +465,17 @@ class VisibleToAllUsersTestCase(MockBoto3TestCase):
         cluster = self.run_and_get_cluster()
         self.assertEqual(cluster['VisibleToAllUsers'], True)
 
+    def test_overridden_false(self):
+        cluster = self.run_and_get_cluster(
+                            '--extra-cluster-param', 'VisibleToAllUsers=false')
+        self.assertEqual(cluster['VisibleToAllUsers'], False)
+
+    def test_overridden_true(self):
+        cluster = self.run_and_get_cluster(
+                            '--extra-cluster-param', 'VisibleToAllUsers=true')
+        self.assertEqual(cluster['VisibleToAllUsers'], True)
+
+
     def test_mock_boto3_does_not_force_to_bool(self):
         # make sure that mrjob is converting to bool, not mock_boto3
         self.assertRaises(ParamValidationError,

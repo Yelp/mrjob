@@ -26,6 +26,7 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.bin import _unarchive_cmd
 from mrjob.conf import combine_dicts
 from mrjob.py2 import integer_types
 from mrjob.py2 import xrange
@@ -38,15 +39,6 @@ log = logging.getLogger(__name__)
 
 # don't try to bind SSH tunnel to more than this many local ports
 _MAX_SSH_RETRIES = 20
-
-
-# map archive file extensions to the command used to unarchive them
-_EXT_TO_UNARCHIVE_CMD = {
-    '.zip': 'unzip -o %(file)s -d %(dir)s',
-    '.tar': 'mkdir %(dir)s; tar xf %(file)s -C %(dir)s',
-    '.tar.gz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
-    '.tgz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
-}
 
 # issue a warning if max_mins_idle is set to less than this
 _DEFAULT_MAX_MINS_IDLE = 10.0
@@ -346,12 +338,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                 out.append('  %s %s %s' % (
                     cp_to_local, pipes.quote(uri), quoted_archive_path))
 
-                # unarchive file
-                if ext not in _EXT_TO_UNARCHIVE_CMD:
-                    raise KeyError('unknown archive file extension: %s' % path)
-                unarchive_cmd = _EXT_TO_UNARCHIVE_CMD[ext]
-
-                out.append('  ' + unarchive_cmd % dict(
+                out.append('  ' + _unarchive_cmd(path) % dict(
                     file=quoted_archive_path,
                     dir='$__mrjob_PWD/' + pipes.quote(name)))
 

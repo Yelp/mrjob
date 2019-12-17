@@ -51,6 +51,7 @@ from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
+from mrjob.util import file_ext
 from mrjob.util import shlex_split
 from mrjob.util import unique
 from mrjob.util import which
@@ -63,6 +64,24 @@ _HADOOP_SAFE_ARG_RE = re.compile(r'^[\w\./=-]*$')
 
 # used to handle manifest files
 _MANIFEST_INPUT_FORMAT = 'org.apache.hadoop.mapred.lib.NLineInputFormat'
+
+# map archive file extensions to the command used to unarchive them
+_EXT_TO_UNARCHIVE_CMD = {
+    '.zip': 'unzip -o %(file)s -d %(dir)s',
+    '.tar': 'mkdir %(dir)s; tar xf %(file)s -C %(dir)s',
+    '.tar.gz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
+    '.tgz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
+}
+
+def _unarchive_cmd(path):
+    """Look up the unarchive command to use with the given file extension,
+    or raise KeyError if there is no matching command."""
+    for ext, unarchive_cmd in sorted(_EXT_TO_UNARCHIVE_CMD.items()):
+        # use this so we can match e.g. mrjob-0.7.0.tar.gz
+        if path.endswith(ext):
+            return unarchive_cmd
+
+    raise KeyError('unknown archive type: %s' % path)
 
 
 class MRJobBinRunner(MRJobRunner):
@@ -430,18 +449,36 @@ class MRJobBinRunner(MRJobRunner):
                     'manifest setup wrapper script',
                     manifest=True)
 
-        if (self._uses_spark_setup_script() and not
-                self._spark_python_wrapper_path):
+        if (self._has_pyspark_steps() and
+                self._spark_executors_have_own_wd() and
+                not self._spark_python_wrapper_path):
 
-            self._spark_python_wrapper_path = self._write_setup_script(
-                self._setup,
-                'python-wrapper.sh', 'Spark Python wrapper script',
-                wrap_python=True)
+            pyspark_setup = self._pyspark_setup()
+            if pyspark_setup:
+                self._spark_python_wrapper_path = self._write_setup_script(
+                    pyspark_setup,
+                    'python-wrapper.sh', 'Spark Python wrapper script',
+                    wrap_python=True)
 
-    def _uses_spark_setup_script(self):
-        return (self._setup and
-                self._has_pyspark_steps() and
-                self._spark_executors_have_own_wd())
+    def _pyspark_setup(self):
+        """Like ``self._setup``, but prepends commands for archive
+        emulation if needed."""
+        setup = []
+
+        if self._emulate_archives_on_spark():
+            for name, path in sorted(
+                    self._working_dir_mgr.name_to_path('archive').items()):
+
+                archive_file_name = self._working_dir_mgr.name(
+                    'archive_file', path)
+
+                setup.append(_unarchive_cmd(path) % dict(
+                    file=pipes.quote(archive_file_name),
+                    dir=pipes.quote(name)))
+
+        setup.extend(self._setup)
+
+        return setup
 
     def _py_files_setup(self):
         """A list of additional setup commands to emulate Spark's

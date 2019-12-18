@@ -25,6 +25,7 @@ from multiprocessing import Pool
 from multiprocessing import cpu_count
 from os.path import exists
 from os.path import join
+from shutil import make_archive
 from subprocess import check_call
 from unittest import skipIf
 
@@ -1131,7 +1132,49 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
         # fish was uploaded as "ghoti"
         self.assertNotIn('fish', file_sizes)
 
-        # TODO: add a Spark JAR to the repo, so we can test it
+    def test_archive_emulation(self):
+        f_dir = self.makedirs('f')
+        self.makefile(join(f_dir, 'fish'), b'salmon')
+        self.makefile(join(f_dir, 'fowl'), b'goose')
+
+        f_tar_gz = make_archive(join(self.tmp_dir, 'f'), 'gztar', f_dir)
+
+        job = MRSparkOSWalk(['-r', 'local',
+                             '--archives', '%s#f-unpacked' % f_tar_gz,
+                             '--dirs', f_dir])
+        job.sandbox()
+
+        file_sizes = {}
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in to_lines(runner.cat_output()):
+                path, size = safeeval(line)
+                file_sizes[path] = size
+
+        self.assertIn('f/fish', file_sizes)
+        self.assertEqual(file_sizes['f/fish'], 6)
+        self.assertIn('f/fowl', file_sizes)
+        self.assertEqual(file_sizes['f/fowl'], 5)
+
+        self.assertIn('f-unpacked/fish', file_sizes)
+        self.assertEqual(file_sizes['f-unpacked/fish'], 6)
+        self.assertIn('f-unpacked/fowl', file_sizes)
+        self.assertEqual(file_sizes['f-unpacked/fowl'], 5)
+
+        # archives should have been uploaded as files
+        self.assertIn('f.tar.gz.file', file_sizes)
+        self.assertIn('f-1.tar.gz.file', file_sizes)
+
+
+
+
+
+
+
+
+    # TODO: add a Spark JAR to the repo, so we can test it
 
 
 class InputFileArgsTestCase(SandboxedTestCase):

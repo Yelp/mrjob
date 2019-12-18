@@ -1214,6 +1214,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._opts['additional_emr_info']:
             kwargs['AdditionalInfo'] = self._opts['additional_emr_info']
 
+        kwargs['VisibleToAllUsers'] = True
+
         kwargs['JobFlowRole'] = self._instance_profile()
         kwargs['ServiceRole'] = self._service_role()
 

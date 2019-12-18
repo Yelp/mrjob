@@ -229,7 +229,7 @@ Deprecated methods :py:meth:`~mrjob.job.MRJob.add_file_option` and
 Nearly full support for Spark
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This release adds nearly full support for Spark, including mrjob-speific
+This release adds nearly full support for Spark, including mrjob-specific
 features like :mrjob-opt:`setup` scripts and
 :ref:`passthrough options <writing-cl-opts>`. See
 :ref:`why-mrjob-with-spark` for everything mrjob can do with Spark.

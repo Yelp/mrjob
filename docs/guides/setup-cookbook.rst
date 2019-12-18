@@ -91,7 +91,7 @@ or, in mrjob.conf:
     runners:
       hadoop:
         setup:
-        - cd your-src-dir.tar.gz#
+        - cd your-src-dir.tar.gz#/
         - make
 
 If Hadoop runs multiple tasks on the same node, your source dir will be shared

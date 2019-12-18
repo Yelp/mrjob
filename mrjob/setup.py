@@ -237,7 +237,7 @@ def parse_legacy_hash_path(type, path, must_name=None):
 
 
 def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False,
-                  strip_ext=False, add_ext=''):
+                  strip_ext=False, suffix=''):
     """Come up with a unique name for *path*.
 
     :param names_taken: a dictionary or set of names not to use.
@@ -246,7 +246,7 @@ def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False,
     :param unhide: make sure final name doesn't start with periods or
                    underscores
     :param strip_ext: if we propose a name, it shouldn't have a file extension
-    :param add_ext: if set to a string, add this to the end of any filename
+    :param suffix: if set to a string, add this to the end of any filename
                     we propose. Should include the ``.``.
 
     If the proposed name is taken, we add a number to the end of the
@@ -264,8 +264,8 @@ def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False,
     if strip_ext and not proposed_name:
         ext = ''
 
-    if add_ext and not proposed_name:
-        ext += add_ext
+    if suffix and not proposed_name:
+        ext += suffix
 
     if unhide:
         prefix = prefix.lstrip('.').lstrip('_')
@@ -369,10 +369,11 @@ class WorkingDirManager(object):
     # into, in case we need to un-archive it ourselves
     _SUPPORTED_TYPES = ('archive', 'archive_file', 'file')
 
-    def __init__(self):
+    def __init__(self, archive_file_suffix=''):
         # map from paths added without a name to None or lazily chosen name
         self._typed_path_to_auto_name = {}
         self._name_to_typed_path = {}
+        self._archive_file_suffix = archive_file_suffix
 
     def add(self, type, path, name=None):
         """Add a path as either a file or an archive, optionally
@@ -448,18 +449,18 @@ class WorkingDirManager(object):
 
         if not self._typed_path_to_auto_name[(type, path)]:
             strip_ext = False
-            add_ext = ''
+            suffix = ''
 
             if type == 'archive':
                 # weird to have .tar.gz etc. in a directory name
                 strip_ext = True
             elif type == 'archive_file':
                 # keep Spark from auto-untarring by adding .file
-                add_ext = '.file'
+                suffix = self._archive_file_suffix
 
             name = name_uniquely(
                 path, names_taken=self._name_to_typed_path,
-                strip_ext=strip_ext, add_ext=add_ext)
+                strip_ext=strip_ext, suffix=suffix)
 
             self._name_to_typed_path[name] = (type, path)
             self._typed_path_to_auto_name[(type, path)] = name

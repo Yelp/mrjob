@@ -226,7 +226,16 @@ class MRJobRunner(object):
         # access/make this using self._get_local_tmp_dir()
         self._local_tmp_dir = None
 
-        self._working_dir_mgr = WorkingDirManager()
+        if self._emulate_archives_on_spark():
+            # keep Spark from auto-uncompressing tarballs
+            archive_file_suffix = '.file'
+        else:
+            # otherwise, leave as-is, so that --archive will
+            # work properly
+            archive_file_suffix = ''
+
+        self._working_dir_mgr = WorkingDirManager(
+            archive_file_suffix=archive_file_suffix)
 
         # mapping from dir to path for corresponding archive. we pick
         # paths during init(), but don't actually create the archives

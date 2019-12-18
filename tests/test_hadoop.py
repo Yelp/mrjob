@@ -1524,66 +1524,6 @@ class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
             )
 
 
-class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):
-
-    def setUp(self):
-        super(WarnAboutSparkArchivesTestCase, self).setUp()
-
-        self.log = self.start(patch('mrjob.hadoop.log'))
-
-    def test_warning(self):
-        fake_archive = self.makefile('fake.tar.gz')
-
-        job = MRNullSpark(['-r', 'hadoop',
-                           '--spark-master', 'local',
-                           '--archives', fake_archive])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner._warn_about_spark_archives(runner._get_step(0))
-
-        self.assertTrue(self.log.warning.called)
-
-    def test_requires_spark(self):
-        fake_archive = self.makefile('fake.tar.gz')
-
-        job = MRTwoStepJob(['-r', 'hadoop',
-                            '--spark-master', 'local',
-                            '--archives', fake_archive])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner._warn_about_spark_archives(runner._get_step(0))
-
-        self.assertFalse(self.log.warning.called)
-
-    def test_requires_non_yarn_spark_master(self):
-        fake_archive = self.makefile('fake.tar.gz')
-
-        job = MRNullSpark(['-r', 'hadoop',
-                           '--spark-master', 'yarn',
-                           '--archives', fake_archive])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner._warn_about_spark_archives(runner._get_step(0))
-
-        self.assertFalse(self.log.warning.called)
-
-    def test_requires_archives(self):
-        fake_file = self.makefile('fake.txt')
-
-        job = MRNullSpark(['-r', 'hadoop',
-                           '--spark-master', 'local',
-                           '--files', fake_file])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner._warn_about_spark_archives(runner._get_step(0))
-
-        self.assertFalse(self.log.warning.called)
-
-
 class GetHadoopBinTestCase(MockHadoopTestCase):
     # mostly exists to test --hadoop-bin ''
 

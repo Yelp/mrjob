@@ -344,9 +344,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             else:
                 self._opts['region'] = _DEFAULT_GCE_REGION
 
-    def _default_opts(self):
+    @classmethod
+    def _default_opts(cls):
         return combine_dicts(
-            super(DataprocJobRunner, self)._default_opts(),
+            super(DataprocJobRunner, cls)._default_opts(),
             dict(
                 bootstrap_python=True,
                 check_cluster_every=_DEFAULT_CHECK_CLUSTER_EVERY,

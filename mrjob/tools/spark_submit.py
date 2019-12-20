@@ -26,6 +26,10 @@ This also adds a few mrjob features that are not standard with
    added ``local``, ``spark`` runners, made ``spark`` the default (was
    ``hadoop``)
 
+.. versionchanged:: 0.7.1
+
+   ``--archives`` and ``--dirs`` are supported on all masters (except local)
+
 Usage::
 
     mrjob spark-submit [-r <runner>] [options] <python file | app jar>
@@ -55,7 +59,7 @@ Options::
                         to search for the maven coordinates given with
                         --packages.
   --py-files PY_FILES   Comma-separated list of .zip, .egg, or .py files to
-                        placeon the PYTHONPATH for Python apps.
+                        placed on the PYTHONPATH for Python apps.
   --files UPLOAD_FILES  Comma-separated list of files to be placed in the
                         working directory of each executor. Ignored on
                         local[*] master.
@@ -316,9 +320,11 @@ _SPARK_SUBMIT_ARG_HELP = dict(
     supervise='If given, restarts the driver on failure.',
     total_executor_cores='Total cores for all executors.',
     upload_archives=('Comma-separated list of archives to be extracted into'
-                     ' the working directory of each executor.'),
+                     ' the working directory of each executor. Ignored on'
+                     ' local[*] master.'),
     upload_dirs=('Comma-separated list of directors to be archived and then'
-                 ' extracted into the working directory of each executor.'),
+                 ' extracted into the working directory of each executor.'
+                 ' Ignored on local[*] master.'),
     upload_files=('Comma-separated list of files to be placed in the working'
                   ' directory of each executor. Ignored on local[*] master.'),
 )

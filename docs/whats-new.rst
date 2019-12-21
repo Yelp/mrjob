@@ -4,6 +4,25 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.7.1:
+
+0.7.1
+-----
+
+EMR
+^^^
+Fixed a bug to set default value of `VisibleToAllUsers` to `True`.
+
+You can set sub-parameters with :mrjob-opt:`extra_cluster_params` to set it `False`. For
+example, you can now do:
+
+.. code-block:: sh
+
+   --extra-cluster-param VisibleToAllUsers=false
+
+Added logging for mrjob to show invoked runner with keyword arguments.
+
+
 .. _v0.7.0:
 
 0.7.0

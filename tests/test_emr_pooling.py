@@ -1763,10 +1763,22 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
         _, cluster_id = self.make_pooled_cluster(bootstrap=[true_story])
 
+        # same bootstrap command, same file (matches)
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--bootstrap', true_story])
 
+        # same command, different file path with same contents (matches)
+        story_2_path = self.makefile('story-2.txt', b'Once upon a time')
+        self.assertNotEqual(story_2_path, story_path)
+
+        true_story_2 = 'true %s#story.txt' % story_2_path
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--bootstrap', true_story_2])
+
+        # same command, same file path, different contents (does not match)
         with open(story_path, 'wb') as f:
             f.write(b'Call me Ishmael.')  # same file size, different letters
 

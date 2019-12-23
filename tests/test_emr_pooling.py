@@ -1795,7 +1795,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         os.remove(story_path)
 
         empty_story_path = make_archive(join(self.tmp_dir, 'story'),
-                                           'gztar', story_dir)
+                                        'gztar', empty_dir)
 
         self.assertEqual(story_path, empty_story_path)
 

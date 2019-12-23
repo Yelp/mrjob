@@ -2658,7 +2658,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # depending on insertion/deletion order.
             sorted(
                 (name, self.fs.md5sum(path)) for name, path
-                in self._bootstrap_dir_mgr.name_to_path('file').items()
+                in self._bootstrap_dir_mgr.name_to_path().items()
                 if not path == self._mrjob_zip_path),
             self._opts['additional_emr_info'],
             self._bootstrap,

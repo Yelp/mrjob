@@ -17,8 +17,9 @@
 """Tests of EMRJobRunner's cluster pooling."""
 import json
 import os
-import os.path
 from datetime import timedelta
+from os.path import join
+from shutil import make_archive
 
 import mrjob
 import mrjob.emr
@@ -1745,7 +1746,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--bootstrap', 'true'])
 
     def test_dont_join_differently_bootstrapped_pool_2(self):
-        bootstrap_path = os.path.join(self.tmp_dir, 'go.sh')
+        bootstrap_path = join(self.tmp_dir, 'go.sh')
         with open(bootstrap_path, 'w') as f:
             f.write('#!/usr/bin/sh\necho "hi mom"\n')
 
@@ -1755,7 +1756,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--bootstrap-action', bootstrap_path + ' a b c'])
 
-    def test_join_with_same_file_contents(self):
+    def test_bootstrap_file_contents(self):
         story_path = self.makefile('story.txt', b'Once upon a time')
 
         true_story = 'true %s#' % story_path
@@ -1766,15 +1767,37 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '--pool-clusters',
             '--bootstrap', true_story])
 
-    def test_dont_join_with_different_file_contents(self):
-        story_path = self.makefile('story.txt', b'Once upon a time')
+        with open(story_path, 'wb') as f:
+            f.write(b'Call me Ishmael.')  # same file size, different letters
 
-        true_story = 'true %s#' % story_path
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--bootstrap', true_story])
+
+    def test_bootstrap_archive_contents(self):
+        story_dir = self.makedirs('story')
+        self.makefile(join(story_dir, 'fairy.txt'), b'Once upon a time')
+        self.makefile(join(story_dir, 'moby.txt'), b'Call me Ishmael.')
+
+        empty_dir = self.makedirs('empty')
+
+        story_path = make_archive(join(self.tmp_dir, 'story'),
+                                     'gztar', story_dir)
+
+        true_story = 'true %s#/' % story_path
 
         _, cluster_id = self.make_pooled_cluster(bootstrap=[true_story])
 
-        with open(story_path, 'wb') as f:
-            f.write(b'Call me Ishmael.')  # same length, different letters
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--bootstrap', true_story])
+
+        os.remove(story_path)
+
+        empty_story_path = make_archive(join(self.tmp_dir, 'story'),
+                                           'gztar', story_dir)
+
+        self.assertEqual(story_path, empty_story_path)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',

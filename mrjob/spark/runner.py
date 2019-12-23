@@ -173,9 +173,10 @@ class SparkMRJobRunner(MRJobBinRunner):
                             " runner does not support commands" % (
                                 step_num, mrc))
 
-    def _default_opts(self):
+    @classmethod
+    def _default_opts(cls):
         return combine_dicts(
-            super(SparkMRJobRunner, self)._default_opts(),
+            super(SparkMRJobRunner, cls)._default_opts(),
             dict(
                 cloud_part_size_mb=_DEFAULT_CLOUD_PART_SIZE_MB,
             ),

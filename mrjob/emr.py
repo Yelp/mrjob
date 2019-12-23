@@ -426,9 +426,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     ### Options ###
 
-    def _default_opts(self):
+    @classmethod
+    def _default_opts(cls):
         return combine_dicts(
-            super(EMRJobRunner, self)._default_opts(),
+            super(EMRJobRunner, cls)._default_opts(),
             dict(
                 bootstrap_python=None,
                 check_cluster_every=30,

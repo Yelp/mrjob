@@ -133,9 +133,10 @@ class MRJobBinRunner(MRJobRunner):
         # Keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
 
-    def _default_opts(self):
+    @classmethod
+    def _default_opts(cls):
         return combine_dicts(
-            super(MRJobBinRunner, self)._default_opts(),
+            super(MRJobBinRunner, cls)._default_opts(),
             dict(
                 read_logs=True,
             )

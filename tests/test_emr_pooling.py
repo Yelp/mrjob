@@ -1755,6 +1755,31 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--bootstrap-action', bootstrap_path + ' a b c'])
 
+    def test_join_with_same_file_contents(self):
+        story_path = self.makefile('story.txt', b'Once upon a time')
+
+        true_story = 'true %s#' % story_path
+
+        _, cluster_id = self.make_pooled_cluster(bootstrap=[true_story])
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--bootstrap', true_story])
+
+    def test_dont_join_with_different_file_contents(self):
+        story_path = self.makefile('story.txt', b'Once upon a time')
+
+        true_story = 'true %s#' % story_path
+
+        _, cluster_id = self.make_pooled_cluster(bootstrap=[true_story])
+
+        with open(story_path, 'wb') as f:
+            f.write(b'Call me Ishmael.')  # same length, different letters
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--bootstrap', true_story])
+
     def test_pool_contention(self):
         _, cluster_id = self.make_pooled_cluster('robert_downey_jr')
 

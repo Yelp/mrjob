@@ -2647,24 +2647,36 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         The way the hash is calculated may vary between point releases
         (pooling requires the exact same version of :py:mod:`mrjob` anyway).
         """
+        # exclude mrjob.zip because it's only created if the
+        # job starts its own cluster (also, its hash changes every time
+        # since the zip file contains different timestamps).
+        # The filenames/md5sums are sorted because we need to
+        # ensure the order they're added doesn't affect the hash
+        # here
+        file_md5sums = sorted(
+            (name, self.fs.md5sum(path)) for name, path
+            in self._bootstrap_dir_mgr.name_to_path().items()
+            if not path == self._mrjob_zip_path)
+
+        # original path of the file doesn't matter, just its name and contents
+        bootstrap_without_paths = [
+            [
+                dict(type=x['type'], name=self._bootstrap_dir_mgr.name(**x))
+                if isinstance(x, dict) else x
+                for x in cmd
+            ]
+            for cmd in self._bootstrap
+        ]
+
         things_to_hash = [
-            # exclude mrjob.zip because it's only created if the
-            # job starts its own cluster (also, its hash changes every time
-            # since the zip file contains different timestamps).
-            # The filenames/md5sums are sorted because we need to
-            # ensure the order they're added doesn't affect the hash
-            # here. Previously this used a dict, but Python doesn't
-            # guarantee the ordering of dicts -- they can vary
-            # depending on insertion/deletion order.
-            sorted(
-                (name, self.fs.md5sum(path)) for name, path
-                in self._bootstrap_dir_mgr.name_to_path('file').items()
-                if not path == self._mrjob_zip_path),
+            file_md5sums,
             self._opts['additional_emr_info'],
-            self._bootstrap,
+            bootstrap_without_paths,
             self._bootstrap_actions(),
             self._bootstrap_mrjob(),
         ]
+
+        #import pdb; pdb.set_trace()
 
         if self._bootstrap_mrjob():
             things_to_hash.append(mrjob.__version__)

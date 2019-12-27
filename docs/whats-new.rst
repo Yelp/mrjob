@@ -21,7 +21,7 @@ example, you can now do:
    --extra-cluster-param VisibleToAllUsers=false
 
 Added logging for mrjob to show invoked runner with keyword arguments.
-
+Contents of archives are now used during bootstrapping to ensure clusters have same setup.
 
 .. _v0.7.0:
 

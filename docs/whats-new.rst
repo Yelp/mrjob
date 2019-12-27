@@ -16,14 +16,12 @@ Fixed a bug to set default value of `VisibleToAllUsers` to `True`.
 You can set sub-parameters with :mrjob-opt:`extra_cluster_params` to set it `False`. For
 example, you can now do:
 
-Contents of archives are now used during bootstraping to ensure clusters have same setup.
-
 .. code-block:: sh
 
    --extra-cluster-param VisibleToAllUsers=false
 
 Added logging for mrjob to show invoked runner with keyword arguments.
-
+Contents of archives are now used during bootstrapping to ensure clusters have same setup.
 
 .. _v0.7.0:
 

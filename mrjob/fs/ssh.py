@@ -70,7 +70,7 @@ class SSHFilesystem(Filesystem):
         Address consists of one or most hosts, joined by '!' (so that
         we can reach hosts only accessible through an internal network).
          Before running the command returned, you should run
-        ``self._copy_key_pair_files(address)`` to ensure that it's possible
+        ``self._ssh_copy_key(address)`` to ensure that it's possible
         to ssh from the first host in *address*.
 
         We assume that any host we SSH into is a UNIX system, and that

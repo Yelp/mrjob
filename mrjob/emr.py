@@ -2608,8 +2608,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 valid_clusters, invalid_clusters,
                 locked_clusters, num_steps)
             log.debug(
-                '  Found %d usable clusters%s%s' % (
+                '  Found %d usable cluster%s%s%s' % (
                     len(cluster_info_list),
+                    '' if len(cluster_info_list) == 1 else 's',
                     ': ' if cluster_info_list else '',
                     ', '.join(c for c, n in reversed(cluster_info_list))))
 

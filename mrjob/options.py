@@ -1177,6 +1177,15 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    ssh_add_bin=dict(
+        combiner=combine_cmds,
+        switches=[
+            (['--ssh-add-bin'], dict(
+                help=("Name/path of ssh-add binary. Arguments are allowed"
+                      " (e.g. --ssh-bin 'ssh-add -v')"),
+            )),
+        ],
+    ),
     ssh_bin=dict(
         combiner=combine_cmds,
         switches=[

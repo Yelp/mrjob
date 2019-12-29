@@ -316,6 +316,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'pool_wait_minutes',
         'release_label',
         's3_endpoint',
+        'ssh_add_bin',
         'ssh_bin',
         'ssh_bind_ports',
         'ssh_tunnel',
@@ -818,6 +819,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             for key in 'jar', 'script':
                 if step.get(key):
                     self._upload_mgr.add(step[key])
+
+    def _ssh_add_bin(self):
+        # the args of the ssh-add binary
+        return self._opts['ssh_add_bin'] or ['ssh-add']
 
     def _ssh_bin(self):
         # the args of the ssh binary

@@ -181,7 +181,7 @@ class SSHFilesystem(Filesystem):
         """Add ``self._ec2_key_pair_file`` to the ssh agent with ``ssh-add``.
         """
         args = self._ssh_add_bin + [
-            'ssh-add', '-t', '60', self._ec2_key_pair_file]
+            '-t', '60', self._ec2_key_pair_file]
 
         log.debug('  > ' + cmd_line(args))
 

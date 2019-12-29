@@ -233,6 +233,10 @@ def main(stdin, stdout, stderr, args, environ):
 
         return 1
 
+    # for now, skip ssh-add
+    if '-add' in args[0]:
+        return 0
+
     # Find where the user's commands begin
     arg_pos = 0
 

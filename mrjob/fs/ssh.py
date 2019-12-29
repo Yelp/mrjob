@@ -39,16 +39,21 @@ class SSHFilesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
 
-    def __init__(self, ssh_bin, ec2_key_pair_file):
+    # adding default to ssh_add_bin only because SSHFilesystem is technically
+    # user-facing. remove this in the release after v0.7.x
+    def __init__(self, ssh_bin, ec2_key_pair_file, ssh_add_bin=None):
         """
         :param ssh_bin: path to ``ssh`` binary
         :param ec2_key_pair_file: path to an SSH keyfile
+        :param ssh_add_bin: path to ``ssh-add`` binary if any
         """
         super(SSHFilesystem, self).__init__()
         self._ssh_bin = ssh_bin
         self._ec2_key_pair_file = ec2_key_pair_file
         if self._ec2_key_pair_file is None:
             raise ValueError('ec2_key_pair_file must be a path')
+
+        self._ssh_add_bin = ssh_add_bin or ['ssh-add']
 
         # use this name for all remote copies of the key pair file
         self._remote_key_pair_file = '.mrjob-%s.pem' % random_identifier()
@@ -69,9 +74,6 @@ class SSHFilesystem(Filesystem):
 
         Address consists of one or most hosts, joined by '!' (so that
         we can reach hosts only accessible through an internal network).
-         Before running the command returned, you should run
-        ``self._ssh_copy_key(address)`` to ensure that it's possible
-        to ssh from the first host in *address*.
 
         We assume that any host we SSH into is a UNIX system, and that
         we don't need sudo to run ssh itself. We also assume the username
@@ -94,6 +96,7 @@ class SSHFilesystem(Filesystem):
                     '-o', 'UserKnownHostsFile=' + known_hosts_file,
                     '-o', 'StrictHostKeyChecking=no',
                     '-o', 'VerifyHostKeyDNS=no',
+                    '-A',
                     'hadoop@' + host,
                 ]
             )
@@ -108,7 +111,8 @@ class SSHFilesystem(Filesystem):
     def _ssh_launch(self, address, cmd_args, stdin=None):
         """Copy SSH keys if necessary, then launch the given command
         over SSH and return a Popen."""
-        self._ssh_copy_key(address)
+        if '!' in address:
+            self._ssh_add_key()
 
         args = self._ssh_cmd_args(address, cmd_args)
 
@@ -172,6 +176,24 @@ class SSHFilesystem(Filesystem):
                 self._ssh_run(key_addr, cmd_args, stdin=key_pair)
 
             self._hosts_with_key_pair_file.add(key_addr)
+
+    def _ssh_add_key(self):
+        """Add ``self._ec2_key_pair_file`` to the ssh agent with ``ssh-add``.
+        """
+        args = self._ssh_add_bin + [
+            'ssh-add', '-t', '60', self._ec2_key_pair_file]
+
+        log.debug('  > ' + cmd_line(args))
+
+        try:
+            p = Popen(args, stdout=PIPE, stderr=PIPE)
+        except OSError as ex:
+            raise IOError(ex.strerror)
+
+        stdout, stderr = p.communicate()
+
+        if p.returncode != 0:
+            raise IOError(to_unicode(stderr))
 
     def can_handle_path(self, path):
         return _SSH_URI_RE.match(path) is not None

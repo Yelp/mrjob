@@ -90,9 +90,13 @@ class SSHFilesystem(Filesystem):
                 key_pair_file = self._remote_key_pair_file
                 known_hosts_file = '/dev/null'
 
+            args.extend(self._ssh_bin)
+
+            if i == 0:
+                args.extend(['-i', key_pair_file])
+
             args.extend(
-                self._ssh_bin + [
-                    '-i', key_pair_file,
+                [
                     '-o', 'UserKnownHostsFile=' + known_hosts_file,
                     '-o', 'StrictHostKeyChecking=no',
                     '-o', 'VerifyHostKeyDNS=no',

@@ -201,22 +201,24 @@ def main(stdin, stdout, stderr, args, environ):
 
         # Recursively call for workers
         if remote_args[0].split('/')[-1] == 'ssh':
-            # Actually check the existence of the key file on the master node
-            while not remote_args[remote_arg_pos] == '-i':
-                remote_arg_pos += 1
 
-            worker_key_file = remote_args[remote_arg_pos + 1]
+            if '-i' in remote_args:
+                # Actually check that the key file exists
+                while not remote_args[remote_arg_pos] == '-i':
+                    remote_arg_pos += 1
 
-            if not os.path.exists(
-                    os.path.join(path_for_host(host, environ),
-                                 worker_key_file)):
-                # This is word-for-word what SSH says.
-                print(('Warning: Identity file %s not accessible.'
-                       ' No such file or directory.' %
-                       worker_key_file), file=stderr)
+                worker_key_file = remote_args[remote_arg_pos + 1]
 
-                print('Permission denied (publickey).', file=stderr)
-                return 1
+                if not os.path.exists(
+                        os.path.join(path_for_host(host, environ),
+                                     worker_key_file)):
+                    # This is word-for-word what SSH says.
+                    print(('Warning: Identity file %s not accessible.'
+                           ' No such file or directory.' %
+                           worker_key_file), file=stderr)
+
+                    print('Permission denied (publickey).', file=stderr)
+                    return 1
 
             while not remote_args[remote_arg_pos].startswith('hadoop@'):
                 remote_arg_pos += 1

@@ -150,33 +150,6 @@ class SSHFilesystem(Filesystem):
         if returncode != 0:
             raise IOError(stderr)
 
-    def _ssh_copy_key(self, address):
-        """Copy ``self._ec2_key_pair_file`` to all hosts in *address*
-        that need it. ``'master!core1!foo'``, we'll first copy a key
-        pair file to ``core1`` (via ``master``) and then to ``foo``
-        (via ``master`` and ``core``).
-
-        If there isn't a ``!`` in *address*, do nothing.
-
-        """
-        if '!' not in address:
-            return
-
-        key_addr = '!'.join(address.split('!')[:-1])
-
-        if key_addr not in self._hosts_with_key_pair_file:
-            key_pair_file = self._remote_key_pair_file
-            cmd_args = [
-                'sh', '-c', 'cat > %s && chmod 600 %s' % (
-                    key_pair_file, key_pair_file)]
-
-            with open(self._ec2_key_pair_file, 'rb') as key_pair:
-                # any previous hosts in the chain will get key pairs first
-                # because _ssh_run() calls _ssh_copy_key()
-                self._ssh_run(key_addr, cmd_args, stdin=key_pair)
-
-            self._hosts_with_key_pair_file.add(key_addr)
-
     def _ssh_add_key(self):
         """Add ``self._ec2_key_pair_file`` to the ssh agent with ``ssh-add``.
         """

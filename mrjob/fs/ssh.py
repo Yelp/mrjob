@@ -108,7 +108,7 @@ class SSHFilesystem(Filesystem):
 
         return args
 
-    def _ssh_launch(self, address, cmd_args, stdin=None):
+    def _ssh_launch(self, address, cmd_args):
         """Copy SSH keys if necessary, then launch the given command
         over SSH and return a Popen."""
         if '!' in address:
@@ -118,17 +118,17 @@ class SSHFilesystem(Filesystem):
 
         log.debug('  > ' + cmd_line(args))
         try:
-            return Popen(args, stdout=PIPE, stderr=PIPE, stdin=stdin)
+            return Popen(args, stdout=PIPE, stderr=PIPE)
         except OSError as ex:
             raise IOError(ex.strerror)
 
-    def _ssh_run(self, address, cmd_args, stdin=None):
+    def _ssh_run(self, address, cmd_args):
         """Run the given SSH command, and raise an IOError if it fails.
         Return ``(stdout, stderr)``
 
         Use this for commands with a bounded amount of output.
         """
-        p = self._ssh_launch(address, cmd_args, stdin=stdin)
+        p = self._ssh_launch(address, cmd_args)
 
         stdout, stderr = p.communicate()
 

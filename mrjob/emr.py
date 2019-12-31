@@ -648,6 +648,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if self._opts['ec2_key_pair_file']:
                 self._fs.add_fs('ssh', SSHFilesystem(
                     ssh_bin=self._ssh_bin(),
+                    ssh_add_bin=self._ssh_add_bin(),
                     ec2_key_pair_file=self._opts['ec2_key_pair_file']))
 
             self._fs.add_fs('s3', S3Filesystem(

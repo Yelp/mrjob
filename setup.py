@@ -60,11 +60,7 @@ try:
     # rapidjson is not available on Python 2
     if sys.version_info[0] == 2:
         del setuptools_kwargs['extras_require']['rapidjson']
-
-        setuptools_kwargs['tests_require'] = [
-            tr for tr in setuptools_kwargs['tests_require']
-            if 'rapidjson' not in tr
-        ]
+        setuptools_kwargs['tests_require'].remove('python-rapidjson')
 
     # limited support for Python 3.4, which has reached end-of-life
     # (We continue supporting 3.4 to make old AMIs work, see #2090)
@@ -74,9 +70,14 @@ try:
 
         # PyYAML dropped 3.4 support in version 5.3
         setuptools_kwargs['install_requires'] = [
-            'PyYAML>=3.10,<5.3' if ir.startswith('PyYAML') else ir
+            ir + ',<5.2' if ir.startswith('PyYAML') else ir
             for ir in setuptools_kwargs['install_requires']
         ]
+
+    # 2020-03-23: for now, disable pyspark on Python 3.8 (it installs
+    # but doesn't work)
+    if sys.version_info[:2] >= (3, 4):
+        setuptools_kwargs['tests_require'].remove('pyspark')
 
 except ImportError:
     from distutils.core import setup

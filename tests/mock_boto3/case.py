@@ -16,7 +16,6 @@
 import itertools
 import os
 import shutil
-import stat
 import tempfile
 import time
 from io import BytesIO

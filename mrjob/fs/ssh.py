@@ -55,9 +55,6 @@ class SSHFilesystem(Filesystem):
 
         self._ssh_add_bin = ssh_add_bin or ['ssh-add']
 
-        # use this name for all remote copies of the key pair file
-        self._remote_key_pair_file = '.mrjob-%s.pem' % random_identifier()
-
         # keep track of hosts we've already copied the key pair to
         self._hosts_with_key_pair_file = set()
 
@@ -83,17 +80,12 @@ class SSHFilesystem(Filesystem):
 
         for i, host in enumerate(address.split('!')):
 
-            if i == 0:
-                key_pair_file = self._ec2_key_pair_file
-                known_hosts_file = os.devnull
-            else:
-                key_pair_file = self._remote_key_pair_file
-                known_hosts_file = '/dev/null'
-
             args.extend(self._ssh_bin)
 
             if i == 0:
-                args.extend(['-i', key_pair_file])
+                args.extend(['-i', self._ec2_key_pair_file])
+
+            known_hosts_file = os.devnull if i == 0 else '/dev/null'
 
             args.extend(
                 [

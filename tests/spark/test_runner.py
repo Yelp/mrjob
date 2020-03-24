@@ -679,6 +679,7 @@ class GroupStepsTestCase(MockFilesystemsTestCase):
         ])
 
 
+@skipIf(pyspark is None, 'no pyspark module')
 class SparkCounterSimulationTestCase(MockFilesystemsTestCase):
     # trying to keep number of tests small, since they run actual Spark jobs
 

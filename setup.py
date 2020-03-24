@@ -28,6 +28,12 @@ try:
                 'boto3>=1.4.6',
                 'botocore>=1.6.0',
             ],
+            'google': [
+                'google-cloud-dataproc>=0.3.0',
+                'google-cloud-logging>=1.9.0',
+                'google-cloud-storage>=1.13.1',
+            ],
+            'rapidjson': ['python-rapidjson'],
             'simplejson': ['simplejson'],
             'ujson': ['ujson'],
         },
@@ -38,6 +44,7 @@ try:
         'test_suite': 'tests',
         'tests_require': [
             'pyspark',
+            'python-rapidjson',
             'simplejson',
             'ujson',
             'warcio',
@@ -45,25 +52,32 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # Google libs don't install on Python 3.4. Which is fine, the only
-    # reason we support Python 3.4 at all is to support earlier
-    # AMIs on EMR. See #2090
-    if sys.version_info[0] == 2 or sys.version_info >= (3, 5):
-        setuptools_kwargs['extras_require']['google'] = [
-            'google-cloud-dataproc>=0.3.0',
-            'google-cloud-logging>=1.9.0',
-            'google-cloud-storage>=1.13.1',
+    # grpcio 1.11.0 and 1.12.0 seem not to compile with PyPy
+    if hasattr(sys, 'pypy_version_info'):
+        setuptools_kwargs['extras_require']['google'].append(
+            'grpcio<=1.10.0')
+
+    # rapidjson is not available on Python 2
+    if sys.version_info[0] == 2:
+        del setuptools_kwargs['extras_require']['rapidjson']
+        setuptools_kwargs['tests_require'].remove('python-rapidjson')
+
+    # limited support for Python 3.4, which has reached end-of-life
+    # (We continue supporting 3.4 to make old AMIs work, see #2090)
+    if sys.version_info[:2] == (3, 4):
+        # Google libs don't install on Python 3.4
+        del setuptools_kwargs['extras_require']['google']
+
+        # PyYAML dropped 3.4 support in version 5.3
+        setuptools_kwargs['install_requires'] = [
+            ir + ',<5.2' if ir.startswith('PyYAML') else ir
+            for ir in setuptools_kwargs['install_requires']
         ]
 
-        # grpcio 1.11.0 and 1.12.0 seem not to compile with PyPy
-        if hasattr(sys, 'pypy_version_info'):
-            setuptools_kwargs['extras_require']['google'].append(
-                'grpcio<=1.10.0')
-
-    # rapidjson exists on Python 3 only
-    if sys.version_info >= (3, 0):
-        setuptools_kwargs['extras_require']['rapidjson'] = ['python-rapidjson']
-        setuptools_kwargs['tests_require'].append('python-rapidjson')
+    # 2020-03-23: for now, disable pyspark on Python 3.8 (it installs
+    # but doesn't work)
+    if sys.version_info[:2] >= (3, 4):
+        setuptools_kwargs['tests_require'].remove('pyspark')
 
 except ImportError:
     from distutils.core import setup

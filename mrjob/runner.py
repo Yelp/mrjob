@@ -1373,7 +1373,7 @@ class MRJobRunner(object):
                                       always_use_hash=always_use_hash))
 
         # if emulating --archives, upload archives with files (we'll unpack
-        # them later with a setup script
+        # them later with a setup script)
         if emulate_archives:
             file_hash_paths.extend(
                 self._file_archive_hash_paths(archives))

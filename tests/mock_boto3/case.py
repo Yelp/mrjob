@@ -156,6 +156,8 @@ class MockBoto3TestCase(SandboxedTestCase):
         os.mkdir(os.path.join(master_ssh_root, 'bin'))
         self.ssh_bin = os.path.join(master_ssh_root, 'bin', 'ssh')
         create_mock_ssh_script(self.ssh_bin)
+        self.ssh_add_bin = os.path.join(master_ssh_root, 'bin', 'ssh-add')
+        create_mock_ssh_script(self.ssh_add_bin)
 
         # Make a fake keyfile so that the 'file exists' requirements are
         # satsified
@@ -165,6 +167,7 @@ class MockBoto3TestCase(SandboxedTestCase):
 
         # Tell the runner to use the fake binary
         runner._opts['ssh_bin'] = [self.ssh_bin]
+        runner._opts['ssh_add_bin'] = [self.ssh_add_bin]
         # Also pretend to have an SSH key pair file
         runner._opts['ec2_key_pair_file'] = self.keyfile_path
 

@@ -316,6 +316,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'pool_wait_minutes',
         'release_label',
         's3_endpoint',
+        'ssh_add_bin',
         'ssh_bin',
         'ssh_bind_ports',
         'ssh_tunnel',
@@ -647,6 +648,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if self._opts['ec2_key_pair_file']:
                 self._fs.add_fs('ssh', SSHFilesystem(
                     ssh_bin=self._ssh_bin(),
+                    ssh_add_bin=self._ssh_add_bin(),
                     ec2_key_pair_file=self._opts['ec2_key_pair_file']))
 
             self._fs.add_fs('s3', S3Filesystem(
@@ -818,6 +820,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             for key in 'jar', 'script':
                 if step.get(key):
                     self._upload_mgr.add(step[key])
+
+    def _ssh_add_bin(self):
+        # the args of the ssh-add binary
+        return self._opts['ssh_add_bin'] or ['ssh-add']
 
     def _ssh_bin(self):
         # the args of the ssh binary
@@ -2603,8 +2609,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 valid_clusters, invalid_clusters,
                 locked_clusters, num_steps)
             log.debug(
-                '  Found %d usable clusters%s%s' % (
+                '  Found %d usable cluster%s%s%s' % (
                     len(cluster_info_list),
+                    '' if len(cluster_info_list) == 1 else 's',
                     ': ' if cluster_info_list else '',
                     ', '.join(c for c, n in reversed(cluster_info_list))))
 

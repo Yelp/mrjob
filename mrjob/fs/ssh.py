@@ -39,10 +39,13 @@ class SSHFilesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
 
-    def __init__(self, ssh_bin, ec2_key_pair_file):
+    # adding default to ssh_add_bin only because SSHFilesystem is technically
+    # user-facing. remove this in the release after v0.7.x
+    def __init__(self, ssh_bin, ec2_key_pair_file, ssh_add_bin=None):
         """
         :param ssh_bin: path to ``ssh`` binary
         :param ec2_key_pair_file: path to an SSH keyfile
+        :param ssh_add_bin: path to ``ssh-add`` binary if any
         """
         super(SSHFilesystem, self).__init__()
         self._ssh_bin = ssh_bin
@@ -50,8 +53,7 @@ class SSHFilesystem(Filesystem):
         if self._ec2_key_pair_file is None:
             raise ValueError('ec2_key_pair_file must be a path')
 
-        # use this name for all remote copies of the key pair file
-        self._remote_key_pair_file = '.mrjob-%s.pem' % random_identifier()
+        self._ssh_add_bin = ssh_add_bin or ['ssh-add']
 
         # keep track of hosts we've already copied the key pair to
         self._hosts_with_key_pair_file = set()
@@ -69,9 +71,6 @@ class SSHFilesystem(Filesystem):
 
         Address consists of one or most hosts, joined by '!' (so that
         we can reach hosts only accessible through an internal network).
-         Before running the command returned, you should run
-        ``self._copy_key_pair_files(address)`` to ensure that it's possible
-        to ssh from the first host in *address*.
 
         We assume that any host we SSH into is a UNIX system, and that
         we don't need sudo to run ssh itself. We also assume the username
@@ -81,19 +80,19 @@ class SSHFilesystem(Filesystem):
 
         for i, host in enumerate(address.split('!')):
 
+            args.extend(self._ssh_bin)
+
             if i == 0:
-                key_pair_file = self._ec2_key_pair_file
-                known_hosts_file = os.devnull
-            else:
-                key_pair_file = self._remote_key_pair_file
-                known_hosts_file = '/dev/null'
+                args.extend(['-i', self._ec2_key_pair_file])
+
+            known_hosts_file = os.devnull if i == 0 else '/dev/null'
 
             args.extend(
-                self._ssh_bin + [
-                    '-i', key_pair_file,
+                [
                     '-o', 'UserKnownHostsFile=' + known_hosts_file,
                     '-o', 'StrictHostKeyChecking=no',
                     '-o', 'VerifyHostKeyDNS=no',
+                    '-A',
                     'hadoop@' + host,
                 ]
             )
@@ -105,26 +104,27 @@ class SSHFilesystem(Filesystem):
 
         return args
 
-    def _ssh_launch(self, address, cmd_args, stdin=None):
+    def _ssh_launch(self, address, cmd_args):
         """Copy SSH keys if necessary, then launch the given command
         over SSH and return a Popen."""
-        self._ssh_copy_key(address)
+        if '!' in address:
+            self._ssh_add_key()
 
         args = self._ssh_cmd_args(address, cmd_args)
 
         log.debug('  > ' + cmd_line(args))
         try:
-            return Popen(args, stdout=PIPE, stderr=PIPE, stdin=stdin)
+            return Popen(args, stdout=PIPE, stderr=PIPE)
         except OSError as ex:
             raise IOError(ex.strerror)
 
-    def _ssh_run(self, address, cmd_args, stdin=None):
+    def _ssh_run(self, address, cmd_args):
         """Run the given SSH command, and raise an IOError if it fails.
         Return ``(stdout, stderr)``
 
         Use this for commands with a bounded amount of output.
         """
-        p = self._ssh_launch(address, cmd_args, stdin=stdin)
+        p = self._ssh_launch(address, cmd_args)
 
         stdout, stderr = p.communicate()
 
@@ -146,32 +146,23 @@ class SSHFilesystem(Filesystem):
         if returncode != 0:
             raise IOError(stderr)
 
-    def _ssh_copy_key(self, address):
-        """Copy ``self._ec2_key_pair_file`` to all hosts in *address*
-        that need it. ``'master!core1!foo'``, we'll first copy a key
-        pair file to ``core1`` (via ``master``) and then to ``foo``
-        (via ``master`` and ``core``).
-
-        If there isn't a ``!`` in *address*, do nothing.
-
+    def _ssh_add_key(self):
+        """Add ``self._ec2_key_pair_file`` to the ssh agent with ``ssh-add``.
         """
-        if '!' not in address:
-            return
+        args = self._ssh_add_bin + [
+            '-t', '60', self._ec2_key_pair_file]
 
-        key_addr = '!'.join(address.split('!')[:-1])
+        log.debug('  > ' + cmd_line(args))
 
-        if key_addr not in self._hosts_with_key_pair_file:
-            key_pair_file = self._remote_key_pair_file
-            cmd_args = [
-                'sh', '-c', 'cat > %s && chmod 600 %s' % (
-                    key_pair_file, key_pair_file)]
+        try:
+            p = Popen(args, stdout=PIPE, stderr=PIPE)
+        except OSError as ex:
+            raise IOError(ex.strerror)
 
-            with open(self._ec2_key_pair_file, 'rb') as key_pair:
-                # any previous hosts in the chain will get key pairs first
-                # because _ssh_run() calls _ssh_copy_key()
-                self._ssh_run(key_addr, cmd_args, stdin=key_pair)
+        stdout, stderr = p.communicate()
 
-            self._hosts_with_key_pair_file.add(key_addr)
+        if p.returncode != 0:
+            raise IOError(to_unicode(stderr))
 
     def can_handle_path(self, path):
         return _SSH_URI_RE.match(path) is not None

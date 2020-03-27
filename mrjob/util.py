@@ -69,11 +69,19 @@ def file_ext(filename):
 
     >>> file_ext('foo.tar.gz')
     '.tar.gz'
+
+    >>> file_ext('.emacs')
+    ''
+
+    >>> file_ext('.mrjob.conf')
+    '.conf'
     """
-    dot_index = filename.find('.')
+    stripped_name = filename.lstrip('.')
+    dot_index = stripped_name.find('.')
+
     if dot_index == -1:
         return ''
-    return filename[dot_index:]
+    return stripped_name[dot_index:]
 
 
 def log_to_null(name=None):

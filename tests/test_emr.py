@@ -1761,16 +1761,16 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
                       lines)
 
         self.assertIn(
-            '  mkdir $__mrjob_PWD/foo.tar.gz;'
-            ' tar xfz $__mrjob_TMP/foo.tar.gz -C $__mrjob_PWD/foo.tar.gz',
+            '  mkdir $__mrjob_PWD/foo;'
+            ' tar xfz $__mrjob_TMP/foo.tar.gz -C $__mrjob_PWD/foo',
             lines)
 
         self.assertIn(
-            '  chmod u+rx -R $__mrjob_PWD/foo.tar.gz',
+            '  chmod u+rx -R $__mrjob_PWD/foo',
             lines)
 
         self.assertIn(
-            '  cd $__mrjob_PWD/foo.tar.gz/',
+            '  cd $__mrjob_PWD/foo/',
             lines)
 
     def test_bootstrap_dir(self):
@@ -1797,16 +1797,16 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
                       lines)
 
         self.assertIn(
-            '  mkdir $__mrjob_PWD/foo.tar.gz;'
-            ' tar xfz $__mrjob_TMP/foo.tar.gz -C $__mrjob_PWD/foo.tar.gz',
+            '  mkdir $__mrjob_PWD/foo;'
+            ' tar xfz $__mrjob_TMP/foo.tar.gz -C $__mrjob_PWD/foo',
             lines)
 
         self.assertIn(
-            '  chmod u+rx -R $__mrjob_PWD/foo.tar.gz',
+            '  chmod u+rx -R $__mrjob_PWD/foo',
             lines)
 
         self.assertIn(
-            '  cd $__mrjob_PWD/foo.tar.gz/',
+            '  cd $__mrjob_PWD/foo/',
             lines)
 
 

@@ -347,9 +347,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._working_dir_mgr.paths('archive'):
-            self._upload_mgr.add(path)
-
         for path in self._py_files():
             self._upload_mgr.add(path)
 
@@ -368,8 +365,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
     def _run_job_in_hadoop(self):
         for step_num, step in enumerate(self._get_steps()):
-            self._warn_about_spark_archives(step)
-
             step_type = step['type']
             step_args = self._args_for_step(step_num)
             env = _fix_env(self._env_for_step(step_num))
@@ -462,16 +457,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
                     _, returncode = os.waitpid(pid, 0)
 
         return returncode, step_interpretation
-
-    def _warn_about_spark_archives(self, step):
-        """If *step* is a Spark step, the *upload_archives* option is set,
-        and *spark_master* is not ``'yarn'``, warn that *upload_archives*
-        will be ignored by Spark."""
-        if (_is_spark_step_type(step['type']) and
-                self._spark_master() != 'yarn' and
-                self._opts['upload_archives']):
-            log.warning('Spark will probably ignore archives because'
-                        " spark_master is not 'yarn'")
 
     def _spark_master(self):
         return self._opts['spark_master'] or 'yarn'

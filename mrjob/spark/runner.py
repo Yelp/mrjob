@@ -319,10 +319,6 @@ class SparkMRJobRunner(MRJobBinRunner):
         return groups
 
     def _run_step_on_spark(self, step, step_num, last_step_num=None):
-        if self._opts['upload_archives'] and self._spark_master() != 'yarn':
-            log.warning('Spark master %r will probably ignore archives' %
-                        self._spark_master())
-
         spark_submit_args = self._args_for_spark_step(step_num, last_step_num)
 
         env = dict(os.environ)

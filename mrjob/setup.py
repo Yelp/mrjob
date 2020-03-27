@@ -45,6 +45,7 @@ import re
 from mrjob.parse import is_uri
 from mrjob.py2 import string_types
 from mrjob.util import expand_path
+from mrjob.util import file_ext
 
 
 log = logging.getLogger(__name__)
@@ -235,7 +236,8 @@ def parse_legacy_hash_path(type, path, must_name=None):
     return {'path': path, 'name': name, 'type': type}
 
 
-def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False):
+def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False,
+                  strip_ext=False, suffix=''):
     """Come up with a unique name for *path*.
 
     :param names_taken: a dictionary or set of names not to use.
@@ -243,37 +245,44 @@ def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False):
                           we propose a name based on the filename.
     :param unhide: make sure final name doesn't start with periods or
                    underscores
+    :param strip_ext: if we propose a name, it shouldn't have a file extension
+    :param suffix: if set to a string, add this to the end of any filename
+                    we propose. Should include the ``.``.
 
     If the proposed name is taken, we add a number to the end of the
     filename, keeping the extension the same. For example:
 
-    >>> name_uniquely('foo.tar.gz', set(['foo.tar.gz']))
-    'foo-1.tar.gz'
+    >>> name_uniquely('foo.txt', {'foo.txt'})
+    'foo-1.txt'
+    >>> name_uniquely('bar.tar.gz', {'bar'}, strip_ext=True)
+    'bar-1'
     """
-    if not proposed_name:
-        proposed_name = os.path.basename(path.rstrip('/' + os.sep))
+    filename = proposed_name or os.path.basename(path.rstrip('/' + os.sep))
+    ext = file_ext(filename)
+    prefix = filename[:-len(ext) or None]
+
+    if strip_ext and not proposed_name:
+        ext = ''
+
+    if suffix and not proposed_name:
+        ext += suffix
 
     if unhide:
-        proposed_name = proposed_name.lstrip('.').lstrip('_')
+        prefix = prefix.lstrip('.').lstrip('_')
 
-    # don't treat initial . as part of file extension (but unhide
-    # would have already handled this)
-    dot_idx = proposed_name.find('.', 0 if unhide else 1)
-    if dot_idx == -1:
-        prefix, suffix = proposed_name, ''
-    else:
-        prefix, suffix = proposed_name[:dot_idx], proposed_name[dot_idx:]
+    # is our proposed name taken?
+    name = prefix + ext
+    if prefix and name not in names_taken:
+        return name
 
-    if prefix and proposed_name not in names_taken:
-        return proposed_name
-
+    # add 1, 2, etc. to the name until it's not taken
     for i in itertools.count(1):
         if prefix:
-            name = '%s-%d%s' % (prefix, i, suffix)
+            name = '%s-%d%s' % (prefix, i, ext)
         else:
             # if no prefix is left (due to empty filename or unhiding)
             # just use numbers; don't start filenames with '-'
-            name = '%d%s' % (i, suffix)
+            name = '%d%s' % (i, ext)
         if name not in names_taken:
             return name
 
@@ -354,13 +363,17 @@ class WorkingDirManager(object):
     a path as both a file and an archive (though not mapped to the same name).
     """
     # dirs are not supported directly; runners need to archive them
-    # and add that archive
-    _SUPPORTED_TYPES = ('archive', 'file')
+    # and add that archive.
+    #
+    # archive_file is just a way of reserving a spot to copy an archive
+    # into, in case we need to un-archive it ourselves
+    _SUPPORTED_TYPES = ('archive', 'archive_file', 'file')
 
-    def __init__(self):
+    def __init__(self, archive_file_suffix=''):
         # map from paths added without a name to None or lazily chosen name
         self._typed_path_to_auto_name = {}
         self._name_to_typed_path = {}
+        self._archive_file_suffix = archive_file_suffix
 
     def add(self, type, path, name=None):
         """Add a path as either a file or an archive, optionally
@@ -370,6 +383,11 @@ class WorkingDirManager(object):
         :param path: path/URI to add
         :param name: optional name that this path *must* be assigned, or
                      None to assign this file a name later.
+
+        if *type* is ``archive``, we'll also add *path* as an
+        auto-named ``archive_file``. This reserves space in the working dir
+        in case we need to copy the archive into the working dir and
+        un-archive it ourselves.
         """
         self._check_name(name)
         self._check_type(type)
@@ -391,6 +409,11 @@ class WorkingDirManager(object):
         # otherwise, get ready to auto-name the file
         else:
             self._typed_path_to_auto_name.setdefault((type, path), None)
+
+        # reserve a name for the archive to be copied to, in case we need
+        # to un-archive it ourselves
+        if type == 'archive':
+            self.add('archive_file', path)
 
     def name(self, type, path, name=None):
         """Get the name for a path previously added to this
@@ -425,7 +448,20 @@ class WorkingDirManager(object):
                 raise ValueError('%s %r was never added!' % (type, path))
 
         if not self._typed_path_to_auto_name[(type, path)]:
-            name = name_uniquely(path, names_taken=self._name_to_typed_path)
+            strip_ext = False
+            suffix = ''
+
+            if type == 'archive':
+                # weird to have .tar.gz etc. in a directory name
+                strip_ext = True
+            elif type == 'archive_file':
+                # keep Spark from auto-untarring by adding .file
+                suffix = self._archive_file_suffix
+
+            name = name_uniquely(
+                path, names_taken=self._name_to_typed_path,
+                strip_ext=strip_ext, suffix=suffix)
+
             self._name_to_typed_path[name] = (type, path)
             self._typed_path_to_auto_name[(type, path)] = name
 

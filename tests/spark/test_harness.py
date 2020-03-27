@@ -24,20 +24,19 @@ from os.path import dirname
 from os.path import join
 from tempfile import gettempdir
 from shutil import rmtree
+from unittest import skipIf
 
-import mrjob.spark.harness
+# mrjob.spark.harness is imported within tests because it requires pyspark
 from mrjob.examples.mr_count_lines_by_file import MRCountLinesByFile
 from mrjob.examples.mr_nick_nack import MRNickNack
 from mrjob.examples.mr_nick_nack_input_format import \
     MRNickNackWithHadoopInputFormat
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 from mrjob.job import MRJob
-from mrjob.spark.harness import _run_combiner
-from mrjob.spark.harness import _run_reducer
-from mrjob.spark.harness import _shuffle_and_sort
 from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
+# tests.mr_spark_harness is imported below because it requires pyspark
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_doubler import MRDoubler
 from tests.mr_no_mapper import MRNoMapper
@@ -45,11 +44,11 @@ from tests.mr_pass_thru_arg_test import MRPassThruArgTest
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_sort_and_group_reversed_text import MRSortAndGroupReversedText
-from tests.mr_spark_harness import MRSparkHarness
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_freq_count_with_combiner_cmd import \
     MRWordFreqCountWithCombinerCmd
 from tests.py2 import Mock
+from tests.sandbox import pyspark  # None if not installed
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import SingleSparkContextTestCase
 
@@ -108,10 +107,13 @@ class MRSumValuesByWordWithNoCombinerJobs(MRSumValuesByWord):
             raise NotImplementedError("Can't init combiner jobs")
 
 
+@skipIf(pyspark is None, 'no pyspark module')
 class SparkHarnessOutputComparisonBaseTestCase(
         SandboxedTestCase, SingleSparkContextTestCase):
 
     def _spark_harness_path(self):
+        import mrjob.spark.harness
+
         path = mrjob.spark.harness.__file__
         if path.endswith('.pyc'):
             path = path[:-1]
@@ -134,6 +136,8 @@ class SparkHarnessOutputComparisonBaseTestCase(
                      num_reducers=None, max_output_files=None,
                      emulate_map_input_file=False,
                      skip_internal_protocol=False):
+        from tests.mr_spark_harness import MRSparkHarness
+
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
 
         harness_job_args = ['-r', runner_alias, '--job-class', job_class_path]
@@ -721,6 +725,7 @@ class EmulateMapInputFileTestCase(SparkHarnessOutputComparisonBaseTestCase):
             input_paths=[two_lines_path])
 
 
+@skipIf(pyspark is None, 'no pyspark module')
 class PreservesPartitioningTestCase(SandboxedTestCase):
 
     # ensure that Spark doesn't repartition values once they're grouped
@@ -759,6 +764,8 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         self._test_run_combiner()
 
     def _test_run_combiner(self, sort_values=False, num_reducers=None):
+        from mrjob.spark.harness import _run_combiner
+
         rdd = self.mock_rdd()
 
         combiner_job = Mock()
@@ -808,6 +815,8 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         self._test_shuffle_and_sort()
 
     def _test_shuffle_and_sort(self, sort_values=False, num_reducers=None):
+        from mrjob.spark.harness import _shuffle_and_sort
+
         rdd = self.mock_rdd()
 
         final_rdd = _shuffle_and_sort(
@@ -834,6 +843,8 @@ class PreservesPartitioningTestCase(SandboxedTestCase):
         self._test_run_reducer()
 
     def _test_run_reducer(self, num_reducers=None):
+        from mrjob.spark.harness import _run_reducer
+
         rdd = self.mock_rdd()
 
         def make_mock_mrc_job(mrc, step_num):

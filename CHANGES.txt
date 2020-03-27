@@ -1,7 +1,7 @@
 v0.7.1, 2019-12-20 -- Improve logging
- * enable mrjob to show invoked runner with kwargs
- * set default value of VisibleToAllUsers to true
- * added archives to EMR pool hash during bootstrapping
+ * enable mrjob to show invoked runner with kwargs (#2129)
+ * set default value of VisibleToAllUsers to true (#2131)
+ * added archives to EMR pool hash during bootstrapping (#2136)
 
 v0.7.0, 2019-10-22 -- fall cleaning
  * moved support for AWS and Google Cloud to extras_require (#1935)

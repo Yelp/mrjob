@@ -607,5 +607,9 @@ def _patch_params(params, name, value):
     elif value is None:
         if name in params:
             del params[name]
+    elif isinstance(value, dict) and isinstance(params.get(name), dict):
+        # recursively patch dicts rather than clobbering them (see #2154)
+        for k, v in value.items():
+            _patch_params(params[name], k, v)
     else:
         params[name] = value

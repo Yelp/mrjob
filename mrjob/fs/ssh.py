@@ -23,7 +23,6 @@ from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem
 from mrjob.py2 import to_unicode
 from mrjob.util import cmd_line
-from mrjob.util import random_identifier
 
 
 _SSH_URI_RE = re.compile(

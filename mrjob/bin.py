@@ -46,12 +46,10 @@ from mrjob.conf import combine_dicts
 from mrjob.logs.log4j import _parse_hadoop_log4j_records
 from mrjob.logs.spark import _parse_spark_log
 from mrjob.logs.step import _eio_to_eof
-from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
-from mrjob.util import file_ext
 from mrjob.util import shlex_split
 from mrjob.util import unique
 from mrjob.util import which

@@ -21,7 +21,6 @@ import random
 import signal
 import time
 from copy import deepcopy
-from os.path import basename
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -33,7 +32,6 @@ from mrjob.py2 import xrange
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
-from mrjob.util import file_ext
 
 log = logging.getLogger(__name__)
 
@@ -327,7 +325,6 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
             for name, path in archive_names_and_paths:
                 uri = self._upload_mgr.uri(path)
-                ext = file_ext(basename(path))
 
                 archive_file_name = self._bootstrap_dir_mgr.name(
                      'archive_file', path)

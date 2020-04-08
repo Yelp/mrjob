@@ -64,7 +64,7 @@ from tests.sandbox import mrjob_conf_patcher
 # used to match command lines
 is_pypy = (python_implementation() == 'PyPy')
 PYTHON_BIN = (
-    ('pypy2' if PY2 else 'pypy3') if is_pypy else
+    ('pypy' if PY2 else 'pypy3') if is_pypy else
     ('python2' if PY2 else 'python3')
 )
 

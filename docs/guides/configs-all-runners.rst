@@ -278,8 +278,8 @@ Job execution context
     If you're on Python 2, this defaults to ``'python2'`` (except on EMR
     AMIs prior to 4.3.0, where it will be ``'python2.7'``).
 
-    Likewise, if you're using PyPy, this defaults to ``'pypy2'`` or ``'pypy3'``
-    depending on your version.
+    If you're using PyPy, this defaults to ``'pypy'`` (not ``'pypy2'``) or
+    ``'pypy3'`` depending on your version.
 
     This option also affects which Python binary is used for file locking in
     :mrjob-opt:`setup` scripts. It's also

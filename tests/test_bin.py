@@ -64,8 +64,8 @@ from tests.sandbox import mrjob_conf_patcher
 # used to match command lines
 is_pypy = (python_implementation() == 'PyPy')
 PYTHON_BIN = (
-    ('pypy' if PY2 else 'pypy3') if is_pypy else
-    ('python' if PY2 else 'python3')
+    ('pypy2' if PY2 else 'pypy3') if is_pypy else
+    ('python2' if PY2 else 'python3')
 )
 
 # a --spark-master that has a working directory and is available from pyspark

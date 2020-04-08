@@ -190,7 +190,7 @@ class MRJobBinRunner(MRJobRunner):
 
     def _default_python_bin(self, local=False):
         """The default python command. If local is true, try to use
-        sys.executable. Otherwise use 'python' or 'python3' as appropriate.
+        sys.executable. Otherwise use 'python2' or 'python3' as appropriate.
 
         This returns a single-item list (because it's a command).
         """
@@ -199,11 +199,6 @@ class MRJobBinRunner(MRJobRunner):
 
         if local and sys.executable:
             return [sys.executable]
-        elif PY2:
-            if is_pypy:
-                return ['pypy']
-            else:
-                return ['python']
         else:
             if is_pypy:
                 return ['pypy%d' % major_version]

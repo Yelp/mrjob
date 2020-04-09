@@ -1167,13 +1167,6 @@ class LocalRunnerSparkTestCase(SandboxedTestCase):
         self.assertIn('f.tar.gz.file', file_sizes)
         self.assertIn('f-1.tar.gz.file', file_sizes)
 
-
-
-
-
-
-
-
     # TODO: add a Spark JAR to the repo, so we can test it
 
 

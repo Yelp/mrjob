@@ -201,7 +201,10 @@ class MRJobBinRunner(MRJobRunner):
             return [sys.executable]
         else:
             if is_pypy:
-                return ['pypy%d' % major_version if major_version > 2 else '']
+                if major_version == 2:
+                    return ['pypy']
+                else:
+                    return ['pypy%d' % major_version]
             else:
                 return ['python%d' % major_version]
 

@@ -275,16 +275,20 @@ Job execution context
 
     If you're on Python 3, this always defaults to ``'python3'``.
 
-    If you're on Python 2, this defaults to ``'python'`` (except on EMR
+    If you're on Python 2, this defaults to ``'python2'`` (except on EMR
     AMIs prior to 4.3.0, where it will be ``'python2.7'``).
 
-    Likewise, if you're using PyPy, this defaults to ``'pypy'`` or ``'pypy3'``
-    depending on your version.
+    If you're using PyPy, this defaults to ``'pypy'`` (not ``'pypy2'``) or
+    ``'pypy3'`` depending on your version.
 
     This option also affects which Python binary is used for file locking in
     :mrjob-opt:`setup` scripts. It's also
     used by :py:class:`~mrjob.emr.EMRJobRunner` to compile mrjob after
     bootstrapping it (see :mrjob-opt:`bootstrap_mrjob`).
+
+    .. versionchanged:: 0.7.2
+
+       Defaults to ``'python2'`` (not ``'python'``) on Python 2.
 
     .. versionchanged:: 0.6.10
 

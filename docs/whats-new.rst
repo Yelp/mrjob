@@ -4,6 +4,48 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.7.2:
+
+0.7.2
+-----
+
+Spark normally only supports archives if you're running on YARN.
+However, mrjob now seamlessly emulates archives on all Spark masters
+(other than ``local``). This means you can now use ``--archives`` or
+``--dirs`` with ``mrjob spark-submit``, as well as using archives
+in your ``--setup`` script.
+
+As a result of this change, mrjob is somewhat better at recognizing file
+extensions; it ignores ``.`` at the end of filenames, and can now recognize
+that a file with a name like ``mrjob-0.7.0.tar.gz`` is a ``.tar.gz`` file, not
+a ``.7.0.tar.gz`` file.
+
+Also, if you don't specify a name for an archive (e.g.
+``--setup 'cd foo.tar.gz#/'``) mrjob no longer includes the file extension
+in the resulting directory name (``foo/``, not ``foo.tar.gz/``).
+
+Patched a long-standing security issue on EMR where we were copying the SSH
+key to the master node when reading logs from other nodes, which are only
+accessible via the master node. mrjob now correctly uses
+:command:`ssh-add` and the SSH agent instead of copying the key. As a result,
+mrjob now has a :mrjob-opt:`ssh_add_bin` option.
+
+The :mrjob-opt:`extra_cluster_params` option now recursively merges dict
+params into existing ones. For example, you can now do this:
+
+.. code-block:: yaml
+
+  runners:
+    emr:
+      extra_cluster_params:
+        Instances:
+          EmrManagedMasterSecurityGroup: sg-foo
+
+without obliterating the rest of the ``Instances`` API parameter.
+
+Finally, we ensure that if you're installing mrjob on Python 3.4, we'll install
+a Python 3.4-compatible version of PyYAML.
+
 .. _v0.7.1:
 
 0.7.1

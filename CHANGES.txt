@@ -6,6 +6,7 @@ v0.7.2, 2019-04-11 -- archives on all Spark platforms
  * don't copy SSH key to master node when accessing other nodes on EMR (#1209)
    * added ssh_add_bin option
  * extra_cluster_params merges dict params rather than overwriting them (#2154)
+ * default python_bin on Python 2 is now 'python2.7' (#2151)
  * ensure working PyYAML installs on Python 3.4 (#2149)
 
 v0.7.1, 2019-12-20 -- Improve logging

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2017 Yelp and Contributors
-# Copyright 2018 Yelp
-# Copyright 2019 Yelp
+# Copyright 2018-2019 Yelp
+# Copyright 2020 Affirm, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,6 +70,7 @@ _EXT_TO_UNARCHIVE_CMD = {
     '.tar.gz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
     '.tgz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
 }
+
 
 def _unarchive_cmd(path):
     """Look up the unarchive command to use with the given file extension,

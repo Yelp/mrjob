@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017-2018 Yelp
 # Copyright 2019 Yelp
+# Copyright 2020 Affirm, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -327,7 +328,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                 uri = self._upload_mgr.uri(path)
 
                 archive_file_name = self._bootstrap_dir_mgr.name(
-                     'archive_file', path)
+                    'archive_file', path)
 
                 # copy file to tmp dir
                 quoted_archive_path = '$__mrjob_TMP/%s' % pipes.quote(

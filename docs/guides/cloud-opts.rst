@@ -364,6 +364,19 @@ Cluster software configuration
               SupportedProducts:
               - mapr-m3
 
+    .. versionchanged:: 0.7.2
+
+       Dictionaries will be recursively merged into existing
+       parameters. For example:
+
+       .. code-block:: yaml
+
+          runners:
+            emr:
+              extra_cluster_params:
+                Instances:
+                  EmrManagedMasterSecurityGroup: sg-foo
+
     .. versionchanged:: 0.6.8
 
        You may use a *name* with dots in it to set (or unset) nested

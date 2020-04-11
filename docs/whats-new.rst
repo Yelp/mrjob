@@ -43,6 +43,10 @@ params into existing ones. For example, you can now do this:
 
 without obliterating the rest of the ``Instances`` API parameter.
 
+Python 2 has reached end-of-life, so if you're using Python 2, the default
+:mrjob-opt:`python_bin` is ``python2.7`` rather than ``python``, which now
+means Python 3 on some systems (for example, 6.x EMR AMIs).
+
 Finally, we ensure that if you're installing mrjob on Python 3.4, we'll install
 a Python 3.4-compatible version of PyYAML.
 

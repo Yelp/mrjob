@@ -194,7 +194,6 @@ class MRJobBinRunner(MRJobRunner):
 
         This returns a single-item list (because it's a command).
         """
-        major_version = sys.version_info[0]
         is_pypy = (python_implementation() == 'PyPy')
 
         if local and sys.executable:

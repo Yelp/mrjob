@@ -87,11 +87,6 @@ from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_inline import InlineInputManifestTestCase
 
 
-if PYTHON_BIN == 'python2':
-    OLD_AMI_PYTHON_BIN = 'python2.7'
-else:
-    OLD_AMI_PYTHON_BIN = PYTHON_BIN
-
 # EMR configurations used for testing
 # from http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  # noqa
 
@@ -1616,13 +1611,13 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
     def test_create_master_bootstrap_script_on_3_11_0_ami(self):
         self._test_create_master_bootstrap_script(
-            expected_python_bin=(OLD_AMI_PYTHON_BIN),
+            expected_python_bin=(PYTHON_BIN),
             image_version='3.11.0')
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
             image_version='2.4.11',
-            expected_python_bin=(OLD_AMI_PYTHON_BIN))
+            expected_python_bin=(PYTHON_BIN))
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,
@@ -2416,33 +2411,6 @@ class LibjarPathsTestCase(MockBoto3TestCase):
                 '/left/dora.jar',
             ]
         )
-
-
-class DefaultPythonBinTestCase(MockBoto3TestCase):
-
-    def test_default_ami(self):
-        # this tests 4.x AMIs
-        runner = EMRJobRunner()
-        self.assertTrue(runner._opts['image_version'].startswith('5.'))
-        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
-
-    def test_4_x_release_label(self):
-        runner = EMRJobRunner(release_label='emr-4.0.0')
-        self.assertEqual(runner._default_python_bin(), [OLD_AMI_PYTHON_BIN])
-
-    def test_3_11_0_ami(self):
-        runner = EMRJobRunner(image_version='3.11.0')
-        self.assertEqual(runner._default_python_bin(), [OLD_AMI_PYTHON_BIN])
-
-    def test_2_4_3_ami(self):
-        runner = EMRJobRunner(image_version='2.4.3')
-        self.assertEqual(runner._default_python_bin(), [OLD_AMI_PYTHON_BIN])
-
-    def test_local_python_bin(self):
-        # just make sure we don't break this
-        runner = EMRJobRunner()
-        self.assertEqual(runner._default_python_bin(local=True),
-                         [sys.executable])
 
 
 class StreamingJarAndStepArgPrefixTestCase(MockBoto3TestCase):

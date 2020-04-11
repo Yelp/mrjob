@@ -530,19 +530,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             return opt_value
 
-    def _default_python_bin(self, local=False):
-        """Like :py:meth:`mrjob.runner.MRJobRunner._default_python_bin`,
-        except when running Python 2, we explicitly pick :command:`python2.7`
-        on AMIs prior to 4.3.0 where's it's not the default.
-        """
-        python_bin = super(EMRJobRunner, self)._default_python_bin(local=local)
-
-        if python_bin == ['python2'] and not (
-                self._image_version_gte('4.3.0') or local):
-            return ['python2.7']
-        else:
-            return python_bin
-
     def _image_version_gte(self, version):
         """Check if the requested image version is greater than
         or equal to *version*. If the *release_label* opt is set,

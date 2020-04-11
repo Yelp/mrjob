@@ -536,7 +536,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         python_bin = super(EMRJobRunner, self)._default_python_bin(local=local)
 
-        if python_bin == ['python2'] and not (
+        if python_bin == ['python2.7'] and not (
                 self._image_version_gte('4.3.0') or local):
             return ['python2.7']
         else:

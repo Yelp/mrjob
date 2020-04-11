@@ -87,7 +87,7 @@ from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_inline import InlineInputManifestTestCase
 
 
-if PYTHON_BIN == 'python2':
+if PYTHON_BIN == 'python2.7':
     OLD_AMI_PYTHON_BIN = 'python2.7'
 else:
     OLD_AMI_PYTHON_BIN = PYTHON_BIN

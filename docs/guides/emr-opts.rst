@@ -504,6 +504,18 @@ Other rarely used options
     :default: AWS default
 
 .. mrjob-opt::
+    :config: ssh_add_bin
+    :switch: --ssh-add-bin
+    :type: :ref:`command <data-type-command>`
+    :set: emr
+    :default: ``'ssh-add'``
+
+    Path to the ``ssh-add`` binary. Used on EMR to access logs on the
+    non-master node, without copying your SSH key to the master node.
+
+    .. versionadded:: 0.7.2
+
+.. mrjob-opt::
     :config: ssh_bin
     :switch: --ssh-bin
     :type: :ref:`command <data-type-command>`

@@ -275,10 +275,9 @@ Job execution context
 
     If you're on Python 3, this always defaults to ``'python3'``.
 
-    If you're on Python 2, this defaults to ``'python2'`` (except on EMR
-    AMIs prior to 4.3.0, where it will be ``'python2.7'``).
+    If you're on Python 2, this defaults to ``'python2.7'``.
 
-    If you're using PyPy, this defaults to ``'pypy'`` (not ``'pypy2'``) or
+    If you're using PyPy, this defaults to ``'pypy'`` (not ``'pypy2.7'``) or
     ``'pypy3'`` depending on your version.
 
     This option also affects which Python binary is used for file locking in
@@ -288,7 +287,7 @@ Job execution context
 
     .. versionchanged:: 0.7.2
 
-       Defaults to ``'python2'`` (not ``'python'``) on Python 2.
+       Defaults to ``'python2.7'`` (not ``'python'``) on Python 2.
 
     .. versionchanged:: 0.6.10
 

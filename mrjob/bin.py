@@ -23,6 +23,7 @@ import os.path
 import pipes
 import re
 import sys
+from mrjob.py2 import PY2
 from platform import python_implementation
 from subprocess import Popen
 from subprocess import PIPE
@@ -190,23 +191,19 @@ class MRJobBinRunner(MRJobRunner):
 
     def _default_python_bin(self, local=False):
         """The default python command. If local is true, try to use
-        sys.executable. Otherwise use 'python2' or 'python3' as appropriate.
+        sys.executable. Otherwise use 'python2.7' or 'python3' as appropriate.
 
         This returns a single-item list (because it's a command).
         """
-        major_version = sys.version_info[0]
         is_pypy = (python_implementation() == 'PyPy')
 
         if local and sys.executable:
             return [sys.executable]
         else:
-            if is_pypy:
-                if major_version == 2:
-                    return ['pypy']
-                else:
-                    return ['pypy%d' % major_version]
+            if PY2:
+                return ['pypy'] if is_pypy else ['python2.7']
             else:
-                return ['python%d' % major_version]
+                return ['pypy3'] if is_pypy else ['python3']
 
     ### running MRJob scripts ###
 

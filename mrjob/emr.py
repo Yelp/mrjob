@@ -2,6 +2,7 @@
 # Copyright 2009-2017 Yelp and Contributors
 # Copyright 2018 Yelp
 # Copyright 2019 Yelp and Contributors
+# Copyright 2020 Affirm, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -2666,8 +2667,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._bootstrap_actions(),
             self._bootstrap_mrjob(),
         ]
-
-        #import pdb; pdb.set_trace()
 
         if self._bootstrap_mrjob():
             things_to_hash.append(mrjob.__version__)

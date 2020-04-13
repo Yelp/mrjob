@@ -1,6 +1,7 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2015-2017 Yelp
 # Copyright 2019 Yelp
+# Copyright 2020 Affirm, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +24,6 @@ from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem
 from mrjob.py2 import to_unicode
 from mrjob.util import cmd_line
-from mrjob.util import random_identifier
 
 
 _SSH_URI_RE = re.compile(

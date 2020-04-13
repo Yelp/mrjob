@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017-2018 Yelp
 # Copyright 2019 Yelp
+# Copyright 2020 Affirm, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +22,6 @@ import random
 import signal
 import time
 from copy import deepcopy
-from os.path import basename
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -33,7 +33,6 @@ from mrjob.py2 import xrange
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
-from mrjob.util import file_ext
 
 log = logging.getLogger(__name__)
 
@@ -327,10 +326,9 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
             for name, path in archive_names_and_paths:
                 uri = self._upload_mgr.uri(path)
-                ext = file_ext(basename(path))
 
                 archive_file_name = self._bootstrap_dir_mgr.name(
-                     'archive_file', path)
+                    'archive_file', path)
 
                 # copy file to tmp dir
                 quoted_archive_path = '$__mrjob_TMP/%s' % pipes.quote(

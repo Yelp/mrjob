@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2017 Yelp and Contributors
-# Copyright 2018 Yelp
-# Copyright 2019 Yelp
+# Copyright 2018-2019 Yelp
+# Copyright 2020 Affirm, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,12 +47,10 @@ from mrjob.conf import combine_dicts
 from mrjob.logs.log4j import _parse_hadoop_log4j_records
 from mrjob.logs.spark import _parse_spark_log
 from mrjob.logs.step import _eio_to_eof
-from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
-from mrjob.util import file_ext
 from mrjob.util import shlex_split
 from mrjob.util import unique
 from mrjob.util import which
@@ -73,6 +71,7 @@ _EXT_TO_UNARCHIVE_CMD = {
     '.tar.gz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
     '.tgz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
 }
+
 
 def _unarchive_cmd(path):
     """Look up the unarchive command to use with the given file extension,

@@ -1794,7 +1794,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         empty_dir = self.makedirs('empty')
 
         story_path = make_archive(join(self.tmp_dir, 'story'),
-                                     'gztar', story_dir)
+                                  'gztar', story_dir)
 
         true_story = 'true %s#/' % story_path
 

@@ -57,7 +57,6 @@ import posixpath
 import re
 
 from mrjob.job import MRJob
-from mrjob.protocol import JSONValueProtocol
 from mrjob.py2 import to_unicode
 from mrjob.step import MRStep
 from mrjob.util import file_ext

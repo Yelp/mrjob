@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2009-2019 Yelp and Contributors
+# Copyright 2009-2020 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -139,4 +139,4 @@ __credits__ = [
     'drulludanni <drulludanni5@gmail.com>',
 ]
 
-__version__ = '0.7.2.dev0'
+__version__ = '0.7.2'

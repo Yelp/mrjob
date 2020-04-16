@@ -2463,9 +2463,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         return instance_sort_key
 
     def _usable_clusters(self, valid_clusters, invalid_clusters,
-                         locked_clusters, num_steps):
+                         locked_clusters):
         """Get clusters that this runner can join, returning a list of
-        ``(cluster_id, num_steps)`` (number of steps is used for locking).
+        cluster IDs.
 
         This list is sorted by
         - total compute units for core + task nodes
@@ -2484,7 +2484,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                                 are in a "locked" state.
         :param num_steps: The number of steps this job requires.
 
-        :return: list of tuples of (cluster_id, num_steps_in_cluster)
+        :return: list of cluster IDs
         """
         emr_client = self.make_emr_client()
         req_pool_hash = self._pool_hash()
@@ -2516,10 +2516,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 valid_clusters[cluster_id] = (cluster, instance_sort_key,)
 
             key_cluster_steps_list.append(
-                (instance_sort_key, cluster_id, num_steps_in_cluster,))
+                (instance_sort_key, cluster_id))
 
-        return [(_cluster_id, cluster_num_steps) for
-                (_, _cluster_id, cluster_num_steps)
+        return [_cluster_id for _, _cluster_id
                 in sorted(key_cluster_steps_list)]
 
     def _find_cluster(self, num_steps=1):
@@ -2537,18 +2536,18 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         log.info('Attempting to find an available cluster...')
         while now <= end_time:
-            cluster_info_list = self._usable_clusters(
+            cluster_id_list = self._usable_clusters(
                 valid_clusters, invalid_clusters,
-                locked_clusters, num_steps)
+                locked_clusters)
             log.debug(
                 '  Found %d usable cluster%s%s%s' % (
-                    len(cluster_info_list),
-                    '' if len(cluster_info_list) == 1 else 's',
-                    ': ' if cluster_info_list else '',
-                    ', '.join(c for c, n in reversed(cluster_info_list))))
+                    len(cluster_id_list),
+                    '' if len(cluster_id_list) == 1 else 's',
+                    ': ' if cluster_id_list else '',
+                    ', '.join(reversed(cluster_id_list))))
 
-            if cluster_info_list:
-                cluster_id, cluster_num_steps = cluster_info_list[-1]
+            if cluster_id_list:
+                cluster_id = cluster_id_list[-1]
                 status = _attempt_to_acquire_lock(
                     self.fs.s3, self._lock_uri(cluster_id),
                     self._opts['cloud_fs_sync_secs'], self._job_key)

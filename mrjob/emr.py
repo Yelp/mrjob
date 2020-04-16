@@ -1422,12 +1422,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
         if (self._opts['pool_clusters'] and not self._cluster_id):
-            # master node setup script is an additional step
-            num_steps = self._num_steps()
-            if self._master_node_setup_script_path:
-                num_steps += 1
-
-            cluster_id = self._find_cluster(num_steps=num_steps)
+            cluster_id = self._find_cluster()
             if cluster_id:
                 self._cluster_id = cluster_id
 
@@ -2521,7 +2516,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         return [_cluster_id for _, _cluster_id
                 in sorted(key_cluster_steps_list)]
 
-    def _find_cluster(self, num_steps=1):
+    def _find_cluster(self):
         """Find a cluster that can host this runner. Prefer clusters with more
         compute units. Break ties by choosing cluster with longest idle time.
         Return ``None`` if no suitable clusters exist.

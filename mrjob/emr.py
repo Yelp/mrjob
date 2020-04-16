@@ -221,9 +221,9 @@ class _PooledClusterSelfTerminatedException(Exception):
     pass
 
 
-def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
+def _make_lock_uri(cloud_tmp_dir, cluster_id):
     """Generate the URI to lock the cluster ``cluster_id``"""
-    return cloud_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
+    return cloud_tmp_dir + 'locks/' + cluster_id
 
 
 def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
@@ -2603,7 +2603,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if cluster_info_list:
                 cluster_id, cluster_num_steps = cluster_info_list[-1]
                 status = _attempt_to_acquire_lock(
-                    self.fs.s3, self._lock_uri(cluster_id, cluster_num_steps),
+                    self.fs.s3, self._lock_uri(cluster_id),
                     self._opts['cloud_fs_sync_secs'], self._job_key)
                 if status:
                     log.debug('Acquired lock on cluster %s', cluster_id)
@@ -2626,10 +2626,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         return None
 
-    def _lock_uri(self, cluster_id, num_steps):
-        return _make_lock_uri(self._opts['cloud_tmp_dir'],
-                              cluster_id,
-                              num_steps + 1)
+    def _lock_uri(self, cluster_id):
+        return _make_lock_uri(self._opts['cloud_tmp_dir'], cluster_id)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to

@@ -125,18 +125,15 @@ _IMAGE_VERSION_TO_SSH_TUNNEL_CONFIG = {
 # if we SSH into a node, default place to look for logs
 _EMR_LOG_DIR = '/mnt/var/log'
 
-# no longer limited to 256 steps starting with 2.4.8/3.1.1
-# (# of steps is actually unlimited, but API only shows 1000; see #1462)
-_IMAGE_VERSION_TO_MAX_STEPS = {
-    '2': 256,
-    '2.4.8': 1000,
-    '3': 256,
-    '3.1.1': 1000,
+# Prior to AMI 2.4.8/3.1.1, there is a limit of 256 steps total per cluster.
+# We issue a warning for users who are continuing to used pooling on these
+# very old AMIs
+_IMAGE_SUPPORTS_POOLING = {
+    '2': False,
+    '2.4.8': True,
+    '3': False,
+    '3.1.1': True,
 }
-
-# breaking this out as a separate constant since 4.x AMIs don't report
-# RunningAmiVersion, they report ReleaseLabel
-_4_X_MAX_STEPS = 1000
 
 _MAX_SSH_RETRIES = 20
 
@@ -374,6 +371,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if self._opts['image_id']:
                 log.warning('AMIs prior to 5.7.0 will probably not work'
                             ' with custom machine images')
+
+        if self._opts['pool_clusters'] and not map_version(
+                self._opts['image_version'], _IMAGE_SUPPORTS_POOLING):
+            log.warning(
+                "Cluster pooling is not fully supported on AMIs prior to"
+                " 2.4.8/3.1.1 due to the limit on total number of steps")
 
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
@@ -2459,54 +2462,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.debug('    OK - valid cluster setup')
         return instance_sort_key
 
-    def _check_cluster_state(self, emr_client, cluster, num_steps):
-        """Check if the given cluster's state is in a state we can join. This
-        is unlike :py:meth:`~mrjob.emr.EMRJobRunner._compare_cluster_setup`
-        which only checks for preconfigured fields.
-
-        These checks include
-
-        - there is room for our job in the cluster (clusters top out at
-          256 steps)
-        - the cluster does not have a running step
-
-        :param emr_client: a boto3 EMR client. See
-                           :py:meth:`~mrjob.emr.EMRJobRunner.make_emr_client`
-        :param cluster: EMR cluster dict to check if we are able to join.
-        :param num_steps: The number of steps this job requires.
-
-        :return: -1 on failure or num_steps_in_cluster on success
-        """
-        steps = list(_boto3_paginate(
-            'Steps',
-            emr_client, 'list_steps', ClusterId=cluster['Id']))
-
-        if self._opts['release_label']:
-            max_steps = _4_X_MAX_STEPS
-        else:
-            image_version = cluster.get('RunningAmiVersion', '')
-            max_steps = map_version(image_version, _IMAGE_VERSION_TO_MAX_STEPS)
-
-        # don't add more steps than EMR will allow/display through the API
-        if len(steps) + num_steps > max_steps:
-            log.debug('    no room for our steps')
-            return -1
-
-        # in rare cases, cluster can be WAITING *and* have incomplete
-        # steps. We could just check for PENDING steps, but we're
-        # trying to be defensive about EMR adding a new step state.
-        # Not entirely sure what to make of CANCEL_PENDING
-        for step in steps:
-            if (step['Status']['State'] not in (
-                    'CANCELLED', 'INTERRUPTED') and
-                    not step['Status'].get('Timeline', {}).get(
-                        'EndDateTime')):
-                log.debug('    unfinished steps')
-                return -1
-
-        log.debug('    OK - valid cluster state')
-        return len(steps)
-
     def _usable_clusters(self, valid_clusters, invalid_clusters,
                          locked_clusters, num_steps):
         """Get clusters that this runner can join, returning a list of
@@ -2559,14 +2514,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     invalid_clusters.add(cluster_id)
                     continue
                 valid_clusters[cluster_id] = (cluster, instance_sort_key,)
-
-            # always check the cluster state
-            num_steps_in_cluster = self._check_cluster_state(
-                emr_client, cluster, num_steps)
-            if num_steps_in_cluster == -1:
-                # don't add to invalid cluster list since the cluster may
-                # be valid when we next check
-                continue
 
             key_cluster_steps_list.append(
                 (instance_sort_key, cluster_id, num_steps_in_cluster,))

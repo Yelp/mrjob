@@ -2573,10 +2573,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 lock_acquired = self._attempt_to_lock_cluster(cluster_id)
                 if lock_acquired:
-                    log.debug('Acquired lock on cluster %s', cluster_id)
                     return cluster_id
                 else:
-                    log.debug("Can't acquire lock on cluster %s", cluster_id)
                     locked_clusters.add(cluster_id)
             elif max_wait_time == 0:
                 return None
@@ -2597,7 +2595,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # don't hold more than one lock at once
         self._release_any_cluster_lock_held()
 
-        lock_uri = _make_lock_uri(self._opts['cloud_tmp_dir'], cluster_id)
+        lock_uri = _make_lock_uri(
+            self._opts['cloud_tmp_dir'], cluster_id)
 
         acquired = _attempt_to_acquire_lock(
             self.fs.s3,
@@ -2608,7 +2607,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         )
 
         if acquired:
+            log.debug('Acquired lock on cluster %s: %s' % (
+                cluster_id, lock_uri))
             self._cluster_lock_uri = lock_uri
+        else:
+            log.debug('Unable to acquire lock on cluster %s', cluster_id)
 
         return acquired
 
@@ -2619,6 +2622,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # but going to replace this with something tag-based in
             # a moment (see #2161)
             self.fs.rm(self._cluster_lock_uri)
+            log.debug('Released cluster lock: %s' % self._cluster_lock_uri)
             self._cluster_lock_uri = None
 
     def _lock_uri(self, cluster_id):

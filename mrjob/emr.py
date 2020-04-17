@@ -212,6 +212,10 @@ _CLUSTER_SELF_TERMINATED_RE = re.compile(
 # is available to read even if it's Glacier-archived
 _RESTORED_FROM_GLACIER = 'ongoing-request="false"'
 
+# a minute should be enough time to submit steps and for the cluster
+# to change state
+_CLUSTER_LOCK_SECS_TO_EXPIRATION = 60
+
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
@@ -393,6 +397,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # did we create the cluster we're running on?
         self._created_cluster = False
+
+        # did we acquire a lock on a cluster for pooling?
+        # (each runner may only acquire one lock at a time)
+        self._cluster_lock_uri = None
 
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
@@ -692,6 +700,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._cluster_id = None
         self._created_cluster = False
 
+        # release any lock we may have had on the previous cluster
+        self._release_any_cluster_lock_held()
+
         # old SSH tunnel isn't valid for this cluster (see #1549)
         if self._ssh_proc:
             self._kill_ssh_tunnel()
@@ -909,6 +920,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # always stop our SSH tunnel if it's still running
         self._kill_ssh_tunnel()
 
+        # let go of any locks we have
+        try:
+            self._release_any_cluster_lock_held()
+        except Exception as e:
+            log.exception(e)
+
         # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)
         # don't stop it if it was created due to --pool because the user
@@ -922,6 +939,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 )
             except Exception as e:
                 log.exception(e)
+
+        # TODO: otherwise, cancel any steps we submitted
 
     def _cleanup_cloud_tmp(self):
         # delete all the files we created on S3
@@ -1559,6 +1578,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 continue
 
             elif step['Status']['State'] == 'RUNNING':
+                # cluster status will keep pooled jobs away, don't need lock
+                self._release_any_cluster_lock_held()
+
                 time_running_desc = ''
 
                 start = step['Status']['Timeline'].get('StartDateTime')
@@ -2545,12 +2567,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     ': ' if cluster_id_list else '',
                     ', '.join(reversed(cluster_id_list))))
 
+            # TODO: why not just try locking every cluster in the list?
             if cluster_id_list:
                 cluster_id = cluster_id_list[-1]
-                status = _attempt_to_acquire_lock(
-                    self.fs.s3, self._lock_uri(cluster_id),
-                    self._opts['cloud_fs_sync_secs'], self._job_key)
-                if status:
+
+                lock_acquired = self._attempt_to_lock_cluster(cluster_id)
+                if lock_acquired:
                     log.debug('Acquired lock on cluster %s', cluster_id)
                     return cluster_id
                 else:
@@ -2570,6 +2592,34 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 now += timedelta(seconds=_POOLING_SLEEP_INTERVAL)
 
         return None
+
+    def _attempt_to_lock_cluster(self, cluster_id):
+        # don't hold more than one lock at once
+        self._release_any_cluster_lock_held()
+
+        lock_uri = _make_lock_uri(self._opts['cloud_tmp_dir'], cluster_id)
+
+        acquired = _attempt_to_acquire_lock(
+            self.fs.s3,
+            lock_uri,
+            sync_wait_time=self._opts['cloud_fs_sync_secs'],
+            job_key=self._job_key,
+            secs_to_expiration=_CLUSTER_LOCK_SECS_TO_EXPIRATION,
+        )
+
+        if acquired:
+            self._cluster_lock_uri = lock_uri
+
+        return acquired
+
+    def _release_any_cluster_lock_held(self):
+        """Release any cluster lock we're currently holding."""
+        if self._cluster_lock_uri:
+            # could check if it's really *our* lock by reading the content,
+            # but going to replace this with something tag-based in
+            # a moment (see #2161)
+            self.fs.rm(self._cluster_lock_uri)
+            self._cluster_lock_uri = None
 
     def _lock_uri(self, cluster_id):
         return _make_lock_uri(self._opts['cloud_tmp_dir'], cluster_id)

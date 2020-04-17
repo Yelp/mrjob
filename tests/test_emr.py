@@ -2127,8 +2127,8 @@ class JobWaitTestCase(MockBoto3TestCase):
         def side_effect_lock_uri(*args):
             return args[0]  # Return the only arg given to it.
 
-        def side_effect_acquire_lock(*args):
-            cluster_id = args[1]
+        def side_effect_acquire_lock(*args, **kwargs):
+            cluster_id = args[1].split('/')[-1]
             return self.JOB_ID_LOCKS[cluster_id]
 
         def side_effect_usable_clusters(*args, **kwargs):

@@ -45,6 +45,10 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
     def setUp(self):
         super(ClusterTerminationTestCase, self).setUp()
+
+        # don't delete locks, so we can test they were created
+        self.start(patch('mrjob.fs.s3.S3Filesystem.rm'))
+
         self.create_fake_clusters()
 
     def create_fake_clusters(self):
@@ -192,7 +196,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         ))
         self.add_mock_s3_data({
             'my_bucket': {
-                'locks/j-IDLE_AND_LOCKED/2': b'not_you',
+                'locks/j-IDLE_AND_LOCKED': b'not_you',
             },
         })
 
@@ -425,27 +429,27 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.assertEqual(running,
                          _is_cluster_running(mock_cluster['_Steps']))
 
-    def _lock_contents(self, mock_cluster, steps_ahead=0):
+    def _lock_contents(self, mock_cluster):
         fs = S3Filesystem()
 
-        contents = b''.join(fs.cat('s3://my_bucket/locks/%s/%d' % (
-            mock_cluster['Id'], len(mock_cluster['_Steps']) + steps_ahead)))
+        contents = b''.join(fs.cat(
+            's3://my_bucket/locks/%s' % (mock_cluster['Id'])))
 
         return contents or None
 
-    def assert_locked_by_terminate(self, mock_cluster, steps_ahead=1):
-        contents = self._lock_contents(mock_cluster, steps_ahead=steps_ahead)
+    def assert_locked_by_terminate(self, mock_cluster):
+        contents = self._lock_contents(mock_cluster)
         self.assertIsNotNone(contents)
         self.assertIn(b'terminate', contents)
 
-    def assert_locked_by_something_else(self, mock_cluster, steps_ahead=1):
-        contents = self._lock_contents(mock_cluster, steps_ahead=steps_ahead)
+    def assert_locked_by_something_else(self, mock_cluster):
+        contents = self._lock_contents(mock_cluster)
         self.assertIsNotNone(contents)
         self.assertNotIn(b'terminate', contents)
 
-    def assert_not_locked(self, mock_cluster, steps_ahead=1):
+    def assert_not_locked(self, mock_cluster):
         self.assertIsNone(
-            self._lock_contents(mock_cluster, steps_ahead=steps_ahead))
+            self._lock_contents(mock_cluster))
 
     def assert_terminated_clusters_locked_by_terminate(self):
         for cluster_id in self.ids_of_terminated_clusters():

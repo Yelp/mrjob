@@ -224,7 +224,7 @@ def _make_lock_uri(cloud_tmp_dir, cluster_id):
 
 
 def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
-                             mins_to_expiration=None):
+                             secs_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
@@ -240,12 +240,12 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
 
     # if there's an unexpired lock, give up
     if key_data:
-        if mins_to_expiration is None:
+        if secs_to_expiration is None:
             return False
         else:
             # dateutil is a boto3 dependency
             age = _boto3_now() - key_data['LastModified']
-            if age <= timedelta(minutes=mins_to_expiration):
+            if age <= timedelta(seconds=secs_to_expiration):
                 return False
 
     # try to write our job's key
@@ -1445,6 +1445,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.debug('Calling add_job_flow_steps(%s)' % ','.join(
             ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
         emr_client.add_job_flow_steps(**steps_kwargs)
+
+        # learn about how fast the cluster state switches
+        cluster = self._describe_cluster()
+        log.debug('Cluster has state %s' % cluster['Status']['State'])
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if hasattr(self.fs, 'ssh') and version_gte(

@@ -323,7 +323,7 @@ def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
             runner._opts['cloud_fs_sync_secs'],
             '%s (%s)' % (msg,
                          runner._make_unique_job_key(label='terminate')),
-            mins_to_expiration=max_mins_locked,
+            secs_to_expiration=(max_mins_locked * 60),
         )
         if status:
             runner.make_emr_client().terminate_job_flows(

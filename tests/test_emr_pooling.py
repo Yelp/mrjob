@@ -2142,7 +2142,7 @@ class S3LockTestCase(MockBoto3TestCase):
 
         did_lock = _attempt_to_acquire_lock(
             runner.fs.s3, 's3://locks/expired_lock', 5.0, 'job_one',
-            mins_to_expiration=5)
+            secs_to_expiration=300)
         self.assertEqual(True, did_lock)
 
         self.sleep.assert_called_with(5.0)

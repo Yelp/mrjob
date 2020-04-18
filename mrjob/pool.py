@@ -21,6 +21,7 @@ In theory, this module might support pooling in general, but so far, there's
 only a need for pooling on EMR.
 
 """
+import time
 from collections import defaultdict
 from logging import getLogger
 
@@ -499,3 +500,125 @@ def _ebs_volume_satisfies(actual_volume, req_volume):
         return False
 
     return True
+
+
+### locking pooled clusters ###
+
+# Locking ensures that two jobs don't add their steps to the same cluster at
+# the same time
+
+# after 60 seconds, a lock is considered released
+_CLUSTER_LOCK_SECS = 60.0
+
+# describe the cluster and add our tag within the first 5 seconds
+_ADD_TAG_BEFORE = 5.0
+
+# then wait at least 10 seconds before checking if our tag is still there
+_CHECK_TAG_AFTER = 15.0
+
+# make sure we have at least 40 seconds left to add steps and have them
+# start running, before the lock expires
+_CHECK_TAG_BEFORE = 20.0
+
+# tag key used for locking pooled clusters
+_POOL_LOCK_KEY = '__mrjob_pool_lock'
+
+
+def _make_cluster_lock(job_key, expiry):
+    """Return the contents of a tag used to lock a cluster.
+
+    *expiry* is the unix timestamp for when the lock is no longer valid"""
+    return '%s %.6f' % (job_key, expiry)
+
+
+def _parse_cluster_lock(lock):
+    """Return (job_key, expiry) or raise ValueError"""
+    job_key, expiry_str = lock.split(' ')
+
+    try:
+        expiry = float(expiry_str)
+    except TypeError:
+        raise ValueError
+
+    return job_key, expiry
+
+
+def _get_cluster_lock(emr_client, cluster_id):
+    cluster = emr_client.describe_cluster(
+        ClusterId=cluster_id)['Cluster']
+
+    return _extract_tags(cluster).get(_POOL_LOCK_KEY)
+
+
+def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
+    """Attempt to lock the given pooled cluster using EMR tags."""
+    log.debug('Attempting to lock cluster %s for %.1f seconds' % (
+        cluster_id, _CLUSTER_LOCK_SECS))
+
+    start = time.time()
+
+    # check if there is a non-expired lock
+    lock = _get_cluster_lock(emr_client, cluster_id)
+
+    if lock:
+        expiry = None
+        try:
+            their_job_key, expiry = _parse_cluster_lock(lock)
+        except ValueError:
+            log.debug('  ignoring invalid pool lock: %s' % lock)
+
+        if expiry and expiry > start:
+            log.debug('  locked by %s for %.1f seconds' % (
+                their_job_key, expiry - start))
+            return False
+
+    # add our lock
+    our_lock = _make_cluster_lock(job_key, start + _CLUSTER_LOCK_SECS)
+
+    emr_client.add_tags(
+        ResourceId=cluster_id,
+        Tags=[dict(Key=_POOL_LOCK_KEY, Value=our_lock)]
+    )
+
+    if time.time() - start > _ADD_TAG_BEFORE:
+        log.debug('  took too long to tag cluster with lock')
+        return False
+
+    # wait, then check if our lock is still there
+    wait_time = start + _CHECK_TAG_AFTER - time.time()
+    if wait_time:
+        log.debug('  waiting %.1f seconds to avoid locking race condition')
+        time.sleep(wait_time)
+
+    # check if our lock is still there
+    lock = _get_cluster_lock(emr_client, cluster_id)
+
+    if lock != our_lock:
+        their_job_desc = 'other job'
+        try:
+            their_job_desc, expiry = _parse_cluster_lock()
+        except ValueError:
+            pass
+
+        log.debug('  lock was acquired by %s' % their_job_desc)
+        return False
+
+    # make sure we have enough time to add steps and have them run
+    # before the lock expires
+    if time.time() > start + _CHECK_TAG_BEFORE:
+        log.debug('  took too long to check for lock')
+        return False
+
+    return True
+
+
+def _release_cluster_lock(emr_client, cluster_id):
+    """Release our lock on the given pooled cluster. Only do this if you know
+    the cluster is currently running steps (so other jobs won't try to
+    join the cluster).
+
+    Locks expire after a minute anyway (which is less time than it takes to
+    run most jobs), so this is mostly useful for preventing problems
+    due to clock skew. Also makes unit testing more straightforward.
+    """
+    emr_client.remove_tags(ResourceId=cluster_id, TagKeys=[_POOL_LOCK_KEY])

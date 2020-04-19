@@ -26,7 +26,6 @@ import mrjob.emr
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
-from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.pool import _pool_hash_and_name
 from mrjob.step import StepFailedException
 

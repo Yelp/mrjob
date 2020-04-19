@@ -1754,11 +1754,13 @@ def _validate_param_enum(value, allowed):
 
 
 def _InvalidRequestException(operation_name, message):
-    # boto3 reports this as a botocore.exceptions.InvalidRequestException,
-    # but that's not something you can actually import
-    return AttributeError(
-        'An error occurred (InvalidRequestException) when calling the'
-        ' %s operation: %s' % (operation_name, message))
+    return ClientError(
+        dict(Error=dict(
+            Code='InvalidRequestException',
+            Message=message,
+        )),
+        operation_name
+    )
 
 
 def _ValidationException(operation_name, message):

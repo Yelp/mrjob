@@ -1525,10 +1525,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 continue
 
             elif step['Status']['State'] == 'RUNNING':
-                # it's safe to clean up our lock, cluster isn't WAITING
-                if self._locked_cluster:
-                    _release_cluster_lock(emr_client, self._cluster_id)
-                    self._locked_cluster = False
 
                 time_running_desc = ''
 
@@ -1545,6 +1541,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 # it doesn't appear in job tracker
                 if step_num >= 0:
                     self._log_step_progress()
+
+                # it's safe to clean up our lock, cluster isn't WAITING
+                if self._locked_cluster:
+                    log.info('  releasing lock')
+                    _release_cluster_lock(emr_client, self._cluster_id)
+                    self._locked_cluster = False
 
                 continue
 

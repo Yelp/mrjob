@@ -513,8 +513,8 @@ _CLUSTER_LOCK_SECS = 60.0
 # describe the cluster and add our tag within the first 5 seconds
 _ADD_TAG_BEFORE = 5.0
 
-# then wait at least 10 seconds before checking if our tag is still there
-_CHECK_TAG_AFTER = 15.0
+# then wait 10 seconds before checking if our tag is still there
+_WAIT_AFTER_ADD_TAG = 10.0
 
 # make sure we have at least 40 seconds left to add steps and have them
 # start running, before the lock expires
@@ -565,30 +565,31 @@ def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
         try:
             their_job_key, expiry = _parse_cluster_lock(lock)
         except ValueError:
-            log.debug('  ignoring invalid pool lock: %s' % lock)
+            log.info('  ignoring invalid pool lock: %s' % lock)
 
         if expiry and expiry > start:
-            log.debug('  locked by %s for %.1f seconds' % (
+            log.info('  locked by %s for %.1f seconds' % (
                 their_job_key, expiry - start))
             return False
 
     # add our lock
     our_lock = _make_cluster_lock(job_key, start + _CLUSTER_LOCK_SECS)
 
+    log.debug('  adding tag to cluster %s:' % cluster_id)
+    log.debug('    %s=%s' % (_POOL_LOCK_KEY, our_lock))
     emr_client.add_tags(
         ResourceId=cluster_id,
         Tags=[dict(Key=_POOL_LOCK_KEY, Value=our_lock)]
     )
 
     if time.time() - start > _ADD_TAG_BEFORE:
-        log.debug('  took too long to tag cluster with lock')
+        log.info('  took too long to tag cluster with lock')
         return False
 
     # wait, then check if our lock is still there
-    wait_time = start + _CHECK_TAG_AFTER - time.time()
-    if wait_time:
-        log.debug('  waiting %.1f seconds to avoid locking race condition')
-        time.sleep(wait_time)
+    log.info("  waiting %.1f seconds to ensure lock wasn't overwritten" %
+        _WAIT_AFTER_ADD_TAG)
+    time.sleep(_WAIT_AFTER_ADD_TAG)
 
     # check if our lock is still there
     lock = _get_cluster_lock(emr_client, cluster_id)
@@ -600,15 +601,16 @@ def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
         except ValueError:
             pass
 
-        log.debug('  lock was acquired by %s' % their_job_desc)
+        log.info('  lock was overwritten by %s' % their_job_desc)
         return False
 
     # make sure we have enough time to add steps and have them run
     # before the lock expires
     if time.time() > start + _CHECK_TAG_BEFORE:
-        log.debug('  took too long to check for lock')
+        log.info('  took too long to check for lock')
         return False
 
+    log.info('  lock acquired')
     return True
 
 

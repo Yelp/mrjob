@@ -19,7 +19,7 @@ from mrjob.pool import _pool_hash_and_name
 from tests.sandbox import BasicTestCase
 
 
-class TestPoolHashAndName(BasicTestCase):
+class PoolHashAndNameTestCase(BasicTestCase):
 
     def test_empty(self):
         self.assertEqual(_pool_hash_and_name({}), (None, None))

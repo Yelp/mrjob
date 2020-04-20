@@ -2124,32 +2124,27 @@ class JobWaitTestCase(MockBoto3TestCase):
         self.mock_cluster_ids = []
         self.sleep_counter = 0
 
-        def side_effect_lock_uri(*args):
-            return args[0]  # Return the only arg given to it.
-
-        def side_effect_acquire_lock(*args, **kwargs):
-            cluster_id = args[1].split('/')[-1]
+        def mock_attempt_to_lock_cluster(emr_client, cluster_id, job_key):
             return self.JOB_ID_LOCKS[cluster_id]
 
-        def side_effect_usable_clusters(*args, **kwargs):
+        def mock_usable_clusters(*args, **kwargs):
             return [
                 cluster_id for cluster_id in self.mock_cluster_ids
                 if cluster_id not in args[2]]
 
-        def side_effect_time_sleep(*args):
+        def mock_sleep(*args):
             self.sleep_counter += 1
             if self.future_mock_cluster_ids:
                 cluster_id = self.future_mock_cluster_ids.pop(0)
                 self.mock_cluster_ids.append(cluster_id)
 
         self.start(patch.object(EMRJobRunner, '_usable_clusters',
-                                side_effect=side_effect_usable_clusters))
-        self.start(patch.object(EMRJobRunner, '_lock_uri',
-                                side_effect=side_effect_lock_uri))
-        self.start(patch.object(mrjob.emr, '_attempt_to_acquire_lock',
-                                side_effect=side_effect_acquire_lock))
-        self.start(patch.object(time, 'sleep',
-                                side_effect=side_effect_time_sleep))
+                                side_effect=mock_usable_clusters))
+        self.start(patch('mrjob.emr._attempt_to_lock_cluster',
+                         side_effect=mock_attempt_to_lock_cluster))
+        self.start(patch('mrjob.emr._attempt_to_unlock_cluster'))
+        self.start(patch('time.sleep',
+                         side_effect=mock_sleep))
 
     def tearDown(self):
         super(JobWaitTestCase, self).tearDown()

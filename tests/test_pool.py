@@ -18,6 +18,7 @@ import time
 
 from mrjob.emr import EMRJobRunner
 from mrjob.pool import _attempt_to_lock_cluster
+from mrjob.pool import _attempt_to_unlock_cluster
 from mrjob.pool import _get_cluster_lock
 from mrjob.pool import _make_cluster_lock
 from mrjob.pool import _parse_cluster_lock
@@ -224,3 +225,60 @@ class AttemptToLockClusterTestCase(MockBoto3TestCase):
         acquired = _attempt_to_lock_cluster(
             self.emr_client, self.cluster_id, self.our_key)
         self.assertFalse(acquired)
+
+
+class AttemptToUnlockClusterTestCase(MockBoto3TestCase):
+
+    def setUp(self):
+        super(AttemptToUnlockClusterTestCase, self).setUp()
+
+        self.emr_client = self.client('emr')
+        self.cluster_id = EMRJobRunner().make_persistent_cluster()
+
+        self.log = self.start(patch('mrjob.pool.log'))
+
+        self.our_key = 'mr_wc.dmarin.20200419.185348.359278'
+
+    def test_remove_existing_tags(self):
+        _attempt_to_lock_cluster(
+            self.emr_client, self.cluster_id, self.our_key)
+
+        self.assertIsNotNone(
+            _get_cluster_lock(self.emr_client, self.cluster_id))
+
+        unlocked = _attempt_to_unlock_cluster(
+            self.emr_client, self.cluster_id)
+
+        self.assertTrue(unlocked)
+        self.assertIsNone(
+            _get_cluster_lock(self.emr_client, self.cluster_id))
+
+    def test_okay_if_no_tag(self):
+        unlocked = _attempt_to_unlock_cluster(
+            self.emr_client, self.cluster_id)
+
+        self.assertTrue(unlocked)
+        self.assertIsNone(
+            _get_cluster_lock(self.emr_client, self.cluster_id))
+
+    def test_okay_if_cluster_terminated(self):
+        _attempt_to_lock_cluster(
+            self.emr_client, self.cluster_id, self.our_key)
+
+        self.assertIsNotNone(
+            _get_cluster_lock(self.emr_client, self.cluster_id))
+
+        self.emr_client.terminate_job_flows([self.cluster_id])
+
+        cluster = self.emr_client.describe_cluster(
+            ClusterId=self.cluster_id)['Cluster']
+
+        self.assertEqual(cluster['Status']['State'], 'TERMINATED')
+
+        unlocked = _attempt_to_unlock_cluster(
+            self.emr_client, self.cluster_id)
+
+        # failed, but didn't crash
+        self.assertFalse(unlocked)
+        self.assertIsNotNone(
+            _get_cluster_lock(self.emr_client, self.cluster_id))

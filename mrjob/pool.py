@@ -25,6 +25,11 @@ import time
 from collections import defaultdict
 from logging import getLogger
 
+try:
+    from botocore.exceptions import ClientError
+except ImportError:
+    ClientError = Exception
+
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.py2 import integer_types

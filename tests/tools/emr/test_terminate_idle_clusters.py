@@ -181,44 +181,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
                          args=['hadoop-streaming'] + self._DEFAULT_STEP_ARGS)],
         ))
 
-        # idle cluster with an active lock
-        self.add_mock_emr_cluster(dict(
-            Id='j-IDLE_AND_LOCKED',
-            TerminationProtected=False,
-            Status=dict(
-                State='WAITING',
-                Timeline=dict(
-                    CreationDateTime=ago(hours=6),
-                    ReadyDateTime=ago(hours=5, minutes=5),
-                ),
-            ),
-            _Steps=[step(started=ago(hours=4), ended=ago(hours=2))],
-        ))
-        self.add_mock_s3_data({
-            'my_bucket': {
-                'locks/j-IDLE_AND_LOCKED': b'not_you',
-            },
-        })
-
-        # idle cluster with an expired lock
-        self.add_mock_emr_cluster(dict(
-            Id='j-IDLE_AND_EXPIRED',
-            TerminationProtected=False,
-            Status=dict(
-                State='WAITING',
-                Timeline=dict(
-                    CreationDateTime=ago(hours=6),
-                    ReadyDateTime=ago(hours=5, minutes=5),
-                ),
-            ),
-            _Steps=[step(started=ago(hours=4), ended=ago(hours=2))],
-        ))
-        self.add_mock_s3_data({
-            'my_bucket': {
-                'locks/j-IDLE_AND_EXPIRED/2': b'not_you',
-            },
-        }, age=timedelta(minutes=5))
-
         # idle cluster with an expired lock
         self.add_mock_emr_cluster(dict(
             Id='j-IDLE_BUT_INCOMPLETE_STEPS',
@@ -429,32 +391,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.assertEqual(running,
                          _is_cluster_running(mock_cluster['_Steps']))
 
-    def _lock_contents(self, mock_cluster):
-        fs = S3Filesystem()
-
-        contents = b''.join(fs.cat(
-            's3://my_bucket/locks/%s' % (mock_cluster['Id'])))
-
-        return contents or None
-
-    def assert_locked_by_terminate(self, mock_cluster):
-        contents = self._lock_contents(mock_cluster)
-        self.assertIsNotNone(contents)
-        self.assertIn(b'terminate', contents)
-
-    def assert_locked_by_something_else(self, mock_cluster):
-        contents = self._lock_contents(mock_cluster)
-        self.assertIsNotNone(contents)
-        self.assertNotIn(b'terminate', contents)
-
-    def assert_not_locked(self, mock_cluster):
-        self.assertIsNone(
-            self._lock_contents(mock_cluster))
-
-    def assert_terminated_clusters_locked_by_terminate(self):
-        for cluster_id in self.ids_of_terminated_clusters():
-            self.assert_locked_by_terminate(self.mock_emr_clusters[cluster_id])
-
     def test_empty(self):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-EMPTY'],
@@ -488,12 +424,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
     def test_done_and_idle_4_x(self):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-DONE_AND_IDLE_4_X'],
-            idle_for=timedelta(hours=2),
-        )
-
-    def test_idle_and_expired(self):
-        self.assert_mock_cluster_is(
-            self.mock_emr_clusters['j-IDLE_AND_EXPIRED'],
             idle_for=timedelta(hours=2),
         )
 
@@ -543,8 +473,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
             'j-PENDING_BUT_IDLE',
             'j-POOLED'
         ]
-        for cluster_id in unlocked_ids:
-            self.assert_not_locked(self.mock_emr_clusters[cluster_id])
 
         self.assertEqual(self.ids_of_terminated_clusters(), [])
 
@@ -575,12 +503,11 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
         self.maybe_terminate_quietly(max_mins_idle=60)
 
-        self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-CUSTOM_DONE_AND_IDLE',
                           'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-HADOOP_DEBUGGING',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
     def test_one_hour_is_the_default(self):
@@ -588,12 +515,11 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
         self.maybe_terminate_quietly()
 
-        self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-CUSTOM_DONE_AND_IDLE',
                           'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-HADOOP_DEBUGGING',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
     def test_zero_idle_time(self):
@@ -601,12 +527,11 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
         self.maybe_terminate_quietly(max_mins_idle=0)
 
-        self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-CUSTOM_DONE_AND_IDLE',
                           'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-HADOOP_DEBUGGING',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE',
                           'j-POOLED'])
 
@@ -614,8 +539,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.assertEqual(self.ids_of_terminated_clusters(), [])
 
         self.maybe_terminate_quietly(pooled_only=True)
-
-        self.assert_terminated_clusters_locked_by_terminate()
 
         # pooled job was not idle for an hour (the default)
         self.assertEqual(self.ids_of_terminated_clusters(), [])
@@ -629,13 +552,11 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
         self.maybe_terminate_quietly(unpooled_only=True)
 
-        self.assert_terminated_clusters_locked_by_terminate()
-
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-CUSTOM_DONE_AND_IDLE',
                           'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-HADOOP_DEBUGGING',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
         self.maybe_terminate_quietly(unpooled_only=True, max_mins_idle=0.6)
@@ -644,7 +565,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
                          ['j-CUSTOM_DONE_AND_IDLE',
                           'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
+                          'j-HADOOP_DEBUGGING',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
 
     def test_terminate_by_pool_name(self):
@@ -657,8 +578,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
         # right pool name
         self.maybe_terminate_quietly(pool_name='reflecting', max_mins_idle=0.6)
-
-        self.assert_terminated_clusters_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(), ['j-POOLED'])
 
@@ -678,8 +597,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         'Terminated cluster j-DONE_AND_IDLE (DONE_AND_IDLE);'
         ' was idle for 2:00:00',
         'Terminated cluster j-DONE_AND_IDLE_4_X (DONE_AND_IDLE_4_X);'
-        ' was idle for 2:00:00',
-        'Terminated cluster j-IDLE_AND_EXPIRED (IDLE_AND_EXPIRED);'
         ' was idle for 2:00:00',
         'Terminated cluster j-IDLE_AND_FAILED (IDLE_AND_FAILED);'
         ' was idle for 3:00:00',
@@ -703,7 +620,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
             'j-DONE_AND_IDLE',
             'j-DONE_AND_IDLE_4_X',
             'j-HADOOP_DEBUGGING',
-            'j-IDLE_AND_EXPIRED',
             'j-IDLE_AND_FAILED',
             'j-PENDING_BUT_IDLE',
             'j-POOLED',
@@ -713,14 +629,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         stdout = StringIO()
         self.maybe_terminate_quietly(
             stdout=stdout, max_mins_idle=0.6, dry_run=True)
-
-        # dry_run doesn't actually try to lock
-        expected_stdout_lines = self.EXPECTED_STDOUT_LINES + [
-            'Terminated cluster j-IDLE_AND_LOCKED (IDLE_AND_LOCKED);'
-            ' was idle for 2:00:00']
-
-        self.assertEqual(set(stdout.getvalue().splitlines()),
-                         set(expected_stdout_lines))
 
         # shouldn't *actually* terminate clusters
         self.assertEqual(self.ids_of_terminated_clusters(), [])

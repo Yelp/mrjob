@@ -83,10 +83,10 @@ from mrjob.parse import is_s3_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.pool import _attempt_to_lock_cluster
+from mrjob.pool import _attempt_to_unlock_cluster
 from mrjob.pool import _instance_fleets_satisfy
 from mrjob.pool import _instance_groups_satisfy
 from mrjob.pool import _pool_hash_and_name
-from mrjob.pool import _release_cluster_lock
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
@@ -1544,8 +1544,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 # it's safe to clean up our lock, cluster isn't WAITING
                 if self._locked_cluster:
-                    log.info('  releasing lock')
-                    _release_cluster_lock(emr_client, self._cluster_id)
+                    log.info('  releasing cluster lock')
+                    # this can fail, but usually it's because the cluster
+                    # started terminating, so only try releasing the lock once
+                    _attempt_to_unlock_cluster(emr_client, self._cluster_id)
                     self._locked_cluster = False
 
                 continue

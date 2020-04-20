@@ -614,13 +614,23 @@ def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
     return True
 
 
-def _release_cluster_lock(emr_client, cluster_id):
+def _attempt_to_unlock_cluster(emr_client, cluster_id):
     """Release our lock on the given pooled cluster. Only do this if you know
     the cluster is currently running steps (so other jobs won't try to
     join the cluster).
+
+    Returns True if successful, False if not (usually, this means the
+    cluster terminated). Cluster locks eventually release themselves,
+    so if releasing a lock fails for whatever reason, it's not worth
+    releasing it again.
 
     Locks expire after a minute anyway (which is less time than it takes to
     run most jobs), so this is mostly useful for preventing problems
     due to clock skew. Also makes unit testing more straightforward.
     """
-    emr_client.remove_tags(ResourceId=cluster_id, TagKeys=[_POOL_LOCK_KEY])
+    try:
+        emr_client.remove_tags(ResourceId=cluster_id, TagKeys=[_POOL_LOCK_KEY])
+        return True
+    except ClientError as ex:
+        log.debug('removing tags failed: %r' % ex)
+        return False

@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mrjob.pool import _pool_hash_and_name
+from mrjob.pool import _make_cluster_lock
+from mrjob.pool import _parse_cluster_lock
 
 from tests.sandbox import BasicTestCase
 
@@ -46,3 +48,42 @@ class PoolHashAndNameTestCase(BasicTestCase):
 
         self.assertEqual(_pool_hash_and_name(cluster),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
+
+
+class ParseClusterLockTestCase(BasicTestCase):
+
+    def test_empty(self):
+        self.assertRaises(ValueError, _parse_cluster_lock, '')
+
+    def test_basic(self):
+        self.assertEqual(
+            _parse_cluster_lock(
+                'mr_wc.davidmarin.20200419.185348.359278 1587405489.550173'),
+            ('mr_wc.davidmarin.20200419.185348.359278', 1587405489.550173)
+        )
+
+    def test_round_trip(self):
+        self.assertEqual(
+            _parse_cluster_lock(_make_cluster_lock(
+                'mr_wc.davidmarin.20200419.185348.359278', 1587405489.550173)),
+            ('mr_wc.davidmarin.20200419.185348.359278', 1587405489.550173)
+        )
+
+    def test_too_few_fields(self):
+        self.assertRaises(
+            ValueError,
+            _parse_cluster_lock, 'mr_wc.davidmarin.20200419.185348.359278')
+
+    def test_too_many_fields(self):
+        self.assertRaises(
+            ValueError,
+            _parse_cluster_lock,
+            'mr_wc.davidmarin.20200419.185348.359278 1587405489.550173 yay')
+
+    def test_bad_timestamp(self):
+        # shouldn't raise TypeError
+        self.assertRaises(
+            ValueError,
+            _parse_cluster_lock,
+            'mr_wc.davidmarin.20200419.185348.359278 in-a-minute'
+        )

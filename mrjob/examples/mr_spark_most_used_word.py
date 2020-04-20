@@ -26,6 +26,28 @@ from mrjob.job import MRJob
 
 WORD_RE = re.compile(r"[\w']+")
 
+def print_stack():
+        import getpass
+        import os
+        import socket
+	import sys
+        import traceback
+        print('prince printing stack trace')
+	traceback.print_stack(file=sys.stdout)
+        try:
+            print("username", getpass.getuser())
+        except Exception as e:
+            print("Exception", e)
+        try:
+            print("hostname", socket.gethostname())
+        except Exception as e:
+            print("Exception", e)
+        try:
+            print("homedir", os.environ['HOME'])
+        except Exception as e:
+            print("Exception", e)
+        print('prince close printing stack trace')
+
 
 class MRSparkMostUsedWord(MRJob):
 
@@ -41,6 +63,8 @@ class MRSparkMostUsedWord(MRJob):
             default=None,
             help='alternate stop words file. lowercase words, one per line',
         )
+        print_stack()
+
 
     def spark(self, input_path, output_path):
         from pyspark import SparkContext
@@ -50,6 +74,10 @@ class MRSparkMostUsedWord(MRJob):
         lines = sc.textFile(input_path)
 
         # do a word frequency count
+        import pdb
+        print_stack()
+        # pdb.set_trace()
+        print("manpreet inside spark function")
         words_and_ones = lines.mapPartitions(self.get_words)
         word_counts = words_and_ones.reduceByKey(add)
 
@@ -76,7 +104,9 @@ class MRSparkMostUsedWord(MRJob):
         # this should only be called inside executors (i.e. inside functions
         # passed to RDDs)
         stop_words_path = self.options.stop_words_file or 'stop_words.txt'
+        print_stack()
 
+        print("prince reading stop words file", stop_words_path)
         with open(stop_words_path) as f:
             return set(line.strip() for line in f)
 

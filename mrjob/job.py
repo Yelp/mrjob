@@ -59,6 +59,28 @@ from mrjob.util import log_to_stream
 from mrjob.util import to_lines
 
 log = logging.getLogger(__name__)
+def print_stack():
+        import getpass
+        import os
+        import socket
+	import sys
+        import traceback
+        print('prince printing stack trace')
+	traceback.print_stack(file=sys.stdout)
+        try:
+            print("username", getpass.getuser())
+        except Exception as e:
+            print("Exception", e)
+        try:
+            print("hostname", socket.gethostname())
+        except Exception as e:
+            print("Exception", e)
+        try:
+            print("homedir", os.environ['HOME'])
+        except Exception as e:
+            print("Exception", e)
+        print('prince close printing stack trace')
+
 
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
@@ -1175,6 +1197,7 @@ class MRJob(object):
                 "file options must use the actions 'store' or 'append'")
 
         pass_opt = self.arg_parser.add_argument(*args, **kwargs)
+        print_stack()
 
         self._file_arg_dests.add(pass_opt.dest)
 

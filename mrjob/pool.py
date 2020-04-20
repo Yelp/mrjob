@@ -28,6 +28,7 @@ from logging import getLogger
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.py2 import integer_types
+from mrjob.py2 import string_types
 
 log = getLogger(__name__)
 
@@ -532,7 +533,13 @@ def _make_cluster_lock(job_key, expiry):
 
 
 def _parse_cluster_lock(lock):
-    """Return (job_key, expiry) or raise ValueError"""
+    """Return (job_key, expiry) or raise ValueError
+
+    Raises TypeError if *lock* is not a string.
+    """
+    if not isinstance(lock, (string_types)):
+        raise TypeError
+
     job_key, expiry_str = lock.split(' ')
 
     try:
@@ -594,10 +601,13 @@ def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
     # check if our lock is still there
     lock = _get_cluster_lock(emr_client, cluster_id)
 
-    if lock != our_lock:
+    if lock is None:
+        log.info('  lock was removed')
+        return False
+    elif lock != our_lock:
         their_job_desc = 'other job'
         try:
-            their_job_desc, expiry = _parse_cluster_lock()
+            their_job_desc, expiry = _parse_cluster_lock(lock)
         except ValueError:
             pass
 

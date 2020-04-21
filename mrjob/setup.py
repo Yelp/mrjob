@@ -202,6 +202,10 @@ def parse_legacy_hash_path(type, path, must_name=None):
         raise ValueError('bad path type %r, must be one of %s' % (
             type, ', '.join(sorted(_SUPPORTED_TYPES))))
 
+    if path.startswith('s3://'):
+        log.info('Replace s3 with s3a for given bucket %s' % path)
+        path = 's3a://' + path[len('s3://'):]
+
     if '#' in path:
         path, name = path.split('#', 1)
 

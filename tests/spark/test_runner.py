@@ -358,7 +358,7 @@ class SparkWorkingDirTestCase(MockFilesystemsTestCase):
             self.assertEqual(
                 files_arg, ','.join([
                     fs.join(wd_mirror, 'foe'),
-                    's3://walrus/fowl',
+                    's3a://walrus/fowl',
                     fs.join(wd_mirror, 'ghoti'),
                     fs.join(wd_mirror, 'mr_spark_os_walk.py'),
                 ]))

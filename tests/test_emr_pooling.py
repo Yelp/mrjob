@@ -1849,7 +1849,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {'pool_clusters': True}}}
 
     # for multiple failover test
-    MAX_EMR_CONNECTIONS = 1000
+    MAX_EMR_CLIENTS = 200
 
     def make_pooled_cluster(self, **kwargs):
         cluster_id = EMRJobRunner(**kwargs).make_persistent_cluster()

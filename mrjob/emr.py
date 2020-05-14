@@ -886,7 +886,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             except Exception as e:
                 log.exception(e)
 
-        # TODO: otherwise, cancel any steps we submitted
+        # TODO: otherwise, cancel any steps we submitted (#1570)
 
     def _cleanup_cloud_tmp(self):
         # delete all the files we created on S3
@@ -2522,7 +2522,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     ': ' if cluster_id_list else '',
                     ', '.join(reversed(cluster_id_list))))
 
-            # TODO: why not just try locking every cluster in the list?
+            # TODO: try locking every cluster before asking for more (#2164)
             if cluster_id_list:
                 cluster_id = cluster_id_list[-1]
 

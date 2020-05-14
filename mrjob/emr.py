@@ -125,18 +125,15 @@ _IMAGE_VERSION_TO_SSH_TUNNEL_CONFIG = {
 # if we SSH into a node, default place to look for logs
 _EMR_LOG_DIR = '/mnt/var/log'
 
-# no longer limited to 256 steps starting with 2.4.8/3.1.1
-# (# of steps is actually unlimited, but API only shows 1000; see #1462)
-_IMAGE_VERSION_TO_MAX_STEPS = {
-    '2': 256,
-    '2.4.8': 1000,
-    '3': 256,
-    '3.1.1': 1000,
+# Prior to AMI 2.4.8/3.1.1, there is a limit of 256 steps total per cluster.
+# We issue a warning for users who are continuing to used pooling on these
+# very old AMIs
+_IMAGE_SUPPORTS_POOLING = {
+    '2': False,
+    '2.4.8': True,
+    '3': False,
+    '3.1.1': True,
 }
-
-# breaking this out as a separate constant since 4.x AMIs don't report
-# RunningAmiVersion, they report ReleaseLabel
-_4_X_MAX_STEPS = 1000
 
 _MAX_SSH_RETRIES = 20
 
@@ -215,19 +212,23 @@ _CLUSTER_SELF_TERMINATED_RE = re.compile(
 # is available to read even if it's Glacier-archived
 _RESTORED_FROM_GLACIER = 'ongoing-request="false"'
 
+# a minute should be enough time to submit steps and for the cluster
+# to change state
+_CLUSTER_LOCK_SECS_TO_EXPIRATION = 60
+
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
     pass
 
 
-def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
+def _make_lock_uri(cloud_tmp_dir, cluster_id):
     """Generate the URI to lock the cluster ``cluster_id``"""
-    return cloud_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
+    return cloud_tmp_dir + 'locks/' + cluster_id
 
 
 def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
-                             mins_to_expiration=None):
+                             secs_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
@@ -243,12 +244,12 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
 
     # if there's an unexpired lock, give up
     if key_data:
-        if mins_to_expiration is None:
+        if secs_to_expiration is None:
             return False
         else:
             # dateutil is a boto3 dependency
             age = _boto3_now() - key_data['LastModified']
-            if age <= timedelta(minutes=mins_to_expiration):
+            if age <= timedelta(seconds=secs_to_expiration):
                 return False
 
     # try to write our job's key
@@ -375,6 +376,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 log.warning('AMIs prior to 5.7.0 will probably not work'
                             ' with custom machine images')
 
+        if self._opts['pool_clusters'] and not map_version(
+                self._opts['image_version'], _IMAGE_SUPPORTS_POOLING):
+            log.warning(
+                "Cluster pooling is not fully supported on AMIs prior to"
+                " 2.4.8/3.1.1 due to the limit on total number of steps")
+
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
         s3_files_dir = self._cloud_tmp_dir + 'files/'
@@ -390,6 +397,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # did we create the cluster we're running on?
         self._created_cluster = False
+
+        # did we acquire a lock on a cluster for pooling?
+        # (each runner may only acquire one lock at a time)
+        self._cluster_lock_uri = None
 
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
@@ -689,6 +700,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._cluster_id = None
         self._created_cluster = False
 
+        # release any lock we may have had on the previous cluster
+        self._release_any_cluster_lock_held()
+
         # old SSH tunnel isn't valid for this cluster (see #1549)
         if self._ssh_proc:
             self._kill_ssh_tunnel()
@@ -906,6 +920,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # always stop our SSH tunnel if it's still running
         self._kill_ssh_tunnel()
 
+        # let go of any locks we have
+        try:
+            self._release_any_cluster_lock_held()
+        except Exception as e:
+            log.exception(e)
+
         # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)
         # don't stop it if it was created due to --pool because the user
@@ -919,6 +939,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 )
             except Exception as e:
                 log.exception(e)
+
+        # TODO: otherwise, cancel any steps we submitted (#1570)
 
     def _cleanup_cloud_tmp(self):
         # delete all the files we created on S3
@@ -1419,12 +1441,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
         if (self._opts['pool_clusters'] and not self._cluster_id):
-            # master node setup script is an additional step
-            num_steps = self._num_steps()
-            if self._master_node_setup_script_path:
-                num_steps += 1
-
-            cluster_id = self._find_cluster(num_steps=num_steps)
+            cluster_id = self._find_cluster()
             if cluster_id:
                 self._cluster_id = cluster_id
 
@@ -1447,6 +1464,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.debug('Calling add_job_flow_steps(%s)' % ','.join(
             ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
         emr_client.add_job_flow_steps(**steps_kwargs)
+
+        # learn about how fast the cluster state switches
+        cluster = self._describe_cluster()
+        log.debug('Cluster has state %s' % cluster['Status']['State'])
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if hasattr(self.fs, 'ssh') and version_gte(
@@ -1557,6 +1578,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 continue
 
             elif step['Status']['State'] == 'RUNNING':
+                # cluster status will keep pooled jobs away, don't need lock
+                self._release_any_cluster_lock_held()
+
                 time_running_desc = ''
 
                 start = step['Status']['Timeline'].get('StartDateTime')
@@ -2459,58 +2483,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.debug('    OK - valid cluster setup')
         return instance_sort_key
 
-    def _check_cluster_state(self, emr_client, cluster, num_steps):
-        """Check if the given cluster's state is in a state we can join. This
-        is unlike :py:meth:`~mrjob.emr.EMRJobRunner._compare_cluster_setup`
-        which only checks for preconfigured fields.
-
-        These checks include
-
-        - there is room for our job in the cluster (clusters top out at
-          256 steps)
-        - the cluster does not have a running step
-
-        :param emr_client: a boto3 EMR client. See
-                           :py:meth:`~mrjob.emr.EMRJobRunner.make_emr_client`
-        :param cluster: EMR cluster dict to check if we are able to join.
-        :param num_steps: The number of steps this job requires.
-
-        :return: -1 on failure or num_steps_in_cluster on success
-        """
-        steps = list(_boto3_paginate(
-            'Steps',
-            emr_client, 'list_steps', ClusterId=cluster['Id']))
-
-        if self._opts['release_label']:
-            max_steps = _4_X_MAX_STEPS
-        else:
-            image_version = cluster.get('RunningAmiVersion', '')
-            max_steps = map_version(image_version, _IMAGE_VERSION_TO_MAX_STEPS)
-
-        # don't add more steps than EMR will allow/display through the API
-        if len(steps) + num_steps > max_steps:
-            log.debug('    no room for our steps')
-            return -1
-
-        # in rare cases, cluster can be WAITING *and* have incomplete
-        # steps. We could just check for PENDING steps, but we're
-        # trying to be defensive about EMR adding a new step state.
-        # Not entirely sure what to make of CANCEL_PENDING
-        for step in steps:
-            if (step['Status']['State'] not in (
-                    'CANCELLED', 'INTERRUPTED') and
-                    not step['Status'].get('Timeline', {}).get(
-                        'EndDateTime')):
-                log.debug('    unfinished steps')
-                return -1
-
-        log.debug('    OK - valid cluster state')
-        return len(steps)
-
     def _usable_clusters(self, valid_clusters, invalid_clusters,
-                         locked_clusters, num_steps):
+                         locked_clusters):
         """Get clusters that this runner can join, returning a list of
-        ``(cluster_id, num_steps)`` (number of steps is used for locking).
+        cluster IDs.
 
         This list is sorted by
         - total compute units for core + task nodes
@@ -2529,7 +2505,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                                 are in a "locked" state.
         :param num_steps: The number of steps this job requires.
 
-        :return: list of tuples of (cluster_id, num_steps_in_cluster)
+        :return: list of cluster IDs
         """
         emr_client = self.make_emr_client()
         req_pool_hash = self._pool_hash()
@@ -2560,22 +2536,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     continue
                 valid_clusters[cluster_id] = (cluster, instance_sort_key,)
 
-            # always check the cluster state
-            num_steps_in_cluster = self._check_cluster_state(
-                emr_client, cluster, num_steps)
-            if num_steps_in_cluster == -1:
-                # don't add to invalid cluster list since the cluster may
-                # be valid when we next check
-                continue
-
             key_cluster_steps_list.append(
-                (instance_sort_key, cluster_id, num_steps_in_cluster,))
+                (instance_sort_key, cluster_id))
 
-        return [(_cluster_id, cluster_num_steps) for
-                (_, _cluster_id, cluster_num_steps)
+        return [_cluster_id for _, _cluster_id
                 in sorted(key_cluster_steps_list)]
 
-    def _find_cluster(self, num_steps=1):
+    def _find_cluster(self):
         """Find a cluster that can host this runner. Prefer clusters with more
         compute units. Break ties by choosing cluster with longest idle time.
         Return ``None`` if no suitable clusters exist.
@@ -2590,26 +2557,24 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         log.info('Attempting to find an available cluster...')
         while now <= end_time:
-            cluster_info_list = self._usable_clusters(
+            cluster_id_list = self._usable_clusters(
                 valid_clusters, invalid_clusters,
-                locked_clusters, num_steps)
+                locked_clusters)
             log.debug(
                 '  Found %d usable cluster%s%s%s' % (
-                    len(cluster_info_list),
-                    '' if len(cluster_info_list) == 1 else 's',
-                    ': ' if cluster_info_list else '',
-                    ', '.join(c for c, n in reversed(cluster_info_list))))
+                    len(cluster_id_list),
+                    '' if len(cluster_id_list) == 1 else 's',
+                    ': ' if cluster_id_list else '',
+                    ', '.join(reversed(cluster_id_list))))
 
-            if cluster_info_list:
-                cluster_id, cluster_num_steps = cluster_info_list[-1]
-                status = _attempt_to_acquire_lock(
-                    self.fs.s3, self._lock_uri(cluster_id, cluster_num_steps),
-                    self._opts['cloud_fs_sync_secs'], self._job_key)
-                if status:
-                    log.debug('Acquired lock on cluster %s', cluster_id)
+            # TODO: try locking every cluster before asking for more (#2164)
+            if cluster_id_list:
+                cluster_id = cluster_id_list[-1]
+
+                lock_acquired = self._attempt_to_lock_cluster(cluster_id)
+                if lock_acquired:
                     return cluster_id
                 else:
-                    log.debug("Can't acquire lock on cluster %s", cluster_id)
                     locked_clusters.add(cluster_id)
             elif max_wait_time == 0:
                 return None
@@ -2626,10 +2591,42 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         return None
 
-    def _lock_uri(self, cluster_id, num_steps):
-        return _make_lock_uri(self._opts['cloud_tmp_dir'],
-                              cluster_id,
-                              num_steps + 1)
+    def _attempt_to_lock_cluster(self, cluster_id):
+        # don't hold more than one lock at once
+        self._release_any_cluster_lock_held()
+
+        lock_uri = _make_lock_uri(
+            self._opts['cloud_tmp_dir'], cluster_id)
+
+        acquired = _attempt_to_acquire_lock(
+            self.fs.s3,
+            lock_uri,
+            sync_wait_time=self._opts['cloud_fs_sync_secs'],
+            job_key=self._job_key,
+            secs_to_expiration=_CLUSTER_LOCK_SECS_TO_EXPIRATION,
+        )
+
+        if acquired:
+            log.debug('Acquired lock on cluster %s: %s' % (
+                cluster_id, lock_uri))
+            self._cluster_lock_uri = lock_uri
+        else:
+            log.debug('Unable to acquire lock on cluster %s', cluster_id)
+
+        return acquired
+
+    def _release_any_cluster_lock_held(self):
+        """Release any cluster lock we're currently holding."""
+        if self._cluster_lock_uri:
+            # could check if it's really *our* lock by reading the content,
+            # but going to replace this with something tag-based in
+            # a moment (see #2161)
+            self.fs.rm(self._cluster_lock_uri)
+            log.debug('Released cluster lock: %s' % self._cluster_lock_uri)
+            self._cluster_lock_uri = None
+
+    def _lock_uri(self, cluster_id):
+        return _make_lock_uri(self._opts['cloud_tmp_dir'], cluster_id)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to

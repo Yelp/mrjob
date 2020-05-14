@@ -138,6 +138,7 @@ def _maybe_terminate_clusters(dry_run=False,
     if max_mins_idle is None:
         max_mins_idle = _DEFAULT_MAX_MINS_IDLE
 
+    kwargs['label'] = 'terminate_idle_clusters'  # better than no_script
     runner = EMRJobRunner(**kwargs)
     emr_client = runner.make_emr_client()
 
@@ -317,18 +318,12 @@ def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
     if dry_run:
         did_terminate = True
     else:
-        status = _attempt_to_acquire_lock(
-            runner.fs.s3,
-            runner._lock_uri(cluster_id, num_steps),
-            runner._opts['cloud_fs_sync_secs'],
-            '%s (%s)' % (msg,
-                         runner._make_unique_job_key(label='terminate')),
-            mins_to_expiration=max_mins_locked,
-        )
-        if status:
+        acquired_lock = runner._attempt_to_lock_cluster(cluster_id)
+        if acquired_lock:
             runner.make_emr_client().terminate_job_flows(
                 JobFlowIds=[cluster_id])
             did_terminate = True
+            runner._release_any_cluster_lock_held()
         elif not quiet:
             log.info('%s was locked between getting cluster info and'
                      ' trying to terminate it; skipping' % cluster_id)

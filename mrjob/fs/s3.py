@@ -265,9 +265,6 @@ class S3Filesystem(Filesystem):
 
         kwargs = self._client_kwargs(region_name)
 
-        log.debug('creating S3 resource (%s)' % (
-            kwargs['endpoint_url'] or kwargs['region_name'] or 'default'))
-
         s3_resource = boto3.resource('s3', **kwargs)
         s3_resource.meta.client = _wrap_aws_client(s3_resource.meta.client)
 
@@ -284,9 +281,6 @@ class S3Filesystem(Filesystem):
             raise ImportError('You must install boto3 to connect to S3')
 
         kwargs = self._client_kwargs(region_name or self._s3_region)
-
-        log.debug('creating S3 client (%s)' % (
-            kwargs['endpoint_url'] or kwargs['region_name'] or 'default'))
 
         return _wrap_aws_client(boto3.client('s3', **kwargs))
 

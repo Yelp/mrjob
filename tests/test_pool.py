@@ -19,7 +19,7 @@ import time
 from mrjob.emr import EMRJobRunner
 from mrjob.pool import _attempt_to_lock_cluster
 from mrjob.pool import _attempt_to_unlock_cluster
-from mrjob.pool import _get_cluster_lock
+from mrjob.pool import _get_cluster_state_and_lock
 from mrjob.pool import _make_cluster_lock
 from mrjob.pool import _parse_cluster_lock
 from mrjob.pool import _pool_hash_and_name
@@ -109,6 +109,9 @@ class AttemptToLockClusterTestCase(MockBoto3TestCase):
 
         self.emr_client = self.client('emr')
         self.cluster_id = EMRJobRunner().make_persistent_cluster()
+        # get into WAITING state
+        self.simulate_emr_progress(self.cluster_id)
+        self.simulate_emr_progress(self.cluster_id)
 
         self.log = self.start(patch('mrjob.pool.log'))
         self.mock_sleep = self.start(patch('time.sleep'))
@@ -233,40 +236,44 @@ class AttemptToUnlockClusterTestCase(MockBoto3TestCase):
         super(AttemptToUnlockClusterTestCase, self).setUp()
 
         self.emr_client = self.client('emr')
+
         self.cluster_id = EMRJobRunner().make_persistent_cluster()
+        # get into WAITING state
+        self.simulate_emr_progress(self.cluster_id)
+        self.simulate_emr_progress(self.cluster_id)
 
         self.log = self.start(patch('mrjob.pool.log'))
 
         self.our_key = 'mr_wc.dmarin.20200419.185348.359278'
 
+    def _get_cluster_lock(self):
+        return _get_cluster_state_and_lock(
+            self.emr_client, self.cluster_id)[1]
+
     def test_remove_existing_tags(self):
         _attempt_to_lock_cluster(
             self.emr_client, self.cluster_id, self.our_key)
 
-        self.assertIsNotNone(
-            _get_cluster_lock(self.emr_client, self.cluster_id))
+        self.assertIsNotNone(self._get_cluster_lock())
 
         unlocked = _attempt_to_unlock_cluster(
             self.emr_client, self.cluster_id)
 
         self.assertTrue(unlocked)
-        self.assertIsNone(
-            _get_cluster_lock(self.emr_client, self.cluster_id))
+        self.assertIsNone(self._get_cluster_lock())
 
     def test_okay_if_no_tag(self):
         unlocked = _attempt_to_unlock_cluster(
             self.emr_client, self.cluster_id)
 
         self.assertTrue(unlocked)
-        self.assertIsNone(
-            _get_cluster_lock(self.emr_client, self.cluster_id))
+        self.assertIsNone(self._get_cluster_lock())
 
     def test_okay_if_cluster_terminated(self):
         _attempt_to_lock_cluster(
             self.emr_client, self.cluster_id, self.our_key)
 
-        self.assertIsNotNone(
-            _get_cluster_lock(self.emr_client, self.cluster_id))
+        self.assertIsNotNone(self._get_cluster_lock())
 
         self.emr_client.terminate_job_flows([self.cluster_id])
 
@@ -280,5 +287,4 @@ class AttemptToUnlockClusterTestCase(MockBoto3TestCase):
 
         # failed, but didn't crash
         self.assertFalse(unlocked)
-        self.assertIsNotNone(
-            _get_cluster_lock(self.emr_client, self.cluster_id))
+        self.assertIsNotNone(self._get_cluster_lock())

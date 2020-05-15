@@ -305,11 +305,11 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--image-version', '4.0.0',
             '--application', 'Mahout'])
 
-    def test_extra_applications_okay(self):
+    def test_extra_applications_not_okay(self):
         _, cluster_id = self.make_pooled_cluster(
             image_version='4.0.0', applications=['Ganglia', 'Mahout'])
 
-        self.assertJoins(cluster_id, [
+        self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
             '--application', 'Mahout'])

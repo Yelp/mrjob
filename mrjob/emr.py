@@ -2375,9 +2375,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             cluster_applications = set(
                 a['Name'].lower() for a in cluster.get('Applications', []))
 
-            if not expected_applications <= cluster_applications:
-                log.debug('    missing applications: %s' % ', '.join(
-                    sorted(expected_applications - cluster_applications)))
+            if expected_applications != cluster_applications:
+                log.debug('    applications do not match')
                 return
 
         emr_configurations = cluster.get('Configurations', [])

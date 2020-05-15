@@ -611,6 +611,8 @@ def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
 
     # check if our lock is still there
     state, lock = _get_cluster_state_and_lock(emr_client, cluster_id)
+
+    # this could happen if the cluster is TERMINATING, for instance
     if state != 'WAITING':
         log.info('  cluster is no longer waiting, now %s' % state)
         return False

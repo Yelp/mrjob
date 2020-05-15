@@ -129,6 +129,24 @@ class AttemptToLockClusterTestCase(MockBoto3TestCase):
         self.assertTrue(acquired)
         self.mock_sleep.assert_called_once_with(10.0)
 
+    def test_running_cluster(self):
+        self.mock_emr_clusters[self.cluster_id]['Status']['State'] = 'RUNNING'
+
+        acquired = _attempt_to_lock_cluster(
+            self.emr_client, self.cluster_id, self.our_key)
+
+        self.assertFalse(acquired)
+        self.assertFalse(self.mock_sleep.called)
+
+    def test_terminating_cluster(self):
+        self.emr_client.terminate_job_flows(JobFlowIds=[self.cluster_id])
+
+        acquired = _attempt_to_lock_cluster(
+            self.emr_client, self.cluster_id, self.our_key)
+
+        self.assertFalse(acquired)
+        self.assertFalse(self.mock_sleep.called)
+
     def test_cluster_with_current_lock(self):
         they_acquired = _attempt_to_lock_cluster(
             self.emr_client, self.cluster_id, self.their_key)
@@ -229,6 +247,16 @@ class AttemptToLockClusterTestCase(MockBoto3TestCase):
             self.emr_client, self.cluster_id, self.our_key)
         self.assertFalse(acquired)
 
+    def test_cluster_terminated_after_locking(self):
+        def _terminate_cluster(_):
+            self.emr_client.terminate_job_flows(JobFlowIds=[self.cluster_id])
+
+        self.mock_sleep.side_effect = _terminate_cluster
+
+        acquired = _attempt_to_lock_cluster(
+            self.emr_client, self.cluster_id, self.our_key)
+        self.assertFalse(acquired)
+
 
 class AttemptToUnlockClusterTestCase(MockBoto3TestCase):
 
@@ -275,7 +303,7 @@ class AttemptToUnlockClusterTestCase(MockBoto3TestCase):
 
         self.assertIsNotNone(self._get_cluster_lock())
 
-        self.emr_client.terminate_job_flows([self.cluster_id])
+        self.emr_client.terminate_job_flows(JobFlowIds=[self.cluster_id])
 
         cluster = self.emr_client.describe_cluster(
             ClusterId=self.cluster_id)['Cluster']

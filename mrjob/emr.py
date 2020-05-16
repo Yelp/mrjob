@@ -2341,12 +2341,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             # match actual AMI version
             image_version = cluster.get('RunningAmiVersion', '')
-            # Support partial matches, e.g. let a request for
-            # '2.4' pass if the version is '2.4.2'. The version
-            # extracted from the existing cluster should always
-            # be a full major.minor.patch, so checking matching
-            # prefixes should be sufficient.
-            if not image_version.startswith(self._opts['image_version']):
+            if image_version != self._opts['image_version']:
                 log.debug('    image version mismatch')
                 return
 

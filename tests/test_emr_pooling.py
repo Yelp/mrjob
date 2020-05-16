@@ -175,25 +175,25 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--image-version', '2.2'])
 
     def test_pooling_with_image_version(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.0')
+        _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
 
         self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--image-version', '2.4.9'])
+
+    def test_pooling_requires_exact_image_version_match(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
+
+        self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '2.0'])
 
-    def test_pooling_with_image_version_prefix_major_minor(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
+    def test_pooling_requires_full_image_version(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.4')
 
-        self.assertJoins(cluster_id, [
+        self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--image-version', '2.0'])
-
-    def test_pooling_with_image_version_prefix_major(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
-
-        self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-clusters',
-            '--image-version', '2'])
+            '--image-version', '2.4'])
 
     def test_dont_join_pool_with_wrong_image_version(self):
         _, cluster_id = self.make_pooled_cluster(image_version='2.2')

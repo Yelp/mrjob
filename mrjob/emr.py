@@ -2540,27 +2540,36 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         return None
 
-    def _pool_hash(self):
-        """Generate a hash of the bootstrap configuration so it can be used to
-        match jobs and clusters. This first argument passed to the bootstrap
-        script will be ``'pool-'`` plus this hash.
+    def _pool_hash_dict(self):
+        """A dictionary of information that must be matched exactly to
+        join a pooled cluster (other than mrjob version and pool name).
 
-        The way the hash is calculated may vary between point releases
-        (pooling requires the exact same version of :py:mod:`mrjob` anyway).
+        The format of this dictionary may change between mrjob versions
         """
-        # exclude mrjob.zip because it's only created if the
-        # job starts its own cluster (also, its hash changes every time
-        # since the zip file contains different timestamps).
-        # The filenames/md5sums are sorted because we need to
-        # ensure the order they're added doesn't affect the hash
-        # here
-        file_md5sums = sorted(
-            (name, self.fs.md5sum(path)) for name, path
-            in self._bootstrap_dir_mgr.name_to_path().items()
-            if not path == self._mrjob_zip_path)
+        d = {}
 
-        # original path of the file doesn't matter, just its name and contents
-        bootstrap_without_paths = [
+        # additional_emr_info
+        d['additional_emr_info'] = self._opts['additional_emr_info']
+
+        # applications
+        # (these are case-insensitive)
+        d['applications'] = sorted(a.lower() for a in self._applications())
+
+        # bootstrapping
+
+        # bootstrap_actions
+        d['bootstrap_actions'] = self._bootstrap_actions()
+
+        # bootstrap_file_md5sums
+        d['bootstrap_file_md5sums'] = {
+            name: self.fs.md5sum(path)
+            for name, path in self._bootstrap_dir_mgr.name_to_path().items()
+            if path != self._mrjob_zip_path
+        }
+
+        # bootstrap_without_paths
+        # original path doesn't matter, just contents (above) and name
+        d['bootstrap_without_paths'] = [
             [
                 dict(type=x['type'], name=self._bootstrap_dir_mgr.name(**x))
                 if isinstance(x, dict) else x
@@ -2569,25 +2578,39 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             for cmd in self._bootstrap
         ]
 
-        things_to_hash = [
-            file_md5sums,
-            self._opts['additional_emr_info'],
-            bootstrap_without_paths,
-            self._bootstrap_actions(),
-            self._bootstrap_mrjob(),
-        ]
-
+        # bootstrap_mrjob_python_bin
         if self._bootstrap_mrjob():
-            things_to_hash.append(mrjob.__version__)
-            things_to_hash.append(self._python_bin())
-            things_to_hash.append(self._task_python_bin())
+            d['bootstrap_mrjob_python'] = self._python_bin()
+        else:
+            d['bootstrap_mrjob_python'] = None
 
-        things_json = json.dumps(things_to_hash, sort_keys=True)
-        if not isinstance(things_json, bytes):
-            things_json = things_json.encode('utf_8')
+        # emr_configurations
+        d['emr_configurations'] = self._opts['emr_configurations']
+
+        # image_id
+        d['image_id'] = self._opts['image_id']
+
+        # release_label
+        # use e.g. emr-2.4.9 for 2.x/3.x AMIs, even though the API wouldn't
+        d['release_label'] = (self._opts['release_label'] or
+                              'emr-' + self._opts['image_version'])
+
+        return d
+
+    def _pool_hash(self, hash_dict=None):
+        if hash_dict is None:
+            hash_dict = self._pool_hash_dict()
+
+        # shim to make old tests pass
+        if hash_dict.get('bootstrap_mrjob_python'):
+            hash_dict = dict(mrjob_version=mrjob.__version__, **hash_dict)
+
+        hash_json = json.dumps(hash_dict, sort_keys=True)
+        if not isinstance(hash_json, bytes):
+            hash_json = hash_json.encode('utf_8')
 
         m = hashlib.md5()
-        m.update(things_json)
+        m.update(hash_json)
         return m.hexdigest()
 
     ### EMR-specific Stuff ###

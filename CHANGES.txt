@@ -1,6 +1,8 @@
 v0.7.3, 2020-05-?? -- cluster pooling 2.0
  * terminate_idle_clusters no longer locks pooled clusters
- * only join clusters with exact same application list
+ * cluster pooling rules are slightly more strict
+   * mrjob version must always match
+   * application list must match exactly
 
 v0.7.2, 2020-04-11 -- archives on all Spark platforms
  * archives work on non-YARN Spark installations (#1993)

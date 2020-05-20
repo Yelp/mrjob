@@ -1525,15 +1525,19 @@ class PoolMatchingTestCase(MockBoto3TestCase):
     def test_dont_join_wrong_mrjob_version(self):
         _, cluster_id = self.make_pooled_cluster()
 
-        old_version = mrjob.__version__
+        self.start(patch('mrjob.__version__', 'OVER NINE THOUSAAAAAND'))
 
-        try:
-            mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters'])
 
-            self.assertDoesNotJoin(cluster_id, [
-                '-r', 'emr', '--pool-clusters'])
-        finally:
-            mrjob.__version__ = old_version
+    def test_version_matters_even_if_mrjob_not_bootstrapped(self):
+        _, cluster_id = self.make_pooled_cluster(
+            bootstrap_mrjob=False)
+
+        self.start(patch('mrjob.__version__', 'OVER NINE THOUSAAAAAND'))
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters'])
 
     def test_dont_join_wrong_python_bin(self):
         _, cluster_id = self.make_pooled_cluster()
@@ -1541,22 +1545,6 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--python-bin', 'snake'])
-
-    def test_versions_dont_matter_if_no_bootstrap_mrjob(self):
-        _, cluster_id = self.make_pooled_cluster(
-            bootstrap_mrjob=False)
-
-        old_version = mrjob.__version__
-
-        try:
-            mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
-
-            self.assertJoins(cluster_id, [
-                '-r', 'emr', '--pool-clusters',
-                '--no-bootstrap-mrjob',
-                '--python-bin', 'snake'])
-        finally:
-            mrjob.__version__ = old_version
 
     def test_join_similarly_bootstrapped_pool(self):
         _, cluster_id = self.make_pooled_cluster(

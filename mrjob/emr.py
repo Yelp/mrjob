@@ -1101,7 +1101,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Build kwargs for emr_client.run_job_flow()"""
         kwargs = {}
 
-        kwargs['Name'] = self._job_key + self._cluster_name_suffix()
+        kwargs['Name'] = self._job_key + self._cluster_name_pooling_suffix()
 
         kwargs['LogUri'] = self._opts['cloud_log_dir']
 
@@ -2458,7 +2458,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         :return: list of cluster IDs
         """
         emr_client = self.make_emr_client()
-        req_cluster_name_suffix = self._cluster_name_suffix()
+        req_cluster_name_suffix = self._cluster_name_pooling_suffix()
         req_pool_hash = self._pool_hash()
 
         # list of (sort_key, cluster_id, num_steps)
@@ -2471,6 +2471,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             cluster_name = cluster_summary['Name']
             if not cluster_name.endswith(req_cluster_name_suffix):
                 log.debug('    wrong basic pooling info')
+                continue
 
             cluster_id = cluster_summary['Id']
 
@@ -2616,10 +2617,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _pool_hash(self):
         hash_dict = self._pool_hash_dict()
 
-        # shim to make old tests pass
-        if hash_dict.get('bootstrap_mrjob_python'):
-            hash_dict = dict(mrjob_version=mrjob.__version__, **hash_dict)
-
         hash_json = json.dumps(hash_dict, sort_keys=True)
         if not isinstance(hash_json, bytes):
             hash_json = hash_json.encode('utf_8')
@@ -2628,7 +2625,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         m.update(hash_json)
         return m.hexdigest()
 
-    def _cluster_name_suffix(self):
+    def _cluster_name_pooling_suffix(self):
         """Extra info added to the cluster name, for pooling."""
         if not self._opts['pool_clusters']:
             return ''
@@ -2640,7 +2637,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             'fleet' if self._opts['instance_fleets'] else 'group',
         ]
 
-        return ' ' + json.dumps(fields, sort_keys=True)
+        return ' pooling:%s' % ','.join(fields)
 
     ### EMR-specific Stuff ###
 

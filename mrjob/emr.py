@@ -2605,6 +2605,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # image_id
             d['image_id'] = self._opts['image_id']
 
+            # instance_collection_type
+            # no way to compare instance groups with instance fleets
+            # so make it part of the hash
+            d['instance_collection_type'] = (
+                'INSTANCE_FLEET' if self._opts['instance_fleets']
+                else 'INSTANCE_GROUP'
+            )
+
             # release_label
             # use e.g. emr-2.4.9 for 2.x/3.x AMIs, even though the API wouldn't
             d['release_label'] = (self._opts['release_label'] or
@@ -2634,7 +2642,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             mrjob.__version__,
             self._opts['pool_name'],
             self._pool_hash(),
-            'fleet' if self._opts['instance_fleets'] else 'group',
         ]
 
         return ' pooling:%s' % ','.join(fields)

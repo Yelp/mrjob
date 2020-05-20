@@ -392,6 +392,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # transfer to S3 (so we don't do it twice)
         self._waited_for_logs_on_s3 = set()
 
+        # info used to match clusters. catches _pool_hash_dict()
+        self._pool_hash_dict_cached = None
+
     ### Options ###
 
     @classmethod
@@ -1098,7 +1101,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Build kwargs for emr_client.run_job_flow()"""
         kwargs = {}
 
-        kwargs['Name'] = self._job_key
+        kwargs['Name'] = self._job_key + self._cluster_name_suffix()
 
         kwargs['LogUri'] = self._opts['cloud_log_dir']
 
@@ -2455,6 +2458,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         :return: list of cluster IDs
         """
         emr_client = self.make_emr_client()
+        req_cluster_name_suffix = self._cluster_name_suffix()
         req_pool_hash = self._pool_hash()
 
         # list of (sort_key, cluster_id, num_steps)
@@ -2463,6 +2467,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for cluster_summary in _boto3_paginate(
                 'Clusters', emr_client, 'list_clusters',
                 ClusterStates=['WAITING']):
+
+            cluster_name = cluster_summary['Name']
+            if not cluster_name.endswith(req_cluster_name_suffix):
+                log.debug('    wrong basic pooling info')
+
             cluster_id = cluster_summary['Id']
 
             # this may be a retry due to locked clusters
@@ -2544,62 +2553,68 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """A dictionary of information that must be matched exactly to
         join a pooled cluster (other than mrjob version and pool name).
 
-        The format of this dictionary may change between mrjob versions
+        The format of this dictionary may change between mrjob versions.
         """
-        d = {}
+        # this can be expensive because we have to read every file used in
+        # bootstrapping, so cache it
+        if not self._pool_hash_dict_cached:
+            d = {}
 
-        # additional_emr_info
-        d['additional_emr_info'] = self._opts['additional_emr_info']
+            # additional_emr_info
+            d['additional_emr_info'] = self._opts['additional_emr_info']
 
-        # applications
-        # (these are case-insensitive)
-        d['applications'] = sorted(a.lower() for a in self._applications())
+            # applications
+            # (these are case-insensitive)
+            d['applications'] = sorted(a.lower() for a in self._applications())
 
-        # bootstrapping
+            # bootstrapping
 
-        # bootstrap_actions
-        d['bootstrap_actions'] = self._bootstrap_actions()
+            # bootstrap_actions
+            d['bootstrap_actions'] = self._bootstrap_actions()
 
-        # bootstrap_file_md5sums
-        d['bootstrap_file_md5sums'] = {
-            name: self.fs.md5sum(path)
-            for name, path in self._bootstrap_dir_mgr.name_to_path().items()
-            if path != self._mrjob_zip_path
-        }
+            # bootstrap_file_md5sums
+            d['bootstrap_file_md5sums'] = {
+                name: self.fs.md5sum(path)
+                for name, path
+                in self._bootstrap_dir_mgr.name_to_path().items()
+                if path != self._mrjob_zip_path
+            }
 
-        # bootstrap_without_paths
-        # original path doesn't matter, just contents (above) and name
-        d['bootstrap_without_paths'] = [
-            [
-                dict(type=x['type'], name=self._bootstrap_dir_mgr.name(**x))
-                if isinstance(x, dict) else x
-                for x in cmd
+            # bootstrap_without_paths
+            # original path doesn't matter, just contents (above) and name
+            d['bootstrap_without_paths'] = [
+                [
+                    dict(type=x['type'],
+                         name=self._bootstrap_dir_mgr.name(**x))
+                    if isinstance(x, dict) else x
+                    for x in cmd
+                ]
+                for cmd in self._bootstrap
             ]
-            for cmd in self._bootstrap
-        ]
 
-        # bootstrap_mrjob_python_bin
-        if self._bootstrap_mrjob():
-            d['bootstrap_mrjob_python'] = self._python_bin()
-        else:
-            d['bootstrap_mrjob_python'] = None
+            # bootstrap_mrjob_python_bin
+            if self._bootstrap_mrjob():
+                d['bootstrap_mrjob_python'] = self._python_bin()
+            else:
+                d['bootstrap_mrjob_python'] = None
 
-        # emr_configurations
-        d['emr_configurations'] = self._opts['emr_configurations']
+            # emr_configurations
+            d['emr_configurations'] = self._opts['emr_configurations']
 
-        # image_id
-        d['image_id'] = self._opts['image_id']
+            # image_id
+            d['image_id'] = self._opts['image_id']
 
-        # release_label
-        # use e.g. emr-2.4.9 for 2.x/3.x AMIs, even though the API wouldn't
-        d['release_label'] = (self._opts['release_label'] or
-                              'emr-' + self._opts['image_version'])
+            # release_label
+            # use e.g. emr-2.4.9 for 2.x/3.x AMIs, even though the API wouldn't
+            d['release_label'] = (self._opts['release_label'] or
+                                  'emr-' + self._opts['image_version'])
 
-        return d
+            self._pool_hash_dict_cached = d
 
-    def _pool_hash(self, hash_dict=None):
-        if hash_dict is None:
-            hash_dict = self._pool_hash_dict()
+        return self._pool_hash_dict_cached
+
+    def _pool_hash(self):
+        hash_dict = self._pool_hash_dict()
 
         # shim to make old tests pass
         if hash_dict.get('bootstrap_mrjob_python'):
@@ -2612,6 +2627,20 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         m = hashlib.md5()
         m.update(hash_json)
         return m.hexdigest()
+
+    def _cluster_name_suffix(self):
+        """Extra info added to the cluster name, for pooling."""
+        if not self._opts['pool_clusters']:
+            return ''
+
+        fields = [
+            mrjob.__version__,
+            self._opts['pool_name'],
+            self._pool_hash(),
+            'fleet' if self._opts['instance_fleets'] else 'group',
+        ]
+
+        return ' ' + json.dumps(fields, sort_keys=True)
 
     ### EMR-specific Stuff ###
 

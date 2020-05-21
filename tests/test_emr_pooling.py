@@ -182,16 +182,18 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--image-version', '2.4.9'])
 
     def test_pooling_requires_exact_image_version_match(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
+        _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--image-version', '2.0'])
+            '--image-version', '2.4'])
 
-    def test_pooling_requires_full_image_version(self):
+    def test_partial_image_version_okay(self):
+        # the 2.x series is over, so "2.4" is always the same
+        # patch version anyhow
         _, cluster_id = self.make_pooled_cluster(image_version='2.4')
 
-        self.assertDoesNotJoin(cluster_id, [
+        self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '2.4'])
 

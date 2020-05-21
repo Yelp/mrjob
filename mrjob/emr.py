@@ -2283,21 +2283,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Get the ID of the cluster our job is running on, or ``None``."""
         return self._cluster_id
 
-    def _compare_cluster_setup(self, emr_client, cluster, req_pool_hash):
+    def _compare_cluster_setup(self, emr_client, cluster):
         """Check if the required configuration fields of the given cluster are
         the same as in the requested cluster.
 
-        These checks include
-
-        - same pool name/hash
-        - same bootstrap setup (including mrjob version)
-        - same AMI version and custom AMI ID (if any)
-        - install the same applications (if we requested any)
-        - same number and type of instances
-
-        Note: we allow joining clusters where for each role, every instance
-        has at least as much memory as we require, and the total number of
-        compute units is at least what we require.
+        This only checks fields that are not already covered by the pool
+        hash itself (see :py:meth:_pool_hash_dict())
 
         :param emr_client: a boto3 EMR client. See
                            :py:meth:`~mrjob.emr.EMRJobRunner.make_emr_client`
@@ -2322,36 +2313,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.debug('    not persistent')
             return
 
-        # match pool name, and (bootstrap) hash
-        pool_hash, pool_name = _pool_hash_and_name(cluster)
-
-        if req_pool_hash != pool_hash:
-            log.debug('    pool hash mismatch')
-            return
-
-        if self._opts['pool_name'] != pool_name:
-            log.debug('    pool name mismatch')
-            return
-
-        if self._opts['release_label']:
-            # just check for exact match. EMR doesn't have a concept
-            # of partial release labels like it does for AMI versions.
-            release_label = cluster.get('ReleaseLabel')
-
-            if release_label != self._opts['release_label']:
-                log.debug('    release label mismatch')
-                return
-        else:
-            # match actual AMI version
-            image_version = cluster.get('RunningAmiVersion', '')
-            if image_version != self._opts['image_version']:
-                log.debug('    image version mismatch')
-                return
-
-        if self._opts['image_id'] != cluster.get('CustomAmiId'):
-            log.debug('    custom image ID mismatch')
-            return
-
         if self._opts['ebs_root_volume_gb']:
             if 'EbsRootVolumeSize' not in cluster:
                 log.debug('    EBS root volume size not set')
@@ -2364,23 +2325,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if 'EbsRootVolumeSize' in cluster:
                 log.debug('    uses non-default EBS root volume size')
                 return
-
-        applications = self._applications()
-        if applications:
-            # use case-insensitive mapping (see #1417)
-            expected_applications = set(a.lower() for a in applications)
-
-            cluster_applications = set(
-                a['Name'].lower() for a in cluster.get('Applications', []))
-
-            if expected_applications != cluster_applications:
-                log.debug('    applications do not match')
-                return
-
-        emr_configurations = cluster.get('Configurations', [])
-        if self._opts['emr_configurations'] != emr_configurations:
-            log.debug('    emr configurations mismatch')
-            return
 
         subnet = cluster['Ec2InstanceAttributes'].get('Ec2SubnetId')
         if isinstance(self._opts['subnet'], list):
@@ -2459,7 +2403,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
         req_cluster_name_suffix = self._cluster_name_pooling_suffix()
-        req_pool_hash = self._pool_hash()
 
         # list of (sort_key, cluster_id, num_steps)
         key_cluster_steps_list = []
@@ -2487,7 +2430,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cluster = emr_client.describe_cluster(
                     ClusterId=cluster_id)['Cluster']
                 instance_sort_key = self._compare_cluster_setup(
-                    emr_client, cluster, req_pool_hash)
+                    emr_client, cluster)
                 if not instance_sort_key:
                     invalid_clusters.add(cluster_id)
                     continue

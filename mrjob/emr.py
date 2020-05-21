@@ -2369,7 +2369,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             try:
                 fleets = list(_boto3_paginate(
                     'InstanceFleets', emr_client, 'list_instance_fleets',
-                    ClusterId=self.get_cluster_id()))
+                    ClusterId=cluster_id))
             except botocore.exceptions.ClientError:
                 # this shouldn't usually happen because whether a cluster
                 # uses instance fleets is in the pool hash

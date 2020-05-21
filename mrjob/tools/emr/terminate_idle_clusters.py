@@ -79,7 +79,7 @@ from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
 from mrjob.options import _alphabetize_actions
 from mrjob.options import _filter_by_role
-from mrjob.pool import _pool_hash_and_name
+from mrjob.pool import _pool_name
 from mrjob.util import strip_microseconds
 
 log = logging.getLogger(__name__)
@@ -181,7 +181,7 @@ def _maybe_terminate_clusters(dry_run=False,
         # need to get actual cluster to see tags
         cluster = emr_client.describe_cluster(ClusterId=cluster_id)['Cluster']
 
-        _, pool = _pool_hash_and_name(cluster)
+        pool = _pool_name(cluster)
 
         if is_pending:
             num_pending += 1

@@ -2124,13 +2124,15 @@ class JobWaitTestCase(MockBoto3TestCase):
         self.mock_cluster_ids = []
         self.sleep_counter = 0
 
-        def mock_attempt_to_lock_cluster(emr_client, cluster_id, job_key):
+        def mock_attempt_to_lock_cluster(emr_client, cluster_id, job_key,
+                                         **kwargs):
             return self.JOB_ID_LOCKS[cluster_id]
 
-        def mock_usable_clusters(*args, **kwargs):
-            return [
-                cluster_id for cluster_id in self.mock_cluster_ids
-                if cluster_id not in args[2]]
+        def mock_yield_clusters_to_join(*args, **kwargs):
+            for cluster_id in self.mock_cluster_ids:
+                when_cluster_described = time.time()
+                cluster = dict(Id=cluster_id)
+                yield (cluster, when_cluster_described)
 
         def mock_sleep(*args):
             self.sleep_counter += 1
@@ -2138,8 +2140,8 @@ class JobWaitTestCase(MockBoto3TestCase):
                 cluster_id = self.future_mock_cluster_ids.pop(0)
                 self.mock_cluster_ids.append(cluster_id)
 
-        self.start(patch.object(EMRJobRunner, '_usable_clusters',
-                                side_effect=mock_usable_clusters))
+        self.start(patch.object(EMRJobRunner, '_yield_clusters_to_join',
+                                side_effect=mock_yield_clusters_to_join))
         self.start(patch('mrjob.emr._attempt_to_lock_cluster',
                          side_effect=mock_attempt_to_lock_cluster))
         self.start(patch('mrjob.emr._attempt_to_unlock_cluster'))

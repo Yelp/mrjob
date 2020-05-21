@@ -26,7 +26,7 @@ import mrjob.emr
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
-from mrjob.pool import _pool_hash_and_name
+from mrjob.pool import _pool_name
 from mrjob.step import StepFailedException
 
 from tests.mock_boto3 import MockBoto3TestCase
@@ -143,10 +143,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
             # Make sure that the runner made a pooling-enabled cluster
             cluster = runner._describe_cluster()
-            jf_hash, jf_name = _pool_hash_and_name(cluster)
-
-            self.assertEqual(jf_hash, runner._pool_hash())
-            self.assertEqual(jf_name, runner._opts['pool_name'])
+            self.assertEqual(_pool_name(cluster), runner._opts['pool_name'])
 
             self.simulate_emr_progress(runner.get_cluster_id())
 

@@ -55,11 +55,9 @@ def _extract_tags(cluster):
     return {t['Key']: t['Value'] for t in cluster.get('Tags') or []}
 
 
-def _pool_hash_and_name(cluster):
-    """Return the hash and pool name for the given cluster, or
-    ``(None, None)`` if it isn't pooled."""
+def _pool_name(cluster):
     tags = _extract_tags(cluster)
-    return tags.get('__mrjob_pool_hash'), tags.get('__mrjob_pool_name')
+    return tags.get('__mrjob_pool_name')
 
 
 ### instance groups ###
@@ -555,9 +553,10 @@ def _parse_cluster_lock(lock):
     return job_key, expiry
 
 
-def _get_cluster_state_and_lock(emr_client, cluster_id):
-    cluster = emr_client.describe_cluster(
-        ClusterId=cluster_id)['Cluster']
+def _get_cluster_state_and_lock(emr_client, cluster_id, cluster=None):
+    if cluster is None:
+        cluster = emr_client.describe_cluster(
+            ClusterId=cluster_id)['Cluster']
 
     state = cluster['Status']['State']
     lock = _extract_tags(cluster).get(_POOL_LOCK_KEY)
@@ -565,15 +564,25 @@ def _get_cluster_state_and_lock(emr_client, cluster_id):
     return state, lock
 
 
-def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
-    """Attempt to lock the given pooled cluster using EMR tags."""
+def _attempt_to_lock_cluster(
+        emr_client, cluster_id, job_key,
+        cluster=None, when_cluster_described=None):
+    """Attempt to lock the given pooled cluster using EMR tags.
+
+    You may optionally include *cluster* (a cluster description) and
+    *when_cluster_described*, to save an API call to ``DescribeCluster``
+    """
     log.debug('Attempting to lock cluster %s for %.1f seconds' % (
         cluster_id, _CLUSTER_LOCK_SECS))
 
-    start = time.time()
+    if when_cluster_described is None:
+        start = time.time()
+    else:
+        start = when_cluster_described
 
     # check if there is a non-expired lock
-    state, lock = _get_cluster_state_and_lock(emr_client, cluster_id)
+    state, lock = _get_cluster_state_and_lock(
+        emr_client, cluster_id, cluster=cluster)
     if state != 'WAITING':
         log.info('  cluster is no longer waiting, now %s' % state)
         return False

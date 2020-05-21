@@ -22,7 +22,8 @@ from mrjob.pool import _attempt_to_unlock_cluster
 from mrjob.pool import _get_cluster_state_and_lock
 from mrjob.pool import _make_cluster_lock
 from mrjob.pool import _parse_cluster_lock
-from mrjob.pool import _pool_hash_and_name
+from mrjob.pool import _pool_hash
+from mrjob.pool import _pool_name
 from mrjob.pool import _POOL_LOCK_KEY
 
 from tests.mock_boto3 import MockBoto3TestCase
@@ -33,18 +34,16 @@ from tests.sandbox import BasicTestCase
 class PoolHashAndNameTestCase(BasicTestCase):
 
     def test_empty(self):
-        self.assertEqual(_pool_hash_and_name({}), (None, None))
+        self.assertEqual(_pool_hash({}), None)
 
     def test_pooled_cluster(self):
         cluster = dict(Tags=[
             dict(Key='__mrjob_pool_hash',
                  Value='0123456789abcdef0123456789abcdef'),
-            dict(Key='__mrjob_pool_name',
-                 Value='reflecting'),
         ])
 
-        self.assertEqual(_pool_hash_and_name(cluster),
-                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
+        self.assertEqual(_pool_hash(cluster),
+                         '0123456789abcdef0123456789abcdef')
 
     def test_pooled_cluster_with_other_tags(self):
         cluster = dict(Tags=[
@@ -55,8 +54,33 @@ class PoolHashAndNameTestCase(BasicTestCase):
             dict(Key='price', Value='$9.99'),
         ])
 
-        self.assertEqual(_pool_hash_and_name(cluster),
-                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
+        self.assertEqual(_pool_hash(cluster),
+                         '0123456789abcdef0123456789abcdef')
+
+
+class PoolNameTestCase(BasicTestCase):
+
+    def test_empty(self):
+        self.assertEqual(_pool_name({}), None)
+
+    def test_pooled_cluster(self):
+        cluster = dict(Tags=[
+            dict(Key='__mrjob_pool_name',
+                 Value='reflecting'),
+        ])
+
+        self.assertEqual(_pool_name(cluster), 'reflecting')
+
+    def test_pooled_cluster_with_other_tags(self):
+        cluster = dict(Tags=[
+            dict(Key='__mrjob_pool_hash',
+                 Value='0123456789abcdef0123456789abcdef'),
+            dict(Key='__mrjob_pool_name',
+                 Value='reflecting'),
+            dict(Key='price', Value='$9.99'),
+        ])
+
+        self.assertEqual(_pool_name(cluster), 'reflecting')
 
 
 class ParseClusterLockTestCase(BasicTestCase):

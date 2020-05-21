@@ -2347,7 +2347,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                  now).total_seconds() / 3600), 1.0)
             cpu_capacity = cluster['NormalizedInstanceHours'] / hours
 
-            cluster_id_to_sort_key[cluster['Id']] = cpu_capacity
+            cluster_id_to_sort_key[cluster_id] = cpu_capacity
 
         cluster_ids = sorted(
             cluster_id_to_sort_key,
@@ -2437,6 +2437,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if not matches:
             log.debug('  cluster %s: subnet mismatch' % cluster_id)
             return
+
+        return True
 
     def _find_cluster(self):
         """Find a cluster that can host this runner. Prefer clusters with more

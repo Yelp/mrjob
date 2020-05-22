@@ -455,7 +455,7 @@ class SparkHarnessOutputComparisonTestCase(
         with self.create_temp_counter_dir() as output_counter_dir:
             harness_job = self._harness_job(
                 MRCountingJob, input_bytes=input_bytes,
-                counter_output_dir='{}'.format(output_counter_dir)
+                counter_output_dir='file://{}'.format(output_counter_dir)
             )
             print('counter output dir', output_counter_dir)
             with harness_job.make_runner() as runner:
@@ -463,7 +463,7 @@ class SparkHarnessOutputComparisonTestCase(
 
                 harness_counters = json.loads(
                     self.spark_context.textFile(
-                        output_counter_dir
+                        'file://' + output_counter_dir
                     ).collect()[0])
 
         self.assertEqual(harness_counters, reference_counters)

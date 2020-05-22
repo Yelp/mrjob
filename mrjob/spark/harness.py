@@ -283,21 +283,18 @@ def main(cmd_line_args=None):
 
             # If the given path is an s3 path, use s3.parallelize,
             # otherwise just write them directly to the local dir
-            if args.counter_output_dir.startswith("s3://") or args.counter_output_dir.startswith("s3a://"):
-                sc.parallelize(
-                    [json.dumps(counters)],
-                    numSlices=1
-                ).saveAsTextFile(
-                    args.counter_output_dir
-                )
-            else:
+            sc.parallelize(
+                [json.dumps(counters)],
+                numSlices=1
+            ).saveAsTextFile(
+                args.counter_output_dir
+            )
+            if not (args.counter_output_dir.startswith("s3://") or args.counter_output_dir.startswith("s3a://")):
                 path = args.counter_output_dir + "/part-0000"
                 if not os.path.exists(args.counter_output_dir):
                     os.mkdir(args.counter_output_dir)
                 with open(path, 'w') as wb:
                     wb.write(str(json.dumps(counters)))
-                with open(path, 'rb') as rb:
-                    print(rb.read())
 
 def _text_file_with_path(sc, path):
     """Return an RDD that yields (path, line) for each line in the file.

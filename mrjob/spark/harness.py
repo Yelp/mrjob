@@ -20,6 +20,7 @@ from collections import defaultdict
 from importlib import import_module
 from itertools import chain
 
+from mrjob.parse import is_uri
 from mrjob.util import shlex_split
 from pyspark.accumulators import AccumulatorParam
 
@@ -289,7 +290,7 @@ def main(cmd_line_args=None):
             ).saveAsTextFile(
                 args.counter_output_dir
             )
-            if not (args.counter_output_dir.startswith("s3://") or args.counter_output_dir.startswith("s3a://")):
+            if not is_uri(args.counter_output_dir):
                 path = args.counter_output_dir + "/part-0000"
                 if not os.path.exists(args.counter_output_dir):
                     os.mkdir(args.counter_output_dir)

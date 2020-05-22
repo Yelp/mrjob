@@ -332,6 +332,7 @@ class SparkMRJobRunner(MRJobBinRunner):
             counter_file = self.fs.join(
                 self._counter_output_dir(step_num), 'part-*')
             counter_json = b''.join(self.fs.cat(counter_file))
+            log.info('counters %s' % counter_json)
             if counter_json.strip():
                 # json.loads() on Python 3.4/3.5 can't take bytes
                 counters = json.loads(to_unicode(counter_json))

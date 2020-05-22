@@ -457,7 +457,6 @@ class SparkHarnessOutputComparisonTestCase(
                 MRCountingJob, input_bytes=input_bytes,
                 counter_output_dir='file://{}'.format(output_counter_dir)
             )
-            print('counter output dir', output_counter_dir)
             with harness_job.make_runner() as runner:
                 runner.run()
 

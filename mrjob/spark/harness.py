@@ -290,7 +290,6 @@ def main(cmd_line_args=None):
             ).saveAsTextFile(
                 args.counter_output_dir
             )
-            print('counter output dir', args.counter_output_dir)
             if not is_uri(args.counter_output_dir):
                 path = args.counter_output_dir + "/part-0000"
                 if not os.path.exists(args.counter_output_dir):

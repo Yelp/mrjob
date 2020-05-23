@@ -1869,7 +1869,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
     # for multiple failover test
     MAX_EMR_CLIENTS = 200
 
-    def make_pooled_cluster(self, **kwargs):
+    def make_pooled_cluster(self, normalized_instance_hours=None, **kwargs):
         cluster_id = EMRJobRunner(**kwargs).make_persistent_cluster()
 
         # simulate that instances are provisioned
@@ -1878,6 +1878,14 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         mock_cluster['MasterPublicDnsName'] = 'mockmaster'
         for ig in mock_cluster['_InstanceGroups']:
             ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
+
+        # simulate NormalizedInstanceHours
+        if normalized_instance_hours is not None:
+            mock_cluster['NormalizedInstanceHours'] = normalized_instance_hours
+
+        # make sure ReadyDateTime is set (needed for sorting)
+        mock_cluster['Status']['Timeline']['ReadyDateTime'] = (
+            mock_cluster['Status']['Timeline']['CreationDateTime'])
 
         return cluster_id
 
@@ -1987,9 +1995,11 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
 
     def test_join_pooled_cluster_after_self_termination(self):
         # cluster 1 should be preferable
-        cluster1_id = self.make_pooled_cluster(num_core_instances=20)
+        cluster1_id = self.make_pooled_cluster(num_core_instances=20,
+                                               normalized_instance_hours=272)
         self.mock_emr_self_termination.add(cluster1_id)
-        cluster2_id = self.make_pooled_cluster(num_core_instances=1)
+        cluster2_id = self.make_pooled_cluster(num_core_instances=1,
+                                               normalized_instance_hours=32)
 
         job = MRTwoStepJob(['-r', 'emr', '--num-core-instances', '1'])
         job.sandbox()

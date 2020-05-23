@@ -76,7 +76,7 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
             all(isinstance(req_ig, dict) and 'InstanceRole' in req_ig
                 for req_ig in requested_igs)):
         log.debug('    bad instance_groups config')
-        return None
+        return False
 
     # a is a map from role to actual instance groups
     a = defaultdict(list)
@@ -94,16 +94,13 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
 
     if set(a) != set(r):
         log.debug("    missing instance group roles")
-        return None
+        return False
 
-    sort_keys = {}
-    for role in sorted(r):
-        sort_key = _igs_for_same_role_satisfy(a[role], r[role])
-        if not sort_key:  # doesn't satisfy
-            return None
-        sort_keys[role] = sort_key
+    for role in r:
+        if not _igs_for_same_role_satisfy(a[role], r[role]):
+            return False
 
-    return tuple(sort_keys.get(role) for role in ('CORE', 'TASK', 'MASTER'))
+    return True
 
 
 def _igs_for_same_role_satisfy(actual_igs, requested_ig):
@@ -112,15 +109,15 @@ def _igs_for_same_role_satisfy(actual_igs, requested_ig):
     """
     # bid price/on-demand
     if not all(_ig_satisfies_bid_price(ig, requested_ig) for ig in actual_igs):
-        return None
+        return False
 
     # memory
     if not all(_ig_satisfies_mem(ig, requested_ig) for ig in actual_igs):
-        return None
+        return False
 
     # EBS volumes
     if not all(_ebs_satisfies(ig, requested_ig) for ig in actual_igs):
-        return None
+        return False
 
     # CPU (this returns # of compute units or None)
     return _igs_satisfy_cpu(actual_igs, requested_ig)
@@ -181,17 +178,12 @@ def _ig_satisfies_mem(actual_ig, requested_ig):
 def _igs_satisfy_cpu(actual_igs, requested_ig):
     """Does the list of actual instance groups satisfy the CPU requirements
     of the requested instance group?
-
-    If so, return the number of compute units. Otherwise, return ``None``
-
-    If the requested instance type is unknown, just return the number
-    of actual instances of the same type.
     """
     requested_type = requested_ig.get('InstanceType')
     num_requested = requested_ig.get('InstanceCount')
 
     if not isinstance(num_requested, integer_types):
-        return None
+        return False
 
     # count number of compute units (cu)
     if requested_type in EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS:
@@ -213,10 +205,10 @@ def _igs_satisfy_cpu(actual_igs, requested_ig):
                         if ig['InstanceType'] == requested_type)
 
     if actual_cu >= requested_cu:
-        return actual_cu
+        return True
     else:
         log.debug('    not enough compute units')
-        return None
+        return False
 
 
 ### instance fleets ###
@@ -230,7 +222,7 @@ def _instance_fleets_satisfy(actual_fleets, req_fleets):
             all(isinstance(req_ft, dict) and 'InstanceFleetType' in req_ft
                 for req_ft in req_fleets)):
         log.debug('    bad instance_fleets config')
-        return None
+        return False
 
     # a is a map from role to actual instance fleet
     # (unlike with groups, there can never be more than one fleet per role)
@@ -248,16 +240,13 @@ def _instance_fleets_satisfy(actual_fleets, req_fleets):
 
     if set(a) != set(r):
         log.debug("    missing instance fleet roles")
-        return None
+        return False
 
-    sort_keys = {}
-    for role in sorted(r):
-        sort_key = _fleet_for_same_role_satisfies(a[role], r[role])
-        if not sort_key:  # doesn't satisfy
-            return None
-        sort_keys[role] = sort_key
+    for role in r:
+        if not _fleet_for_same_role_satisfies(a[role], r[role]):
+            return False
 
-    return tuple(sort_keys.get(role) for role in ('CORE', 'TASK', 'MASTER'))
+    return True
 
 
 def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
@@ -268,32 +257,32 @@ def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
         req_specs = {spec['InstanceType']: spec
                      for spec in req_fleet['InstanceTypeConfigs']}
     except (TypeError, KeyError):
-        return
+        return False
 
     if set(actual_specs) - set(req_specs):
         log.debug('    fleet may include wrong instance types')
-        return
+        return False
 
     if not all(_fleet_spec_satsifies(actual_specs[t], req_specs[t])
                for t in actual_specs):
-        return
+        return False
 
     # capacity
     actual_on_demand = actual_fleet.get('ProvisionedOnDemandCapacity', 0)
     req_on_demand = req_fleet.get('TargetOnDemandCapacity', 0)
 
     if not isinstance(req_on_demand, integer_types):
-        return
+        return False
 
     if req_on_demand > actual_on_demand:
         log.debug('    not enough on-demand capacity')
-        return
+        return False
 
     actual_spot = actual_fleet.get('ProvisionedSpotCapacity', 0)
     req_spot = req_fleet.get('TargetSpotCapacity', 0)
 
     if not isinstance(req_spot, integer_types):
-        return
+        return False
 
     # allow extra on-demand instances to serve as spot instances
     if req_spot > actual_spot + (actual_on_demand - req_on_demand):
@@ -304,15 +293,14 @@ def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
     if _get_timeout_action(actual_fleet) == 'TERMINATE_CLUSTER':
         if _get_timeout_action(req_fleet) != 'TERMINATE_CLUSTER':
             log.debug('    self-terminating fleet not requested')
-            return
+            return False
 
         if (_get_timeout_duration(actual_fleet) <
                 _get_timeout_duration(req_fleet)):
             log.debug('    fleet may self-terminate prematurely')
-            return
+            return False
 
-    # sort by total capacity, with on-demand as a tie-breaker
-    return (actual_on_demand + actual_spot, actual_on_demand)
+    return True
 
 
 def _get_timeout_action(fleet):
@@ -342,10 +330,10 @@ def _fleet_spec_satsifies(actual_spec, req_spec):
     if (actual_spec.get('WeightedCapacity', 1) !=
             req_spec.get('WeightedCapacity', 1)):
         log.debug('    different weighted capacity for same instance type')
-        return
+        return False
 
     if not _ebs_satisfies(actual_spec, req_spec):
-        return
+        return False
 
     # bid price is the max, don't worry about it
     if actual_spec.get('BidPriceAsPercentageOfOnDemandPrice', 100) >= 100:
@@ -357,31 +345,31 @@ def _fleet_spec_satsifies(actual_spec, req_spec):
         actual_bid_price = actual_spec.get('BidPrice')
         if actual_bid_price is None:
             log.debug('    no bid price specified')
-            return
+            return False
 
         try:
             if not float(actual_bid_price) >= float(req_bid_price):
                 log.debug('    bid price too low')
-                return
+                return False
         except TypeError:
             log.debug('    non-numeric bid price')
-            return
+            return False
 
     # relative bid price
     req_bid_percent = req_spec.get('BidPriceAsPercentageOfOnDemandPrice')
     if not isinstance(req_spec, (integer_types, float)):
-        return
+        return False
 
     if req_bid_percent:
         actual_bid_percent = actual_spec.get(
             'BidPriceAsPercentageOfOnDemandPrice')
         if actual_bid_percent is None:
             log.debug('    no bid price as % of on-demand price')
-            return
+            return False
 
         if req_bid_percent > actual_bid_percent:
             log.debug('    bid price as % of on-demand price too low')
-            return
+            return False
 
     return True
 

@@ -32,7 +32,6 @@ from mrjob.step import StepFailedException
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import patch
 from tests.sandbox import mrjob_conf_patcher

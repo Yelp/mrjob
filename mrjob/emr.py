@@ -2345,7 +2345,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             when_ready = cluster['Status']['Timeline'].get('ReadyDateTime')
 
             if when_ready:
-                hours = max(ceil((when_ready - now).total_seconds() / 3600),
+                hours = max(ceil((now - when_ready).total_seconds() / 3600),
                             1.0)
                 cpu_capacity = cluster['NormalizedInstanceHours'] / hours
             else:

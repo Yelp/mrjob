@@ -66,7 +66,9 @@ class PoolWaitMinutesOptionTestCase(MockBoto3TestCase):
 class PoolMatchingTestCase(MockBoto3TestCase):
 
     def make_pooled_cluster(self, name=None, minutes_ago=0,
-                            provision=True, **kwargs):
+                            provision=True,
+                            normalized_instance_hours=None,
+                            **kwargs):
         """Returns ``(runner, cluster_id)``. Set minutes_ago to set
         ``cluster.startdatetime`` to seconds before
         ``datetime.datetime.now()``."""
@@ -78,9 +80,17 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
         # poor man's version of simulating cluster progress
         mock_cluster['Status']['State'] = 'WAITING'
+        # minutes_ago is only used in one test, which relies on ReadyDateTime,
+        # so setting CreationDateTime and ReadyDateTime both
         mock_cluster['Status']['Timeline']['CreationDateTime'] = (
             _boto3_now() - timedelta(minutes=minutes_ago))
+        mock_cluster['Status']['Timeline']['ReadyDateTime'] = (
+            _boto3_now() - timedelta(minutes=minutes_ago))
         mock_cluster['MasterPublicDnsName'] = 'mockmaster'
+
+        # set normalized_instance_hours if requested
+        if normalized_instance_hours is not None:
+            mock_cluster['NormalizedInstanceHours'] = normalized_instance_hours
 
         # instance fleets cares about provisioned instances
         if provision:
@@ -1648,13 +1658,34 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertEqual(runner_1._find_cluster(), cluster_id)
         self.assertEqual(runner_2._find_cluster(), None)
 
-    def test_sorting_by_cpu_hours(self):
-        _, cluster_id_1 = self.make_pooled_cluster('pool1',
-                                                   minutes_ago=40,
-                                                   num_core_instances=2)
-        _, cluster_id_2 = self.make_pooled_cluster('pool1',
-                                                   minutes_ago=20,
-                                                   num_core_instances=1)
+    def test_sorting_by_cpu_capacity(self):
+        _, cluster_id_1 = self.make_pooled_cluster(
+            'pool1',
+            num_core_instances=2,
+            normalized_instance_hours=48)
+        _, cluster_id_2 = self.make_pooled_cluster(
+            'pool1',
+            num_core_instances=1,
+            normalized_instance_hours=32)
+
+        runner_1 = self.make_simple_runner(
+            'pool1', '--num-core-instances', '1')
+        runner_2 = self.make_simple_runner(
+            'pool1', '--num-core-instances', '1')
+
+        self.assertEqual(runner_1._find_cluster(), cluster_id_1)
+        self.assertEqual(runner_2._find_cluster(), cluster_id_2)
+
+    def test_sorting_by_cpu_capacity_divides_by_number_of_hours(self):
+        _, cluster_id_1 = self.make_pooled_cluster(
+            'pool1',
+            num_core_instances=2,
+            normalized_instance_hours=48)
+        _, cluster_id_2 = self.make_pooled_cluster(
+            'pool1',
+            num_core_instances=1,
+            minutes_ago=90,
+            normalized_instance_hours=64)
 
         runner_1 = self.make_simple_runner(
             'pool1', '--num-core-instances', '1')

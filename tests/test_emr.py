@@ -27,6 +27,8 @@ import posixpath
 import signal
 import socket
 import time
+from datetime import datetime
+from datetime import timedelta
 from io import BytesIO
 from shutil import make_archive
 
@@ -2122,7 +2124,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         super(JobWaitTestCase, self).setUp()
         self.future_mock_cluster_ids = []
         self.mock_cluster_ids = []
-        self.sleep_counter = 0
+        self.time_slept = 0
 
         def mock_attempt_to_lock_cluster(emr_client, cluster_id, job_key,
                                          **kwargs):
@@ -2134,19 +2136,26 @@ class JobWaitTestCase(MockBoto3TestCase):
                 cluster = dict(Id=cluster_id)
                 yield (cluster, when_cluster_described)
 
-        def mock_sleep(*args):
-            self.sleep_counter += 1
+        def mock_sleep(time):
+            self.time_slept += time
             if self.future_mock_cluster_ids:
                 cluster_id = self.future_mock_cluster_ids.pop(0)
                 self.mock_cluster_ids.append(cluster_id)
+
+        now_func = datetime.now
+
+        def mock_now():
+            return now_func() + timedelta(seconds=self.time_slept)
 
         self.start(patch.object(EMRJobRunner, '_yield_clusters_to_join',
                                 side_effect=mock_yield_clusters_to_join))
         self.start(patch('mrjob.emr._attempt_to_lock_cluster',
                          side_effect=mock_attempt_to_lock_cluster))
         self.start(patch('mrjob.emr._attempt_to_unlock_cluster'))
-        self.start(patch('time.sleep',
-                         side_effect=mock_sleep))
+        self.mock_sleep = self.start(patch('time.sleep',
+                                      side_effect=mock_sleep))
+        mock_datetime = self.start(patch('mrjob.emr.datetime'))
+        mock_datetime.now = mock_now
 
     def tearDown(self):
         super(JobWaitTestCase, self).tearDown()
@@ -2160,8 +2169,6 @@ class JobWaitTestCase(MockBoto3TestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
-        # sleep once after creating temp bucket
-        self.assertEqual(self.sleep_counter, 1)
 
     def test_no_waiting_for_job_pool_success(self):
         self.mock_cluster_ids = ['j-fail-lock']
@@ -2169,6 +2176,8 @@ class JobWaitTestCase(MockBoto3TestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
+        # sleep once after creating temp bucket
+        self.assertEqual(self.mock_sleep.call_count, 1)
 
     def test_acquire_lock_on_first_attempt(self):
         self.mock_cluster_ids = ['j-successful-lock']
@@ -2176,7 +2185,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
-        self.assertEqual(self.sleep_counter, 1)
+        self.assertEqual(self.mock_sleep.call_count, 1)
 
     def test_sleep_then_acquire_lock(self):
         self.mock_cluster_ids = ['j-fail-lock']
@@ -2185,16 +2194,16 @@ class JobWaitTestCase(MockBoto3TestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
-        self.assertEqual(self.sleep_counter, 1)
+        self.assertEqual(self.mock_sleep.call_count, 1)
 
     def test_timeout_waiting_for_cluster(self):
         self.mock_cluster_ids = ['j-fail-lock']
         self.future_mock_cluster_ids.append('j-epic-fail-lock')
-        runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
+        runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=2)
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
-        self.assertEqual(self.sleep_counter, 3)
+        self.assertEqual(self.mock_sleep.call_count, 4)
 
     def test_try_all_clusters_before_waiting(self):
         # regression test for #2164
@@ -2205,7 +2214,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
-        self.assertEqual(self.sleep_counter, 1)
+        self.assertEqual(self.mock_sleep.call_count, 1)
 
 
 class BuildStreamingStepTestCase(MockBoto3TestCase):

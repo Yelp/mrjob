@@ -2453,8 +2453,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        max_wait_time = self._opts['pool_wait_minutes']
-        end_time = datetime.now() + timedelta(minutes=max_wait_time)
+        end_time = datetime.now() + timedelta(
+            minutes=self._opts['pool_wait_minutes'])
 
         log.info('Attempting to find an available cluster...')
         while True:
@@ -2472,7 +2472,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     return cluster_id
 
             # if we're out of time, give up
-            if datetime.now() + timedelta(_POOLING_SLEEP_INTERVAL) > end_time:
+            if (datetime.now() +
+                    timedelta(seconds=_POOLING_SLEEP_INTERVAL)) > end_time:
                 break
 
             log.info('No clusters available in pool %r. Checking again'

@@ -301,7 +301,6 @@ def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
                           dry_run=False, quiet=False):
     emr_client = runner.make_emr_client()
 
-    did_terminate = False
     if not dry_run:
         emr_client.terminate_job_flows(JobFlowIds=[cluster_id])
 

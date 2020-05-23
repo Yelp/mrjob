@@ -26,7 +26,6 @@ import os.path
 import posixpath
 import signal
 import socket
-import time
 from io import BytesIO
 from shutil import make_archive
 

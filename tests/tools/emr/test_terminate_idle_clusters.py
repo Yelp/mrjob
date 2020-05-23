@@ -20,7 +20,6 @@ import sys
 from datetime import timedelta
 
 from mrjob.aws import _boto3_now
-from mrjob.fs.s3 import S3Filesystem
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
 from mrjob.tools.emr.terminate_idle_clusters import _maybe_terminate_clusters
@@ -456,23 +455,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
     def test_dry_run_does_nothing(self):
         self.maybe_terminate_quietly(max_mins_idle=0.6, dry_run=True)
-
-        unlocked_ids = [
-            'j-BOOTSTRAPPING',
-            'j-CURRENTLY_RUNNING',
-            'j-CUSTOM_DONE_AND_IDLE',
-            'j-IDLE_AND_PROTECTED',
-            'j-DEBUG_ONLY',
-            'j-DONE',
-            'j-DONE_AND_IDLE',
-            'j-DONE_AND_IDLE_4_X',
-            'j-EMPTY',
-            'j-HADOOP_DEBUGGING',
-            'j-IDLE_AND_FAILED',
-            'j-IDLE_BUT_INCOMPLETE_STEPS',
-            'j-PENDING_BUT_IDLE',
-            'j-POOLED'
-        ]
 
         self.assertEqual(self.ids_of_terminated_clusters(), [])
 

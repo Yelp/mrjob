@@ -2342,10 +2342,16 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 log.debug('  cluster %s: wrong name suffix' % cluster_id)
                 continue
 
-            hours = max(ceil(
-                (cluster['Status']['Timeline']['CreationDateTime'] -
-                 now).total_seconds() / 3600), 1.0)
-            cpu_capacity = cluster['NormalizedInstanceHours'] / hours
+            when_ready = cluster['Status']['Timeline'].get('ReadyDateTime')
+
+            if when_ready:
+                hours = max(ceil((when_ready - now).total_seconds() / 3600),
+                            1.0)
+                cpu_capacity = cluster['NormalizedInstanceHours'] / hours
+            else:
+                # this probably won't happen, since we only inspect clusters
+                # in the WAITING state
+                cpu_capacity = 0
 
             cluster_id_to_sort_key[cluster_id] = cpu_capacity
 

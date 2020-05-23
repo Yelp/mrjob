@@ -17,6 +17,7 @@ import sys
 import json
 from argparse import ArgumentParser
 from collections import defaultdict
+from glob import glob
 from importlib import import_module
 from itertools import chain
 
@@ -290,10 +291,13 @@ def main(cmd_line_args=None):
             ).saveAsTextFile(
                 args.counter_output_dir
             )
-            if not is_uri(args.counter_output_dir):
+            print('find files', glob(args.counter_output_dir+'/*'))
+            print('find part-files files', glob(args.counter_output_dir+'/part-*'))
+            if not is_uri(args.counter_output_dir) and not glob(args.counter_output_dir+'/part-*'):
                 path = args.counter_output_dir + "/part-0000"
                 if not os.path.exists(args.counter_output_dir):
                     os.mkdir(args.counter_output_dir)
+                print('writing counters', counters)
                 with open(path, 'w') as wb:
                     wb.write(str(json.dumps(counters)))
 

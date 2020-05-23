@@ -293,6 +293,7 @@ def main(cmd_line_args=None):
             )
             print('find files', glob(args.counter_output_dir+'/*'))
             print('find part-files files', glob(args.counter_output_dir+'/part-*'))
+            # Use regular python buildin file writer if the part-* file is not created
             if not is_uri(args.counter_output_dir) and not glob(args.counter_output_dir+'/part-*'):
                 path = args.counter_output_dir + "/part-0000"
                 if not os.path.exists(args.counter_output_dir):

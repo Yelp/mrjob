@@ -25,7 +25,6 @@ from mrjob.parse import is_uri
 from mrjob.util import shlex_split
 from pyspark.accumulators import AccumulatorParam
 
-
 # tuples of (args, kwargs) for ArgumentParser.add_argument()
 #
 # TODO: this is shared code with mr_spark_harness.py, which started out
@@ -292,11 +291,10 @@ def main(cmd_line_args=None):
                 args.counter_output_dir
             )
             # Use regular python buildin file writer if the part-* file is not created
-            if not is_uri(args.counter_output_dir) and not glob(args.counter_output_dir + "/path-*"):
+            if not is_uri(args.counter_output_dir) and not glob(args.counter_output_dir + "/part-*"):
                 path = args.counter_output_dir + "/part-0000"
                 if not os.path.exists(args.counter_output_dir):
                     os.mkdir(args.counter_output_dir)
-                print('writing counters', counters)
                 with open(path, 'w') as wb:
                     wb.write(str(json.dumps(counters)))
 

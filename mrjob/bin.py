@@ -845,7 +845,6 @@ class MRJobBinRunner(MRJobRunner):
         else:
             # we have PTYs
             if pid == 0:  # we are the child process
-                log.debug('Invoking spark-submit via PTY')
                 try:
                     os.execvpe(spark_submit_args[0], spark_submit_args, env)
                     # now this process is no longer Python
@@ -857,6 +856,7 @@ class MRJobBinRunner(MRJobRunner):
                     # if we get some other exception, still exit hard
                     os._exit(-1)
             else:
+                log.debug('Invoking spark-submit via PTY')
                 with os.fdopen(master_fd, 'rb') as master:
                     step_interpretation = (
                         _parse_spark_log(

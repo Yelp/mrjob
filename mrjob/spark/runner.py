@@ -334,14 +334,7 @@ class SparkMRJobRunner(MRJobBinRunner):
             counter_json = b''.join(self.fs.cat(counter_file))
             if counter_json.strip():
                 # json.loads() on Python 3.4/3.5 can't take bytes
-                try:
-                    counters = json.loads(to_unicode(counter_json))
-                except Exception as e:
-                    try:
-                        counters = json.loads(counter_json)
-                    except Exception as e:
-                        counters = counter_json
-
+                counters = json.loads(to_unicode(counter_json))
 
         if isinstance(counters, list):
             self._counters.extend(counters)

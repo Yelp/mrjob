@@ -120,8 +120,9 @@ class SparkHarnessOutputComparisonBaseTestCase(
             path = path[:-1]
         return path
 
-    def _reference_job(self, job_class, input_bytes=b'', input_paths=(),
-                       runner_alias='inline', job_args=[]):
+    def _reference_job(
+            self, job_class, input_bytes=b'', input_paths=(),
+            runner_alias='inline', job_args=[]):
 
         args = ['-r', runner_alias] + list(job_args) + list(input_paths)
 
@@ -130,13 +131,14 @@ class SparkHarnessOutputComparisonBaseTestCase(
 
         return reference_job
 
-    def _harness_job(self, job_class, input_bytes=b'', input_paths=(),
-                     runner_alias='inline', compression_codec=None,
-                     job_args=None, spark_conf=None, first_step_num=None,
-                     last_step_num=None, counter_output_dir=None,
-                     num_reducers=None, max_output_files=None,
-                     emulate_map_input_file=False,
-                     skip_internal_protocol=False):
+    def _harness_job(
+            self, job_class, input_bytes=b'', input_paths=(),
+            runner_alias='inline', compression_codec=None,
+            job_args=None, spark_conf=None, first_step_num=None,
+            last_step_num=None, counter_output_dir=None,
+            num_reducers=None, max_output_files=None,
+            emulate_map_input_file=False,
+            skip_internal_protocol=False):
         from tests.mr_spark_harness import MRSparkHarness
 
         job_class_path = '%s.%s' % (job_class.__module__, job_class.__name__)
@@ -262,16 +264,18 @@ class SparkHarnessOutputComparisonTestCase(
 
             # the streaming part is just an identity mapper, but it converts
             # lines to pairs of JSON
-            self.assertEqual(set(to_lines(runner.cat_output())),
-                             {b'null\t"foo"\n', b'null\t"bar"\n'})
+            self.assertEqual(
+                set(to_lines(runner.cat_output())),
+                {b'null\t"foo"\n', b'null\t"bar"\n'})
 
     def test_range_of_steps(self):
         # check for off-by-one errors, etc.
         input_bytes = b'"three"\t3\n"five"\t5'
 
         # sanity-check
-        self._assert_output_matches(MRDoubler, input_bytes=input_bytes,
-                                    job_args=['-n', '5'])
+        self._assert_output_matches(
+            MRDoubler, input_bytes=input_bytes,
+            job_args=['-n', '5'])
 
         # just run two of the five steps
         steps_2_and_3_job = self._harness_job(
@@ -302,8 +306,9 @@ class SparkHarnessOutputComparisonTestCase(
             self.assertTrue(runner.fs.exists(
                 join(runner.get_output_dir(), 'part*.gz')))
 
-            self.assertEqual(dict(job.parse_output(runner.cat_output())),
-                             dict(fa=1, la=8))
+            self.assertEqual(
+                dict(job.parse_output(runner.cat_output())),
+                dict(fa=1, la=8))
 
     def test_sort_values(self):
         input_bytes = (
@@ -315,16 +320,18 @@ class SparkHarnessOutputComparisonTestCase(
         input_bytes = (
             b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n')
 
-        job = self._harness_job(MRSortAndGroupReversedText,
-                                input_bytes=input_bytes)
+        job = self._harness_job(
+            MRSortAndGroupReversedText,
+            input_bytes=input_bytes)
 
         with job.make_runner() as runner:
             runner.run()
 
             self.assertEqual(
                 dict(job.parse_output(runner.cat_output())),
-                dict(a=['artichoke', 'alligator', 'actuary'],
-                     b=['bowling', 'balloon', 'baby']))
+                dict(
+                    a=['artichoke', 'alligator', 'actuary'],
+                    b=['bowling', 'balloon', 'baby']))
 
     def test_passthru_args(self):
         input_bytes = b'\n'.join([
@@ -353,8 +360,9 @@ class SparkHarnessOutputComparisonTestCase(
     def test_combiner_that_yields_two_values(self):
         input_bytes = b'one two three one two three one two three'
 
-        job = self._harness_job(MRWordFreqCountCombinerYieldsTwo,
-                                input_bytes=input_bytes)
+        job = self._harness_job(
+            MRWordFreqCountCombinerYieldsTwo,
+            input_bytes=input_bytes)
 
         # Given that the combiner for this job yields the count and 1000 for
         # each word and the Spark harness' combiner helper stops running
@@ -376,8 +384,9 @@ class SparkHarnessOutputComparisonTestCase(
     def test_combiner_that_yields_zero_values(self):
         input_bytes = b'a b c\na b c\na b c\na b c'
 
-        job = self._harness_job(MRWordFreqCountCombinerYieldsZero,
-                                input_bytes=input_bytes)
+        job = self._harness_job(
+            MRWordFreqCountCombinerYieldsZero,
+            input_bytes=input_bytes)
 
         with job.make_runner() as runner:
             runner.run()
@@ -408,8 +417,9 @@ class SparkHarnessOutputComparisonTestCase(
         # same as above, but we have to skip combiner because of its pre-filter
         input_bytes = b'happy\t5\nsad\t3\nhappy\t2\nsad\t-3\n'
 
-        job = self._harness_job(MRSumValuesByWordWithCombinerPreFilter,
-                                input_bytes=input_bytes)
+        job = self._harness_job(
+            MRSumValuesByWordWithCombinerPreFilter,
+            input_bytes=input_bytes)
         with job.make_runner() as runner:
             runner.run()
             self.assertEqual(
@@ -420,8 +430,9 @@ class SparkHarnessOutputComparisonTestCase(
     def test_skip_combiner_if_cant_init_job(self):
         input_bytes = b'happy\t5\nsad\t3\nhappy\t2\nsad\t-3\n'
 
-        job = self._harness_job(MRSumValuesByWordWithNoCombinerJobs,
-                                input_bytes=input_bytes)
+        job = self._harness_job(
+            MRSumValuesByWordWithNoCombinerJobs,
+            input_bytes=input_bytes)
         with job.make_runner() as runner:
             runner.run()
             self.assertEqual(
@@ -467,6 +478,32 @@ class SparkHarnessOutputComparisonTestCase(
 
         self.assertEqual(harness_counters, reference_counters)
 
+    def test_increment_counter_non_uri_path(self):
+        input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
+        reference_job = self._reference_job(
+            MRCountingJob, input_bytes=input_bytes)
+
+        with reference_job.make_runner() as runner:
+            runner.run()
+            reference_counters = runner.counters()
+
+        with self.create_temp_counter_dir() as output_counter_dir:
+            harness_job = self._harness_job(
+                MRCountingJob, input_bytes=input_bytes,
+                counter_output_dir='{}'.format(output_counter_dir)
+            )
+            with harness_job.make_runner() as runner:
+                runner.run()
+                print(listdir(output_counter_dir))
+                path = join(output_counter_dir, "part-00000")
+                with open(path, 'r') as rb:
+                    counters = rb.read()
+                print('prince counters', counters)
+
+                harness_counters = json.loads(counters)
+
+        self.assertEqual(harness_counters, reference_counters)
+
     def test_job_with_no_mapper_in_second_step(self):
         # mini-regression test for not passing step_num to step.description()
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
@@ -480,21 +517,24 @@ class SkipInternalProtocolTestCase(
     def test_basic_job(self):
         input_bytes = b'one fish\ntwo fish\nred fish\nblue fish\n'
 
-        self._assert_output_matches(MRWordFreqCount, input_bytes=input_bytes,
-                                    skip_internal_protocol=True)
+        self._assert_output_matches(
+            MRWordFreqCount, input_bytes=input_bytes,
+            skip_internal_protocol=True)
 
     def test_two_step_job(self):
         input_bytes = b'foo\nbar\n'
 
-        self._assert_output_matches(MRTwoStepJob, input_bytes=input_bytes,
-                                    skip_internal_protocol=True)
+        self._assert_output_matches(
+            MRTwoStepJob, input_bytes=input_bytes,
+            skip_internal_protocol=True)
 
     def test_sort_values(self):
         input_bytes = (
             b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n')
 
-        self._assert_output_matches(MRSortAndGroup, input_bytes=input_bytes,
-                                    skip_internal_protocol=True)
+        self._assert_output_matches(
+            MRSortAndGroup, input_bytes=input_bytes,
+            skip_internal_protocol=True)
 
     def test_sort_values_sorts_unencoded_values(self):
         # compare to test_sort_values_sorts_encoded_values(), above.
@@ -503,17 +543,19 @@ class SkipInternalProtocolTestCase(
         input_bytes = (
             b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n')
 
-        job = self._harness_job(MRSortAndGroupReversedText,
-                                input_bytes=input_bytes,
-                                skip_internal_protocol=True)
+        job = self._harness_job(
+            MRSortAndGroupReversedText,
+            input_bytes=input_bytes,
+            skip_internal_protocol=True)
 
         with job.make_runner() as runner:
             runner.run()
 
             self.assertEqual(
                 dict(job.parse_output(runner.cat_output())),
-                dict(a=['actuary', 'alligator', 'artichoke'],
-                     b=['baby', 'balloon', 'bowling']))
+                dict(
+                    a=['actuary', 'alligator', 'artichoke'],
+                    b=['baby', 'balloon', 'bowling']))
 
 
 class SparkConfigureReducerTestCase(SparkHarnessOutputComparisonBaseTestCase):

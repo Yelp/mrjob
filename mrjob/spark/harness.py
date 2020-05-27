@@ -17,9 +17,11 @@ import sys
 import json
 from argparse import ArgumentParser
 from collections import defaultdict
+from glob import glob
 from importlib import import_module
 from itertools import chain
 
+from mrjob.parse import is_uri
 from mrjob.util import shlex_split
 from pyspark.accumulators import AccumulatorParam
 
@@ -281,6 +283,8 @@ def main(cmd_line_args=None):
         if args.counter_output_dir is not None:
             counters = [ca.value for ca in counter_accumulators]
 
+            # If the given path is an s3 path, use s3.parallelize,
+            # otherwise just write them directly to the local dir
             sc.parallelize(
                 [json.dumps(counters)],
                 numSlices=1
@@ -288,6 +292,13 @@ def main(cmd_line_args=None):
                 args.counter_output_dir
             )
 
+            # Use regular python buildin file writer if the part-* file is not created
+            if not is_uri(args.counter_output_dir) and not glob(args.counter_output_dir + "/part-*"):
+		path = args.counter_output_dir + "/part-0000"
+		if not os.path.exists(args.counter_output_dir):
+                    os.mkdir(args.counter_output_dir)
+                with open(path, 'w') as wb:
+                    wb.write(str(json.dumps(counters)))
 
 def _text_file_with_path(sc, path):
     """Return an RDD that yields (path, line) for each line in the file.

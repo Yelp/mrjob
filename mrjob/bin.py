@@ -710,7 +710,7 @@ class MRJobBinRunner(MRJobRunner):
 
         # save return code, turn off echo
         lines.append('# if script fails, print input URI before exiting')
-        lines.append('{ RETURNCODE=$?; set +x; } &> /dev/null')
+        lines.append('{ RETURNCODE=$?; set +x; } 1>&2 2>/dev/null')
         lines.append('')
 
         lines.append('{')

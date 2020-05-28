@@ -2522,17 +2522,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     ': ' if cluster_id_list else '',
                     ', '.join(reversed(cluster_id_list))))
 
-            # TODO: try locking every cluster before asking for more (#2164)
             if cluster_id_list:
-                cluster_id = cluster_id_list[-1]
+                for cluster_id in reversed(cluster_id_list):
+                    lock_acquired = _attempt_to_lock_cluster(
+                        emr_client, cluster_id, self._job_key)
 
-                lock_acquired = _attempt_to_lock_cluster(
-                    emr_client, cluster_id, self._job_key)
-
-                if lock_acquired:
-                    return cluster_id
-                else:
-                    locked_clusters.add(cluster_id)
+                    if lock_acquired:
+                        return cluster_id
+                    else:
+                        locked_clusters.add(cluster_id)
             elif max_wait_time == 0:
                 return None
             else:

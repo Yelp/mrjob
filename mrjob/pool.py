@@ -555,11 +555,14 @@ def _parse_cluster_lock(lock):
     return job_key, expiry
 
 
-def _get_cluster_lock(emr_client, cluster_id):
+def _get_cluster_state_and_lock(emr_client, cluster_id):
     cluster = emr_client.describe_cluster(
         ClusterId=cluster_id)['Cluster']
 
-    return _extract_tags(cluster).get(_POOL_LOCK_KEY)
+    state = cluster['Status']['State']
+    lock = _extract_tags(cluster).get(_POOL_LOCK_KEY)
+
+    return state, lock
 
 
 def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
@@ -570,7 +573,10 @@ def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
     start = time.time()
 
     # check if there is a non-expired lock
-    lock = _get_cluster_lock(emr_client, cluster_id)
+    state, lock = _get_cluster_state_and_lock(emr_client, cluster_id)
+    if state != 'WAITING':
+        log.info('  cluster is no longer waiting, now %s' % state)
+        return False
 
     if lock:
         expiry = None
@@ -604,7 +610,12 @@ def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
     time.sleep(_WAIT_AFTER_ADD_TAG)
 
     # check if our lock is still there
-    lock = _get_cluster_lock(emr_client, cluster_id)
+    state, lock = _get_cluster_state_and_lock(emr_client, cluster_id)
+
+    # this could happen if the cluster is TERMINATING, for instance
+    if state != 'WAITING':
+        log.info('  cluster is no longer waiting, now %s' % state)
+        return False
 
     if lock is None:
         log.info('  lock was removed')

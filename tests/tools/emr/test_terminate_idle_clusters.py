@@ -20,7 +20,7 @@ import sys
 from datetime import timedelta
 
 from mrjob.aws import _boto3_now
-from mrjob.pool import _pool_hash_and_name
+from mrjob.pool import _pool_name
 from mrjob.py2 import StringIO
 from mrjob.tools.emr.terminate_idle_clusters import _maybe_terminate_clusters
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_bootstrapping
@@ -371,7 +371,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
             done=False,
             has_pending_steps=False,
             idle_for=timedelta(0),
-            pool_hash=None,
             pool_name=None,
             running=False):
 
@@ -385,8 +384,8 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
                          _cluster_has_pending_steps(mock_cluster['_Steps']))
         self.assertEqual(idle_for,
                          self.time_mock_cluster_idle(mock_cluster))
-        self.assertEqual((pool_hash, pool_name),
-                         _pool_hash_and_name(mock_cluster))
+        self.assertEqual(pool_name,
+                         _pool_name(mock_cluster))
         self.assertEqual(running,
                          _is_cluster_running(mock_cluster['_Steps']))
 
@@ -442,7 +441,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-POOLED'],
             idle_for=timedelta(minutes=50),
-            pool_hash='0123456789abcdef0123456789abcdef',
             pool_name='reflecting',
         )
 

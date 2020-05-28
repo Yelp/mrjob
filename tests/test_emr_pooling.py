@@ -26,7 +26,7 @@ import mrjob.emr
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
-from mrjob.pool import _pool_hash_and_name
+from mrjob.pool import _pool_name
 from mrjob.step import StepFailedException
 
 from tests.mock_boto3 import MockBoto3TestCase
@@ -65,7 +65,9 @@ class PoolWaitMinutesOptionTestCase(MockBoto3TestCase):
 class PoolMatchingTestCase(MockBoto3TestCase):
 
     def make_pooled_cluster(self, name=None, minutes_ago=0,
-                            provision=True, **kwargs):
+                            provision=True,
+                            normalized_instance_hours=None,
+                            **kwargs):
         """Returns ``(runner, cluster_id)``. Set minutes_ago to set
         ``cluster.startdatetime`` to seconds before
         ``datetime.datetime.now()``."""
@@ -77,9 +79,17 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
         # poor man's version of simulating cluster progress
         mock_cluster['Status']['State'] = 'WAITING'
+        # minutes_ago is only used in one test, which relies on ReadyDateTime,
+        # so setting CreationDateTime and ReadyDateTime both
         mock_cluster['Status']['Timeline']['CreationDateTime'] = (
             _boto3_now() - timedelta(minutes=minutes_ago))
+        mock_cluster['Status']['Timeline']['ReadyDateTime'] = (
+            _boto3_now() - timedelta(minutes=minutes_ago))
         mock_cluster['MasterPublicDnsName'] = 'mockmaster'
+
+        # set normalized_instance_hours if requested
+        if normalized_instance_hours is not None:
+            mock_cluster['NormalizedInstanceHours'] = normalized_instance_hours
 
         # instance fleets cares about provisioned instances
         if provision:
@@ -142,10 +152,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
             # Make sure that the runner made a pooling-enabled cluster
             cluster = runner._describe_cluster()
-            jf_hash, jf_name = _pool_hash_and_name(cluster)
-
-            self.assertEqual(jf_hash, runner._pool_hash())
-            self.assertEqual(jf_name, runner._opts['pool_name'])
+            self.assertEqual(_pool_name(cluster), runner._opts['pool_name'])
 
             self.simulate_emr_progress(runner.get_cluster_id())
 
@@ -174,25 +181,27 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--image-version', '2.2'])
 
     def test_pooling_with_image_version(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.0')
+        _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--image-version', '2.0'])
+            '--image-version', '2.4.9'])
 
-    def test_pooling_with_image_version_prefix_major_minor(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
+    def test_pooling_requires_exact_image_version_match(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--image-version', '2.4'])
+
+    def test_partial_image_version_okay(self):
+        # the 2.x series is over, so "2.4" is always the same
+        # patch version anyhow
+        _, cluster_id = self.make_pooled_cluster(image_version='2.4')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--image-version', '2.0'])
-
-    def test_pooling_with_image_version_prefix_major(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
-
-        self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-clusters',
-            '--image-version', '2'])
+            '--image-version', '2.4'])
 
     def test_dont_join_pool_with_wrong_image_version(self):
         _, cluster_id = self.make_pooled_cluster(image_version='2.2')
@@ -304,11 +313,11 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--image-version', '4.0.0',
             '--application', 'Mahout'])
 
-    def test_extra_applications_okay(self):
+    def test_extra_applications_not_okay(self):
         _, cluster_id = self.make_pooled_cluster(
             image_version='4.0.0', applications=['Ganglia', 'Mahout'])
 
-        self.assertJoins(cluster_id, [
+        self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
             '--application', 'Mahout'])
@@ -1524,15 +1533,19 @@ class PoolMatchingTestCase(MockBoto3TestCase):
     def test_dont_join_wrong_mrjob_version(self):
         _, cluster_id = self.make_pooled_cluster()
 
-        old_version = mrjob.__version__
+        self.start(patch('mrjob.__version__', 'OVER NINE THOUSAAAAAND'))
 
-        try:
-            mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters'])
 
-            self.assertDoesNotJoin(cluster_id, [
-                '-r', 'emr', '--pool-clusters'])
-        finally:
-            mrjob.__version__ = old_version
+    def test_version_matters_even_if_mrjob_not_bootstrapped(self):
+        _, cluster_id = self.make_pooled_cluster(
+            bootstrap_mrjob=False)
+
+        self.start(patch('mrjob.__version__', 'OVER NINE THOUSAAAAAND'))
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters'])
 
     def test_dont_join_wrong_python_bin(self):
         _, cluster_id = self.make_pooled_cluster()
@@ -1540,22 +1553,6 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--python-bin', 'snake'])
-
-    def test_versions_dont_matter_if_no_bootstrap_mrjob(self):
-        _, cluster_id = self.make_pooled_cluster(
-            bootstrap_mrjob=False)
-
-        old_version = mrjob.__version__
-
-        try:
-            mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
-
-            self.assertJoins(cluster_id, [
-                '-r', 'emr', '--pool-clusters',
-                '--no-bootstrap-mrjob',
-                '--python-bin', 'snake'])
-        finally:
-            mrjob.__version__ = old_version
 
     def test_join_similarly_bootstrapped_pool(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -1660,13 +1657,34 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertEqual(runner_1._find_cluster(), cluster_id)
         self.assertEqual(runner_2._find_cluster(), None)
 
-    def test_sorting_by_cpu_hours(self):
-        _, cluster_id_1 = self.make_pooled_cluster('pool1',
-                                                   minutes_ago=40,
-                                                   num_core_instances=2)
-        _, cluster_id_2 = self.make_pooled_cluster('pool1',
-                                                   minutes_ago=20,
-                                                   num_core_instances=1)
+    def test_sorting_by_cpu_capacity(self):
+        _, cluster_id_1 = self.make_pooled_cluster(
+            'pool1',
+            num_core_instances=2,
+            normalized_instance_hours=48)
+        _, cluster_id_2 = self.make_pooled_cluster(
+            'pool1',
+            num_core_instances=1,
+            normalized_instance_hours=32)
+
+        runner_1 = self.make_simple_runner(
+            'pool1', '--num-core-instances', '1')
+        runner_2 = self.make_simple_runner(
+            'pool1', '--num-core-instances', '1')
+
+        self.assertEqual(runner_1._find_cluster(), cluster_id_1)
+        self.assertEqual(runner_2._find_cluster(), cluster_id_2)
+
+    def test_sorting_by_cpu_capacity_divides_by_number_of_hours(self):
+        _, cluster_id_1 = self.make_pooled_cluster(
+            'pool1',
+            num_core_instances=2,
+            normalized_instance_hours=48)
+        _, cluster_id_2 = self.make_pooled_cluster(
+            'pool1',
+            num_core_instances=1,
+            minutes_ago=90,
+            normalized_instance_hours=64)
 
         runner_1 = self.make_simple_runner(
             'pool1', '--num-core-instances', '1')
@@ -1850,7 +1868,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
     # for multiple failover test
     MAX_EMR_CLIENTS = 200
 
-    def make_pooled_cluster(self, **kwargs):
+    def make_pooled_cluster(self, normalized_instance_hours=None, **kwargs):
         cluster_id = EMRJobRunner(**kwargs).make_persistent_cluster()
 
         # simulate that instances are provisioned
@@ -1859,6 +1877,14 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         mock_cluster['MasterPublicDnsName'] = 'mockmaster'
         for ig in mock_cluster['_InstanceGroups']:
             ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
+
+        # simulate NormalizedInstanceHours
+        if normalized_instance_hours is not None:
+            mock_cluster['NormalizedInstanceHours'] = normalized_instance_hours
+
+        # make sure ReadyDateTime is set (needed for sorting)
+        mock_cluster['Status']['Timeline']['ReadyDateTime'] = (
+            mock_cluster['Status']['Timeline']['CreationDateTime'])
 
         return cluster_id
 
@@ -1968,9 +1994,11 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
 
     def test_join_pooled_cluster_after_self_termination(self):
         # cluster 1 should be preferable
-        cluster1_id = self.make_pooled_cluster(num_core_instances=20)
+        cluster1_id = self.make_pooled_cluster(num_core_instances=20,
+                                               normalized_instance_hours=272)
         self.mock_emr_self_termination.add(cluster1_id)
-        cluster2_id = self.make_pooled_cluster(num_core_instances=1)
+        cluster2_id = self.make_pooled_cluster(num_core_instances=1,
+                                               normalized_instance_hours=32)
 
         job = MRTwoStepJob(['-r', 'emr', '--num-core-instances', '1'])
         job.sandbox()

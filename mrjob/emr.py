@@ -28,9 +28,11 @@ from collections import OrderedDict
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
+from math import ceil
 
 try:
     import botocore.client
+    import botocore.exceptions
     botocore  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     botocore = None
@@ -86,7 +88,6 @@ from mrjob.pool import _attempt_to_lock_cluster
 from mrjob.pool import _attempt_to_unlock_cluster
 from mrjob.pool import _instance_fleets_satisfy
 from mrjob.pool import _instance_groups_satisfy
-from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
@@ -391,6 +392,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # set of step numbers (0-indexed) where we waited 5 minutes for logs to
         # transfer to S3 (so we don't do it twice)
         self._waited_for_logs_on_s3 = set()
+
+        # info used to match clusters. catches _pool_hash_dict()
+        self._pool_hash_dict_cached = None
 
     ### Options ###
 
@@ -1098,7 +1102,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Build kwargs for emr_client.run_job_flow()"""
         kwargs = {}
 
-        kwargs['Name'] = self._job_key
+        kwargs['Name'] = self._job_key + self._cluster_name_pooling_suffix()
 
         kwargs['LogUri'] = self._opts['cloud_log_dir']
 
@@ -2280,111 +2284,155 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Get the ID of the cluster our job is running on, or ``None``."""
         return self._cluster_id
 
-    def _compare_cluster_setup(self, emr_client, cluster, req_pool_hash):
-        """Check if the required configuration fields of the given cluster are
-        the same as in the requested cluster.
+    def _yield_clusters_to_join(self):
+        """Get a list of IDs of pooled clusters that this runner can join,
+        sorted so that the ones with the greatest CPU capacity come first.
 
-        These checks include
-
-        - same pool name/hash
-        - same bootstrap setup (including mrjob version)
-        - same AMI version and custom AMI ID (if any)
-        - install the same applications (if we requested any)
-        - same number and type of instances
-
-        Note: we allow joining clusters where for each role, every instance
-        has at least as much memory as we require, and the total number of
-        compute units is at least what we require.
-
-        :param emr_client: a boto3 EMR client. See
-                           :py:meth:`~mrjob.emr.EMRJobRunner.make_emr_client`
-        :param cluster: EMR cluster dict to check if we are able to join.
-        :param req_pool_hash: Required pool hash. See :py:meth:`_pool_hash`.
-
-        :return: A hashable key to sort clusters by.
+        yields (cluster, when_cluster_described) so we can lock clusters that
+        we wish to join (*cluster* is the cluster description and
+        *when_cluster_described* is a unix timestamp).
         """
-        cluster_id = cluster['Id']
+        emr_client = self.make_emr_client()
 
-        log.debug('  Considering joining cluster %s...' % cluster_id)
+        # check cluster summaries (ListClusters)
+        for cluster_id in self._available_matching_clusters():
+            # check instance group/fleet setup (ListInstanceGroups/Fleets)
+            if not self._cluster_has_adequate_capacity(cluster_id):
+                continue
+
+            # check other things about the cluster that we can't hash
+            # (DescribeCluster)
+            #
+            # save cluster description so we can use it for locking
+            when_cluster_described = time.time()
+            cluster = emr_client.describe_cluster(
+                ClusterId=cluster_id)['Cluster']
+
+            if not self._cluster_description_matches(cluster):
+                continue
+
+            yield (cluster, when_cluster_described)
+
+    def _available_matching_clusters(self):
+        """Returns a list of IDs of clusters who are in the ``WAITING`` state
+        and whose name suffix (cluster pool name and hash) match the one our
+        job needs.
+
+        Sort IDs in descending order by approximate CPU capacity, based
+        on ``NormalizedInstanceHours``.
+
+        The only API call this method makes is ``ListClusters``.
+        """
+        emr_client = self.make_emr_client()
+
+        suffix = self._cluster_name_pooling_suffix()
+
+        # tuples of (cluster_summary, cpu_capacity)
+        cluster_id_to_sort_key = {}
+
+        now = _boto3_now()
+
+        for cluster in _boto3_paginate(
+                'Clusters', emr_client, 'list_clusters',
+                ClusterStates=['WAITING']):
+
+            cluster_id = cluster['Id']
+
+            if not cluster['Name'].endswith(suffix):
+                log.debug('  cluster %s: wrong name suffix' % cluster_id)
+                continue
+
+            when_ready = cluster['Status']['Timeline'].get('ReadyDateTime')
+
+            if when_ready:
+                hours = max(ceil((now - when_ready).total_seconds() / 3600),
+                            1.0)
+                cpu_capacity = cluster['NormalizedInstanceHours'] / hours
+            else:
+                # this probably won't happen, since we only inspect clusters
+                # in the WAITING state
+                cpu_capacity = 0
+
+            cluster_id_to_sort_key[cluster_id] = cpu_capacity
+
+        cluster_ids = sorted(
+            cluster_id_to_sort_key,
+            key=lambda c: cluster_id_to_sort_key[c],
+            reverse=True)
+
+        return cluster_ids
+
+    def _cluster_has_adequate_capacity(self, cluster_id):
+        """Check if the cluster has an instance group/fleet configuration
+        that works as well or better.
+
+        This either calls ``ListInstanceFleets`` or ``ListInstanceGroups``,
+        as appropriate
+        """
+        emr_client = self.make_emr_client()
+
+        if self._opts['instance_fleets']:
+            try:
+                fleets = list(_boto3_paginate(
+                    'InstanceFleets', emr_client, 'list_instance_fleets',
+                    ClusterId=cluster_id))
+            except botocore.exceptions.ClientError:
+                # this shouldn't usually happen because whether a cluster
+                # uses instance fleets is in the pool hash
+                log.debug('  cluster %s: does not use instance fleets' %
+                          cluster_id)
+                return False
+
+            return _instance_fleets_satisfy(
+                fleets, self._opts['instance_fleets'])
+        else:
+            try:
+                groups = list(_boto3_paginate(
+                    'InstanceGroups', emr_client, 'list_instance_groups',
+                    ClusterId=cluster_id))
+            except botocore.exceptions.ClientError:
+                # this shouldn't usually happen because whether a cluster
+                # uses instance fleets is in the pool hash
+                log.debug(' cluster %s: does not use instance groups' %
+                          cluster_id)
+                return False
+
+            return _instance_groups_satisfy(groups, self._instance_groups())
+
+    def _cluster_description_matches(self, cluster):
+        """Do we want to join the cluster with the given description?"""
+        cluster_id = cluster['Id']
 
         # skip if user specified a key pair and it doesn't match
         if (self._opts['ec2_key_pair'] and
                 self._opts['ec2_key_pair'] !=
                 cluster['Ec2InstanceAttributes'].get('Ec2KeyName')):
-            log.debug('    ec2 key pair mismatch')
-            return
+            log.debug('  cluster %s: ec2 key pair mismatch' % cluster_id)
+            return False
 
         # only take persistent clusters
         if cluster['AutoTerminate']:
-            log.debug('    not persistent')
-            return
+            log.debug('  cluster %s: not persistent' % cluster_id)
+            return False
 
-        # match pool name, and (bootstrap) hash
-        pool_hash, pool_name = _pool_hash_and_name(cluster)
-
-        if req_pool_hash != pool_hash:
-            log.debug('    pool hash mismatch')
-            return
-
-        if self._opts['pool_name'] != pool_name:
-            log.debug('    pool name mismatch')
-            return
-
-        if self._opts['release_label']:
-            # just check for exact match. EMR doesn't have a concept
-            # of partial release labels like it does for AMI versions.
-            release_label = cluster.get('ReleaseLabel')
-
-            if release_label != self._opts['release_label']:
-                log.debug('    release label mismatch')
-                return
-        else:
-            # match actual AMI version
-            image_version = cluster.get('RunningAmiVersion', '')
-            # Support partial matches, e.g. let a request for
-            # '2.4' pass if the version is '2.4.2'. The version
-            # extracted from the existing cluster should always
-            # be a full major.minor.patch, so checking matching
-            # prefixes should be sufficient.
-            if not image_version.startswith(self._opts['image_version']):
-                log.debug('    image version mismatch')
-                return
-
-        if self._opts['image_id'] != cluster.get('CustomAmiId'):
-            log.debug('    custom image ID mismatch')
-            return
-
+        # EBS root volume size
         if self._opts['ebs_root_volume_gb']:
             if 'EbsRootVolumeSize' not in cluster:
-                log.debug('    EBS root volume size not set')
-                return
+                log.debug('  cluster %s: EBS root volume size not set' %
+                          cluster_id)
+                return False
             elif (cluster['EbsRootVolumeSize'] <
                     self._opts['ebs_root_volume_gb']):
-                log.debug('    EBS root volume size too small')
-                return
+                log.debug('  cluster %s: EBS root volume size too small' %
+                          cluster_id)
+                return False
         else:
             if 'EbsRootVolumeSize' in cluster:
-                log.debug('    uses non-default EBS root volume size')
-                return
+                log.debug('  cluster %s: uses non-default EBS root volume'
+                          ' size' % cluster_id)
+                return False
 
-        applications = self._applications()
-        if applications:
-            # use case-insensitive mapping (see #1417)
-            expected_applications = set(a.lower() for a in applications)
-
-            cluster_applications = set(
-                a['Name'].lower() for a in cluster.get('Applications', []))
-
-            if not expected_applications <= cluster_applications:
-                log.debug('    missing applications: %s' % ', '.join(
-                    sorted(expected_applications - cluster_applications)))
-                return
-
-        emr_configurations = cluster.get('Configurations', [])
-        if self._opts['emr_configurations'] != emr_configurations:
-            log.debug('    emr configurations mismatch')
-            return
-
+        # subnet
         subnet = cluster['Ec2InstanceAttributes'].get('Ec2SubnetId')
         if isinstance(self._opts['subnet'], list):
             matches = (subnet in self._opts['subnet'])
@@ -2393,107 +2441,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             matches = (subnet == (self._opts['subnet'] or None))
 
         if not matches:
-            log.debug('    subnet mismatch')
+            log.debug('  cluster %s: subnet mismatch' % cluster_id)
             return
 
-        collection_type = cluster.get('InstanceCollectionType',
-                                      'INSTANCE_GROUP')
-
-        instance_sort_key = None
-
-        if self._opts['instance_fleets']:
-            if collection_type != 'INSTANCE_FLEET':
-                log.debug('    does not use instance fleets')
-                return
-
-            actual_fleets = list(_boto3_paginate(
-                'InstanceFleets', emr_client, 'list_instance_fleets',
-                ClusterId=cluster_id))
-
-            req_fleets = self._opts['instance_fleets']
-
-            instance_sort_key = _instance_fleets_satisfy(
-                actual_fleets, req_fleets)
-        else:
-            if collection_type != 'INSTANCE_GROUP':
-                log.debug('    does not use instance groups')
-                return
-
-            # check memory and compute units, bailing out if we hit
-            # an instance with too little memory
-            actual_igs = list(_boto3_paginate(
-                'InstanceGroups', emr_client, 'list_instance_groups',
-                ClusterId=cluster_id))
-
-            requested_igs = self._instance_groups()
-
-            instance_sort_key = _instance_groups_satisfy(
-                actual_igs, requested_igs)
-
-        if not instance_sort_key:
-            return
-
-        log.debug('    OK - valid cluster setup')
-        return instance_sort_key
-
-    def _usable_clusters(self, valid_clusters, invalid_clusters,
-                         locked_clusters):
-        """Get clusters that this runner can join, returning a list of
-        cluster IDs.
-
-        This list is sorted by
-        - total compute units for core + task nodes
-        - total compute units for master node
-        - time left to an even instance hour
-
-        Note: this will update pass-by-reference arguments `valid_clusters`
-        and `invalid_clusters`.
-
-        :param valid_clusters: A map of cluster id to cluster info with a valid
-                               setup; thus we do not need to check their setup
-                               again.
-        :param invalid_clusters: A set of clusters with an invalid setup; thus
-                                 we skip these clusters.
-        :param locked_clusters: A set of clusters managed by the callee that
-                                are in a "locked" state.
-        :param num_steps: The number of steps this job requires.
-
-        :return: list of cluster IDs
-        """
-        emr_client = self.make_emr_client()
-        req_pool_hash = self._pool_hash()
-
-        # list of (sort_key, cluster_id, num_steps)
-        key_cluster_steps_list = []
-
-        for cluster_summary in _boto3_paginate(
-                'Clusters', emr_client, 'list_clusters',
-                ClusterStates=['WAITING']):
-            cluster_id = cluster_summary['Id']
-
-            # this may be a retry due to locked clusters
-            if cluster_id in invalid_clusters or cluster_id in locked_clusters:
-                log.debug('    excluded')
-                continue
-
-            # if we haven't seen this cluster before then check the setup
-            cluster, instance_sort_key = valid_clusters.get(cluster_id,
-                                                            (None, None,))
-            if cluster is None:
-                cluster = emr_client.describe_cluster(
-                    ClusterId=cluster_id)['Cluster']
-                instance_sort_key = self._compare_cluster_setup(
-                    emr_client, cluster, req_pool_hash)
-                if not instance_sort_key:
-                    invalid_clusters.add(cluster_id)
-                    continue
-                valid_clusters[cluster_id] = (cluster, instance_sort_key,)
-
-            key_cluster_steps_list.append(
-                (instance_sort_key, cluster_id))
-
-        return [_cluster_id for _, _cluster_id
-                in sorted(key_cluster_steps_list)]
+        return True
 
     def _find_cluster(self):
         """Find a cluster that can host this runner. Prefer clusters with more
@@ -2502,99 +2453,132 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        valid_clusters = {}
-        invalid_clusters = set()
-        locked_clusters = set()
-
-        max_wait_time = self._opts['pool_wait_minutes']
-        now = datetime.now()
-        end_time = now + timedelta(minutes=max_wait_time)
+        end_time = datetime.now() + timedelta(
+            minutes=self._opts['pool_wait_minutes'])
 
         log.info('Attempting to find an available cluster...')
-        while now <= end_time:
-            cluster_id_list = self._usable_clusters(
-                valid_clusters, invalid_clusters,
-                locked_clusters)
-            log.debug(
-                '  Found %d usable cluster%s%s%s' % (
-                    len(cluster_id_list),
-                    '' if len(cluster_id_list) == 1 else 's',
-                    ': ' if cluster_id_list else '',
-                    ', '.join(reversed(cluster_id_list))))
+        while True:
+            for cluster, when_cluster_described in (
+                    self._yield_clusters_to_join()):
+                cluster_id = cluster['Id']
 
-            if cluster_id_list:
-                for cluster_id in reversed(cluster_id_list):
-                    lock_acquired = _attempt_to_lock_cluster(
-                        emr_client, cluster_id, self._job_key)
+                log.debug('  Attempting to join cluster %s' % cluster_id)
+                lock_acquired = _attempt_to_lock_cluster(
+                    emr_client, cluster_id, self._job_key,
+                    cluster=cluster,
+                    when_cluster_described=when_cluster_described)
 
-                    if lock_acquired:
-                        return cluster_id
-                    else:
-                        locked_clusters.add(cluster_id)
-            elif max_wait_time == 0:
-                return None
-            else:
-                # Reset the exclusion set since it is possible to reclaim a
-                # lock that was previously unavailable.
-                locked_clusters = set()
-                log.info('No clusters available in pool %r. Checking again'
-                         ' in %d seconds...' % (
-                             self._opts['pool_name'],
-                             int(_POOLING_SLEEP_INTERVAL)))
-                time.sleep(_POOLING_SLEEP_INTERVAL)
-                now += timedelta(seconds=_POOLING_SLEEP_INTERVAL)
+                if lock_acquired:
+                    return cluster_id
+
+            # if we're out of time, give up
+            if (datetime.now() +
+                    timedelta(seconds=_POOLING_SLEEP_INTERVAL)) > end_time:
+                break
+
+            log.info('No clusters available in pool %r. Checking again'
+                     ' in %d seconds...' % (
+                         self._opts['pool_name'],
+                         int(_POOLING_SLEEP_INTERVAL)))
+            time.sleep(_POOLING_SLEEP_INTERVAL)
 
         return None
 
-    def _pool_hash(self):
-        """Generate a hash of the bootstrap configuration so it can be used to
-        match jobs and clusters. This first argument passed to the bootstrap
-        script will be ``'pool-'`` plus this hash.
+    def _pool_hash_dict(self):
+        """A dictionary of information that must be matched exactly to
+        join a pooled cluster (other than mrjob version and pool name).
 
-        The way the hash is calculated may vary between point releases
-        (pooling requires the exact same version of :py:mod:`mrjob` anyway).
+        The format of this dictionary may change between mrjob versions.
         """
-        # exclude mrjob.zip because it's only created if the
-        # job starts its own cluster (also, its hash changes every time
-        # since the zip file contains different timestamps).
-        # The filenames/md5sums are sorted because we need to
-        # ensure the order they're added doesn't affect the hash
-        # here
-        file_md5sums = sorted(
-            (name, self.fs.md5sum(path)) for name, path
-            in self._bootstrap_dir_mgr.name_to_path().items()
-            if not path == self._mrjob_zip_path)
+        # this can be expensive because we have to read every file used in
+        # bootstrapping, so cache it
+        if not self._pool_hash_dict_cached:
+            d = {}
 
-        # original path of the file doesn't matter, just its name and contents
-        bootstrap_without_paths = [
-            [
-                dict(type=x['type'], name=self._bootstrap_dir_mgr.name(**x))
-                if isinstance(x, dict) else x
-                for x in cmd
+            # additional_emr_info
+            d['additional_emr_info'] = self._opts['additional_emr_info']
+
+            # applications
+            # (these are case-insensitive)
+            d['applications'] = sorted(a.lower() for a in self._applications())
+
+            # bootstrapping
+
+            # bootstrap_actions
+            d['bootstrap_actions'] = self._bootstrap_actions()
+
+            # bootstrap_file_md5sums
+            d['bootstrap_file_md5sums'] = {
+                name: self.fs.md5sum(path)
+                for name, path
+                in self._bootstrap_dir_mgr.name_to_path().items()
+                if path != self._mrjob_zip_path
+            }
+
+            # bootstrap_without_paths
+            # original path doesn't matter, just contents (above) and name
+            d['bootstrap_without_paths'] = [
+                [
+                    dict(type=x['type'],
+                         name=self._bootstrap_dir_mgr.name(**x))
+                    if isinstance(x, dict) else x
+                    for x in cmd
+                ]
+                for cmd in self._bootstrap
             ]
-            for cmd in self._bootstrap
-        ]
 
-        things_to_hash = [
-            file_md5sums,
-            self._opts['additional_emr_info'],
-            bootstrap_without_paths,
-            self._bootstrap_actions(),
-            self._bootstrap_mrjob(),
-        ]
+            # bootstrap_mrjob_python_bin
+            if self._bootstrap_mrjob():
+                d['bootstrap_mrjob_python'] = self._python_bin()
+            else:
+                d['bootstrap_mrjob_python'] = None
 
-        if self._bootstrap_mrjob():
-            things_to_hash.append(mrjob.__version__)
-            things_to_hash.append(self._python_bin())
-            things_to_hash.append(self._task_python_bin())
+            # emr_configurations
+            d['emr_configurations'] = self._opts['emr_configurations']
 
-        things_json = json.dumps(things_to_hash, sort_keys=True)
-        if not isinstance(things_json, bytes):
-            things_json = things_json.encode('utf_8')
+            # image_id
+            d['image_id'] = self._opts['image_id']
+
+            # instance_collection_type
+            # no way to compare instance groups with instance fleets
+            # so make it part of the hash
+            d['instance_collection_type'] = (
+                'INSTANCE_FLEET' if self._opts['instance_fleets']
+                else 'INSTANCE_GROUP'
+            )
+
+            # release_label
+            # use e.g. emr-2.4.9 for 2.x/3.x AMIs, even though the API wouldn't
+            d['release_label'] = (self._opts['release_label'] or
+                                  'emr-' + self._opts['image_version'])
+
+            self._pool_hash_dict_cached = d
+
+        return self._pool_hash_dict_cached
+
+    def _pool_hash(self):
+        hash_dict = self._pool_hash_dict()
+
+        hash_json = json.dumps(hash_dict, sort_keys=True)
+        if not isinstance(hash_json, bytes):
+            hash_json = hash_json.encode('utf_8')
 
         m = hashlib.md5()
-        m.update(things_json)
+        m.update(hash_json)
         return m.hexdigest()
+
+    def _cluster_name_pooling_suffix(self):
+        """Extra info added to the cluster name, for pooling."""
+        if not self._opts['pool_clusters']:
+            return ''
+
+        fields = [
+            mrjob.__version__,
+            self._opts['pool_name'],
+            self._pool_hash(),
+        ]
+
+        return ' pooling:%s' % ','.join(fields)
 
     ### EMR-specific Stuff ###
 

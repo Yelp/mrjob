@@ -2153,7 +2153,7 @@ class JobWaitTestCase(MockBoto3TestCase):
                          side_effect=mock_attempt_to_lock_cluster))
         self.start(patch('mrjob.emr._attempt_to_unlock_cluster'))
         self.mock_sleep = self.start(patch('time.sleep',
-                                      side_effect=mock_sleep))
+                                           side_effect=mock_sleep))
         mock_datetime = self.start(patch('mrjob.emr.datetime'))
         mock_datetime.now = mock_now
 

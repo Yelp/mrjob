@@ -293,8 +293,9 @@ def main(cmd_line_args=None):
                 ).saveAsTextFile(
                     args.counter_output_dir
                 )
-                # Use regular python buildin file writer if the part-* file is not created
             elif not glob(args.counter_output_dir + "/part-*"):
+                # Use regular python built-in file writer if the part-* file
+                # is not created
                 path = os.path.join(args.counter_output_dir, "part-00000")
                 if not os.path.exists(args.counter_output_dir):
                     os.mkdir(args.counter_output_dir)
@@ -529,9 +530,11 @@ def _shuffle_and_sort(
              adjacent and in the same partition
     """
     if skip_internal_protocol:
-        def key_func(k_v): return k_v[0]
+        def key_func(k_v):
+            return k_v[0]
     else:
-        def key_func(line): return line.split(b'\t')[0]
+        def key_func(line):
+            return line.split(b'\t')[0]
 
     rdd = rdd.groupBy(key_func, numPartitions=num_reducers)
     rdd = _discard_key_and_flatten_values(rdd, sort_values=sort_values)
@@ -596,9 +599,11 @@ def _discard_key_and_flatten_values(rdd, sort_values=False):
     If *sort_values* is true, sort each list of lines before flattening it.
     """
     if sort_values:
-        def map_f(key_and_lines): return sorted(key_and_lines[1])
+        def map_f(key_and_lines):
+            return sorted(key_and_lines[1])
     else:
-        def map_f(key_and_lines): return key_and_lines[1]
+        def map_f(key_and_lines):
+            return key_and_lines[1]
 
     return rdd.flatMap(map_f, preservesPartitioning=True)
 

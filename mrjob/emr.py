@@ -215,6 +215,7 @@ _CLUSTER_SELF_TERMINATED_RE = re.compile(
 # is available to read even if it's Glacier-archived
 _RESTORED_FROM_GLACIER = 'ongoing-request="false"'
 
+
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
     pass

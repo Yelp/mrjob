@@ -603,7 +603,7 @@ def _attempt_to_lock_cluster(
 
     # wait, then check if our lock is still there
     log.info("  waiting %.1f seconds to ensure lock wasn't overwritten" %
-        _WAIT_AFTER_ADD_TAG)
+             _WAIT_AFTER_ADD_TAG)
     time.sleep(_WAIT_AFTER_ADD_TAG)
 
     # check if our lock is still there

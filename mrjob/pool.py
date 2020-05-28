@@ -21,12 +21,19 @@ In theory, this module might support pooling in general, but so far, there's
 only a need for pooling on EMR.
 
 """
+import time
 from collections import defaultdict
 from logging import getLogger
+
+try:
+    from botocore.exceptions import ClientError
+except ImportError:
+    ClientError = Exception
 
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.py2 import integer_types
+from mrjob.py2 import string_types
 
 log = getLogger(__name__)
 
@@ -499,3 +506,146 @@ def _ebs_volume_satisfies(actual_volume, req_volume):
         return False
 
     return True
+
+
+### locking pooled clusters ###
+
+# Locking ensures that two jobs don't add their steps to the same cluster at
+# the same time
+
+# after 60 seconds, a lock is considered released
+_CLUSTER_LOCK_SECS = 60.0
+
+# describe the cluster and add our tag within the first 5 seconds
+_ADD_TAG_BEFORE = 5.0
+
+# then wait 10 seconds before checking if our tag is still there
+_WAIT_AFTER_ADD_TAG = 10.0
+
+# make sure we have at least 40 seconds left to add steps and have them
+# start running, before the lock expires
+_CHECK_TAG_BEFORE = 20.0
+
+# tag key used for locking pooled clusters
+_POOL_LOCK_KEY = '__mrjob_pool_lock'
+
+
+def _make_cluster_lock(job_key, expiry):
+    """Return the contents of a tag used to lock a cluster.
+
+    *expiry* is the unix timestamp for when the lock is no longer valid"""
+    return '%s %.6f' % (job_key, expiry)
+
+
+def _parse_cluster_lock(lock):
+    """Return (job_key, expiry) or raise ValueError
+
+    Raises TypeError if *lock* is not a string.
+    """
+    if not isinstance(lock, (string_types)):
+        raise TypeError
+
+    job_key, expiry_str = lock.split(' ')
+
+    try:
+        expiry = float(expiry_str)
+    except TypeError:
+        raise ValueError
+
+    return job_key, expiry
+
+
+def _get_cluster_lock(emr_client, cluster_id):
+    cluster = emr_client.describe_cluster(
+        ClusterId=cluster_id)['Cluster']
+
+    return _extract_tags(cluster).get(_POOL_LOCK_KEY)
+
+
+def _attempt_to_lock_cluster(emr_client, cluster_id, job_key):
+    """Attempt to lock the given pooled cluster using EMR tags."""
+    log.debug('Attempting to lock cluster %s for %.1f seconds' % (
+        cluster_id, _CLUSTER_LOCK_SECS))
+
+    start = time.time()
+
+    # check if there is a non-expired lock
+    lock = _get_cluster_lock(emr_client, cluster_id)
+
+    if lock:
+        expiry = None
+        try:
+            their_job_key, expiry = _parse_cluster_lock(lock)
+        except ValueError:
+            log.info('  ignoring invalid pool lock: %s' % lock)
+
+        if expiry and expiry > start:
+            log.info('  locked by %s for %.1f seconds' % (
+                their_job_key, expiry - start))
+            return False
+
+    # add our lock
+    our_lock = _make_cluster_lock(job_key, start + _CLUSTER_LOCK_SECS)
+
+    log.debug('  adding tag to cluster %s:' % cluster_id)
+    log.debug('    %s=%s' % (_POOL_LOCK_KEY, our_lock))
+    emr_client.add_tags(
+        ResourceId=cluster_id,
+        Tags=[dict(Key=_POOL_LOCK_KEY, Value=our_lock)]
+    )
+
+    if time.time() - start > _ADD_TAG_BEFORE:
+        log.info('  took too long to tag cluster with lock')
+        return False
+
+    # wait, then check if our lock is still there
+    log.info("  waiting %.1f seconds to ensure lock wasn't overwritten" %
+        _WAIT_AFTER_ADD_TAG)
+    time.sleep(_WAIT_AFTER_ADD_TAG)
+
+    # check if our lock is still there
+    lock = _get_cluster_lock(emr_client, cluster_id)
+
+    if lock is None:
+        log.info('  lock was removed')
+        return False
+    elif lock != our_lock:
+        their_job_desc = 'other job'
+        try:
+            their_job_desc, expiry = _parse_cluster_lock(lock)
+        except ValueError:
+            pass
+
+        log.info('  lock was overwritten by %s' % their_job_desc)
+        return False
+
+    # make sure we have enough time to add steps and have them run
+    # before the lock expires
+    if time.time() > start + _CHECK_TAG_BEFORE:
+        log.info('  took too long to check for lock')
+        return False
+
+    log.info('  lock acquired')
+    return True
+
+
+def _attempt_to_unlock_cluster(emr_client, cluster_id):
+    """Release our lock on the given pooled cluster. Only do this if you know
+    the cluster is currently running steps (so other jobs won't try to
+    join the cluster).
+
+    Returns True if successful, False if not (usually, this means the
+    cluster terminated). Cluster locks eventually release themselves,
+    so if releasing a lock fails for whatever reason, it's not worth
+    releasing it again.
+
+    Locks expire after a minute anyway (which is less time than it takes to
+    run most jobs), so this is mostly useful for preventing problems
+    due to clock skew. Also makes unit testing more straightforward.
+    """
+    try:
+        emr_client.remove_tags(ResourceId=cluster_id, TagKeys=[_POOL_LOCK_KEY])
+        return True
+    except ClientError as ex:
+        log.debug('removing tags failed: %r' % ex)
+        return False

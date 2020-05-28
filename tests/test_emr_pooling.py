@@ -26,14 +26,12 @@ import mrjob.emr
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
-from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.pool import _pool_hash_and_name
 from mrjob.step import StepFailedException
 
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import patch
 from tests.sandbox import mrjob_conf_patcher
@@ -1850,7 +1848,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {'pool_clusters': True}}}
 
     # for multiple failover test
-    MAX_EMR_CONNECTIONS = 1000
+    MAX_EMR_CLIENTS = 200
 
     def make_pooled_cluster(self, **kwargs):
         cluster_id = EMRJobRunner(**kwargs).make_persistent_cluster()
@@ -2096,85 +2094,3 @@ class PoolingDisablingTestCase(MockBoto3TestCase):
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['AutoTerminate'], True)
-
-
-class S3LockTestCase(MockBoto3TestCase):
-
-    LOCK_URI = 's3://locks/some_lock'
-
-    def setUp(self):
-        super(S3LockTestCase, self).setUp()
-
-        self.sleep = self.start(patch('time.sleep'))
-
-        # create a bucket to put locks on
-        self.add_mock_s3_data({'locks': {}})
-
-    def test_lock(self):
-        # Most basic test case
-        runner = EMRJobRunner(conf_paths=[])
-
-        self.assertEqual(
-            True,
-            _attempt_to_acquire_lock(
-                runner.fs.s3, self.LOCK_URI, 5.0, 'job_one')
-        )
-
-        self.sleep.assert_called_with(5.0)
-
-        self.sleep.reset_mock()
-
-        self.assertEqual(
-            False,
-            _attempt_to_acquire_lock(
-                runner.fs.s3, self.LOCK_URI, 5.0, 'job_two')
-        )
-
-        self.assertFalse(self.sleep.called)
-
-    def test_lock_expiration(self):
-        runner = EMRJobRunner(conf_paths=[])
-
-        # add an expired lock
-        self.add_mock_s3_data({'locks': {
-            'expired_lock': b'x',
-        }}, age=timedelta(minutes=30))
-
-        did_lock = _attempt_to_acquire_lock(
-            runner.fs.s3, 's3://locks/expired_lock', 5.0, 'job_one',
-            secs_to_expiration=300)
-        self.assertEqual(True, did_lock)
-
-        self.sleep.assert_called_with(5.0)
-
-    def test_write_race_condition(self):
-        # Test case where one attempt puts the key in existence
-        # right before we attempt to lock
-        runner = EMRJobRunner(conf_paths=[])
-
-        self.sleep.side_effect = StopIteration
-
-        self.assertRaises(
-            StopIteration, _attempt_to_acquire_lock,
-            runner.fs.s3, self.LOCK_URI, 5.0, 'job_one')
-
-        did_lock = _attempt_to_acquire_lock(
-            runner.fs.s3, self.LOCK_URI, 5.0, 'job_two')
-        self.assertFalse(did_lock)
-
-    def test_read_race_condition(self):
-        # test case where lock is created while we're waiting
-        # for S3 to sync
-        runner = EMRJobRunner(conf_paths=[])
-
-        def _while_you_were_sleeping(*args, **kwargs):
-            key = runner.fs.s3._get_s3_key(self.LOCK_URI)
-            key.put(b'job_two')
-
-        self.sleep.side_effect = _while_you_were_sleeping
-
-        did_lock = _attempt_to_acquire_lock(
-            runner.fs.s3, self.LOCK_URI, 5.0, 'job_one')
-        self.assertFalse(did_lock)
-
-        self.sleep.assert_called_with(5.0)

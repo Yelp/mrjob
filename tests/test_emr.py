@@ -27,6 +27,8 @@ import posixpath
 import signal
 import socket
 import time
+from datetime import datetime
+from datetime import timedelta
 from io import BytesIO
 from shutil import make_archive
 
@@ -2122,34 +2124,38 @@ class JobWaitTestCase(MockBoto3TestCase):
         super(JobWaitTestCase, self).setUp()
         self.future_mock_cluster_ids = []
         self.mock_cluster_ids = []
-        self.sleep_counter = 0
+        self.time_slept = 0
 
-        def side_effect_lock_uri(*args):
-            return args[0]  # Return the only arg given to it.
-
-        def side_effect_acquire_lock(*args, **kwargs):
-            cluster_id = args[1].split('/')[-1]
+        def mock_attempt_to_lock_cluster(emr_client, cluster_id, job_key,
+                                         **kwargs):
             return self.JOB_ID_LOCKS[cluster_id]
 
-        def side_effect_usable_clusters(*args, **kwargs):
-            return [
-                cluster_id for cluster_id in self.mock_cluster_ids
-                if cluster_id not in args[2]]
+        def mock_yield_clusters_to_join(*args, **kwargs):
+            for cluster_id in self.mock_cluster_ids:
+                when_cluster_described = time.time()
+                cluster = dict(Id=cluster_id)
+                yield (cluster, when_cluster_described)
 
-        def side_effect_time_sleep(*args):
-            self.sleep_counter += 1
+        def mock_sleep(time):
+            self.time_slept += time
             if self.future_mock_cluster_ids:
                 cluster_id = self.future_mock_cluster_ids.pop(0)
                 self.mock_cluster_ids.append(cluster_id)
 
-        self.start(patch.object(EMRJobRunner, '_usable_clusters',
-                                side_effect=side_effect_usable_clusters))
-        self.start(patch.object(EMRJobRunner, '_lock_uri',
-                                side_effect=side_effect_lock_uri))
-        self.start(patch.object(mrjob.emr, '_attempt_to_acquire_lock',
-                                side_effect=side_effect_acquire_lock))
-        self.start(patch.object(time, 'sleep',
-                                side_effect=side_effect_time_sleep))
+        now_func = datetime.now
+
+        def mock_now():
+            return now_func() + timedelta(seconds=self.time_slept)
+
+        self.start(patch.object(EMRJobRunner, '_yield_clusters_to_join',
+                                side_effect=mock_yield_clusters_to_join))
+        self.start(patch('mrjob.emr._attempt_to_lock_cluster',
+                         side_effect=mock_attempt_to_lock_cluster))
+        self.start(patch('mrjob.emr._attempt_to_unlock_cluster'))
+        self.mock_sleep = self.start(patch('time.sleep',
+                                      side_effect=mock_sleep))
+        mock_datetime = self.start(patch('mrjob.emr.datetime'))
+        mock_datetime.now = mock_now
 
     def tearDown(self):
         super(JobWaitTestCase, self).tearDown()
@@ -2157,47 +2163,58 @@ class JobWaitTestCase(MockBoto3TestCase):
         self.future_mock_cluster_ids = []
 
     def test_no_waiting_for_job_pool_fail(self):
-        self.mock_cluster_ids.append('j-fail-lock')
+        self.mock_cluster_ids = ['j-fail-lock']
 
+        runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=0)
+        cluster_id = runner._find_cluster()
+
+        self.assertEqual(cluster_id, None)
+
+    def test_no_waiting_for_job_pool_success(self):
+        self.mock_cluster_ids = ['j-fail-lock']
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=0)
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
         # sleep once after creating temp bucket
-        self.assertEqual(self.sleep_counter, 1)
-
-    def test_no_waiting_for_job_pool_success(self):
-        self.mock_cluster_ids.append('j-fail-lock')
-        runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=0)
-        cluster_id = runner._find_cluster()
-
-        self.assertEqual(cluster_id, None)
+        self.assertEqual(self.mock_sleep.call_count, 1)
 
     def test_acquire_lock_on_first_attempt(self):
-        self.mock_cluster_ids.append('j-successful-lock')
+        self.mock_cluster_ids = ['j-successful-lock']
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
-        self.assertEqual(self.sleep_counter, 1)
+        self.assertEqual(self.mock_sleep.call_count, 1)
 
     def test_sleep_then_acquire_lock(self):
-        self.mock_cluster_ids.append('j-fail-lock')
+        self.mock_cluster_ids = ['j-fail-lock']
         self.future_mock_cluster_ids.append('j-successful-lock')
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
-        self.assertEqual(self.sleep_counter, 1)
+        self.assertEqual(self.mock_sleep.call_count, 1)
 
     def test_timeout_waiting_for_cluster(self):
-        self.mock_cluster_ids.append('j-fail-lock')
+        self.mock_cluster_ids = ['j-fail-lock']
         self.future_mock_cluster_ids.append('j-epic-fail-lock')
-        runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
+        runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=2)
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
-        self.assertEqual(self.sleep_counter, 3)
+        self.assertEqual(self.mock_sleep.call_count, 4)
+
+    def test_try_all_clusters_before_waiting(self):
+        # regression test for #2164
+        self.mock_cluster_ids = [
+            'j-fail-lock', 'j-epic-fail-lock', 'j-successful-lock']
+
+        runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
+        cluster_id = runner._find_cluster()
+
+        self.assertEqual(cluster_id, 'j-successful-lock')
+        self.assertEqual(self.mock_sleep.call_count, 1)
 
 
 class BuildStreamingStepTestCase(MockBoto3TestCase):

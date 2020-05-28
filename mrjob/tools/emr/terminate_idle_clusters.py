@@ -51,8 +51,7 @@ Options::
                         this higher than the amount of time your jobs can take
                         to start instances and bootstrap.
   --max-mins-locked MAX_MINS_LOCKED
-                        Max number of minutes a cluster can be locked while
-                        idle.
+                        Deprecated, does nothing
   --pool-name POOL_NAME
                         Only terminate clusters in the given named pool.
   --pooled-only         Only terminate pooled clusters
@@ -74,20 +73,18 @@ from datetime import timedelta
 
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
-from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
 from mrjob.options import _alphabetize_actions
 from mrjob.options import _filter_by_role
-from mrjob.pool import _pool_hash_and_name
+from mrjob.pool import _pool_name
 from mrjob.util import strip_microseconds
 
 log = logging.getLogger(__name__)
 
 _DEFAULT_MAX_MINS_IDLE = 60
-_DEFAULT_MAX_MINUTES_LOCKED = 1
 
 
 def main(cl_args=None):
@@ -106,7 +103,6 @@ def main(cl_args=None):
         now=_boto3_now(),
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
-        max_mins_locked=options.max_mins_locked,
         quiet=options.quiet,
         **_runner_kwargs(options)
     )
@@ -115,8 +111,7 @@ def main(cl_args=None):
 def _runner_kwargs(options):
     kwargs = options.__dict__.copy()
     for unused_arg in ('quiet', 'verbose', 'max_mins_idle',
-                       'max_mins_locked', 'unpooled_only',
-                       'pooled_only', 'pool_name', 'dry_run'):
+                       'unpooled_only', 'pooled_only', 'pool_name', 'dry_run'):
         del kwargs[unused_arg]
 
     return kwargs
@@ -128,7 +123,6 @@ def _maybe_terminate_clusters(dry_run=False,
                               pool_name=None,
                               pooled_only=False,
                               unpooled_only=False,
-                              max_mins_locked=None,
                               quiet=False,
                               **kwargs):
     if now is None:
@@ -138,7 +132,6 @@ def _maybe_terminate_clusters(dry_run=False,
     if max_mins_idle is None:
         max_mins_idle = _DEFAULT_MAX_MINS_IDLE
 
-    kwargs['label'] = 'terminate_idle_clusters'  # better than no_script
     runner = EMRJobRunner(**kwargs)
     emr_client = runner.make_emr_client()
 
@@ -188,7 +181,7 @@ def _maybe_terminate_clusters(dry_run=False,
         # need to get actual cluster to see tags
         cluster = emr_client.describe_cluster(ClusterId=cluster_id)['Cluster']
 
-        _, pool = _pool_hash_and_name(cluster)
+        pool = _pool_name(cluster)
 
         if is_pending:
             num_pending += 1
@@ -231,7 +224,6 @@ def _maybe_terminate_clusters(dry_run=False,
             is_pending=is_pending,
             time_idle=time_idle,
             dry_run=dry_run,
-            max_mins_locked=max_mins_locked,
             quiet=quiet)
 
     log.info(
@@ -306,29 +298,19 @@ def _time_last_active(cluster_summary, steps):
 
 def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
                           is_pending, time_idle,
-                          dry_run=False, max_mins_locked=None, quiet=False):
+                          dry_run=False, quiet=False):
+    emr_client = runner.make_emr_client()
 
-    fmt = ('Terminated cluster %s (%s); was %s for %s')
-    msg = fmt % (
-        cluster_id, cluster_name,
-        'pending' if is_pending else 'idle',
-        strip_microseconds(time_idle))
+    if not dry_run:
+        emr_client.terminate_job_flows(JobFlowIds=[cluster_id])
 
-    did_terminate = False
-    if dry_run:
-        did_terminate = True
-    else:
-        acquired_lock = runner._attempt_to_lock_cluster(cluster_id)
-        if acquired_lock:
-            runner.make_emr_client().terminate_job_flows(
-                JobFlowIds=[cluster_id])
-            did_terminate = True
-            runner._release_any_cluster_lock_held()
-        elif not quiet:
-            log.info('%s was locked between getting cluster info and'
-                     ' trying to terminate it; skipping' % cluster_id)
+    if not quiet:
+        fmt = ('Terminated cluster %s (%s); was %s for %s')
+        msg = fmt % (
+            cluster_id, cluster_name,
+            'pending' if is_pending else 'idle',
+            strip_microseconds(time_idle))
 
-    if did_terminate and not quiet:
         print(msg)
 
 
@@ -350,8 +332,8 @@ def _make_arg_parser():
               ' your jobs can take to start instances and bootstrap.'))
     arg_parser.add_argument(
         '--max-mins-locked', dest='max_mins_locked',
-        default=_DEFAULT_MAX_MINUTES_LOCKED, type=float,
-        help='Max number of minutes a cluster can be locked while idle.')
+        type=float,
+        help='Deprecated, does nothing')
     arg_parser.add_argument(
         '--unpooled-only', dest='unpooled_only', action='store_true',
         default=False,

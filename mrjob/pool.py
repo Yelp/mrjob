@@ -21,12 +21,19 @@ In theory, this module might support pooling in general, but so far, there's
 only a need for pooling on EMR.
 
 """
+import time
 from collections import defaultdict
 from logging import getLogger
+
+try:
+    from botocore.exceptions import ClientError
+except ImportError:
+    ClientError = Exception
 
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.py2 import integer_types
+from mrjob.py2 import string_types
 
 log = getLogger(__name__)
 
@@ -48,11 +55,9 @@ def _extract_tags(cluster):
     return {t['Key']: t['Value'] for t in cluster.get('Tags') or []}
 
 
-def _pool_hash_and_name(cluster):
-    """Return the hash and pool name for the given cluster, or
-    ``(None, None)`` if it isn't pooled."""
+def _pool_name(cluster):
     tags = _extract_tags(cluster)
-    return tags.get('__mrjob_pool_hash'), tags.get('__mrjob_pool_name')
+    return tags.get('__mrjob_pool_name')
 
 
 ### instance groups ###
@@ -71,7 +76,7 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
             all(isinstance(req_ig, dict) and 'InstanceRole' in req_ig
                 for req_ig in requested_igs)):
         log.debug('    bad instance_groups config')
-        return None
+        return False
 
     # a is a map from role to actual instance groups
     a = defaultdict(list)
@@ -89,16 +94,13 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
 
     if set(a) != set(r):
         log.debug("    missing instance group roles")
-        return None
+        return False
 
-    sort_keys = {}
-    for role in sorted(r):
-        sort_key = _igs_for_same_role_satisfy(a[role], r[role])
-        if not sort_key:  # doesn't satisfy
-            return None
-        sort_keys[role] = sort_key
+    for role in r:
+        if not _igs_for_same_role_satisfy(a[role], r[role]):
+            return False
 
-    return tuple(sort_keys.get(role) for role in ('CORE', 'TASK', 'MASTER'))
+    return True
 
 
 def _igs_for_same_role_satisfy(actual_igs, requested_ig):
@@ -107,15 +109,15 @@ def _igs_for_same_role_satisfy(actual_igs, requested_ig):
     """
     # bid price/on-demand
     if not all(_ig_satisfies_bid_price(ig, requested_ig) for ig in actual_igs):
-        return None
+        return False
 
     # memory
     if not all(_ig_satisfies_mem(ig, requested_ig) for ig in actual_igs):
-        return None
+        return False
 
     # EBS volumes
     if not all(_ebs_satisfies(ig, requested_ig) for ig in actual_igs):
-        return None
+        return False
 
     # CPU (this returns # of compute units or None)
     return _igs_satisfy_cpu(actual_igs, requested_ig)
@@ -176,17 +178,12 @@ def _ig_satisfies_mem(actual_ig, requested_ig):
 def _igs_satisfy_cpu(actual_igs, requested_ig):
     """Does the list of actual instance groups satisfy the CPU requirements
     of the requested instance group?
-
-    If so, return the number of compute units. Otherwise, return ``None``
-
-    If the requested instance type is unknown, just return the number
-    of actual instances of the same type.
     """
     requested_type = requested_ig.get('InstanceType')
     num_requested = requested_ig.get('InstanceCount')
 
     if not isinstance(num_requested, integer_types):
-        return None
+        return False
 
     # count number of compute units (cu)
     if requested_type in EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS:
@@ -208,10 +205,10 @@ def _igs_satisfy_cpu(actual_igs, requested_ig):
                         if ig['InstanceType'] == requested_type)
 
     if actual_cu >= requested_cu:
-        return actual_cu
+        return True
     else:
         log.debug('    not enough compute units')
-        return None
+        return False
 
 
 ### instance fleets ###
@@ -225,7 +222,7 @@ def _instance_fleets_satisfy(actual_fleets, req_fleets):
             all(isinstance(req_ft, dict) and 'InstanceFleetType' in req_ft
                 for req_ft in req_fleets)):
         log.debug('    bad instance_fleets config')
-        return None
+        return False
 
     # a is a map from role to actual instance fleet
     # (unlike with groups, there can never be more than one fleet per role)
@@ -243,16 +240,13 @@ def _instance_fleets_satisfy(actual_fleets, req_fleets):
 
     if set(a) != set(r):
         log.debug("    missing instance fleet roles")
-        return None
+        return False
 
-    sort_keys = {}
-    for role in sorted(r):
-        sort_key = _fleet_for_same_role_satisfies(a[role], r[role])
-        if not sort_key:  # doesn't satisfy
-            return None
-        sort_keys[role] = sort_key
+    for role in r:
+        if not _fleet_for_same_role_satisfies(a[role], r[role]):
+            return False
 
-    return tuple(sort_keys.get(role) for role in ('CORE', 'TASK', 'MASTER'))
+    return True
 
 
 def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
@@ -263,32 +257,32 @@ def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
         req_specs = {spec['InstanceType']: spec
                      for spec in req_fleet['InstanceTypeConfigs']}
     except (TypeError, KeyError):
-        return
+        return False
 
     if set(actual_specs) - set(req_specs):
         log.debug('    fleet may include wrong instance types')
-        return
+        return False
 
     if not all(_fleet_spec_satsifies(actual_specs[t], req_specs[t])
                for t in actual_specs):
-        return
+        return False
 
     # capacity
     actual_on_demand = actual_fleet.get('ProvisionedOnDemandCapacity', 0)
     req_on_demand = req_fleet.get('TargetOnDemandCapacity', 0)
 
     if not isinstance(req_on_demand, integer_types):
-        return
+        return False
 
     if req_on_demand > actual_on_demand:
         log.debug('    not enough on-demand capacity')
-        return
+        return False
 
     actual_spot = actual_fleet.get('ProvisionedSpotCapacity', 0)
     req_spot = req_fleet.get('TargetSpotCapacity', 0)
 
     if not isinstance(req_spot, integer_types):
-        return
+        return False
 
     # allow extra on-demand instances to serve as spot instances
     if req_spot > actual_spot + (actual_on_demand - req_on_demand):
@@ -299,15 +293,14 @@ def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
     if _get_timeout_action(actual_fleet) == 'TERMINATE_CLUSTER':
         if _get_timeout_action(req_fleet) != 'TERMINATE_CLUSTER':
             log.debug('    self-terminating fleet not requested')
-            return
+            return False
 
         if (_get_timeout_duration(actual_fleet) <
                 _get_timeout_duration(req_fleet)):
             log.debug('    fleet may self-terminate prematurely')
-            return
+            return False
 
-    # sort by total capacity, with on-demand as a tie-breaker
-    return (actual_on_demand + actual_spot, actual_on_demand)
+    return True
 
 
 def _get_timeout_action(fleet):
@@ -337,10 +330,10 @@ def _fleet_spec_satsifies(actual_spec, req_spec):
     if (actual_spec.get('WeightedCapacity', 1) !=
             req_spec.get('WeightedCapacity', 1)):
         log.debug('    different weighted capacity for same instance type')
-        return
+        return False
 
     if not _ebs_satisfies(actual_spec, req_spec):
-        return
+        return False
 
     # bid price is the max, don't worry about it
     if actual_spec.get('BidPriceAsPercentageOfOnDemandPrice', 100) >= 100:
@@ -352,31 +345,31 @@ def _fleet_spec_satsifies(actual_spec, req_spec):
         actual_bid_price = actual_spec.get('BidPrice')
         if actual_bid_price is None:
             log.debug('    no bid price specified')
-            return
+            return False
 
         try:
             if not float(actual_bid_price) >= float(req_bid_price):
                 log.debug('    bid price too low')
-                return
+                return False
         except TypeError:
             log.debug('    non-numeric bid price')
-            return
+            return False
 
     # relative bid price
     req_bid_percent = req_spec.get('BidPriceAsPercentageOfOnDemandPrice')
     if not isinstance(req_spec, (integer_types, float)):
-        return
+        return False
 
     if req_bid_percent:
         actual_bid_percent = actual_spec.get(
             'BidPriceAsPercentageOfOnDemandPrice')
         if actual_bid_percent is None:
             log.debug('    no bid price as % of on-demand price')
-            return
+            return False
 
         if req_bid_percent > actual_bid_percent:
             log.debug('    bid price as % of on-demand price too low')
-            return
+            return False
 
     return True
 
@@ -499,3 +492,168 @@ def _ebs_volume_satisfies(actual_volume, req_volume):
         return False
 
     return True
+
+
+### locking pooled clusters ###
+
+# Locking ensures that two jobs don't add their steps to the same cluster at
+# the same time
+
+# after 60 seconds, a lock is considered released
+_CLUSTER_LOCK_SECS = 60.0
+
+# describe the cluster and add our tag within the first 5 seconds
+_ADD_TAG_BEFORE = 5.0
+
+# then wait 10 seconds before checking if our tag is still there
+_WAIT_AFTER_ADD_TAG = 10.0
+
+# make sure we have at least 40 seconds left to add steps and have them
+# start running, before the lock expires
+_CHECK_TAG_BEFORE = 20.0
+
+# tag key used for locking pooled clusters
+_POOL_LOCK_KEY = '__mrjob_pool_lock'
+
+
+def _make_cluster_lock(job_key, expiry):
+    """Return the contents of a tag used to lock a cluster.
+
+    *expiry* is the unix timestamp for when the lock is no longer valid"""
+    return '%s %.6f' % (job_key, expiry)
+
+
+def _parse_cluster_lock(lock):
+    """Return (job_key, expiry) or raise ValueError
+
+    Raises TypeError if *lock* is not a string.
+    """
+    if not isinstance(lock, (string_types)):
+        raise TypeError
+
+    job_key, expiry_str = lock.split(' ')
+
+    try:
+        expiry = float(expiry_str)
+    except TypeError:
+        raise ValueError
+
+    return job_key, expiry
+
+
+def _get_cluster_state_and_lock(emr_client, cluster_id, cluster=None):
+    if cluster is None:
+        cluster = emr_client.describe_cluster(
+            ClusterId=cluster_id)['Cluster']
+
+    state = cluster['Status']['State']
+    lock = _extract_tags(cluster).get(_POOL_LOCK_KEY)
+
+    return state, lock
+
+
+def _attempt_to_lock_cluster(
+        emr_client, cluster_id, job_key,
+        cluster=None, when_cluster_described=None):
+    """Attempt to lock the given pooled cluster using EMR tags.
+
+    You may optionally include *cluster* (a cluster description) and
+    *when_cluster_described*, to save an API call to ``DescribeCluster``
+    """
+    log.debug('Attempting to lock cluster %s for %.1f seconds' % (
+        cluster_id, _CLUSTER_LOCK_SECS))
+
+    if when_cluster_described is None:
+        start = time.time()
+    else:
+        start = when_cluster_described
+
+    # check if there is a non-expired lock
+    state, lock = _get_cluster_state_and_lock(
+        emr_client, cluster_id, cluster=cluster)
+    if state != 'WAITING':
+        log.info('  cluster is no longer waiting, now %s' % state)
+        return False
+
+    if lock:
+        expiry = None
+        try:
+            their_job_key, expiry = _parse_cluster_lock(lock)
+        except ValueError:
+            log.info('  ignoring invalid pool lock: %s' % lock)
+
+        if expiry and expiry > start:
+            log.info('  locked by %s for %.1f seconds' % (
+                their_job_key, expiry - start))
+            return False
+
+    # add our lock
+    our_lock = _make_cluster_lock(job_key, start + _CLUSTER_LOCK_SECS)
+
+    log.debug('  adding tag to cluster %s:' % cluster_id)
+    log.debug('    %s=%s' % (_POOL_LOCK_KEY, our_lock))
+    emr_client.add_tags(
+        ResourceId=cluster_id,
+        Tags=[dict(Key=_POOL_LOCK_KEY, Value=our_lock)]
+    )
+
+    if time.time() - start > _ADD_TAG_BEFORE:
+        log.info('  took too long to tag cluster with lock')
+        return False
+
+    # wait, then check if our lock is still there
+    log.info("  waiting %.1f seconds to ensure lock wasn't overwritten" %
+        _WAIT_AFTER_ADD_TAG)
+    time.sleep(_WAIT_AFTER_ADD_TAG)
+
+    # check if our lock is still there
+    state, lock = _get_cluster_state_and_lock(emr_client, cluster_id)
+
+    # this could happen if the cluster is TERMINATING, for instance
+    if state != 'WAITING':
+        log.info('  cluster is no longer waiting, now %s' % state)
+        return False
+
+    if lock is None:
+        log.info('  lock was removed')
+        return False
+    elif lock != our_lock:
+        their_job_desc = 'other job'
+        try:
+            their_job_desc, expiry = _parse_cluster_lock(lock)
+        except ValueError:
+            pass
+
+        log.info('  lock was overwritten by %s' % their_job_desc)
+        return False
+
+    # make sure we have enough time to add steps and have them run
+    # before the lock expires
+    if time.time() > start + _CHECK_TAG_BEFORE:
+        log.info('  took too long to check for lock')
+        return False
+
+    log.info('  lock acquired')
+    return True
+
+
+def _attempt_to_unlock_cluster(emr_client, cluster_id):
+    """Release our lock on the given pooled cluster. Only do this if you know
+    the cluster is currently running steps (so other jobs won't try to
+    join the cluster).
+
+    Returns True if successful, False if not (usually, this means the
+    cluster terminated). Cluster locks eventually release themselves,
+    so if releasing a lock fails for whatever reason, it's not worth
+    releasing it again.
+
+    Locks expire after a minute anyway (which is less time than it takes to
+    run most jobs), so this is mostly useful for preventing problems
+    due to clock skew. Also makes unit testing more straightforward.
+    """
+    try:
+        emr_client.remove_tags(ResourceId=cluster_id, TagKeys=[_POOL_LOCK_KEY])
+        return True
+    except ClientError as ex:
+        log.debug('removing tags failed: %r' % ex)
+        return False

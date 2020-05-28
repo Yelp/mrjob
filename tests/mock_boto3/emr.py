@@ -1242,6 +1242,8 @@ class MockEMRClient(object):
 
         self._add_tags('AddTags', Tags, cluster)
 
+        return {}
+
     def describe_cluster(self, ClusterId):
         _validate_param_type(ClusterId, string_types)
         cluster = self._get_mock_cluster('DescribeCluster', ClusterId)
@@ -1432,6 +1434,27 @@ class MockEMRClient(object):
                 results.append(step)
 
         return [deepcopy(step) for step in results]
+
+    def remove_tags(self, ResourceId, TagKeys):
+        """Simulate successful creation of new metadata tags for the specified
+        resource id.
+        """
+        _validate_param_type(ResourceId, string_types)
+        _validate_param_type(TagKeys, (list, tuple))
+
+        cluster = self._get_mock_cluster('RemoveTags', ResourceId)
+
+        if cluster['Status']['State'].startswith('TERMINATED'):
+            raise _InvalidRequestException(
+                'RemoveTags',
+                'Tags cannot be modified on terminated clusters.')
+
+        # it's okay to remove tags that don't exist
+        TagKeys = set(TagKeys)
+        cluster['Tags'] = [
+            tag for tag in cluster['Tags'] if tag['Key'] not in TagKeys]
+
+        return {}
 
     def terminate_job_flows(self, JobFlowIds):
         _validate_param_type(JobFlowIds, (list, tuple))
@@ -1731,11 +1754,13 @@ def _validate_param_enum(value, allowed):
 
 
 def _InvalidRequestException(operation_name, message):
-    # boto3 reports this as a botocore.exceptions.InvalidRequestException,
-    # but that's not something you can actually import
-    return AttributeError(
-        'An error occurred (InvalidRequestException) when calling the'
-        ' %s operation: %s' % (operation_name, message))
+    return ClientError(
+        dict(Error=dict(
+            Code='InvalidRequestException',
+            Message=message,
+        )),
+        operation_name
+    )
 
 
 def _ValidationException(operation_name, message):

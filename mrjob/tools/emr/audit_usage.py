@@ -67,7 +67,7 @@ from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
 from mrjob.options import _alphabetize_actions
 from mrjob.options import _filter_by_role
-from mrjob.pool import _pool_hash_and_name
+from mrjob.pool import _pool_name
 from mrjob.util import strip_microseconds
 
 # match an mrjob job key (used to uniquely identify the job)
@@ -340,7 +340,7 @@ def _cluster_to_basic_summary(cluster, now=None):
 
     bcs['num_steps'] = len(cluster['Steps'])
 
-    _, bcs['pool'] = _pool_hash_and_name(cluster)
+    bcs['pool'] = _pool_name(cluster)
 
     m = _JOB_KEY_RE.match(bcs['name'] or '')
     if m:

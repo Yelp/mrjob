@@ -21,8 +21,6 @@ from datetime import timedelta
 from os.path import join
 from shutil import make_archive
 
-import mrjob
-import mrjob.emr
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION

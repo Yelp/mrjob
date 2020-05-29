@@ -3,6 +3,7 @@ v0.7.3, 2020-05-?? -- cluster pooling 2.0
  * cluster pooling rules are slightly more strict
    * mrjob version must always match
    * application list must match exactly
+ * support for counters to be published with with counter-output-dir as a local file-path
 
 v0.7.2, 2020-04-11 -- archives on all Spark platforms
  * archives work on non-YARN Spark installations (#1993)

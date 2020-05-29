@@ -20,6 +20,7 @@ from collections import defaultdict
 from importlib import import_module
 from itertools import chain
 
+from mrjob.parse import is_uri
 from mrjob.util import shlex_split
 from pyspark.accumulators import AccumulatorParam
 
@@ -254,11 +255,12 @@ def main(cmd_line_args=None):
 
         # run steps
         for step_num, step in steps_to_run:
-            rdd = _run_step(step, step_num, rdd,
-                            make_mrc_job,
-                            args.num_reducers, sort_values,
-                            emulate_map_input_file,
-                            args.skip_internal_protocol)
+            rdd = _run_step(
+                step, step_num, rdd,
+                make_mrc_job,
+                args.num_reducers, sort_values,
+                emulate_map_input_file,
+                args.skip_internal_protocol)
 
         # max_output_files: limit number of partitions
         if args.max_output_files:
@@ -281,12 +283,22 @@ def main(cmd_line_args=None):
         if args.counter_output_dir is not None:
             counters = [ca.value for ca in counter_accumulators]
 
-            sc.parallelize(
-                [json.dumps(counters)],
-                numSlices=1
-            ).saveAsTextFile(
-                args.counter_output_dir
-            )
+            # If the given path is an s3 path, use s3.parallelize,
+            # otherwise just write them directly to the local dir
+            if is_uri(args.counter_output_dir):
+                sc.parallelize(
+                    [json.dumps(counters)],
+                    numSlices=1
+                ).saveAsTextFile(
+                    args.counter_output_dir
+                )
+                # Use regular python buildin file writer if the part-* file is not created
+            else:
+                path = os.path.join(args.counter_output_dir, "part-00000")
+                if not os.path.exists(args.counter_output_dir):
+                    os.mkdir(args.counter_output_dir)
+                with open(path, 'w') as wb:
+                    wb.write(str(json.dumps(counters)))
 
 
 def _text_file_with_path(sc, path):
@@ -311,10 +323,11 @@ def _text_file_with_path(sc, path):
     )
 
 
-def _run_step(step, step_num, rdd, make_mrc_job,
-              num_reducers=None, sort_values=None,
-              emulate_map_input_file=False,
-              skip_internal_protocol=False):
+def _run_step(
+        step, step_num, rdd, make_mrc_job,
+        num_reducers=None, sort_values=None,
+        emulate_map_input_file=False,
+        skip_internal_protocol=False):
     """Run the given step on the RDD and return the transformed RDD."""
     _check_step(step, step_num)
 
@@ -339,7 +352,7 @@ def _run_step(step, step_num, rdd, make_mrc_job,
         try:
             _check_substep(step, step_num, 'combiner')
             combiner_job = make_mrc_job('combiner', step_num)
-        except:
+        except Exception:
             # if combiner needs to run subprocesses, or we can't
             # initialize a job instance, just skip combiners
             pass
@@ -494,8 +507,9 @@ def _run_combiner(combiner_job, rdd, sort_values=False, num_reducers=None):
     return rdd
 
 
-def _shuffle_and_sort(rdd, sort_values=False, num_reducers=None,
-                      skip_internal_protocol=False):
+def _shuffle_and_sort(
+        rdd, sort_values=False, num_reducers=None,
+        skip_internal_protocol=False):
     """Simulate Hadoop's shuffle-and-sort step, so that data will be in the
     format the reducer expects.
 
@@ -514,9 +528,9 @@ def _shuffle_and_sort(rdd, sort_values=False, num_reducers=None,
              adjacent and in the same partition
     """
     if skip_internal_protocol:
-        key_func = lambda k_v: k_v[0]
+        def key_func(k_v): return k_v[0]
     else:
-        key_func = lambda line: line.split(b'\t')[0]
+        def key_func(line): return line.split(b'\t')[0]
 
     rdd = rdd.groupBy(key_func, numPartitions=num_reducers)
     rdd = _discard_key_and_flatten_values(rdd, sort_values=sort_values)
@@ -564,8 +578,9 @@ def _run_reducer(make_mrc_job, step_num, rdd, num_reducers=None):
                 yield k, v
 
     # if *num_reducers* is set, don't re-partition. otherwise, doesn't matter
-    return rdd.mapPartitions(reduce_lines,
-                             preservesPartitioning=bool(num_reducers))
+    return rdd.mapPartitions(
+        reduce_lines,
+        preservesPartitioning=bool(num_reducers))
 
 
 def _discard_key_and_flatten_values(rdd, sort_values=False):
@@ -580,9 +595,9 @@ def _discard_key_and_flatten_values(rdd, sort_values=False):
     If *sort_values* is true, sort each list of lines before flattening it.
     """
     if sort_values:
-        map_f = lambda key_and_lines: sorted(key_and_lines[1])
+        def map_f(key_and_lines): return sorted(key_and_lines[1])
     else:
-        map_f = lambda key_and_lines: key_and_lines[1]
+        def map_f(key_and_lines): return key_and_lines[1]
 
     return rdd.flatMap(map_f, preservesPartitioning=True)
 

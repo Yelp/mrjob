@@ -1,10 +1,11 @@
-v0.7.3, 2020-05-?? -- cluster pooling 2.0
+v0.7.3, 2020-05-?? -- spark harness counters support improvement
  * terminate_idle_clusters no longer locks pooled clusters
  * cluster pooling rules are slightly more strict
    * mrjob version must always match
    * application list must match exactly
+ * support for counters to be published with with counter-output-dir as a local file-path (#2176)
 
-v0.7.2, 2020-04-11 -- archives on all Spark platforms
+v0.7.2, 2019-04-11 -- archives on all Spark platforms
  * archives work on non-YARN Spark installations (#1993)
    * mrjob.util.file_ext() ignores initial dots
    * archives in setup scripts etc. are auto-named without file extension

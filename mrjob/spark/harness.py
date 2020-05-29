@@ -17,7 +17,6 @@ import sys
 import json
 from argparse import ArgumentParser
 from collections import defaultdict
-from glob import glob
 from importlib import import_module
 from itertools import chain
 
@@ -294,7 +293,7 @@ def main(cmd_line_args=None):
                     args.counter_output_dir
                 )
                 # Use regular python buildin file writer if the part-* file is not created
-            elif not glob(args.counter_output_dir + "/part-*"):
+            else:
                 path = os.path.join(args.counter_output_dir, "part-00000")
                 if not os.path.exists(args.counter_output_dir):
                     os.mkdir(args.counter_output_dir)

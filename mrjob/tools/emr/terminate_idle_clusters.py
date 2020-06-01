@@ -2,8 +2,8 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 Yelp and Contributors
 # Copyright 2014 Brett Gibson
-# Copyright 2015-2018 Yelp
-# Copyright 2019 Yelp
+# Copyright 2015-2019 Yelp
+# Copyright 2020 Affirm, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

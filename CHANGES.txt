@@ -1,9 +1,20 @@
-v0.7.3, 2020-05-?? -- spark harness counters support improvement
+v0.7.3, 2020-06-03 -- API-efficient cluster pooling
+ * cluster pooling changes:
+   * clusters locking now uses EMR tags, not S3 objects (#2160)
+     * cluster locks always expire after one minute (#2162)
+       * deprecated --max-mins-locked (terminate-idle-clusters), does nothing
+   * pooling uses API more efficiently
+     * most cluster pooling info is in job name (#2160)
+     * don't list pooled clusters' steps (#2159)
+     * use any matching cluster, not just the "best" one (#2164)
+   * "best" cluster determined by NormalizedInstanceHours / hours run
+   * matching rules are slightly more strict:
+      * mrjob version must always match
+      * application list must match exactly
  * terminate_idle_clusters no longer locks pooled clusters
- * cluster pooling rules are slightly more strict
-   * mrjob version must always match
-   * application list must match exactly
- * support for counters to be published with with counter-output-dir as a local file-path (#2176)
+ * spark runner:
+   * counters work when spark_tmp_dir is a local path (#2176)
+ * manifest download script correctly handles errors with dash (#2175)
 
 v0.7.2, 2019-04-11 -- archives on all Spark platforms
  * archives work on non-YARN Spark installations (#1993)

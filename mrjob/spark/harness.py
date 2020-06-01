@@ -17,7 +17,6 @@ import sys
 import json
 from argparse import ArgumentParser
 from collections import defaultdict
-from glob import glob
 from importlib import import_module
 from itertools import chain
 
@@ -293,7 +292,7 @@ def main(cmd_line_args=None):
                 ).saveAsTextFile(
                     args.counter_output_dir
                 )
-            elif not glob(args.counter_output_dir + "/part-*"):
+            else:
                 # Use regular python built-in file writer if the part-* file
                 # is not created
                 path = os.path.join(args.counter_output_dir, "part-00000")

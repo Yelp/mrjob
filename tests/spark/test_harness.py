@@ -494,11 +494,9 @@ class SparkHarnessOutputComparisonTestCase(
             )
             with harness_job.make_runner() as runner:
                 runner.run()
-                print(listdir(output_counter_dir))
                 path = join(output_counter_dir, "part-00000")
                 with open(path, 'r') as rb:
                     counters = rb.read()
-                print('prince counters', counters)
 
                 harness_counters = json.loads(counters)
 

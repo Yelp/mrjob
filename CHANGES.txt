@@ -1,4 +1,4 @@
-v0.7.3, 2020-06-03 -- API-efficient cluster pooling
+v0.7.3, 2020-06-05 -- API-efficient cluster pooling
  * cluster pooling changes:
    * clusters locking now uses EMR tags, not S3 objects (#2160)
      * cluster locks always expire after one minute (#2162)

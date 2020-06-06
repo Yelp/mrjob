@@ -4,6 +4,42 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.7.3:
+
+0.7.3
+-----
+
+Made many long-overdue changes to :ref:`cluster-pooling`, to reduce the
+potential for throttling by the EMR API. Pooling now puts most information
+a job needs to tell if it can join a cluster into the cluster name, meaning
+most non-matching clusters can be filtered out when we call ``ListClusters``.
+Pooling also no longer needs to list cluster steps. Finally, if
+:mrjob-opt:`pool_wait_minutes` is set, and there are multiple clusters we can
+join, we try them all, rather than just trying the "best" one and then
+requesting more information from the API.
+
+This update resulted in a few minor changes to pooling. When a job has the
+choice of multiple clusters, it chooses solely on based on CPU capacity, using
+``NormalizedInstanceHours`` in the cluster summary returned by the
+``ListClusters`` API call. mrjob version and :mrjob-opt:`applications` must
+now match exactly in all cases.
+
+We also re-worked the "locking" mechanism that keeps multiple jobs from joining
+the same cluster. Formerly, this used S3 (which may only be eventually
+consistent), and locks had no fixed expiration time. Now, EMR tags are used
+for locking, locks always expire after one minute, and every job uses the same
+timing when locking clusters, reducing the potential for race conditions.
+
+:command:`mrjob terminate-idle-clusters` no longer attempts to lock clusters
+before terminating them, so its ``--max-mins-locked`` option is deprecated and
+does nothing.
+
+The Spark harness now emulates counters correctly in local mode.
+
+If you use :py:meth:`~mrjob.job.MRJob.mapper_raw`, and your :mrjob-opt:`setup`
+script has an error, it will be correctly reported, even if your underlying
+shell is :command:`dash` and not :command:`bash`.
+
 .. _v0.7.2:
 
 0.7.2

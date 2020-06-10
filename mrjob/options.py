@@ -561,6 +561,42 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    docker_client_config=dict(
+        switches=[
+            (['--docker-client-config'], dict(
+                help='Patch of docker client config, used connect to ECR',
+            )),
+        ],
+    ),
+    docker_image=dict(
+        switches=[
+            (['--docker-image'], dict(
+                help='ID of Docker image to run tasks inside',
+            )),
+            (['--no-docker'], dict(
+                action='store_const',
+                const=None,
+                help="Don't run tasks inside Docker",
+            )),
+        ],
+    ),
+    docker_mounts=dict(
+        switches=[
+            (['--docker-mount'], dict(
+                help=('Volume to mount into docker, e.g. '
+                      ' "/etc/passwd:/etc/passwd:ro". May be used multiple'
+                      ' times'),
+            )),
+        ]
+    ),
+    docker_registry=dict(
+        switches=[
+            (['--docker-registry'], dict(
+                help=('Hostname of docker registry. Set this to "centos" to'
+                      ' use Docker Hub (the default)'),
+            )),
+        ],
+    ),
     ebs_root_volume_gb=dict(
         cloud_role='launch',
         switches=[

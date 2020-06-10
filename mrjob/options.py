@@ -592,8 +592,8 @@ _RUNNER_OPTS = dict(
     docker_registry=dict(
         switches=[
             (['--docker-registry'], dict(
-                help=('Hostname of docker registry. Set this to "centos" to'
-                      ' use Docker Hub (the default)'),
+                help=('Name of a registry on Docker Hub, or hostname'
+                      ' of a registry'),
             )),
         ],
     ),

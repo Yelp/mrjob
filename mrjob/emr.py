@@ -1196,8 +1196,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             kwargs['Applications'] = [
                 dict(Name=a) for a in sorted(applications)]
 
-        if self._opts['emr_configurations']:
-            kwargs['Configurations'] = self._opts['emr_configurations']
+        emr_configurations = self._emr_configurations()
+        if emr_configurations:
+            kwargs['Configurations'] = emr_configurations
 
         if self._opts['subnet']:
             # handle lists of subnets (for instance fleets)
@@ -2858,6 +2859,28 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     return (too_small_msg % ig['InstanceType'])
 
         return None
+
+    def _emr_configurations(self):
+        # don't keep two configs with the same Classification (#2097)
+        return _deduplicate_emr_configurations(
+            self._opts['emr_configurations'] +
+            self._docker_emr_configurations()
+        )
+
+    def _docker_emr_configurations(self):
+        if self._opts['docker_image']:
+            registries = ','.join(['local', self._opts['docker_registry']])
+            return [
+                dict(
+                    Classification='docker',
+                    Properties={
+                        'docker.trusted.registries': registries,
+                        'docker.privileged-containers.registries': registries,
+                    }
+                ),
+            ]
+        else:
+            return []
 
 
 def _get_job_steps(emr_client, cluster_id, job_key):

@@ -2860,6 +2860,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         return None
 
+    def _jobconf_for_step(self, step_num):
+        j = super(EMRJobRunner, self)._jobconf_for_step(step_num)
+
+        return combine_dicts(j, self._docker_jobconf())
+
     def _emr_configurations(self):
         # don't keep two configs with the same Classification (#2097)
         return _deduplicate_emr_configurations(
@@ -2868,19 +2873,34 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         )
 
     def _docker_emr_configurations(self):
-        if self._opts['docker_image']:
-            registries = ','.join(['local', self._opts['docker_registry']])
-            return [
-                dict(
-                    Classification='docker',
-                    Properties={
-                        'docker.trusted.registries': registries,
-                        'docker.privileged-containers.registries': registries,
-                    }
-                ),
-            ]
-        else:
+        if not self._opts['docker_image']:
             return []
+
+        registries = ','.join(['local', self._opts['docker_registry']])
+        return [
+            dict(
+                Classification='docker',
+                Properties={
+                    'docker.trusted.registries': registries,
+                    'docker.privileged-containers.registries': registries,
+                }
+            ),
+        ]
+
+    def _docker_jobconf(self):
+        if not self._opts['docker_image']:
+            return {}
+
+        j = dict(
+            YARN_CONTAINER_RUNTIME_TYPE='docker',
+            YARN_CONTAINER_RUNTIME_DOCKER_IMAGE=self._opts['docker_image'],
+        )
+
+        if self._opts['docker_client_config']:
+            j['YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG'] = (
+                self._opts['docker_client_config'])
+
+        return j
 
 
 def _get_job_steps(emr_client, cluster_id, job_key):

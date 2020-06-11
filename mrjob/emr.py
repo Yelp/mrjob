@@ -2879,11 +2879,18 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         registries = ','.join(['local', self._opts['docker_registry']])
         return [
             dict(
-                Classification='docker',
-                Properties={
-                    'docker.trusted.registries': registries,
-                    'docker.privileged-containers.registries': registries,
-                }
+                Classification='container-executor',
+                Configurations=[
+                    dict(
+                        Classification='docker',
+                        Properties={
+                            'docker.trusted.registries': registries,
+                            'docker.privileged-containers.registries': (
+                                registries),
+                        },
+                    ),
+                ],
+                Properties={},
             ),
         ]
 

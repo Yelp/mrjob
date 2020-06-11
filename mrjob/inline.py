@@ -172,7 +172,7 @@ class InlineMRJobRunner(SimMRJobRunner):
                 open(stderr_path, 'wb') as stderr:
             with save_current_environment(), save_cwd(), save_sys_path(), \
                     save_sys_std():
-                os.environ.update(_fix_env(self._opts['cmdenv']))
+                os.environ.update(_fix_env(self._cmdenv()))
                 os.chdir(wd)
                 sys.path = [os.getcwd()] + sys.path
 

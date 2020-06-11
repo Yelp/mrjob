@@ -1309,6 +1309,11 @@ class MRJobRunner(object):
         else:
             return to_uri(self._intermediate_output_dir(step_num))
 
+    def _cmdenv(self):
+        """Return a copy of ``self._opts['cmdenv']``. This exists so we
+        can instrument cmdenv in runner subclasses."""
+        return dict(self._opts['cmdenv'])
+
     def _jobconf_for_step(self, step_num):
         """Get the jobconf dictionary, optionally including step-specific
         jobconf info.

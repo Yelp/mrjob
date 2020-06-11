@@ -346,7 +346,7 @@ class SimMRJobRunner(MRJobRunner):
         return combine_local_envs(os.environ,
                                   to_env(user_jobconf),
                                   to_env(simulated_jobconf),
-                                  self._opts['cmdenv'])
+                                  self._cmdenv())
 
     def _simulate_jobconf_for_step(
             self, task_type, step_num, task_num, map_split=None):

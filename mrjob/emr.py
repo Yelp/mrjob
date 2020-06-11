@@ -2863,13 +2863,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _jobconf_for_step(self, step_num):
         j = super(EMRJobRunner, self)._jobconf_for_step(step_num)
 
-        return combine_dicts(j, self._docker_jobconf())
+        return combine_dicts(self._docker_jobconf(), j)
 
     def _emr_configurations(self):
         # don't keep two configs with the same Classification (#2097)
         return _deduplicate_emr_configurations(
-            self._opts['emr_configurations'] +
-            self._docker_emr_configurations()
+            self._docker_emr_configurations() +
+            self._opts['emr_configurations']
         )
 
     def _docker_emr_configurations(self):

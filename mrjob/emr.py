@@ -2885,6 +2885,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             env['YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG'] = (
                 self._opts['docker_client_config'])
 
+        if self._opts['docker_mounts']:
+            env['YARN_CONTAINER_RUNTIME_DOCKER_MOUNTS'] = ','.join(
+                self._opts['docker_mounts'])
+
         return env
 
     def _docker_emr_configurations(self):

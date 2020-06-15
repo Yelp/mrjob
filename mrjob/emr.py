@@ -2895,7 +2895,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if not self._opts['docker_image']:
             return []
 
-        registries = ','.join(['local', self._opts['docker_registry']])
+        registries = ','.join([
+            'local', 'centos', self._opts['docker_registry']])
+
         return [
             dict(
                 Classification='container-executor',

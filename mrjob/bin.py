@@ -409,7 +409,7 @@ class MRJobBinRunner(MRJobRunner):
         """
         py_files = list(self._opts['py_files'])
 
-        if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_PY_FILES:
+        if self._bootstrap_mrjob():
             py_files.append(self._create_mrjob_zip())
 
         return py_files

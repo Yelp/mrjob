@@ -113,10 +113,6 @@ class MRJobRunner(object):
     # re-define this as a set of step types supported by your runner
     _STEP_TYPES = None
 
-    # if this is true, when bootstrap_mrjob is true, create a mrjob.zip
-    # and patch it into the *py_files* option
-    _BOOTSTRAP_MRJOB_IN_PY_FILES = True
-
     ### methods to call from your batch script ###
 
     def __init__(self, mr_job_script=None, conf_paths=None,

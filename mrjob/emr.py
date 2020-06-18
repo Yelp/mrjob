@@ -720,17 +720,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _add_bootstrap_files_for_upload(self, persistent=False):
         """Add files needed by the bootstrap script to self._upload_mgr.
 
-        Tar up mrjob if bootstrap_mrjob is True.
-
         Create the master bootstrap script if necessary.
 
         persistent -- set by make_persistent_cluster()
         """
-        # lazily create mrjob.zip
-        if self._bootstrap_mrjob():
-            self._create_mrjob_zip()
-            self._bootstrap_dir_mgr.add('file', self._mrjob_zip_path)
-
         # all other files needed by the script are already in
         # _bootstrap_dir_mgr
         for path in self._bootstrap_dir_mgr.paths():
@@ -2536,12 +2529,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 ]
                 for cmd in self._bootstrap
             ]
-
-            # bootstrap_mrjob_python_bin
-            if self._bootstrap_mrjob():
-                d['bootstrap_mrjob_python'] = self._python_bin()
-            else:
-                d['bootstrap_mrjob_python'] = None
 
             # emr_configurations
             d['emr_configurations'] = self._opts['emr_configurations']

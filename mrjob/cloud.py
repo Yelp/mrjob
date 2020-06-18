@@ -222,45 +222,14 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
             return
 
         # Also don't bother if we're not bootstrapping
-        if not (self._bootstrap or self._bootstrap_mrjob()):
+        if not self._bootstrap:
             return
-
-        # create mrjob.zip if we need it, and add commands to install it
-        mrjob_bootstrap = []
-        if self._bootstrap_mrjob():
-            assert self._mrjob_zip_path
-            path_dict = {
-                'type': 'file', 'name': None, 'path': self._mrjob_zip_path}
-            self._bootstrap_dir_mgr.add(**path_dict)
-
-            # find out where python keeps its libraries
-            mrjob_bootstrap.append([
-                "__mrjob_PYTHON_LIB=$(%s -c "
-                "'from distutils.sysconfig import get_python_lib;"
-                " print(get_python_lib())')" %
-                cmd_line(self._python_bin())])
-
-            # remove anything that might be in the way (see #1567)
-            mrjob_bootstrap.append(['sudo rm -rf $__mrjob_PYTHON_LIB/mrjob'])
-
-            # unzip mrjob.zip
-            mrjob_bootstrap.append(
-                ['sudo unzip ', path_dict, ' -d $__mrjob_PYTHON_LIB'])
-
-            # re-compile pyc files now, since mappers/reducers can't
-            # write to this directory. Don't fail if there is extra
-            # un-compileable crud in the tarball (this would matter if
-            # sh_bin were 'sh -e')
-            mrjob_bootstrap.append(
-                ['sudo %s -m compileall -q'
-                 ' -f $__mrjob_PYTHON_LIB/mrjob && true' %
-                 cmd_line(self._python_bin())])
 
         path = os.path.join(self._get_local_tmp_dir(), 'b.sh')
         log.info('writing master bootstrap script to %s' % path)
 
         contents = self._master_bootstrap_script_content(
-            self._bootstrap + mrjob_bootstrap)
+            self._bootstrap)
 
         self._write_script(contents, path, 'master bootstrap script')
 

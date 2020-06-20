@@ -581,8 +581,10 @@ _RUNNER_OPTS = dict(
         ],
     ),
     docker_mounts=dict(
+        combiner=combine_lists,
         switches=[
             (['--docker-mount'], dict(
+                action='append',
                 help=('Volume to mount into docker, e.g. '
                       ' "/etc/passwd:/etc/passwd:ro". May be used multiple'
                       ' times'),

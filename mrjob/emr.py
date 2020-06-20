@@ -259,7 +259,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'docker_client_config',
         'docker_image',
         'docker_mounts',
-        'docker_registry',
         'ebs_root_volume_gb',
         'ec2_endpoint',
         'ec2_key_pair',

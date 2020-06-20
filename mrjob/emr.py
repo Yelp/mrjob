@@ -2906,7 +2906,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if not registry:
             return []
 
-        registries = ','.join(['local', 'centos', registry])
+        registries = ','.join(['local', registry])
 
         return [
             dict(

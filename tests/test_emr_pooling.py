@@ -1545,10 +1545,10 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters'])
 
-    def test_dont_join_wrong_python_bin(self):
+    def test_python_bin_doesnt_matter(self):
         _, cluster_id = self.make_pooled_cluster()
 
-        self.assertDoesNotJoin(cluster_id, [
+        self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--python-bin', 'snake'])
 

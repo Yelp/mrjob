@@ -589,14 +589,6 @@ _RUNNER_OPTS = dict(
             )),
         ]
     ),
-    docker_registry=dict(
-        switches=[
-            (['--docker-registry'], dict(
-                help=('Name of a registry on Docker Hub, or hostname'
-                      ' of a registry'),
-            )),
-        ],
-    ),
     ebs_root_volume_gb=dict(
         cloud_role='launch',
         switches=[

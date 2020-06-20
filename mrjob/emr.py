@@ -2858,13 +2858,36 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._opts['emr_configurations']
         )
 
+    def _docker_image(self):
+        """Special-case the "library" registry which is implied on Docker Hub
+        but needs to be specified explicitly on EMR."""
+        image = self._opts['docker_image']
+
+        if not image:
+            return None
+        elif '/' in image:
+            return image
+        else:
+            return 'library/' + image
+
+    def _docker_registry(self):
+        """Infer the trusted docker registry from the docker image."""
+        image = self._docker_image()
+
+        if not image:
+            return None
+        else:
+            return image.split('/')[0]
+
     def _docker_cmdenv(self):
-        if not self._opts['docker_image']:
+        image = self._docker_image()
+
+        if not image:
             return {}
 
         env = dict(
             YARN_CONTAINER_RUNTIME_TYPE='docker',
-            YARN_CONTAINER_RUNTIME_DOCKER_IMAGE=self._opts['docker_image'],
+            YARN_CONTAINER_RUNTIME_DOCKER_IMAGE=image,
         )
 
         if self._opts['docker_client_config']:
@@ -2878,11 +2901,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         return env
 
     def _docker_emr_configurations(self):
-        if not self._opts['docker_image']:
+        registry = self._docker_registry()
+
+        if not registry:
             return []
 
-        registries = ','.join([
-            'local', 'centos', self._opts['docker_registry']])
+        registries = ','.join(['local', 'centos', registry])
 
         return [
             dict(

@@ -2530,7 +2530,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             ]
 
             # emr_configurations
-            d['emr_configurations'] = self._opts['emr_configurations']
+            d['emr_configurations'] = self._emr_configurations()
 
             # image_id
             d['image_id'] = self._opts['image_id']

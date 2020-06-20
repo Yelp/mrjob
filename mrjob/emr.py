@@ -2341,7 +2341,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             cluster_id = cluster['Id']
 
             if not cluster['Name'].endswith(suffix):
-                log.debug('  cluster %s: wrong name suffix' % cluster_id)
+                log.debug('  cluster %s: wrong cluster name suffix'
+                          % cluster_id)
                 continue
 
             when_ready = cluster['Status']['Timeline'].get('ReadyDateTime')

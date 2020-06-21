@@ -5911,3 +5911,79 @@ class LogAddressOfMasterTestCase(MockBoto3TestCase):
             runner.run()
 
         self.assertEqual(self._num_times_address_of_master_logged(), 2)
+
+
+class DockerImageTestCase(MockBoto3TestCase):
+
+    def test_no_docker_image_by_default(self):
+        runner = self.make_runner()
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(cluster['Configurations'], [])
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_IMAGE',
+            runner._cmdenv())
+
+    def test_docker_hub_image_with_explicit_registry(self):
+        runner = self.make_runner('--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(
+            cluster['Configurations'],
+            [
+                dict(
+                    Classification='container-executor',
+                    Configurations=[
+                        dict(
+                            Classification='docker',
+                            Properties={
+                                'docker.trusted.registries':
+                                    'local,dead-sea',
+                                'docker.privileged-containers.registries':
+                                    'local,dead-sea',
+                            }
+                        )
+                    ],
+                    Properties={}
+                )
+            ]
+        )
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            'dead-sea/scrolls:latest'
+        )
+
+    def test_docker_hub_image_with_default_registry(self):
+        runner = self.make_runner('--docker-image', 'mrjob')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(
+            cluster['Configurations'],
+            [
+                dict(
+                    Classification='container-executor',
+                    Configurations=[
+                        dict(
+                            Classification='docker',
+                            Properties={
+                                'docker.trusted.registries':
+                                    'local,library',
+                                'docker.privileged-containers.registries':
+                                    'local,library',
+                            }
+                        )
+                    ],
+                    Properties={}
+                )
+            ]
+        )
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            'library/mrjob'
+        )

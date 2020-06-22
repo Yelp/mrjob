@@ -413,7 +413,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cloud_fs_sync_secs=5.0,
                 docker_client_config=None,
                 docker_image=None,
-                docker_registry='centos',
                 image_version=_DEFAULT_IMAGE_VERSION,
                 num_core_instances=0,
                 num_task_instances=0,

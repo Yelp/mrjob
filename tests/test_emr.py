@@ -5926,30 +5926,31 @@ class DockerImageTestCase(MockBoto3TestCase):
             'YARN_CONTAINER_RUNTIME_DOCKER_IMAGE',
             runner._cmdenv())
 
+    def _assert_emr_config_trusts_registries(self, c, registries):
+        self.assertEqual(c.get('Classification'), 'container-executor')
+
+        self.assertEqual(
+            c.get('Configurations'),
+            [
+                dict(
+                    Classification='docker',
+                    Properties={
+                        'docker.trusted.registries': registries,
+                        'docker.privileged-containers.registries': registries,
+                    }
+                )
+            ]
+        )
+
     def test_docker_hub_image_with_explicit_registry(self):
         runner = self.make_runner('--docker-image', 'dead-sea/scrolls:latest')
         runner.run()
         cluster = runner._describe_cluster()
 
-        self.assertEqual(
-            cluster['Configurations'],
-            [
-                dict(
-                    Classification='container-executor',
-                    Configurations=[
-                        dict(
-                            Classification='docker',
-                            Properties={
-                                'docker.trusted.registries':
-                                    'local,dead-sea',
-                                'docker.privileged-containers.registries':
-                                    'local,dead-sea',
-                            }
-                        )
-                    ],
-                    Properties={}
-                )
-            ]
+        self.assertEqual(len(cluster['Configurations']), 1)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,dead-sea'
         )
 
         self.assertEqual(
@@ -5962,28 +5963,34 @@ class DockerImageTestCase(MockBoto3TestCase):
         runner.run()
         cluster = runner._describe_cluster()
 
-        self.assertEqual(
-            cluster['Configurations'],
-            [
-                dict(
-                    Classification='container-executor',
-                    Configurations=[
-                        dict(
-                            Classification='docker',
-                            Properties={
-                                'docker.trusted.registries':
-                                    'local,library',
-                                'docker.privileged-containers.registries':
-                                    'local,library',
-                            }
-                        )
-                    ],
-                    Properties={}
-                )
-            ]
+        self.assertEqual(len(cluster['Configurations']), 1)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,library'
+        )
+
+    def test_ecr_registry(self):
+        runner = self.make_runner(
+            '--docker-image',
+            '999999999999.dkr.ecr.us-west-2.amazonaws.com/mrjob'
+        )
+
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(len(cluster['Configurations']), 1)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,999999999999.dkr.ecr.us-west-2.amazonaws.com'
         )
 
         self.assertEqual(
             runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
-            'library/mrjob'
+            '999999999999.dkr.ecr.us-west-2.amazonaws.com/mrjob'
         )
+
+    def test_no_docker_switch_override_config(self):
+        pass
+
+    def test_emr_configurations_overrides_docker_image(self):
+        pass

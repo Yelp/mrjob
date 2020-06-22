@@ -575,7 +575,7 @@ _RUNNER_OPTS = dict(
             )),
             (['--no-docker'], dict(
                 action='store_const',
-                const=None,
+                const='',
                 help="Don't run tasks inside Docker",
             )),
         ],

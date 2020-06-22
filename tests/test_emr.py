@@ -5989,8 +5989,92 @@ class DockerImageTestCase(MockBoto3TestCase):
             '999999999999.dkr.ecr.us-west-2.amazonaws.com/mrjob'
         )
 
-    def test_no_docker_switch_override_config(self):
-        pass
+    def test_config(self):
+        self.start(mrjob_conf_patcher(dict(
+            runners=dict(
+                emr=dict(
+                    docker_image='dead-sea/scrolls:latest')))))
 
-    def test_emr_configurations_overrides_docker_image(self):
-        pass
+        runner = self.make_runner()
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(len(cluster['Configurations']), 1)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,dead-sea'
+        )
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            'dead-sea/scrolls:latest'
+        )
+
+    def test_no_docker_switch_overrides_config(self):
+        self.start(mrjob_conf_patcher(dict(
+            runners=dict(
+                emr=dict(
+                    docker_image='dead-sea/scrolls:latest')))))
+
+        runner = self.make_runner('--no-docker')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(cluster['Configurations'], [])
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_IMAGE',
+            runner._cmdenv())
+
+    def test_plays_well_with_emr_configurations(self):
+        runner = self.make_runner(
+            '--emr-configuration',
+            json.dumps(CORE_SITE_EMR_CONFIGURATION),
+            '--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(len(cluster['Configurations']), 2)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,dead-sea'
+        )
+        self.assertEqual(
+            cluster['Configurations'][1], CORE_SITE_EMR_CONFIGURATION)
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            'dead-sea/scrolls:latest'
+        )
+
+    def test_can_override_configurations_in_docker_image(self):
+        # what if we want to trust more Docker registries?
+        registries = 'local,centos,mrjob,dead-sea'
+        emr_config = dict(
+            Classification='container-executor',
+            Configurations=[
+                dict(
+                    Classification='docker',
+                    Properties={
+                        'docker.trusted.registries': registries,
+                        'docker.privileged-containers.registries': (
+                            registries),
+                    },
+                ),
+            ],
+            Properties={},
+        )
+
+        runner = self.make_runner(
+            '--emr-configuration',
+            json.dumps(emr_config),
+            '--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(cluster['Configurations'], [emr_config])
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            'dead-sea/scrolls:latest'
+        )

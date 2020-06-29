@@ -6110,3 +6110,34 @@ class DockerMountsTestCase(MockBoto3TestCase):
         self.assertNotIn(
             'YARN_CONTAINER_RUNTIME_DOCKER_MOUNTS',
             runner._cmdenv())
+
+
+class DockerClientConfigTestCase(MockBoto3TestCase):
+
+    def test_no_client_config(self):
+        runner = self.make_runner('--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG',
+            runner._cmdenv())
+
+    def test_docker_client_config_option(self):
+        runner = self.make_runner(
+            '--docker-image', 'dead-sea/scrolls:latest',
+            '--docker-client-config', 'hdfs:///tmp/mrjob/docker-config.json')
+        runner.run()
+
+        self.assertEqual(
+            runner._cmdenv().get(
+                'YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG'),
+            'hdfs:///tmp/mrjob/docker-config.json')
+
+    def test_no_mounts_without_docker_image(self):
+        runner = self.make_runner(
+            '--docker-client-config', 'hdfs:///tmp/mrjob/docker-config.json')
+        runner.run()
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG',
+            runner._cmdenv())

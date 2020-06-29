@@ -6078,3 +6078,35 @@ class DockerImageTestCase(MockBoto3TestCase):
             runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
             'dead-sea/scrolls:latest'
         )
+
+
+class DockerMountsTestCase(MockBoto3TestCase):
+
+    def test_no_mounts(self):
+        runner = self.make_runner('--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_MOUNTS',
+            runner._cmdenv())
+
+    def test_docker_mounts_option(self):
+        runner = self.make_runner(
+            '--docker-image', 'dead-sea/scrolls:latest',
+            '--docker-mount', '/usr/lib:/docker/usr/lib:ro',
+            '--docker-mount', '/usr/share:/docker/usr/share:ro')
+        runner.run()
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_MOUNTS'),
+            '/usr/lib:/docker/usr/lib:ro,/usr/share:/docker/usr/share:ro')
+
+    def test_no_mounts_without_docker_image(self):
+        runner = self.make_runner(
+            '--docker-mount', '/usr/lib:/docker/usr/lib:ro',
+            '--docker-mount', '/usr/share:/docker/usr/share:ro')
+        runner.run()
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_MOUNTS',
+            runner._cmdenv())

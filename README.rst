@@ -133,7 +133,8 @@ for its conf file in:
 * ``/etc/mrjob.conf``
 
 See `the mrjob.conf documentation
-<http://packages.python.org/mrjob/guides/configs-basics.html>`_ for more information.
+<https://mrjob.readthedocs.io/en/latest/guides/configs-basics.html>`_ for more
+information.
 
 
 Project Links

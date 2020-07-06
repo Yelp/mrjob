@@ -2343,9 +2343,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         now = _boto3_now()
 
+        if self._opts['max_concurrent_steps'] > 1:
+            cluster_states = ['RUNNING', 'WAITING']
+        else:
+            cluster_states = ['WAITING']
+
         for cluster in _boto3_paginate(
                 'Clusters', emr_client, 'list_clusters',
-                ClusterStates=['WAITING']):
+                ClusterStates=cluster_states):
 
             cluster_id = cluster['Id']
 
@@ -2454,6 +2459,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if not matches:
             log.debug('  cluster %s: subnet mismatch' % cluster_id)
             return
+
+        # step concurrency
+        step_concurrency = cluster.get('StepConcurrencyLevel', 1)
+        if step_concurrency > self._opts['max_concurrent_steps']:
+            log.debug('  cluster %s: step concurrency level too high' %
+                      cluster_id)
 
         return True
 

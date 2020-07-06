@@ -1176,6 +1176,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         kwargs['Steps'] = Steps = []
 
+        kwargs['StepConcurrencyLevel'] = self._opts['max_concurrent_steps']
+
         if self._opts['enable_emr_debugging']:
             # other steps are added separately
             Steps.append(self._build_debugging_step())
@@ -1236,7 +1238,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             return self._opts['emr_action_on_failure']
         elif (self._opts['cluster_id'] or
                 self._opts['pool_clusters']):
-            return 'CANCEL_AND_WAIT'
+            if self._opts['max_concurrent_steps'] > 1:
+                return 'CONTINUE'
+            else:
+                return 'CANCEL_AND_WAIT'
         else:
             return 'TERMINATE_CLUSTER'
 

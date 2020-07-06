@@ -888,6 +888,16 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    max_concurrent_steps=dict(
+        cloud_role='launch',
+        switches=[
+            (['--max-concurrent-steps'], dict(
+                help=("Maximum number of steps that may run on the cluster"
+                      " at one time. Default is 1"),
+                type=int,
+            )),
+        ],
+    ),
     max_mins_idle=dict(
         cloud_role='launch',
         switches=[

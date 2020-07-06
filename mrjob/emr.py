@@ -271,6 +271,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
+        'max_concurrent_steps',
         'pool_clusters',
         'pool_name',
         'pool_wait_minutes',
@@ -339,6 +340,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.warning(
                 "Cluster pooling is not fully supported on AMIs prior to"
                 " 2.4.8/3.1.1 due to the limit on total number of steps")
+
+        if self._opts['max_concurrent_steps'] < 1:
+            raise ValueError('max_concurrent_steps must be at least 1')
 
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
@@ -409,6 +413,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cleanup_on_failure=['JOB'],
                 cloud_fs_sync_secs=5.0,
                 image_version=_DEFAULT_IMAGE_VERSION,
+                max_concurrent_steps=1,
                 num_core_instances=0,
                 num_task_instances=0,
                 pool_clusters=False,

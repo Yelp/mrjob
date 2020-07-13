@@ -214,8 +214,7 @@ class MockBoto3TestCase(SandboxedTestCase):
         runner._launch()
 
     def run_and_get_cluster(self, *args):
-        # TODO: not sure why we include -v
-        with self.make_runner('-v', *args) as runner:
+        with self.make_runner(*args) as runner:
             runner.run()
             return runner._describe_cluster()
 

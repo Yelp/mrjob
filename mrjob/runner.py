@@ -113,10 +113,6 @@ class MRJobRunner(object):
     # re-define this as a set of step types supported by your runner
     _STEP_TYPES = None
 
-    # if this is true, when bootstrap_mrjob is true, create a mrjob.zip
-    # and patch it into the *py_files* option
-    _BOOTSTRAP_MRJOB_IN_PY_FILES = True
-
     ### methods to call from your batch script ###
 
     def __init__(self, mr_job_script=None, conf_paths=None,
@@ -1308,6 +1304,11 @@ class MRJobRunner(object):
             return to_uri(self._output_dir)
         else:
             return to_uri(self._intermediate_output_dir(step_num))
+
+    def _cmdenv(self):
+        """Return a copy of ``self._opts['cmdenv']``. This exists so we
+        can instrument cmdenv in runner subclasses."""
+        return dict(self._opts['cmdenv'])
 
     def _jobconf_for_step(self, step_num):
         """Get the jobconf dictionary, optionally including step-specific

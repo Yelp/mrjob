@@ -25,10 +25,9 @@ that affect which cluster a job can join:
 
 * :mrjob-opt:`additional_emr_info`: (or lack thereof) must match
 * :mrjob-opt:`applications`: must match
-* :mrjob-opt:`bootstrap`: must match, and local files uploaded must
+* :mrjob-opt:`bootstrap`: must match, and files referenced must
   have identical contents
 * :mrjob-opt:`bootstrap_actions`: must match
-* :mrjob-opt:`bootstrap_mrjob`: must match
 * :mrjob-opt:`image_version`\/:mrjob-opt:`release_label`: must match
 * :mrjob-opt:`image_id` (or lack thereof) must match
 * :mrjob-opt:`ec2_key_pair`: if specified, only join clusters with the same key

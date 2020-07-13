@@ -821,16 +821,6 @@ class PyFilesTestCase(GenericLocalRunnerTestCase):
             self.assertEqual(runner._py_files(),
                              [])
 
-    def test_no_bootstrap_mrjob_in_py_files(self):
-        job = MRNullSpark(['-r', 'local'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            # this happens in runners that run on a cluster
-            runner._BOOTSTRAP_MRJOB_IN_PY_FILES = False
-            self.assertEqual(runner._py_files(),
-                             [])
-
     def test_no_hash_paths(self):
         egg_path = self.makefile('horton.egg')
 

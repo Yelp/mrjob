@@ -240,13 +240,6 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
             # job overrides jobconf in step 1
             self.assertIn('x=z', step_1_args)
 
-            # make sure mrjob.zip is created and uploaded as a bootstrap file
-            self.assertTrue(os.path.exists(runner._mrjob_zip_path))
-            self.assertIn(runner._mrjob_zip_path,
-                          runner._upload_mgr.path_to_uri())
-            self.assertIn(runner._mrjob_zip_path,
-                          runner._bootstrap_dir_mgr.paths())
-
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
@@ -332,13 +325,13 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
         self._test_cloud_tmp_cleanup('CLOUD_TMP', 0, 1)
 
     def test_cleanup_local(self):
-        self._test_cloud_tmp_cleanup('LOCAL_TMP', 5, 1)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 6, 1)
 
     def test_cleanup_logs(self):
-        self._test_cloud_tmp_cleanup('LOGS', 5, 0)
+        self._test_cloud_tmp_cleanup('LOGS', 6, 0)
 
     def test_cleanup_none(self):
-        self._test_cloud_tmp_cleanup('NONE', 5, 1)
+        self._test_cloud_tmp_cleanup('NONE', 6, 1)
 
     def test_cleanup_combine(self):
         self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0, 0)
@@ -1514,7 +1507,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
     def test_usr_bin_env(self):
         runner = EMRJobRunner(conf_paths=[],
-                              bootstrap_mrjob=True,
+                              bootstrap=['true'],
                               sh_bin='bash -e')
 
         runner._add_bootstrap_files_for_upload()
@@ -1587,7 +1580,6 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # check files get downloaded
         assertScriptDownloads(foo_py_path, 'bar.py')
         assertScriptDownloads('s3://walrus/scripts/ohnoes.sh')
-        assertScriptDownloads(runner._mrjob_zip_path)
 
         # check scripts get run
 
@@ -1595,16 +1587,6 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertIn('  ' + expected_python_bin + ' $__mrjob_PWD/bar.py',
                       lines)
         self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
-        # bootstrap_mrjob
-        mrjob_zip_name = runner._bootstrap_dir_mgr.name(
-            'file', runner._mrjob_zip_path)
-        self.assertIn("  __mrjob_PYTHON_LIB=$(" + expected_python_bin +
-                      " -c 'from distutils.sysconfig import get_python_lib;"
-                      " print(get_python_lib())')", lines)
-        self.assertIn('  sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
-                      ' -d $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -q -f'
-                      ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
 
     def test_create_master_bootstrap_script(self):
         # this tests 4.x
@@ -1656,6 +1638,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         ]
 
         runner = EMRJobRunner(conf_paths=[],
+                              bootstrap=['true'],
                               bootstrap_actions=bootstrap_actions,
                               cloud_fs_sync_secs=0.00)
 
@@ -1693,19 +1676,6 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # make sure master bootstrap script is on S3
         self.assertTrue(runner.fs.exists(actions[2]['ScriptPath']))
 
-    def test_bootstrap_mrjob_uses_python_bin(self):
-        # use all the bootstrap options
-        runner = EMRJobRunner(conf_paths=[],
-                              bootstrap_mrjob=True,
-                              python_bin=['anaconda'])
-
-        runner._add_bootstrap_files_for_upload()
-        self.assertIsNotNone(runner._master_bootstrap_script_path)
-        with open(runner._master_bootstrap_script_path, 'r') as f:
-            content = f.read()
-
-        self.assertIn('sudo anaconda -m compileall -q -f', content)
-
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3
         action_path = os.path.join(self.tmp_dir, 'apt-install.sh')
@@ -1717,6 +1687,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_actions=bootstrap_actions,
+                              bootstrap=['true'],
                               cloud_fs_sync_secs=0.00,
                               pool_clusters=False)
 
@@ -5079,15 +5050,20 @@ class SparkPyFilesTestCase(MockBoto3TestCase):
             # we don't use py_files to bootstrap mrjob
             self.assertEqual(
                 runner._py_files(),
-                [egg1_path, egg2_path]
+                [egg1_path, egg2_path, runner._mrjob_zip_path]
             )
 
             # in the cloud, we need to upload py_files to cloud storage
             self.assertIn(egg1_path, runner._upload_mgr.path_to_uri())
             self.assertIn(egg2_path, runner._upload_mgr.path_to_uri())
+            self.assertIn(runner._mrjob_zip_path,
+                          runner._upload_mgr.path_to_uri())
 
-            egg_uris = '%s,%s' % (runner._upload_mgr.uri(egg1_path),
-                                  runner._upload_mgr.uri(egg2_path))
+            egg_uris = ','.join([
+                runner._upload_mgr.uri(egg1_path),
+                runner._upload_mgr.uri(egg2_path),
+                runner._upload_mgr.uri(runner._mrjob_zip_path),
+            ])
 
             self.assertIn(egg_uris, runner._spark_submit_args(0))
 
@@ -5399,7 +5375,7 @@ class BadBashWorkaroundTestCase(MockBoto3TestCase):
         cookie_jar = self.makefile('cookie.jar')
 
         job = MRTwoStepJob(['-r', 'emr', '--image-version', image_version,
-                            '--libjars', cookie_jar])
+                            '--libjars', cookie_jar, '--bootstrap', 'true'])
         job.sandbox()
 
         def check_script(path):
@@ -5935,3 +5911,233 @@ class LogAddressOfMasterTestCase(MockBoto3TestCase):
             runner.run()
 
         self.assertEqual(self._num_times_address_of_master_logged(), 2)
+
+
+class DockerImageTestCase(MockBoto3TestCase):
+
+    def test_no_docker_image_by_default(self):
+        runner = self.make_runner()
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(cluster['Configurations'], [])
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_IMAGE',
+            runner._cmdenv())
+
+    def _assert_emr_config_trusts_registries(self, c, registries):
+        self.assertEqual(c.get('Classification'), 'container-executor')
+
+        self.assertEqual(
+            c.get('Configurations'),
+            [
+                dict(
+                    Classification='docker',
+                    Properties={
+                        'docker.trusted.registries': registries,
+                        'docker.privileged-containers.registries': registries,
+                    }
+                )
+            ]
+        )
+
+    def test_docker_hub_image_with_explicit_registry(self):
+        runner = self.make_runner('--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(len(cluster['Configurations']), 1)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,dead-sea'
+        )
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            'dead-sea/scrolls:latest'
+        )
+
+    def test_docker_hub_image_with_default_registry(self):
+        runner = self.make_runner('--docker-image', 'mrjob')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(len(cluster['Configurations']), 1)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,library'
+        )
+
+    def test_ecr_registry(self):
+        runner = self.make_runner(
+            '--docker-image',
+            '999999999999.dkr.ecr.us-west-2.amazonaws.com/mrjob'
+        )
+
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(len(cluster['Configurations']), 1)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,999999999999.dkr.ecr.us-west-2.amazonaws.com'
+        )
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            '999999999999.dkr.ecr.us-west-2.amazonaws.com/mrjob'
+        )
+
+    def test_config(self):
+        self.start(mrjob_conf_patcher(dict(
+            runners=dict(
+                emr=dict(
+                    docker_image='dead-sea/scrolls:latest')))))
+
+        runner = self.make_runner()
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(len(cluster['Configurations']), 1)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,dead-sea'
+        )
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            'dead-sea/scrolls:latest'
+        )
+
+    def test_no_docker_switch_overrides_config(self):
+        self.start(mrjob_conf_patcher(dict(
+            runners=dict(
+                emr=dict(
+                    docker_image='dead-sea/scrolls:latest')))))
+
+        runner = self.make_runner('--no-docker')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(cluster['Configurations'], [])
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_IMAGE',
+            runner._cmdenv())
+
+    def test_plays_well_with_emr_configurations(self):
+        runner = self.make_runner(
+            '--emr-configuration',
+            json.dumps(CORE_SITE_EMR_CONFIGURATION),
+            '--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(len(cluster['Configurations']), 2)
+        self._assert_emr_config_trusts_registries(
+            cluster['Configurations'][0],
+            'local,dead-sea'
+        )
+        self.assertEqual(
+            cluster['Configurations'][1], CORE_SITE_EMR_CONFIGURATION)
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            'dead-sea/scrolls:latest'
+        )
+
+    def test_can_override_configurations_in_docker_image(self):
+        # what if we want to trust more Docker registries?
+        registries = 'local,centos,mrjob,dead-sea'
+        emr_config = dict(
+            Classification='container-executor',
+            Configurations=[
+                dict(
+                    Classification='docker',
+                    Properties={
+                        'docker.trusted.registries': registries,
+                        'docker.privileged-containers.registries': (
+                            registries),
+                    },
+                ),
+            ],
+            Properties={},
+        )
+
+        runner = self.make_runner(
+            '--emr-configuration',
+            json.dumps(emr_config),
+            '--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+        cluster = runner._describe_cluster()
+
+        self.assertEqual(cluster['Configurations'], [emr_config])
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_IMAGE'),
+            'dead-sea/scrolls:latest'
+        )
+
+
+class DockerMountsTestCase(MockBoto3TestCase):
+
+    def test_no_mounts(self):
+        runner = self.make_runner('--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_MOUNTS',
+            runner._cmdenv())
+
+    def test_docker_mounts_option(self):
+        runner = self.make_runner(
+            '--docker-image', 'dead-sea/scrolls:latest',
+            '--docker-mount', '/usr/lib:/docker/usr/lib:ro',
+            '--docker-mount', '/usr/share:/docker/usr/share:ro')
+        runner.run()
+
+        self.assertEqual(
+            runner._cmdenv().get('YARN_CONTAINER_RUNTIME_DOCKER_MOUNTS'),
+            '/usr/lib:/docker/usr/lib:ro,/usr/share:/docker/usr/share:ro')
+
+    def test_no_mounts_without_docker_image(self):
+        runner = self.make_runner(
+            '--docker-mount', '/usr/lib:/docker/usr/lib:ro',
+            '--docker-mount', '/usr/share:/docker/usr/share:ro')
+        runner.run()
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_MOUNTS',
+            runner._cmdenv())
+
+
+class DockerClientConfigTestCase(MockBoto3TestCase):
+
+    def test_no_client_config(self):
+        runner = self.make_runner('--docker-image', 'dead-sea/scrolls:latest')
+        runner.run()
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG',
+            runner._cmdenv())
+
+    def test_docker_client_config_option(self):
+        runner = self.make_runner(
+            '--docker-image', 'dead-sea/scrolls:latest',
+            '--docker-client-config', 'hdfs:///tmp/mrjob/docker-config.json')
+        runner.run()
+
+        self.assertEqual(
+            runner._cmdenv().get(
+                'YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG'),
+            'hdfs:///tmp/mrjob/docker-config.json')
+
+    def test_no_mounts_without_docker_image(self):
+        runner = self.make_runner(
+            '--docker-client-config', 'hdfs:///tmp/mrjob/docker-config.json')
+        runner.run()
+
+        self.assertNotIn(
+            'YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG',
+            runner._cmdenv())

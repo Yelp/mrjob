@@ -15,6 +15,7 @@
 /dist
 /mrjob.egg-info
 /docs/_build
+/tmp
 .tox
 .coverage
 *,cover

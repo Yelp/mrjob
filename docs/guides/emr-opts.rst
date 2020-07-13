@@ -409,6 +409,57 @@ See also :mrjob-opt:`cloud_tmp_dir`, :mrjob-opt:`cloud_part_size_mb`
     your cluster will go into a subdirectory, e.g.
     ``s3://yourbucket/logs/j-CLUSTERID/``.
 
+Docker
+------
+
+.. mrjob-opt::
+    :config: docker_client_config
+    :switch: --docker-client-config
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: ``None``
+
+    An ``hdfs://`` URI pointing to the client config, which is used to
+    authenticate with a private Docker registry (e.g. ECR).
+
+    See "Using ECR" on `this page <https://aws.amazon.com/blogs/big-data/run-spark-applications-with-docker-using-amazon-emr-6-0-0-beta/>`__
+    for information about how to fetch working credentials. Because ECR
+    credentials only last 12 hours, if you want to use ECR and Docker
+    for multiple jobs on a long-running cluster, you may wish to set up
+    a cron job at bootstrap time.
+
+    .. versionadded:: 0.7.4
+
+.. mrjob-opt::
+    :config: docker_image
+    :switch: --docker-image, --no-docker
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: ``None``
+
+    The repository, name, and optionally, tag of a docker image, in the format
+    ``registry/repository:tag``. If ``registry/`` is omitted, we assume the
+    default registry on Docker Hub (``library``). If registry is a hostname,
+    we connect to that host instead (e.g. for use of ECR).
+
+    Other ``docker_*`` options will do nothing if this is not set.
+
+    Note that you must be running at least AMI 6.0.0 to use Docker on EMR.
+
+    .. versionadded:: 0.7.4
+
+.. mrjob-opt::
+    :config: docker_mounts
+    :switch: --docker-mount
+    :type: :ref:`string list <data-type-string-list>`
+    :set: emr
+    :default: ``[]``
+
+    Optional mounting instructions to pass to Docker, in the format
+    ``/local/path:/path/inside/docker:ro_or_rw``.
+
+    .. versionadded:: 0.7.4
+
 API Endpoints
 -------------
 

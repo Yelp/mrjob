@@ -157,7 +157,7 @@ _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 _DEFAULT_EMR_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This may be updated with each version
-_DEFAULT_IMAGE_VERSION = '5.27.0'
+_DEFAULT_IMAGE_VERSION = '6.0.0'
 
 # first AMI version that we can't run bash -e on (see #1548)
 _BAD_BASH_IMAGE_VERSION = '5.2.0'
@@ -256,6 +256,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'bootstrap_spark',
         'cloud_log_dir',
         'core_instance_bid_price',
+        'docker_client_config',
+        'docker_image',
+        'docker_mounts',
         'ebs_root_volume_gb',
         'ec2_endpoint',
         'ec2_key_pair',
@@ -408,6 +411,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 check_cluster_every=30,
                 cleanup_on_failure=['JOB'],
                 cloud_fs_sync_secs=5.0,
+                docker_client_config=None,
+                docker_image=None,
                 image_version=_DEFAULT_IMAGE_VERSION,
                 num_core_instances=0,
                 num_task_instances=0,
@@ -712,17 +717,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _add_bootstrap_files_for_upload(self, persistent=False):
         """Add files needed by the bootstrap script to self._upload_mgr.
 
-        Tar up mrjob if bootstrap_mrjob is True.
-
         Create the master bootstrap script if necessary.
 
         persistent -- set by make_persistent_cluster()
         """
-        # lazily create mrjob.zip
-        if self._bootstrap_mrjob():
-            self._create_mrjob_zip()
-            self._bootstrap_dir_mgr.add('file', self._mrjob_zip_path)
-
         # all other files needed by the script are already in
         # _bootstrap_dir_mgr
         for path in self._bootstrap_dir_mgr.paths():
@@ -1188,8 +1186,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             kwargs['Applications'] = [
                 dict(Name=a) for a in sorted(applications)]
 
-        if self._opts['emr_configurations']:
-            kwargs['Configurations'] = self._opts['emr_configurations']
+        emr_configurations = self._emr_configurations()
+        if emr_configurations:
+            kwargs['Configurations'] = emr_configurations
 
         if self._opts['subnet']:
             # handle lists of subnets (for instance fleets)
@@ -2340,7 +2339,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             cluster_id = cluster['Id']
 
             if not cluster['Name'].endswith(suffix):
-                log.debug('  cluster %s: wrong name suffix' % cluster_id)
+                log.debug('  cluster %s: wrong cluster name suffix'
+                          % cluster_id)
                 continue
 
             when_ready = cluster['Status']['Timeline'].get('ReadyDateTime')
@@ -2528,14 +2528,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 for cmd in self._bootstrap
             ]
 
-            # bootstrap_mrjob_python_bin
-            if self._bootstrap_mrjob():
-                d['bootstrap_mrjob_python'] = self._python_bin()
-            else:
-                d['bootstrap_mrjob_python'] = None
-
             # emr_configurations
-            d['emr_configurations'] = self._opts['emr_configurations']
+            d['emr_configurations'] = self._emr_configurations()
 
             # image_id
             d['image_id'] = self._opts['image_id']
@@ -2850,6 +2844,85 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     return (too_small_msg % ig['InstanceType'])
 
         return None
+
+    def _cmdenv(self):
+        env = super(EMRJobRunner, self)._cmdenv()
+
+        return combine_dicts(self._docker_cmdenv(), env)
+
+    def _emr_configurations(self):
+        # don't keep two configs with the same Classification (#2097)
+        return _deduplicate_emr_configurations(
+            self._docker_emr_configurations() +
+            self._opts['emr_configurations']
+        )
+
+    def _docker_image(self):
+        """Special-case the "library" registry which is implied on Docker Hub
+        but needs to be specified explicitly on EMR."""
+        image = self._opts['docker_image']
+
+        if not image:
+            return None
+        elif '/' in image:
+            return image
+        else:
+            return 'library/' + image
+
+    def _docker_registry(self):
+        """Infer the trusted docker registry from the docker image."""
+        image = self._docker_image()
+
+        if not image:
+            return None
+        else:
+            return image.split('/')[0]
+
+    def _docker_cmdenv(self):
+        image = self._docker_image()
+
+        if not image:
+            return {}
+
+        env = dict(
+            YARN_CONTAINER_RUNTIME_TYPE='docker',
+            YARN_CONTAINER_RUNTIME_DOCKER_IMAGE=image,
+        )
+
+        if self._opts['docker_client_config']:
+            env['YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG'] = (
+                self._opts['docker_client_config'])
+
+        if self._opts['docker_mounts']:
+            env['YARN_CONTAINER_RUNTIME_DOCKER_MOUNTS'] = ','.join(
+                self._opts['docker_mounts'])
+
+        return env
+
+    def _docker_emr_configurations(self):
+        registry = self._docker_registry()
+
+        if not registry:
+            return []
+
+        registries = ','.join(['local', registry])
+
+        return [
+            dict(
+                Classification='container-executor',
+                Configurations=[
+                    dict(
+                        Classification='docker',
+                        Properties={
+                            'docker.trusted.registries': registries,
+                            'docker.privileged-containers.registries': (
+                                registries),
+                        },
+                    ),
+                ],
+                Properties={},
+            ),
+        ]
 
 
 def _get_job_steps(emr_client, cluster_id, job_key):

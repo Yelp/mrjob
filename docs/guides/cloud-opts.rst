@@ -233,7 +233,7 @@ Cluster software configuration
     :switch: --image-version
     :type: :ref:`string <data-type-string>`
     :set: cloud
-    :default: ``'5.27.0'`` on EMR, ``'1.3'`` on Dataproc
+    :default: ``'6.0.0'`` on EMR, ``'1.3'`` on Dataproc
 
     Machine image version to use. This controls which Hadoop
     version(s) are available and which version of Python is installed, among

@@ -371,6 +371,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # map from cluster ID to a dictionary containing cached info about
         # that cluster. Includes the following keys:
+        #
         # - image_version
         # - hadoop_version
         # - master_public_dns

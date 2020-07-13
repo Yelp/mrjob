@@ -1545,10 +1545,10 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters'])
 
-    def test_dont_join_wrong_python_bin(self):
+    def test_python_bin_doesnt_matter(self):
         _, cluster_id = self.make_pooled_cluster()
 
-        self.assertDoesNotJoin(cluster_id, [
+        self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--python-bin', 'snake'])
 
@@ -1857,6 +1857,37 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--instance-fleets', json.dumps(fleets)])
+
+    def test_same_docker_image(self):
+        _, cluster_id = self.make_pooled_cluster(
+            docker_image='dead-sea/scrolls:latest')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--docker-image', 'dead-sea/scrolls:latest'])
+
+    def test_same_docker_registry(self):
+        _, cluster_id = self.make_pooled_cluster(
+            docker_image='dead-sea/scrolls:latest')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--docker-image', 'dead-sea/mud'])
+
+    def test_different_docker_registry(self):
+        _, cluster_id = self.make_pooled_cluster(
+            docker_image='dead-sea/scrolls:latest')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--docker-image', 'mrjob-registry/mrjob'])
+
+    def test_docker_image_vs_none(self):
+        _, cluster_id = self.make_pooled_cluster(
+            docker_image='dead-sea/scrolls:latest')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters'])
 
 
 class PoolingRecoveryTestCase(MockBoto3TestCase):

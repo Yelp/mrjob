@@ -490,16 +490,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _add_bootstrap_files_for_upload(self):
         """Add files needed by the bootstrap script to self._upload_mgr.
 
-        Tar up mrjob if bootstrap_mrjob is True.
-
         Create the master bootstrap script if necessary.
 
         """
-        # lazily create mrjob.zip
-        if self._bootstrap_mrjob():
-            self._create_mrjob_zip()
-            self._bootstrap_dir_mgr.add('file', self._mrjob_zip_path)
-
         # all other files needed by the script are already in
         # _bootstrap_dir_mgr
         for path in self._bootstrap_dir_mgr.paths():

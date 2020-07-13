@@ -287,7 +287,7 @@ class MRJobBinRunner(MRJobRunner):
             args.extend(['-partitioner', partitioner])
 
         # cmdenv
-        for key, value in sorted(self._opts['cmdenv'].items()):
+        for key, value in sorted(self._cmdenv().items()):
             args.append('-cmdenv')
             args.append('%s=%s' % (key, value))
 
@@ -409,7 +409,7 @@ class MRJobBinRunner(MRJobRunner):
         """
         py_files = list(self._opts['py_files'])
 
-        if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_PY_FILES:
+        if self._bootstrap_mrjob():
             py_files.append(self._create_mrjob_zip())
 
         return py_files
@@ -1042,7 +1042,7 @@ class MRJobBinRunner(MRJobRunner):
                 cmdenv['PYSPARK_PYTHON'] = executor_python
                 cmdenv['PYSPARK_DRIVER_PYTHON'] = driver_python
 
-        cmdenv.update(self._opts['cmdenv'])
+        cmdenv.update(self._cmdenv())
         return cmdenv
 
 

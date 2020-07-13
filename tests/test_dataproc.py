@@ -223,13 +223,6 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
             # job overrides jobconf in step 1
             self.assertIn('x=z', step_1_args)
 
-            # make sure mrjob.zip is created and uploaded as a bootstrap file
-            self.assertTrue(os.path.exists(runner._mrjob_zip_path))
-            self.assertIn(runner._mrjob_zip_path,
-                          runner._upload_mgr.path_to_uri())
-            self.assertIn(runner._mrjob_zip_path,
-                          runner._bootstrap_dir_mgr.paths())
-
             cluster_id = runner.get_cluster_id()
 
         self.assertEqual(sorted(results),
@@ -303,13 +296,13 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
         self._test_cloud_tmp_cleanup('CLOUD_TMP', 0)
 
     def test_cleanup_local(self):
-        self._test_cloud_tmp_cleanup('LOCAL_TMP', 4)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 5)
 
     def test_cleanup_logs(self):
-        self._test_cloud_tmp_cleanup('LOGS', 4)
+        self._test_cloud_tmp_cleanup('LOGS', 5)
 
     def test_cleanup_none(self):
-        self._test_cloud_tmp_cleanup('NONE', 4)
+        self._test_cloud_tmp_cleanup('NONE', 5)
 
     def test_cleanup_combine(self):
         self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0)
@@ -1057,7 +1050,6 @@ class MasterBootstrapScriptTestCase(MockGoogleTestCase):
         # check files get downloaded
         assertScriptDownloads(foo_py_path, 'bar.py')
         assertScriptDownloads('gs://walrus/scripts/ohnoes.sh')
-        assertScriptDownloads(runner._mrjob_zip_path)
 
         # check scripts get run
 
@@ -1077,16 +1069,6 @@ class MasterBootstrapScriptTestCase(MockGoogleTestCase):
         self.assertIn('  speedups.sh', lines)
         self.assertIn('  /tmp/s.sh', lines)
 
-        # bootstrap_mrjob
-        mrjob_zip_name = runner._bootstrap_dir_mgr.name(
-            'file', runner._mrjob_zip_path)
-        self.assertIn("  __mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
-                      " distutils.sysconfig import get_python_lib;"
-                      " print(get_python_lib())')", lines)
-        self.assertIn('  sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
-                      ' -d $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('  sudo ' + PYTHON_BIN + ' -m compileall -q -f'
-                      ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python
         if PY2:
             self.assertIn(
@@ -1103,19 +1085,6 @@ class MasterBootstrapScriptTestCase(MockGoogleTestCase):
 
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
-
-    def test_bootstrap_mrjob_uses_python_bin(self):
-        # use all the bootstrap options
-        runner = DataprocJobRunner(conf_paths=[],
-                                   bootstrap_mrjob=True,
-                                   python_bin=['anaconda'])
-
-        runner._add_bootstrap_files_for_upload()
-        self.assertIsNotNone(runner._master_bootstrap_script_path)
-        with open(runner._master_bootstrap_script_path, 'r') as f:
-            content = f.read()
-
-        self.assertIn('sudo anaconda -m compileall -q -f', content)
 
     def test_bootstrap_script_respects_sh_bin(self):
         runner = DataprocJobRunner(conf_paths=[])

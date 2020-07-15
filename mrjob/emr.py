@@ -188,6 +188,9 @@ _MIN_SPARK_AMI_VERSION = '3.8.0'
 # first AMI version with Spark that supports Python 3
 _MIN_SPARK_PY3_AMI_VERSION = '4.0.0'
 
+# first AMI version that allows steps to run concurrently
+_MIN_STEP_CONCURRENCY_AMI_VERSION = '5.28.0'
+
 # we have to wait this many minutes for logs to transfer to S3 (or wait
 # for the cluster to terminate). Docs say logs are transferred every 5
 # minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
@@ -1229,11 +1232,22 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # don't terminate other people's clusters
         if (self._opts['emr_action_on_failure']):
             return self._opts['emr_action_on_failure']
+        elif not self._add_steps_in_batch():
+            # concurrent clusters don't allow CANCEL_ON_WAIT
+            return 'CONTINUE'
         elif (self._opts['cluster_id'] or
                 self._opts['pool_clusters']):
             return 'CANCEL_AND_WAIT'
         else:
             return 'TERMINATE_CLUSTER'
+
+    def _add_steps_in_batch(self):
+        if self._opts['add_steps_in_batch'] is None:
+            # by default, add steps in batch only when concurrent steps
+            # are not possible
+            return not self._image_version_gte('5.28.0')
+        else:
+            return self._opts['add_steps_in_batch']
 
     def _build_steps(self):
         """Return a step data structures to pass to ``boto3``"""

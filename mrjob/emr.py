@@ -247,6 +247,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     alias = 'emr'
 
     OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
+        'add_steps_in_batch',
         'additional_emr_info',
         'applications',
         'aws_access_key_id',

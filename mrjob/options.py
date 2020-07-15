@@ -310,11 +310,13 @@ _RUNNER_OPTS = dict(
     add_steps_in_batch=dict(
         switches=[
             (['--add-steps-in-batch'], dict(
-                'For multi-step jobs, submit all steps at once',
+                action='store_true',
+                help='For multi-step jobs, submit all steps at once',
             )),
             (['--no-add-steps-in-batch'], dict(
-                'For multi-step jobs, submit steps successively after'
-                ' the previous one completes',
+                action='store_false',
+                help=('For multi-step jobs, submit steps successively after'
+                      ' the previous one completes'),
             )),
         ]
     ),

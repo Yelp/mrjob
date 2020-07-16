@@ -366,6 +366,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # did we acquire a lock on self._cluster_id? (used for pooling)
         self._locked_cluster = None
 
+        # IDs of steps we have submitted to the cluster
+        self._step_ids = []
+
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
 
@@ -668,6 +671,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         assert not self._opts['cluster_id']
         self._cluster_id = None
         self._created_cluster = False
+        self._step_ids = []
 
         # old SSH tunnel isn't valid for this cluster (see #1549)
         if self._ssh_proc:
@@ -1249,7 +1253,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             return self._opts['add_steps_in_batch']
 
-    def _build_steps(self):
+    def _steps_to_submit(self):
         """Return a step data structures to pass to ``boto3``"""
         # quick, add the other steps before the job spins up and
         # then shuts itself down! (in practice that won't happen
@@ -1401,8 +1405,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Create an empty cluster on EMR, and set self._cluster_id to
         its ID.
         """
-        emr_client = self.make_emr_client()
-
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
         if (self._opts['pool_clusters'] and not self._cluster_id):
@@ -1425,11 +1427,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._check_cluster_spark_support()
 
         # define our steps
-        steps = self._build_steps()
-        steps_kwargs = dict(JobFlowId=self._cluster_id, Steps=steps)
-        log.debug('Calling add_job_flow_steps(%s)' % ','.join(
-            ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
-        emr_client.add_job_flow_steps(**steps_kwargs)
+        steps = self._steps_to_submit()
+
+        if self._add_steps_in_batch():
+            self._add_steps_to_cluster(steps)
+        else:
+            # later steps will be added one at a time
+            self._add_steps_to_cluster(steps[:1])
 
         # learn about how fast the cluster state switches
         cluster = self._describe_cluster()
@@ -1439,6 +1443,17 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if hasattr(self.fs, 'ssh') and version_gte(
                 self.get_image_version(), '4.3.0'):
             self.fs.ssh.use_sudo_over_ssh()
+
+    def _add_steps_to_cluster(self, steps):
+        """Add steps (from _steps_to_submit()) to our cluster and append their
+         IDs to self._step_ids"""
+        emr_client = self.make_emr_client()
+
+        steps_kwargs = dict(JobFlowId=self._cluster_id, Steps=steps)
+        log.debug('Calling add_job_flow_steps(%s)' % ','.join(
+            ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
+        step_ids = emr_client.add_job_flow_steps(**steps_kwargs)['StepIds']
+        self._step_ids.extend(step_ids)
 
     def get_job_steps(self):
         """Fetch the steps submitted by this runner from the EMR API.
@@ -1450,19 +1465,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
-        # get info about expected number of steps
-        num_steps = len(self._get_steps())
-
-        expected_num_steps = num_steps
-        if self._master_node_setup_script_path:
-            expected_num_steps += 1
-
-        # get info about steps submitted to cluster
-        steps = self.get_job_steps()
-
-        if len(steps) < expected_num_steps:
-            log.warning('Expected to find %d steps on cluster, found %d' %
-                        (expected_num_steps, len(steps)))
+        steps = self._steps_to_submit()
 
         # clear out log interpretations if they were filled somehow
         self._log_interpretations = []
@@ -1474,23 +1477,27 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
             self._set_up_ssh_tunnel_and_hdfs()
 
-        # treat master node setup as step -1
-        start = 0
-        if self._master_node_setup_script_path:
-            start -= 1
+        for i, step in enumerate(steps):
+            # if our step isn't already submitted, submit it
+            if len(self._step_ids) <= i:
+                self._add_steps_to_cluster(
+                    steps[len(self._step_ids):i + 1])
 
-        for step_num, step in enumerate(steps, start=start):
-            step_id = step['Id']
-            # don't include job_key in logging messages
+            step_id = self._step_ids[i]
             step_name = step['Name'].split(': ')[-1]
+
+            # treat master node setup script is treated as step -1
+            if self._master_node_setup_script_path:
+                step_num = i - 1
+            else:
+                step_num = i
 
             log.info('Waiting for %s (%s) to complete...' %
                      (step_name, step_id))
 
-            self._wait_for_step_to_complete(step_id, step_num, num_steps)
+            self._wait_for_step_to_complete(step_id, step_num)
 
-    def _wait_for_step_to_complete(
-            self, step_id, step_num=None, num_steps=None):
+    def _wait_for_step_to_complete(self, step_id, step_num=None):
         """Helper for _wait_for_step_to_complete(). Wait for
         step with the given ID to complete, and fetch counters.
         If it fails, attempt to diagnose the error, and raise an
@@ -1498,13 +1505,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         :param step_id: the s-XXXXXXX step ID on EMR
         :param step_num: which step this is out of the steps
-                         belonging to our job (0-indexed)
-        :param num_steps: number of steps in our job
+                         belonging to our job (0-indexed). Master node
+                         setup script, if there is one, is step -1
 
-        *step_num* and *num_steps* are optional and only used when raising
-        a :py:class:`~mrjob.step.StepFailedException`.
-
-        This also adds an item to self._log_interpretations
+        This also adds an item to self._log_interpretations or sets
+        self._mns_log_interpretation
         """
         log_interpretation = dict(step_id=step_id)
 
@@ -1627,7 +1632,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     _log_probable_cause_of_failure(log, error)
 
             raise StepFailedException(
-                step_num=step_num, num_steps=num_steps,
+                step_num=step_num, num_steps=self._num_steps(),
                 # "Step 0 of ... failed" looks weird
                 step_desc=(
                     'Master node setup step' if step_num == -1 else None))

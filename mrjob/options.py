@@ -307,6 +307,19 @@ _DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
 # the list of which options apply to which runner is in the runner class
 # itself (e.g. EMRJobRunner.OPT_NAMES)
 _RUNNER_OPTS = dict(
+    add_steps_in_batch=dict(
+        switches=[
+            (['--add-steps-in-batch'], dict(
+                action='store_true',
+                help='For multi-step jobs, submit all steps at once',
+            )),
+            (['--no-add-steps-in-batch'], dict(
+                action='store_false',
+                help=('For multi-step jobs, submit steps successively after'
+                      ' the previous one completes'),
+            )),
+        ]
+    ),
     additional_emr_info=dict(
         cloud_role='launch',
         switches=[

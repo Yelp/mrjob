@@ -1249,10 +1249,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             return 'CONTINUE'
         elif (self._opts['cluster_id'] or
                 self._opts['pool_clusters']):
-            if self._opts['max_concurrent_steps'] > 1:
-                return 'CONTINUE'
-            else:
-                return 'CANCEL_AND_WAIT'
+            return 'CANCEL_AND_WAIT'
         else:
             return 'TERMINATE_CLUSTER'
 

@@ -519,6 +519,19 @@ Other rarely used options
 -------------------------
 
 .. mrjob-opt::
+    :config: add_steps_in_batch
+    :switch: --add-steps-in-batch, --no-add-steps-in-batch
+    :type: boolean
+    :set: emr
+    :default: ``True`` for AMIs before 5.28.0, ``False`` otherwise
+
+    For a multi-step job, should we submit all steps at once, or one at
+    a time? By default, we only submit steps all at once if the AMI doesn't
+    support running concurrent steps (that is, before AMI 5.28.0).
+
+    .. versionadded:: 0.7.4
+
+.. mrjob-opt::
     :config: additional_emr_info
     :switch: --additional-emr-info
     :type: special

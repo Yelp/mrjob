@@ -412,6 +412,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # info used to match clusters. catches _pool_hash_dict()
         self._pool_hash_dict_cached = None
 
+        # add_steps_in_batch and concurrent steps don't mix
+        if (self._add_steps_in_batch() and
+                self._opts['max_concurrent_steps'] > 1):
+            log.warning('add_steps_in_batch will probably not work'
+                        ' with max_concurrent_steps > 1')
+
     ### Options ###
 
     @classmethod

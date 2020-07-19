@@ -4294,6 +4294,9 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
 
 class GetJobStepsTestCase(MockBoto3TestCase):
 
+    # get_job_steps() was designed with the assumption that all job steps
+    # will be submitted at once, and is now obsolete
+
     def test_empty(self):
         runner = EMRJobRunner()
         runner.make_persistent_cluster()
@@ -4301,7 +4304,7 @@ class GetJobStepsTestCase(MockBoto3TestCase):
         self.assertEqual(runner.get_job_steps(), [])
 
     def test_own_cluster(self):
-        job = MRTwoStepJob(['-r', 'emr']).sandbox()
+        job = MRTwoStepJob(['-r', 'emr', '--add-steps-in-batch']).sandbox()
 
         with job.make_runner() as runner:
             self.launch(runner)
@@ -4325,7 +4328,9 @@ class GetJobStepsTestCase(MockBoto3TestCase):
                             HadoopJarStep=(dict(Jar='dummy.jar')))] * n,
             )
 
-        job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id]).sandbox()
+        job = MRTwoStepJob([
+            '-r', 'emr', '--add-steps-in-batch', '--cluster-id', cluster_id]
+        ).sandbox()
 
         with job.make_runner() as runner:
             add_other_steps(runner, 50)

@@ -1,3 +1,7 @@
+v0.7.4, 2020-??-?? -- ???
+ * EMR Runner:
+   * get_job_steps() is deprecated
+
 v0.7.3, 2020-06-05 -- API-efficient cluster pooling
  * cluster pooling changes:
    * clusters locking now uses EMR tags, not S3 objects (#2160)

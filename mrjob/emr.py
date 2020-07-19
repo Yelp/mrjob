@@ -1458,8 +1458,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def get_job_steps(self):
         """Fetch the steps submitted by this runner from the EMR API.
 
+        .. deprecated:: 0.7.4
+
         .. versionadded:: 0.6.1
         """
+        log.warning(
+            'get_job_steps() is deprecated and will be removed in v0.8.0')
+
         return _get_job_steps(
             self.make_emr_client(), self.get_cluster_id(), self.get_job_key())
 

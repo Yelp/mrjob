@@ -253,6 +253,7 @@ class MockEMRClient(object):
                 StateChangeReason={},
                 Timeline=dict(CreationDateTime=now),
             ),
+            StepConcurrencyLevel=1,
             Tags=[],
             TerminationProtected=False,
             VisibleToAllUsers=False,
@@ -400,6 +401,12 @@ class MockEMRClient(object):
             # report it if you don't set it
             _validate_param(kwargs, 'EbsRootVolumeSize', integer_types)
             cluster['EbsRootVolumeSize'] = kwargs.pop('EbsRootVolumeSize')
+
+        # StepConcurrencyLevel
+        if 'StepConcurrencyLevel' in kwargs:
+            _validate_param(kwargs, 'StepConcurrencyLevel', integer_types)
+            cluster['StepConcurrencyLevel'] = kwargs.pop(
+                'StepConcurrencyLevel')
 
         # pass BootstrapActions off to helper
         if 'BootstrapActions' in kwargs:

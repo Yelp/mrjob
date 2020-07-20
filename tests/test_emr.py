@@ -4448,6 +4448,26 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         mock_cluster = self.mock_emr_clusters[runner._cluster_id]
         mock_steps = mock_cluster['_Steps']
 
+        # steps are submitted one at a time
+        self.assertEqual(len(mock_steps), 1)
+        self.assertEqual(mock_steps[0]['Status']['State'], 'RUNNING')
+
+    def test_open_ssh_tunnel_when_first_step_of_batch_runs(self):
+        # normally, we'll open the SSH tunnel when the first step
+        # is RUNNING
+
+        # stop the test as soon as SSH tunnel is set up
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
+
+        runner = self.make_runner('--add-steps-in-batch')
+
+        self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
+
+        self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 1)
+
+        mock_cluster = self.mock_emr_clusters[runner._cluster_id]
+        mock_steps = mock_cluster['_Steps']
+
         self.assertEqual(len(mock_steps), 2)
         self.assertEqual(mock_steps[0]['Status']['State'], 'RUNNING')
 
@@ -4490,9 +4510,10 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         # put steps from previous job on cluster
-        previous_runner = self.make_runner()
+        previous_runner = self.make_runner('--add-steps-in-batch')
 
         runner = self.make_runner(
+            '--add-steps-in-batch',
             '--cluster-id', previous_runner.get_cluster_id())
 
         mock_cluster = self.mock_emr_clusters[runner._cluster_id]

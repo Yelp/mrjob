@@ -405,6 +405,10 @@ class MockEMRClient(object):
         # StepConcurrencyLevel
         if 'StepConcurrencyLevel' in kwargs:
             _validate_param(kwargs, 'StepConcurrencyLevel', integer_types)
+            if not 1 <= kwargs['StepConcurrencyLevel'] <= 256:
+                raise _error('Invalid step concurrency level. Allowed level'
+                             ' is from 1 to 256')
+
             cluster['StepConcurrencyLevel'] = kwargs.pop(
                 'StepConcurrencyLevel')
 

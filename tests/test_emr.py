@@ -260,7 +260,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
         self.assertEqual(step_ids, [step['Id'] for step in steps])
 
     def test_failed_job(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v'])
+        mr_job = MRTwoStepJob(['-r', 'emr'])
         mr_job.sandbox()
 
         self.add_mock_s3_data({'walrus': {}})
@@ -279,15 +279,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'],
-                             'TERMINATED_WITH_ERRORS')
-
-        # job should get terminated on cleanup
-        cluster_id = runner.get_cluster_id()
-        for _ in range(10):
-            self.simulate_emr_progress(cluster_id)
-
-        cluster = runner._describe_cluster()
-        self.assertEqual(cluster['Status']['State'], 'TERMINATED_WITH_ERRORS')
+                             'TERMINATED')
 
     def _test_cloud_tmp_cleanup(self, mode, tmp_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKCLUSTER0/1': b'1\n'}})

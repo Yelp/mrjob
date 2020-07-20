@@ -2842,15 +2842,30 @@ class ActionOnFailureTestCase(MockBoto3TestCase):
     def test_default(self):
         runner = EMRJobRunner()
         self.assertEqual(runner._action_on_failure(),
-                         'TERMINATE_CLUSTER')
+                         'CONTINUE')
 
     def test_default_with_pooling(self):
         runner = EMRJobRunner(pool_clusters=True)
         self.assertEqual(runner._action_on_failure(),
-                         'CANCEL_AND_WAIT')
+                         'CONTINUE')
 
     def test_default_with_cluster_id(self):
         runner = EMRJobRunner(cluster_id='j-CLUSTER')
+        self.assertEqual(runner._action_on_failure(),
+                         'CONTINUE')
+
+    def test_add_steps_in_batch(self):
+        runner = EMRJobRunner(add_steps_in_batch=True)
+        self.assertEqual(runner._action_on_failure(),
+                         'TERMINATE_CLUSTER')
+
+    def test_pooling_with_add_steps_in_batch(self):
+        runner = EMRJobRunner(add_steps_in_batch=True, pool_clusters=True)
+        self.assertEqual(runner._action_on_failure(),
+                         'CANCEL_AND_WAIT')
+
+    def test_cluster_id_with_add_steps_in_batch(self):
+        runner = EMRJobRunner(add_steps_in_batch=True, cluster_id='j-CLUSTER')
         self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
 

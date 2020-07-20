@@ -1143,6 +1143,13 @@ class MockEMRClient(object):
                     ['CANCEL_AND_WAIT', 'CONTINUE',
                      'TERMINATE_JOB_FLOW', 'TERMINATE_CLUSTER'])
 
+                # CANCEL_AND_WAIT makes no sense when other job's steps
+                # could be cancelled
+                if cluster.get('StepConcurrencyLevel') != 1:
+                    raise _ValidationException(
+                        operation_name,
+                        "Action on failure 'CANCEL_AND_WAIT' is invalid.")
+
                 new_step['ActionOnFailure'] = Step.pop('ActionOnFailure')
 
             # HadoopJarStep (required)

@@ -6174,3 +6174,52 @@ class DockerClientConfigTestCase(MockBoto3TestCase):
         self.assertNotIn(
             'YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG',
             runner._cmdenv())
+
+
+class AddStepsInBatchTestCase(MockBoto3TestCase):
+
+    def setUp(self):
+        super(AddStepsInBatchTestCase, self).setUp()
+
+        # tests fail, so see how many steps they have on them
+        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0)}
+
+    def _assert_adds_steps_in_batch(self, *job_args):
+        self._assert_matches(True, 2, job_args)
+
+    def _assert_adds_steps_one_at_a_time(self, *job_args):
+        self._assert_matches(False, 1, job_args)
+
+    def _assert_matches(self, expected_value, expected_num_steps, job_args):
+        job = MRTwoStepJob(['-r', 'emr'] + list(job_args)).sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._add_steps_in_batch(), expected_value)
+
+            self.assertRaises(StepFailedException, runner.run)
+            num_steps_submitted = len(
+                self.mock_emr_clusters[runner.get_cluster_id()]['_Steps'])
+            self.assertEqual(num_steps_submitted, expected_num_steps)
+
+    def test_default(self):
+        self._assert_adds_steps_one_at_a_time()
+
+    def test_ami_4_0_0(self):
+        self._assert_adds_steps_in_batch('--image-version', '4.0.0')
+
+    def test_ami_5_27_0(self):
+        self._assert_adds_steps_in_batch('--image-version', '5.27.0')
+
+    def test_ami_5_28_0(self):
+        self._assert_adds_steps_one_at_a_time('--image-version', '5.28.0')
+
+    def test_ami_6_0_0(self):
+        self._assert_adds_steps_one_at_a_time('--image-version', '6.0.0')
+
+    def test_add_steps_in_batch_switch(self):
+        self._assert_adds_steps_in_batch('--add-steps-in-batch')
+
+    def test_no_add_steps_in_batch_switch(self):
+        self._assert_adds_steps_one_at_a_time(
+            '--image-version', '4.0.0',
+            '--no-add-steps-in-batch')

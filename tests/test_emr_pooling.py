@@ -178,6 +178,12 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--cluster-id', cluster_id,
             '--image-version', '2.2'])
 
+    def test_add_batch_in_steps_does_not_affect_pooling(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--add-steps-in-batch'])
+
     def test_pooling_with_image_version(self):
         _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
 
@@ -1917,6 +1923,9 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
 
         return cluster_id
 
+    def step_ids(self, cluster_id):
+        return [s['Id'] for s in self.mock_emr_clusters[cluster_id]['_Steps']]
+
     def num_steps(self, cluster_id):
         return len(self.mock_emr_clusters[cluster_id]['_Steps'])
 
@@ -1942,11 +1951,15 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            # tried to add steps to pooled cluster, had to try again
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # tried to add step to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+            # make sure self._step_ids got cleared
+            self.assertEqual(runner._step_ids,
+                             self.step_ids(runner.get_cluster_id()))
 
     def test_launch_new_multi_node_cluster_after_self_termination(self):
         # the error message is different when a multi-node cluster
@@ -1960,11 +1973,15 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            # tried to add steps to pooled cluster, had to try again
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # tried to add step to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+            # make sure self._step_ids got cleared
+            self.assertEqual(runner._step_ids,
+                             self.step_ids(runner.get_cluster_id()))
 
     def test_reset_ssh_tunnel_and_hadoop_fs_on_launch(self):
         # regression test for #1549
@@ -2007,8 +2024,8 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
 
             runner.run()
 
-            # tried to add steps to pooled cluster, had to try again
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # tried to add step to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
@@ -2035,10 +2052,13 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            self.assertEqual(self.num_steps(cluster1_id), 2)
+            self.assertEqual(self.num_steps(cluster1_id), 1)
 
             self.assertEqual(runner.get_cluster_id(), cluster2_id)
             self.assertEqual(self.num_steps(cluster2_id), 2)
+
+            # make sure self._step_ids got cleared
+            self.assertEqual(runner._step_ids, self.step_ids(cluster2_id))
 
     def test_multiple_failover(self):
         cluster_ids = []
@@ -2068,7 +2088,8 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertRaises(StepFailedException, runner.run)
 
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # steps are added one at a time
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
     def test_dont_recover_from_user_termination(self):
         cluster_id = self.make_pooled_cluster()
@@ -2082,7 +2103,8 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.launch(runner)
 
             self.assertEqual(runner.get_cluster_id(), cluster_id)
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # steps are added one at a time
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
             self.client('emr').terminate_job_flows(JobFlowIds=[cluster_id])
 
@@ -2096,7 +2118,8 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.launch(runner)
 
             cluster_id = runner.get_cluster_id()
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # steps are added one at a time
+            self.assertEqual(self.num_steps(cluster_id), 1)
             self.mock_emr_self_termination.add(cluster_id)
 
             self.assertRaises(StepFailedException, runner._finish_run)

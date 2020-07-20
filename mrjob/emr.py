@@ -1419,10 +1419,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Create an empty cluster on EMR, and set self._cluster_id to
         its ID.
         """
+        # step concurrency level of a cluster we added steps to, used
+        # for locking
+        step_concurrency_level = None
+
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
         if (self._opts['pool_clusters'] and not self._cluster_id):
-            cluster_id = self._find_cluster()
+            cluster_id, step_concurrency_level = self._find_cluster()
             if cluster_id:
                 self._cluster_id = cluster_id
                 self._locked_cluster = True
@@ -1449,6 +1453,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # later steps will be added one at a time
             self._add_steps_to_cluster(steps[:1])
 
+        # if we locked a cluster with concurrent steps, we can release
+        # the lock immediately
+        if step_concurrency_level and step_concurrency_level > 1:
+            self._release_cluster_lock()
+
         # learn about how fast the cluster state switches
         cluster = self._describe_cluster()
         log.debug('Cluster has state %s' % cluster['Status']['State'])
@@ -1457,6 +1466,18 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if hasattr(self.fs, 'ssh') and version_gte(
                 self.get_image_version(), '4.3.0'):
             self.fs.ssh.use_sudo_over_ssh()
+
+    def _release_cluster_lock(self):
+        if not self._locked_cluster:
+            return
+
+        emr_client = self.make_emr_client()
+
+        log.info('  releasing cluster lock')
+        # this can fail, but usually it's because the cluster
+        # started terminating, so only try releasing the lock once
+        _attempt_to_unlock_cluster(emr_client, self._cluster_id)
+        self._locked_cluster = False
 
     def _add_steps_to_cluster(self, steps):
         """Add steps (from _steps_to_submit()) to our cluster and append their
@@ -1586,12 +1607,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     self._log_step_progress()
 
                 # it's safe to clean up our lock, cluster isn't WAITING
-                if self._locked_cluster:
-                    log.info('  releasing cluster lock')
-                    # this can fail, but usually it's because the cluster
-                    # started terminating, so only try releasing the lock once
-                    _attempt_to_unlock_cluster(emr_client, self._cluster_id)
-                    self._locked_cluster = False
+                self._release_cluster_lock()
 
                 continue
 
@@ -2512,15 +2528,17 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             for cluster, when_cluster_described in (
                     self._yield_clusters_to_join()):
                 cluster_id = cluster['Id']
+                step_concurrency_level = cluster['StepConcurrencyLevel']
 
                 log.debug('  Attempting to join cluster %s' % cluster_id)
                 lock_acquired = _attempt_to_lock_cluster(
                     emr_client, cluster_id, self._job_key,
                     cluster=cluster,
-                    when_cluster_described=when_cluster_described)
+                    when_cluster_described=when_cluster_described,
+                    step_concurrency_level=step_concurrency_level)
 
                 if lock_acquired:
-                    return cluster_id
+                    return cluster_id, step_concurrency_level
 
             # if we're out of time, give up
             if (datetime.now() +
@@ -2533,7 +2551,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                          int(_POOLING_SLEEP_INTERVAL)))
             time.sleep(_POOLING_SLEEP_INTERVAL)
 
-        return None
+        return None, None
 
     def _pool_hash_dict(self):
         """A dictionary of information that must be matched exactly to

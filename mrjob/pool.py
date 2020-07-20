@@ -554,11 +554,27 @@ def _get_cluster_state_and_lock(emr_client, cluster_id, cluster=None):
 
 def _attempt_to_lock_cluster(
         emr_client, cluster_id, job_key,
-        cluster=None, when_cluster_described=None):
+        cluster=None, when_cluster_described=None,
+        step_concurrency_level=1):
     """Attempt to lock the given pooled cluster using EMR tags.
 
     You may optionally include *cluster* (a cluster description) and
     *when_cluster_described*, to save an API call to ``DescribeCluster``
+
+    *step_concurrency_level* is the number of steps the cluster can run at
+    once.
+
+    If *step_concurrency_level* is 1, locking considers the cluster
+    available if it's in the WAITING state. this means we should not release
+    our lock until our step(s) have started running, which can take several
+    seconds.
+
+    If *step_concurrency_level* is > 1 (steps can run concurrently), locking
+    considers the cluster available if it's in the WAITING or RUNNING state.
+    Additionally, it makes a ``ListSteps`` API call to verify that the cluster
+    doesn't already have as many active steps as it can run simultaneously.
+    Because other jobs looking to join the cluster will also count steps,
+    we can release our lock as soon as we add our steps.
     """
     log.debug('Attempting to lock cluster %s for %.1f seconds' % (
         cluster_id, _CLUSTER_LOCK_SECS))
@@ -568,11 +584,18 @@ def _attempt_to_lock_cluster(
     else:
         start = when_cluster_described
 
+    if step_concurrency_level == 1:
+        step_accepting_states = ['WAITING']
+    else:
+        step_accepting_states = ['RUNNING', 'WAITING']
+
     # check if there is a non-expired lock
     state, lock = _get_cluster_state_and_lock(
         emr_client, cluster_id, cluster=cluster)
-    if state != 'WAITING':
-        log.info('  cluster is no longer waiting, now %s' % state)
+
+    if state not in step_accepting_states:
+        # this could happen if the cluster were TERMINATING, for example
+        log.info('  cluster is not accepting steps, state is %s' % state)
         return False
 
     if lock:
@@ -609,10 +632,21 @@ def _attempt_to_lock_cluster(
     # check if our lock is still there
     state, lock = _get_cluster_state_and_lock(emr_client, cluster_id)
 
-    # this could happen if the cluster is TERMINATING, for instance
-    if state != 'WAITING':
-        log.info('  cluster is no longer waiting, now %s' % state)
+    if state not in step_accepting_states:
+        # this could happen if the cluster were TERMINATING, for example
+        log.info('  cluster is not accepting steps, state is %s' % state)
         return False
+
+    if step_concurrency_level > 1:
+        # is cluster already full of steps?
+        num_active_steps = len(_boto3_paginate(
+            'Steps', emr_client, 'list_steps',
+            ClusterId=cluster_id,
+            StepStates=['PENDING', 'RUNNING']))
+
+        if num_active_steps >= step_concurrency_level:
+            log.info(
+                '  cluster already has %d active steps' % num_active_steps)
 
     if lock is None:
         log.info('  lock was removed')

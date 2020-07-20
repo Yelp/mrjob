@@ -2096,7 +2096,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         def mock_yield_clusters_to_join(*args, **kwargs):
             for cluster_id in self.mock_cluster_ids:
                 when_cluster_described = time.time()
-                cluster = dict(Id=cluster_id)
+                cluster = dict(Id=cluster_id, StepConcurrencyLevel=1)
                 yield (cluster, when_cluster_described)
 
         def mock_sleep(time):
@@ -2129,14 +2129,14 @@ class JobWaitTestCase(MockBoto3TestCase):
         self.mock_cluster_ids = ['j-fail-lock']
 
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=0)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
 
     def test_no_waiting_for_job_pool_success(self):
         self.mock_cluster_ids = ['j-fail-lock']
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=0)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
         # sleep once after creating temp bucket
@@ -2145,7 +2145,7 @@ class JobWaitTestCase(MockBoto3TestCase):
     def test_acquire_lock_on_first_attempt(self):
         self.mock_cluster_ids = ['j-successful-lock']
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
         self.assertEqual(self.mock_sleep.call_count, 1)
@@ -2154,7 +2154,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         self.mock_cluster_ids = ['j-fail-lock']
         self.future_mock_cluster_ids.append('j-successful-lock')
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
         self.assertEqual(self.mock_sleep.call_count, 1)
@@ -2163,7 +2163,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         self.mock_cluster_ids = ['j-fail-lock']
         self.future_mock_cluster_ids.append('j-epic-fail-lock')
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=2)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
         self.assertEqual(self.mock_sleep.call_count, 4)
@@ -2174,7 +2174,7 @@ class JobWaitTestCase(MockBoto3TestCase):
             'j-fail-lock', 'j-epic-fail-lock', 'j-successful-lock']
 
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
         self.assertEqual(self.mock_sleep.call_count, 1)

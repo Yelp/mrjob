@@ -1658,8 +1658,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         runner_1 = runner_plz()
         runner_2 = runner_plz()
 
-        self.assertEqual(runner_1._find_cluster(), cluster_id)
-        self.assertEqual(runner_2._find_cluster(), None)
+        self.assertEqual(runner_1._find_cluster()[0], cluster_id)
+        self.assertEqual(runner_2._find_cluster()[0], None)
 
     def test_sorting_by_cpu_capacity(self):
         _, cluster_id_1 = self.make_pooled_cluster(
@@ -1676,8 +1676,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         runner_2 = self.make_simple_runner(
             'pool1', '--num-core-instances', '1')
 
-        self.assertEqual(runner_1._find_cluster(), cluster_id_1)
-        self.assertEqual(runner_2._find_cluster(), cluster_id_2)
+        self.assertEqual(runner_1._find_cluster()[0], cluster_id_1)
+        self.assertEqual(runner_2._find_cluster()[0], cluster_id_2)
 
     def test_sorting_by_cpu_capacity_divides_by_number_of_hours(self):
         _, cluster_id_1 = self.make_pooled_cluster(
@@ -1695,8 +1695,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         runner_2 = self.make_simple_runner(
             'pool1', '--num-core-instances', '1')
 
-        self.assertEqual(runner_1._find_cluster(), cluster_id_1)
-        self.assertEqual(runner_2._find_cluster(), cluster_id_2)
+        self.assertEqual(runner_1._find_cluster()[0], cluster_id_1)
+        self.assertEqual(runner_2._find_cluster()[0], cluster_id_2)
 
     def test_dont_destroy_own_pooled_cluster_on_failure(self):
         # Issue 242: job failure shouldn't kill the pooled clusters

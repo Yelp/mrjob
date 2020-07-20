@@ -178,6 +178,12 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--cluster-id', cluster_id,
             '--image-version', '2.2'])
 
+    def test_add_batch_in_steps_does_not_affect_pooling(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--add-steps-in-batch'])
+
     def test_pooling_with_image_version(self):
         _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
 

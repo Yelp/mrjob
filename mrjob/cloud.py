@@ -65,7 +65,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         'image_id',
         'image_version',
         'instance_type',
-        'master_instance_type',
+        'main_instance_type',
         'max_mins_idle',
         'num_core_instances',
         'num_task_instances',
@@ -101,7 +101,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                     self._bootstrap_dir_mgr.add(**token)
 
         # we'll create this script later, as needed
-        self._master_bootstrap_script_path = None
+        self._main_bootstrap_script_path = None
 
         # ssh state
 
@@ -165,12 +165,12 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                     if v == opts[k]:
                         opt_priority[k] = i
 
-            # instance_type only affects master_instance_type if there are
+            # instance_type only affects main_instance_type if there are
             # no other instances
             if opts['num_core_instances'] or opts['num_task_instances']:
                 propagate_to = ['core_instance_type', 'task_instance_type']
             else:
-                propagate_to = ['master_instance_type']
+                propagate_to = ['main_instance_type']
 
             for k in propagate_to:
                 if opts[k] is None or (
@@ -206,15 +206,15 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         """
         return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
 
-    def _create_master_bootstrap_script_if_needed(self):
+    def _create_main_bootstrap_script_if_needed(self):
         """Helper for :py:meth:`_add_bootstrap_files_for_upload`.
 
-        Create the master bootstrap script and write it into our local
-        temp directory. Set self._master_bootstrap_script_path.
+        Create the main bootstrap script and write it into our local
+        temp directory. Set self._main_bootstrap_script_path.
 
         This will do nothing if there are no bootstrap scripts or commands,
         or if it has already been called."""
-        if self._master_bootstrap_script_path:
+        if self._main_bootstrap_script_path:
             return
 
         # don't bother if we're not starting a cluster
@@ -226,17 +226,17 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
             return
 
         path = os.path.join(self._get_local_tmp_dir(), 'b.sh')
-        log.info('writing master bootstrap script to %s' % path)
+        log.info('writing main bootstrap script to %s' % path)
 
-        contents = self._master_bootstrap_script_content(
+        contents = self._main_bootstrap_script_content(
             self._bootstrap)
 
-        self._write_script(contents, path, 'master bootstrap script')
+        self._write_script(contents, path, 'main bootstrap script')
 
-        self._master_bootstrap_script_path = path
+        self._main_bootstrap_script_path = path
 
-    def _master_bootstrap_script_content(self, bootstrap):
-        """Return a list containing the lines of the master bootstrap script.
+    def _main_bootstrap_script_content(self, bootstrap):
+        """Return a list containing the lines of the main bootstrap script.
         (without trailing newlines)
         """
         out = []
@@ -556,8 +556,8 @@ def _patch_params(params, name, value):
 
     If *name* has one or more dots in it, recursively set the value
     in successive nested dictionaries, creating them if necessary.
-    For example, if *name* is ``Instances.EmrManagedMasterSecurityGroup``,
-    set ``params['Instances']['EmrManagedMasterSecurityGroup']``
+    For example, if *name* is ``Instances.EmrManagedMainSecurityGroup``,
+    set ``params['Instances']['EmrManagedMainSecurityGroup']``
 
     If *value* is ``None``, delete the value (if it exists), rather than
     setting it to ``None``.

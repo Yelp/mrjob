@@ -144,25 +144,25 @@ class MockBoto3TestCase(SandboxedTestCase):
         os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
 
         # Create temporary directories and add them to MOCK_SSH_ROOTS
-        master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
-        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % master_ssh_root
-        mock_ssh_dir('testmaster', _EMR_LOG_DIR + '/hadoop/history')
+        main_ssh_root = tempfile.mkdtemp(prefix='main_ssh_root.')
+        os.environ['MOCK_SSH_ROOTS'] = 'testmain=%s' % main_ssh_root
+        mock_ssh_dir('testmain', _EMR_LOG_DIR + '/hadoop/history')
 
         if not hasattr(self, 'worker_ssh_roots'):
             self.worker_ssh_roots = []
 
-        self.addCleanup(self.teardown_ssh, master_ssh_root)
+        self.addCleanup(self.teardown_ssh, main_ssh_root)
 
         # Make the fake binary
-        os.mkdir(os.path.join(master_ssh_root, 'bin'))
-        self.ssh_bin = os.path.join(master_ssh_root, 'bin', 'ssh')
+        os.mkdir(os.path.join(main_ssh_root, 'bin'))
+        self.ssh_bin = os.path.join(main_ssh_root, 'bin', 'ssh')
         create_mock_ssh_script(self.ssh_bin)
-        self.ssh_add_bin = os.path.join(master_ssh_root, 'bin', 'ssh-add')
+        self.ssh_add_bin = os.path.join(main_ssh_root, 'bin', 'ssh-add')
         create_mock_ssh_script(self.ssh_add_bin)
 
         # Make a fake keyfile so that the 'file exists' requirements are
         # satsified
-        self.keyfile_path = os.path.join(master_ssh_root, 'key.pem')
+        self.keyfile_path = os.path.join(main_ssh_root, 'key.pem')
         with open(self.keyfile_path, 'w') as f:
             f.write('I AM DEFINITELY AN SSH KEY FILE')
 
@@ -173,8 +173,8 @@ class MockBoto3TestCase(SandboxedTestCase):
         runner._opts['ec2_key_pair_file'] = self.keyfile_path
 
         # use fake hostname
-        runner._address_of_master = MagicMock(return_value='testmaster')
-        runner._master_private_ip = MagicMock(return_value='172.172.172.172')
+        runner._address_of_main = MagicMock(return_value='testmain')
+        runner._main_private_ip = MagicMock(return_value='172.172.172.172')
 
         # re-initialize fs
         runner._fs = None
@@ -187,11 +187,11 @@ class MockBoto3TestCase(SandboxedTestCase):
         worker_num = len(self.worker_ssh_roots)
         new_dir = tempfile.mkdtemp(prefix='worker_%d_ssh_root.' % worker_num)
         self.worker_ssh_roots.append(new_dir)
-        os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testworker%d=%s'
+        os.environ['MOCK_SSH_ROOTS'] += (':testmain!testworker%d=%s'
                                          % (worker_num, new_dir))
 
-    def teardown_ssh(self, master_ssh_root):
-        shutil.rmtree(master_ssh_root)
+    def teardown_ssh(self, main_ssh_root):
+        shutil.rmtree(main_ssh_root)
         for path in self.worker_ssh_roots:
             shutil.rmtree(path)
 

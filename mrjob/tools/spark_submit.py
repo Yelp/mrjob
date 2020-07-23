@@ -28,7 +28,7 @@ This also adds a few mrjob features that are not standard with
 
 .. versionchanged:: 0.7.1
 
-   ``--archives`` and ``--dirs`` are supported on all masters (except local)
+   ``--archives`` and ``--dirs`` are supported on all mains (except local)
 
 Usage::
 
@@ -62,7 +62,7 @@ Options::
                         placed on the PYTHONPATH for Python apps.
   --files UPLOAD_FILES  Comma-separated list of files to be placed in the
                         working directory of each executor. Ignored on
-                        local[*] master.
+                        local[*] main.
   --archives UPLOAD_ARCHIVES
                         Comma-separated list of archives to be extracted into
                         the working directory of each executor.
@@ -108,7 +108,7 @@ Options::
   -h, --help            show this message and exit
 
 Spark and Hadoop runners only:
-  --master SPARK_MASTER
+  --main SPARK_MASTER
                         spark://host:port, mesos://host:port,
                         yarn,k8s://https://host:port, or local. Defaults to
                         local[*] on spark runner, yarn on hadoop runner.
@@ -145,7 +145,7 @@ YARN-only:
                         onsecure HDFS.
   --keytab KEYTAB       The full path to the file that contains the keytab for
                         the principal specified above. This keytab will be
-                        copied to the node running the Application Master via
+                        copied to the node running the Application Main via
                         the Secure Distributed Cache, for renewing the login
                         tickets and the delegation tokens periodically.
 
@@ -202,7 +202,7 @@ _DEFAULT_RUNNER = 'spark'  # just find spark-submit and use it
 # our mostly similar version of spark-submit's args, arranged in to groups
 # for the --help message. Differences:
 #
-# spark_master (--master) is in its own "Spark and Hadoop runners only" group
+# spark_main (--main) is in its own "Spark and Hadoop runners only" group
 # added upload_dirs (--dirs) which is similar to --archives
 #
 # --runner and other basic options are patched into the first ("None")
@@ -231,7 +231,7 @@ _SPARK_SUBMIT_ARG_GROUPS = [
         'proxy_user',
     ]),
     ('Spark and Hadoop runners only', [
-        'spark_master',
+        'spark_main',
         'spark_deploy_mode',
     ]),
     ('Cluster deploy mode only', [
@@ -277,7 +277,7 @@ _SPARK_SUBMIT_ARG_HELP = dict(
              ' PROP=VALUE.'),
     keytab=('The full path to the file that contains the keytab for the'
             ' principal specified above. This keytab will be copied to'
-            ' the node running the Application Master via the Secure'
+            ' the node running the Application Main via the Secure'
             ' Distributed Cache, for renewing the login tickets and the'
             ' delegation tokens periodically.'),
     libjars=('Comma-separated list of jars to include on the driver'
@@ -314,19 +314,19 @@ _SPARK_SUBMIT_ARG_HELP = dict(
     spark_deploy_mode=('Whether to launch the driver program locally'
                        ' ("client") or on one of the worker machines inside'
                        ' the cluster ("cluster") (Default: client).'),
-    spark_master=('spark://host:port, mesos://host:port, yarn,'
+    spark_main=('spark://host:port, mesos://host:port, yarn,'
                   'k8s://https://host:port, or local. Defaults'
                   ' to local[*] on spark runner, yarn on hadoop runner.'),
     supervise='If given, restarts the driver on failure.',
     total_executor_cores='Total cores for all executors.',
     upload_archives=('Comma-separated list of archives to be extracted into'
                      ' the working directory of each executor. Ignored on'
-                     ' local[*] master.'),
+                     ' local[*] main.'),
     upload_dirs=('Comma-separated list of directors to be archived and then'
                  ' extracted into the working directory of each executor.'
-                 ' Ignored on local[*] master.'),
+                 ' Ignored on local[*] main.'),
     upload_files=('Comma-separated list of files to be placed in the working'
-                  ' directory of each executor. Ignored on local[*] master.'),
+                  ' directory of each executor. Ignored on local[*] main.'),
 )
 
 _SPARK_SUBMIT_OPT_NAMES = {
@@ -359,7 +359,7 @@ _SPARK_SUBMIT_SWITCHES = dict(
     repositories='--repositories',
     setup='--setup',
     spark_deploy_mode='--deploy-mode',
-    spark_master='--master',
+    spark_main='--main',
     supervise='--supervise',
     total_executor_cores='--total-executor-cores',
     upload_archives='--archives',
@@ -380,7 +380,7 @@ _SPARK_ARG_OPT_NAMES = (
     set(_SPARK_SUBMIT_SWITCHES) - set(_RUNNER_OPTS) - _STEP_OPT_NAMES)
 
 _SWITCH_ALIASES = {
-    '--master': '--spark-master',
+    '--main': '--spark-main',
     '--deploy-mode': '--spark-deploy-mode',
     '--jars': '--libjars',
     '--conf': '--jobconf',

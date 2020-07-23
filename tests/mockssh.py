@@ -109,7 +109,7 @@ def rel_posix_to_abs_local(host, path, environ=None):
     return os.path.join(root, *path.split('/'))
 
 
-_WORKER_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<worker>.*?)=(?P<dir>.*)$')
+_WORKER_ADDR_RE = re.compile(r'^(?P<main>.*?)!(?P<worker>.*?)=(?P<dir>.*)$')
 _SCP_RE = re.compile(r'cat > (?P<filename>.*?) &&.*$')
 
 

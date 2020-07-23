@@ -133,7 +133,7 @@ def _infer_step_type(step):
     #
     # and of course we don't know the logging habits of jar steps,
     # so we might as well use streaming's logic
-    if '--master' in args and '--deploy-mode' in args:
+    if '--main' in args and '--deploy-mode' in args:
         return 'spark'
     else:
         return 'streaming'

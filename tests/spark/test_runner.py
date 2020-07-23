@@ -95,22 +95,22 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
 
         self.assertFalse(self.log.warning.called)
 
-    def test_spark_master_local(self):
-        runner = SparkMRJobRunner(spark_master='local[*]')
+    def test_spark_main_local(self):
+        runner = SparkMRJobRunner(spark_main='local[*]')
 
         self.assertFalse(is_uri(runner._spark_tmp_dir))
         self.assertIsNone(runner._upload_mgr)
 
-    def test_spark_master_mesos(self):
-        runner = SparkMRJobRunner(spark_master='mesos://host:12345')
+    def test_spark_main_mesos(self):
+        runner = SparkMRJobRunner(spark_main='mesos://host:12345')
 
         self.assertTrue(is_uri(runner._spark_tmp_dir))
         self.assertEqual(runner._spark_tmp_dir[:8], 'hdfs:///')
 
         self.assertIsNotNone(runner._upload_mgr)
 
-    def test_spark_master_yarn(self):
-        runner = SparkMRJobRunner(spark_master='yarn')
+    def test_spark_main_yarn(self):
+        runner = SparkMRJobRunner(spark_main='yarn')
 
         self.assertTrue(is_uri(runner._spark_tmp_dir))
         self.assertEqual(runner._spark_tmp_dir[:8], 'hdfs:///')
@@ -118,7 +118,7 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
         self.assertIsNotNone(runner._upload_mgr)
 
     def test_explicit_spark_tmp_dir_uri(self):
-        runner = SparkMRJobRunner(spark_master='mesos://host:12345',
+        runner = SparkMRJobRunner(spark_main='mesos://host:12345',
                                   spark_tmp_dir='s3://walrus/tmp')
 
         self.assertTrue(runner._spark_tmp_dir.startswith('s3://walrus/tmp/'))
@@ -144,7 +144,7 @@ class SparkTmpDirTestCase(MockFilesystemsTestCase):
 
     def test_local_uri_with_non_local_runner(self):
         SparkMRJobRunner(spark_tmp_dir='/tmp',
-                         spark_master='mesos://host:12345')
+                         spark_main='mesos://host:12345')
 
         self.assertTrue(self.log.warning.called)
 
@@ -162,7 +162,7 @@ class SparkPyFilesTestCase(MockFilesystemsTestCase):
             return_value=(0, {})))
 
     def test_dont_upload_mrjob_zip(self):
-        job = MRNullSpark(['-r', 'spark', '--spark-master', 'yarn'])
+        job = MRNullSpark(['-r', 'spark', '--spark-main', 'yarn'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -271,10 +271,10 @@ class SparkWorkingDirTestCase(MockFilesystemsTestCase):
         fish_path = self.makefile('fish', b'salmon')
         fowl_path = self.makefile('fowl', b'goose')
 
-        # use _LOCAL_CLUSTER_MASTER because the default master (local[*])
+        # use _LOCAL_CLUSTER_MASTER because the default main (local[*])
         # doesn't have a working directory
         job = MRSparkOSWalk(['-r', 'spark',
-                             '--spark-master', _LOCAL_CLUSTER_MASTER,
+                             '--spark-main', _LOCAL_CLUSTER_MASTER,
                              '--files',
                              '%s#ghoti,%s' % (fish_path, fowl_path)])
         job.sandbox()
@@ -320,7 +320,7 @@ class SparkWorkingDirTestCase(MockFilesystemsTestCase):
             return_value=(0, {})))
 
         job = MRSparkOSWalk(['-r', 'spark',
-                             '--spark-master', 'mesos://host:9999',
+                             '--spark-main', 'mesos://host:9999',
                              '--spark-tmp-dir', 's3://walrus/tmp',
                              '--files',
                              ('s3://walrus/fish#ghoti,s3://walrus/fowl,%s' %
@@ -524,7 +524,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
                 ]
             )
 
-    def _test_file_upload_args(self, job_class, spark_master):
+    def _test_file_upload_args(self, job_class, spark_main):
         input_bytes = (b'Market Song:\n'
                        b'To market, to market, to buy a fat pig.\n'
                        b'Home again, home again, jiggety-jig')
@@ -537,7 +537,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
             b'again\nmarket\nto\n')
 
         job = job_class(['-r', 'spark',
-                         '--spark-master', spark_master,
+                         '--spark-main', spark_main,
                          '--stop-words-file', stop_words_file])
         job.sandbox(stdin=BytesIO(input_bytes))
 
@@ -560,7 +560,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
     def test_spark_step_file_upload_args_without_working_dir(self):
         self._test_file_upload_args(MRSparkMostUsedWord, 'local[*]')
 
-    def _test_file_upload_args_loaded_at_init(self, spark_master):
+    def _test_file_upload_args_loaded_at_init(self, spark_main):
         # can we simulate a MRJob that expects to load files in its
         # constructor?
 
@@ -574,7 +574,7 @@ class SparkRunnerStreamingStepsTestCase(MockFilesystemsTestCase):
 
         # this should work because we can see n_file_path
         job = MRTowerOfPowers(['-r', 'spark',
-                               '--spark-master', spark_master,
+                               '--spark-main', spark_main,
                                '--n-file', n_file_path])
         job.sandbox(stdin=BytesIO(input_bytes))
 
@@ -927,7 +927,7 @@ class SparkSetupScriptTestCase(MockFilesystemsTestCase):
     def test_setup_command(self):
         job = MROSWalkJob(
             ['-r', 'spark',
-             '--spark-master', _LOCAL_CLUSTER_MASTER,
+             '--spark-main', _LOCAL_CLUSTER_MASTER,
              '--setup', 'touch bar'])
         job.sandbox()
 

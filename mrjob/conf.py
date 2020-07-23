@@ -543,7 +543,7 @@ def combine_path_lists(*path_seqs):
 
 
 def combine_opts(combiners, *opts_list):
-    """The master combiner, used to combine dictionaries of options with
+    """The main combiner, used to combine dictionaries of options with
     appropriate sub-combiners.
 
     :param combiners: a map from option name to a combine_*() function to

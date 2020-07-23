@@ -161,7 +161,7 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
             raise InvalidArgument('Cluster name is required')
 
         # add in default disk config
-        for x in ('master', 'worker', 'secondary_worker'):
+        for x in ('main', 'worker', 'secondary_worker'):
             field = x + '_config'
             conf = getattr(cluster.config, field, None)
             if conf and str(conf):  # empty DiskConfigs are still true-ish

@@ -101,7 +101,7 @@ _HADOOP_STREAMING_JAR_URI = (
 
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
-# on Dataproc, the resource manager is always at 8088. Tunnel to the master
+# on Dataproc, the resource manager is always at 8088. Tunnel to the main
 # node's own hostname, not localhost.
 _SSH_TUNNEL_CONFIG = dict(
     localhost=False,
@@ -220,7 +220,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'cluster_properties',
         'core_instance_config',
         'gcloud_bin',
-        'master_instance_config',
+        'main_instance_config',
         'network',
         'project_id',
         'service_account',
@@ -246,10 +246,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 'You must install google-cloud-logging and '
                 'google-cloud-storage to connect to Dataproc')
 
-        # Dataproc requires a master and >= 2 core instances
+        # Dataproc requires a main and >= 2 core instances
         # num_core_instances refers ONLY to number of CORE instances and does
-        # NOT include the required 1 instance for master
-        # In other words, minimum cluster size is 3 machines, 1 master and 2
+        # NOT include the required 1 instance for main
+        # In other words, minimum cluster size is 3 machines, 1 main and 2
         # "num_core_instances" workers
         if self._opts['num_core_instances'] < _DATAPROC_MIN_WORKERS:
             raise DataprocException(
@@ -355,7 +355,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cloud_fs_sync_secs=_DEFAULT_CLOUD_FS_SYNC_SECS,
                 image_version=_DEFAULT_IMAGE_VERSION,
                 instance_type=_DEFAULT_INSTANCE_TYPE,
-                master_instance_type=_DEFAULT_INSTANCE_TYPE,
+                main_instance_type=_DEFAULT_INSTANCE_TYPE,
                 num_core_instances=_DATAPROC_MIN_WORKERS,
                 num_task_instances=0,
             )
@@ -490,7 +490,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _add_bootstrap_files_for_upload(self):
         """Add files needed by the bootstrap script to self._upload_mgr.
 
-        Create the master bootstrap script if necessary.
+        Create the main bootstrap script if necessary.
 
         """
         # all other files needed by the script are already in
@@ -499,10 +499,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._upload_mgr.add(path)
 
         # now that we know where the above files live, we can create
-        # the master bootstrap script
-        self._create_master_bootstrap_script_if_needed()
-        if self._master_bootstrap_script_path:
-            self._upload_mgr.add(self._master_bootstrap_script_path)
+        # the main bootstrap script
+        self._create_main_bootstrap_script_if_needed()
+        if self._main_bootstrap_script_path:
+            self._upload_mgr.add(self._main_bootstrap_script_path)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -1078,9 +1078,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _cluster_create_kwargs(self):
         gcs_init_script_uris = []
-        if self._master_bootstrap_script_path:
+        if self._main_bootstrap_script_path:
             gcs_init_script_uris.append(
-                self._upload_mgr.uri(self._master_bootstrap_script_path))
+                self._upload_mgr.uri(self._main_bootstrap_script_path))
 
         cluster_metadata = dict()
         cluster_metadata['mrjob-version'] = mrjob.__version__
@@ -1122,12 +1122,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         )
 
         # Task tracker
-        master_conf = _gcp_instance_group_config(
+        main_conf = _gcp_instance_group_config(
             project=self._project_id, zone=self._opts['zone'],
-            count=1, instance_type=self._opts['master_instance_type'],
+            count=1, instance_type=self._opts['main_instance_type'],
         )
-        if self._opts['master_instance_config']:
-            master_conf.update(self._opts['master_instance_config'])
+        if self._opts['main_instance_config']:
+            main_conf.update(self._opts['main_instance_config'])
 
         # Compute + storage
         worker_conf = _gcp_instance_group_config(
@@ -1148,7 +1148,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._opts['task_instance_config']:
             secondary_worker_conf.update(self._opts['task_instance_config'])
 
-        cluster_config['master_config'] = master_conf
+        cluster_config['main_config'] = main_conf
         cluster_config['worker_config'] = worker_conf
         if secondary_worker_conf.get('num_instances'):
             cluster_config['secondary_worker_config'] = secondary_worker_conf

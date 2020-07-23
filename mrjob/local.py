@@ -78,7 +78,7 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
 
     .. versionadded:: 0.6.8
 
-       can run Spark steps as well, on the ``local-cluster`` Spark master.
+       can run Spark steps as well, on the ``local-cluster`` Spark main.
     """
     alias = 'local'
 
@@ -119,8 +119,8 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
 
     def _run_step_on_spark(self, step, step_num):
         if self._opts['upload_archives']:
-            log.warning('Spark master %r will probably ignore archives' %
-                        self._spark_master())
+            log.warning('Spark main %r will probably ignore archives' %
+                        self._spark_main())
 
         spark_submit_args = self._args_for_spark_step(step_num)
 
@@ -228,10 +228,10 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
 
     # Spark steps
 
-    # TODO: _spark_master() should probably take step_num, to allow for
+    # TODO: _spark_main() should probably take step_num, to allow for
     # step-specific jobconf
-    def _spark_master(self):
-        """Use the local-cluster master, which simulates a Spark cluster."""
+    def _spark_main(self):
+        """Use the local-cluster main, which simulates a Spark cluster."""
         # figure out the required parameters to local-cluster
         num_executors = self._num_cores()
 

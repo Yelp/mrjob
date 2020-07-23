@@ -121,7 +121,7 @@ class StepPickingTestCase(MockBoto3TestCase):
                 dict(
                     Config=dict(Args=[
                         'custom-spark-submit',
-                        '--master',
+                        '--main',
                         'yarn',
                         '--deploy-mode',
                         'cluster',

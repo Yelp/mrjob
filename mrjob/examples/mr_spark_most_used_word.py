@@ -14,9 +14,9 @@
 # limitations under the License.
 """Like mr_most_used_word.py, but on Spark.
 
-To make this work on the local[*] master, pass in your own --stop-words-file
+To make this work on the local[*] main, pass in your own --stop-words-file
 (it won't be able to see stop_words.txt because --files doesn't work
-on local[*] master)
+on local[*] main)
 """
 import json
 import re

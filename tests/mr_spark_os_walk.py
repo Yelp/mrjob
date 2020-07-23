@@ -36,7 +36,7 @@ class MRSparkOSWalk(MRJob):
         # we'd like to walk the executor's directory. However, when running
         # directly through pyspark (inline runner), there's no way to restart
         # the JVM with a new CWD, so instead we walk the driver's directory
-        # (which executors *would* match on local master if we had a fresh
+        # (which executors *would* match on local main if we had a fresh
         # JVM)
         if self.options.use_driver_cwd:
             cwd = getcwd()

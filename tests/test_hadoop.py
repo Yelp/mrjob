@@ -1484,7 +1484,7 @@ class FindBinariesAndJARsTestCase(SandboxedTestCase):
             self.assertTrue(self.get_spark_submit_bin.called)
 
 
-class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
+class SparkMainAndDeployModeTestCase(MockHadoopTestCase):
 
     def test_default(self):
         mr_job = MRNullSpark(['-r', 'hadoop'])
@@ -1494,19 +1494,19 @@ class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
             runner._add_job_files_for_upload()
             self.assertEqual(
                 runner._spark_submit_args(0)[4:8],
-                ['--master', 'yarn', '--deploy-mode', 'client']
+                ['--main', 'yarn', '--deploy-mode', 'client']
             )
 
-    def test_spark_master_opt(self):
+    def test_spark_main_opt(self):
         # these are hard-coded and always the same
-        mr_job = MRNullSpark(['-r', 'hadoop', '--spark-master', 'local'])
+        mr_job = MRNullSpark(['-r', 'hadoop', '--spark-main', 'local'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner._add_job_files_for_upload()
             self.assertEqual(
                 runner._spark_submit_args(0)[2:6],
-                ['--master', 'local', '--deploy-mode', 'client']
+                ['--main', 'local', '--deploy-mode', 'client']
             )
 
     def test_spark_deploy_mode_opt(self):
@@ -1520,7 +1520,7 @@ class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
 
             self.assertEqual(
                 runner._spark_submit_args(0)[4:8],
-                ['--master', 'yarn', '--deploy-mode', 'cluster']
+                ['--main', 'yarn', '--deploy-mode', 'cluster']
             )
 
 

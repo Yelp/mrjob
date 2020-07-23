@@ -1002,25 +1002,25 @@ class UnsupportedStepsTestCase(SandboxedTestCase):
         self.assertRaises(NotImplementedError, job.make_runner)
 
 
-class SparkMasterTestCase(SandboxedTestCase):
+class SparkMainTestCase(SandboxedTestCase):
 
-    def test_default_spark_master(self):
+    def test_default_spark_main(self):
         runner = LocalMRJobRunner()
 
-        self.assertEqual(runner._spark_master(),
+        self.assertEqual(runner._spark_main(),
                          'local-cluster[%d,1,1024]' % cpu_count())
 
     def test_num_cores(self):
         runner = LocalMRJobRunner(num_cores=3)
 
-        self.assertEqual(runner._spark_master(),
+        self.assertEqual(runner._spark_main(),
                          'local-cluster[3,1,1024]')
 
     def _test_spark_executor_memory(self, conf_value, megs):
         runner = LocalMRJobRunner(
             jobconf={'spark.executor.memory': conf_value})
 
-        self.assertEqual(runner._spark_master(),
+        self.assertEqual(runner._spark_main(),
                          'local-cluster[%d,1,%d]' % (
                              cpu_count(), megs))
 

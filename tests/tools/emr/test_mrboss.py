@@ -62,15 +62,15 @@ class MRBossTestCase(MockBoto3TestCase):
         self.runner.cleanup()
 
     def test_one_node(self):
-        mock_ssh_file('testmaster', 'some_file', b'file contents')
+        mock_ssh_file('testmain', 'some_file', b'file contents')
 
         _run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
                           print_stderr=False)
 
-        with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
+        with open(os.path.join(self.output_dir, 'main', 'stdout'), 'r') as f:
             self.assertEqual(f.read().rstrip(), 'file contents')
 
-        self.assertEqual(os.listdir(self.output_dir), ['master'])
+        self.assertEqual(os.listdir(self.output_dir), ['main'])
 
     def test_two_nodes(self):
         self.add_worker()
@@ -78,8 +78,8 @@ class MRBossTestCase(MockBoto3TestCase):
 
         self.runner._opts['num_core_instances'] = 1
 
-        mock_ssh_file('testmaster', 'some_file', b'file contents 1')
-        mock_ssh_file('testmaster!testworker0', 'some_file',
+        mock_ssh_file('testmain', 'some_file', b'file contents 1')
+        mock_ssh_file('testmain!testworker0', 'some_file',
                       b'file contents 2')
 
         self.runner.fs  # force initialization of _ssh_fs
@@ -87,7 +87,7 @@ class MRBossTestCase(MockBoto3TestCase):
         _run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
                           print_stderr=False)
 
-        with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
+        with open(os.path.join(self.output_dir, 'main', 'stdout'), 'r') as f:
             self.assertEqual(f.read().rstrip(), 'file contents 1')
 
         with open(
@@ -96,4 +96,4 @@ class MRBossTestCase(MockBoto3TestCase):
             self.assertEqual(f.read().strip(), 'file contents 2')
 
         self.assertEqual(sorted(os.listdir(self.output_dir)),
-                         ['master', 'worker testworker0'])
+                         ['main', 'worker testworker0'])

@@ -84,7 +84,7 @@ class SparkMRJobRunner(MRJobBinRunner):
         's3_region',  # used when creating buckets on S3
         'skip_internal_protocol',
         'spark_deploy_mode',
-        'spark_master',
+        'spark_main',
         'spark_tmp_dir',  # where to put temp files in Spark
     }
 
@@ -143,13 +143,13 @@ class SparkMRJobRunner(MRJobBinRunner):
         # (see #2062)
         tmp_dir_is_local = to_uri(
             self._opts['spark_tmp_dir']).startswith('file://')
-        spark_master_is_local = self._spark_master().startswith('local')
+        spark_main_is_local = self._spark_main().startswith('local')
 
-        if tmp_dir_is_local != spark_master_is_local:
+        if tmp_dir_is_local != spark_main_is_local:
             log.warning(
-                'Warning: executors on Spark master %s may not be able to'
+                'Warning: executors on Spark main %s may not be able to'
                 ' access spark_tmp_dir %s' %
-                (self._spark_master(), self._opts['spark_tmp_dir']))
+                (self._spark_main(), self._opts['spark_tmp_dir']))
 
     def _check_step(self, step, step_num):
         """Don't try to run steps that include commands or use manifests."""
@@ -192,8 +192,8 @@ class SparkMRJobRunner(MRJobBinRunner):
         if self._opts['spark_tmp_dir']:
             return self.fs.join(self._opts['spark_tmp_dir'], self._job_key)
         else:
-            master = self._spark_master() or 'local'
-            if master.startswith('local'):  # including local-cluster
+            main = self._spark_main() or 'local'
+            if main.startswith('local'):  # including local-cluster
                 # need a local temp dir
                 # add "-spark" so we don't collide with default local temp dir
                 return os.path.join(
@@ -435,7 +435,7 @@ class SparkMRJobRunner(MRJobBinRunner):
 
         # --job-args (passthrough args)
 
-        # if on local[*] master, keep file upload args as-is (see #2031)
+        # if on local[*] main, keep file upload args as-is (see #2031)
         job_args = self._mr_job_extra_args(
             local=not self._spark_executors_have_own_wd())
 

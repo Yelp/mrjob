@@ -29,19 +29,19 @@ class CheckForNonzeroReturnCodeTestCase(BasicTestCase):
             _check_for_nonzero_return_code(''),
             None)
 
-    def test_nonzero_return_code_on_master_instance(self):
+    def test_nonzero_return_code_on_main_instance(self):
         self.assertEqual(
             _check_for_nonzero_return_code(
-                'On the master instance (i-96c21a39), bootstrap action 2'
+                'On the main instance (i-96c21a39), bootstrap action 2'
                 ' returned a non-zero return code'),
             # action_num is 0-indexed
             dict(action_num=1, node_id='i-96c21a39'),
         )
 
-    def test_nonzero_return_code_on_two_slave_instances(self):
+    def test_nonzero_return_code_on_two_subordinate_instances(self):
         self.assertEqual(
             _check_for_nonzero_return_code(
-                'On 2 slave instances (including i-105af6bf and i-b659f519),'
+                'On 2 subordinate instances (including i-105af6bf and i-b659f519),'
                 ' bootstrap action 1 returned a non-zero return code'),
             dict(action_num=0, node_id='i-105af6bf')
         )
@@ -49,7 +49,7 @@ class CheckForNonzeroReturnCodeTestCase(BasicTestCase):
     def test_failed_to_download_bootstrap_action(self):
         self.assertEqual(
             _check_for_nonzero_return_code(
-                'Master instance (i-ec41ed43) failed attempting to download'
+                'Main instance (i-ec41ed43) failed attempting to download'
                 ' bootstrap action 1 file from S3'),
             None)
 

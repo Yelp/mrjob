@@ -251,7 +251,7 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
 
     def test_runner_kwargs(self):
         spark_submit_main(['--hadoop-bin', 'super-hadoop',
-                           '--master', 'local',
+                           '--main', 'local',
                            '--py-files', 'bar.py,baz.py',
                            'foo.py', 'arg1'])
 
@@ -261,7 +261,7 @@ class SparkSubmitToolTestCase(SandboxedTestCase):
         self.assertEqual(kwargs['hadoop_bin'], 'super-hadoop')
 
         # spark alias for mrjob opt
-        self.assertEqual(kwargs['spark_master'], 'local')
+        self.assertEqual(kwargs['spark_main'], 'local')
 
         # arg with custom parser
         self.assertEqual(kwargs['py_files'], ['bar.py', 'baz.py'])

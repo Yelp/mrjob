@@ -205,11 +205,11 @@ def _interpret_emr_step_stderr(fs, matches):
     return {}
 
 
-def _eio_to_eof(pty_master):
+def _eio_to_eof(pty_main):
     """Yield lines from a PTY, gracefully handling an ``IOError`` with
     ``errno == EIO`` as end-of-file."""
     try:
-        for line in pty_master:
+        for line in pty_main:
             yield line
     except IOError as e:
         # this is just the PTY's way of saying goodbye

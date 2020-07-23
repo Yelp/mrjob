@@ -161,7 +161,7 @@ class MockEMRClient(object):
         :param mock_emr_failures: a set of ``(cluster ID, step_num)`` for steps
                                   that should fail.
         :param mock_emr_self_termination: a set of cluster IDs that should
-                                          simulate master node termination
+                                          simulate main node termination
                                           once cluster is up
         :param mock_emr_output: a map from ``(cluster ID, step_num)`` to a
                                 list of ``str``s representing file contents to
@@ -236,8 +236,8 @@ class MockEMRClient(object):
             AutoTerminate=True,
             Configurations=[],
             Ec2InstanceAttributes=dict(
-                EmrManagedMasterSecurityGroup='sg-mockmaster',
-                EmrManagedSlaveSecurityGroup='sg-mockslave',
+                EmrManagedMainSecurityGroup='sg-mockmain',
+                EmrManagedSubordinateSecurityGroup='sg-mocksubordinate',
                 IamInstanceProfile='',
             ),
             Id='j-MOCKCLUSTER%d' % len(self.mock_emr_clusters),
@@ -498,7 +498,7 @@ class MockEMRClient(object):
             if 'InstanceFleets' not in Instances:
                 raise _error('Only one subnet may be specified for clusters'
                              ' configured with instance groups or instance'
-                             ' count, master and slave instance type. Revise'
+                             ' count, main and subordinate instance type. Revise'
                              ' the configuration and resubmit.')
 
             _validate_param(Instances, 'Ec2SubnetIds', list)
@@ -531,12 +531,12 @@ class MockEMRClient(object):
             for fields in [
                 {'InstanceFleets'},
                 {'InstanceGroups'},
-                {'InstanceCount', 'MasterInstanceType', 'SlaveInstanceType'}])
+                {'InstanceCount', 'MainInstanceType', 'SubordinateInstanceType'}])
         if num_config_types > 1:
             raise _error(
                 'Please configure instances using one and only one of the'
                 ' following: instance groups; instance fleets; instance'
-                ' count, master and slave instance type.')
+                ' count, main and subordinate instance type.')
 
         if 'InstanceGroups' in Instances:
             self._add_instance_groups(
@@ -552,21 +552,21 @@ class MockEMRClient(object):
             _validate_param_type(instance_count, integer_types)
 
             # note: boto3 actually lets 'null' fall through to the API here
-            _validate_param(Instances, 'MasterInstanceType', string_types)
+            _validate_param(Instances, 'MainInstanceType', string_types)
             instance_groups.append(dict(
                 InstanceRole='MASTER',
-                InstanceType=Instances.pop('MasterInstanceType'),
+                InstanceType=Instances.pop('MainInstanceType'),
                 InstanceCount=1))
 
-            if 'SlaveInstanceType' in Instances:
-                SlaveInstanceType = Instances.pop('SlaveInstanceType')
-                _validate_param_type(SlaveInstanceType, string_types)
+            if 'SubordinateInstanceType' in Instances:
+                SubordinateInstanceType = Instances.pop('SubordinateInstanceType')
+                _validate_param_type(SubordinateInstanceType, string_types)
 
                 # don't create a group with no instances!
                 if instance_count > 1:
                     instance_groups.append(dict(
                         InstanceRole='CORE',
-                        InstanceType=SlaveInstanceType,
+                        InstanceType=SubordinateInstanceType,
                         InstanceCount=instance_count - 1))
 
             self._add_instance_groups(
@@ -683,7 +683,7 @@ class MockEMRClient(object):
                                fleet['TargetSpotCapacity'])
 
             if role == 'MASTER' and target_capacity != 1:
-                raise _error('A master instance fleet can only have a target'
+                raise _error('A main instance fleet can only have a target'
                              ' capacity of 1. Revise the configuration and'
                              ' resubmit.')
             elif target_capacity < 1:
@@ -707,8 +707,8 @@ class MockEMRClient(object):
 
         # MASTER role is required
         if 'MASTER' not in roles:
-            raise _error('No master instance fleets were supplied; you must'
-                         ' specify exactly one master instance fleet. Revise'
+            raise _error('No main instance fleets were supplied; you must'
+                         ' specify exactly one main instance fleet. Revise'
                          ' the configuration and resubmit.')
 
         cluster['_InstanceFleets'].extend(new_fleets)
@@ -764,7 +764,7 @@ class MockEMRClient(object):
             _validate_param(InstanceTypeConfig, 'WeightedCapacity', int)
             WeightedCapacity = InstanceTypeConfig.pop('WeightedCapacity')
             if InstanceFleetType == 'MASTER' and WeightedCapacity != 1:
-                raise _error('All instance types in the master instance fleet'
+                raise _error('All instance types in the main instance fleet'
                              ' must have weighted capacity as 1. Revise the'
                              ' configuration and resubmit.')
             elif WeightedCapacity < 1:
@@ -978,7 +978,7 @@ class MockEMRClient(object):
 
             if role == 'MASTER' and InstanceCount != 1:
                 raise _error(
-                    'A master instance group must specify a single instance')
+                    'A main instance group must specify a single instance')
             ig['RequestedInstanceCount'] = InstanceCount
 
             # Name
@@ -1055,8 +1055,8 @@ class MockEMRClient(object):
 
         # MASTER role is required
         if 'MASTER' not in roles:
-            raise _error('Zero master instance groups supplied, you must'
-                         ' specify exactly one master instance group')
+            raise _error('Zero main instance groups supplied, you must'
+                         ' specify exactly one main instance group')
 
         cluster['_InstanceGroups'].extend(new_igs)
 
@@ -1538,8 +1538,8 @@ class MockEMRClient(object):
         if cluster['Status']['State'] == 'STARTING':
             cluster['Status']['State'] = 'BOOTSTRAPPING'
 
-            # master now has a hostname
-            cluster['MasterPublicDnsName'] = 'master.%s.mock' % cluster['Id']
+            # main now has a hostname
+            cluster['MainPublicDnsName'] = 'main.%s.mock' % cluster['Id']
 
             # instances are now provisioned
             if cluster['InstanceCollectionType'] == 'INSTANCE_FLEET':
@@ -1592,10 +1592,10 @@ class MockEMRClient(object):
 
             if (len(cluster.get('_InstanceFleets') or ()) == 1 or
                     len(cluster.get('_InstanceGroups') or ()) == 1):
-                # single master node
+                # single main node
                 message = 'All instances in the job flow are terminated'
             else:
-                message = 'The master node was terminated'
+                message = 'The main node was terminated'
 
             cluster['Status']['StateChangeReason'] = dict(
                 Code='INSTANCE_FAILURE',

@@ -884,8 +884,8 @@ class MRJobRunner(object):
         """
         return _is_pyspark_step_type(step_type)
 
-    def _spark_master(self):
-        return self._opts.get('spark_master') or 'local[*]'
+    def _spark_main(self):
+        return self._opts.get('spark_main') or 'local[*]'
 
     def _spark_deploy_mode(self):
         return self._opts.get('spark_deploy_mode') or 'client'
@@ -905,14 +905,14 @@ class MRJobRunner(object):
 
         (True on everything but local.)
         """
-        # note: local-cluster[...] master does in fact have working dirs
-        return self._spark_master().split('[')[0] != 'local'
+        # note: local-cluster[...] main does in fact have working dirs
+        return self._spark_main().split('[')[0] != 'local'
 
     def _emulate_archives_on_spark(self):
         """True if spark-submit's --archives doesn't work on the given Spark
-        master, which means we'll need to emulate archives in setup scripts.
+        main, which means we'll need to emulate archives in setup scripts.
         """
-        return self._spark_master() != 'yarn'
+        return self._spark_main() != 'yarn'
 
     def _args_for_task(self, step_num, mrc):
         return [
@@ -949,7 +949,7 @@ class MRJobRunner(object):
         step = self._get_step(step_num)
 
         if step['type'] == 'spark':
-            # if on local[*] master, keep file upload args as-is (see #2031)
+            # if on local[*] main, keep file upload args as-is (see #2031)
             local = not self._spark_executors_have_own_wd()
 
             args = (
@@ -1180,10 +1180,10 @@ class MRJobRunner(object):
         """When we tell Hadoop/Spark to put files in the working directory,
         must they have the same names as the files in the working dir?
 
-        This basically only happens with Spark on non-YARN masters. YARN/Hadoop
+        This basically only happens with Spark on non-YARN mains. YARN/Hadoop
         allows you to specify a name for each file (``path#name_in_wd``).
         """
-        return self._has_spark_steps() and self._spark_master() != 'yarn'
+        return self._has_spark_steps() and self._spark_main() != 'yarn'
 
     def _dest_in_wd_mirror(self, path, name):
         """Return the URI of where to upload *path* so it can appear in the
@@ -1450,7 +1450,7 @@ class MRJobRunner(object):
         # we always use path#name syntax, even on Spark, because unlike
         # with --files, Spark will either accept that syntax with --archives
         # (if we're on YARN) or ignore --archives completely (if we're on
-        # any other Spark master)
+        # any other Spark main)
         if named_paths is None:
             # just return every archive managed by _working_dir_mgr
             named_paths = sorted(

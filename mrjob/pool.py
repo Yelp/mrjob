@@ -388,7 +388,7 @@ def _add_missing_roles_to_request(
     # a helper func
 
     if 'CORE' in missing_roles and list(role_to_req) == ['MASTER']:
-        # both core and master have to satisfy master-only request
+        # both core and main have to satisfy main-only request
         role_to_req['CORE'] = role_to_req['MASTER']
 
     if 'TASK' in missing_roles and 'CORE' in role_to_req:

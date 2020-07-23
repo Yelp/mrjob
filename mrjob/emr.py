@@ -207,7 +207,7 @@ _INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
 _YARN_HDFS_HISTORY_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging/history'
 
 # mildly flexible regex to detect cluster self-termination. Termination of
-# non-master nodes won't shut down the cluster, so don't need to match that.
+# non-main nodes won't shut down the cluster, so don't need to match that.
 _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*(node|instances) .* terminated.*$', re.I)
 
@@ -273,7 +273,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'iam_service_role',
         'instance_fleets',
         'instance_groups',
-        'master_instance_bid_price',
+        'main_instance_bid_price',
         'pool_clusters',
         'pool_name',
         'pool_wait_minutes',
@@ -348,10 +348,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         s3_files_dir = self._cloud_tmp_dir + 'files/'
         self._upload_mgr = UploadDirManager(s3_files_dir)
 
-        # master node setup script (handled later by
-        # _add_master_node_setup_files_for_upload())
-        self._master_node_setup_mgr = WorkingDirManager()
-        self._master_node_setup_script_path = None
+        # main node setup script (handled later by
+        # _add_main_node_setup_files_for_upload())
+        self._main_node_setup_mgr = WorkingDirManager()
+        self._main_node_setup_script_path = None
 
         # where our own logs ended up (we'll find this out once we run the job)
         self._s3_log_dir_uri = None
@@ -362,22 +362,22 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # did we acquire a lock on self._cluster_id? (used for pooling)
         self._locked_cluster = None
 
-        # we don't upload the ssh key to master until it's needed
+        # we don't upload the ssh key to main until it's needed
         self._ssh_key_is_copied = False
 
         # map from cluster ID to a dictionary containing cached info about
         # that cluster. Includes the following keys:
         # - image_version
         # - hadoop_version
-        # - master_public_dns
-        # - master_private_ip
+        # - main_public_dns
+        # - main_private_ip
         #
         # (we may do this for multiple cluster IDs if we join a pooled cluster
         # that self-terminates)
         self._cluster_to_cache = defaultdict(dict)
 
-        # set of cluster IDs for which we logged the master node's public DNS
-        self._logged_address_of_master = set()
+        # set of cluster IDs for which we logged the main node's public DNS
+        self._logged_address_of_main = set()
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task'. These will also always
@@ -388,7 +388,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # This might work better as a dictionary.
         self._log_interpretations = []
 
-        # log interpretation for master node setup step (currently we don't
+        # log interpretation for main node setup step (currently we don't
         # use this for anything; we just want to keep it out of
         # self._log_interpretations)
         self._mns_log_interpretation = None
@@ -650,7 +650,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._check_output_not_exists()
         self._create_setup_wrapper_scripts()
         self._add_bootstrap_files_for_upload()
-        self._add_master_node_setup_files_for_upload()
+        self._add_main_node_setup_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files()
 
@@ -717,7 +717,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _add_bootstrap_files_for_upload(self, persistent=False):
         """Add files needed by the bootstrap script to self._upload_mgr.
 
-        Create the master bootstrap script if necessary.
+        Create the main bootstrap script if necessary.
 
         persistent -- set by make_persistent_cluster()
         """
@@ -727,10 +727,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._upload_mgr.add(path)
 
         # now that we know where the above files live, we can create
-        # the master bootstrap script
-        self._create_master_bootstrap_script_if_needed()
-        if self._master_bootstrap_script_path:
-            self._upload_mgr.add(self._master_bootstrap_script_path)
+        # the main bootstrap script
+        self._create_main_bootstrap_script_if_needed()
+        if self._main_bootstrap_script_path:
+            self._upload_mgr.add(self._main_bootstrap_script_path)
 
         # make sure bootstrap action scripts are on S3
         for bootstrap_action in self._bootstrap_actions():
@@ -740,11 +740,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if persistent or self._opts['pool_clusters']:
             self._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 
-    def _add_master_node_setup_files_for_upload(self):
-        """Add files necesary for the master node setup script to
-        self._master_node_setup_mgr() and self._upload_mgr().
+    def _add_main_node_setup_files_for_upload(self):
+        """Add files necesary for the main node setup script to
+        self._main_node_setup_mgr() and self._upload_mgr().
 
-        Create the master node setup script if necessary.
+        Create the main node setup script if necessary.
         """
         # currently, only used by libjars; see #1336 for how we might open
         # this up more generally
@@ -753,12 +753,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if path.startswith('file:///'):
                 continue
 
-            self._master_node_setup_mgr.add('file', path)
+            self._main_node_setup_mgr.add('file', path)
             self._upload_mgr.add(path)
 
-        self._create_master_node_setup_script_if_needed()
-        if self._master_node_setup_script_path:
-            self._upload_mgr.add(self._master_node_setup_script_path)
+        self._create_main_node_setup_script_if_needed()
+        if self._main_node_setup_script_path:
+            self._upload_mgr.add(self._main_node_setup_script_path)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -799,7 +799,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                            _IMAGE_VERSION_TO_SSH_TUNNEL_CONFIG)
 
     def _job_tracker_host(self):
-        """The host of the job tracker/resource manager, from the master node.
+        """The host of the job tracker/resource manager, from the main node.
         """
         tunnel_config = self._ssh_tunnel_config()
 
@@ -810,9 +810,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             return 'localhost'
         else:
             # Issue #1397: on the 3.x and 4.x AMIs we want to tunnel to the
-            # resource manager on the master node's *internal* IP; otherwise
+            # resource manager on the main node's *internal* IP; otherwise
             # it work won't work on some VPC setups
-            return self._master_private_ip()
+            return self._main_private_ip()
 
     def _ssh_tunnel_args(self, bind_port):
         for opt_name in ('ec2_key_pair', 'ec2_key_pair_file',
@@ -824,7 +824,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 self._give_up_on_ssh_tunnel = True
                 return
 
-        host = self._address_of_master()
+        host = self._address_of_main()
         if not host:
             return
 
@@ -842,7 +842,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if not self._opts['ec2_key_pair_file']:
             return []
 
-        host = self._address_of_master()
+        host = self._address_of_main()
         if not host:
             return []
 
@@ -991,8 +991,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             return 'm4.large'
 
     def _instance_is_worker(self, role):
-        """Do instances of the given role run tasks? True for non-master
-        instances and sole master instance."""
+        """Do instances of the given role run tasks? True for non-main
+        instances and sole main instance."""
         if role not in _INSTANCE_ROLES:
             raise ValueError
 
@@ -1139,11 +1139,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     Path=uri,
                     Args=bootstrap_action['args'])))
 
-        if self._master_bootstrap_script_path:
-            uri = self._upload_mgr.uri(self._master_bootstrap_script_path)
+        if self._main_bootstrap_script_path:
+            uri = self._upload_mgr.uri(self._main_bootstrap_script_path)
 
             BootstrapActions.append(dict(
-                Name='master',
+                Name='main',
                 ScriptBootstrapAction=dict(
                     Path=uri,
                     Args=[])))
@@ -1241,8 +1241,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # for several minutes)
         steps = []
 
-        if self._master_node_setup_script_path:
-            steps.append(self._build_master_node_setup_step())
+        if self._main_node_setup_script_path:
+            steps.append(self._build_main_node_setup_step())
 
         for n in range(self._num_steps()):
             steps.append(self._build_step(n))
@@ -1310,7 +1310,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             return [_3_X_SPARK_SUBMIT]
 
-    def _spark_master(self):
+    def _spark_main(self):
         # hard-coded for EMR
         return 'yarn'
 
@@ -1337,10 +1337,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             return self._upload_mgr.uri(path)
 
-    def _build_master_node_setup_step(self):
-        name = '%s: Master node setup' % self._job_key
+    def _build_main_node_setup_step(self):
+        name = '%s: Main node setup' % self._job_key
         jar = self._script_runner_jar_uri()
-        step_args = [self._upload_mgr.uri(self._master_node_setup_script_path)]
+        step_args = [self._upload_mgr.uri(self._main_node_setup_script_path)]
 
         return dict(
             Name=name,
@@ -1354,15 +1354,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _libjar_paths(self):
         results = []
 
-        # libjars should be in the working dir of the master node setup
+        # libjars should be in the working dir of the main node setup
         # script path, unless they refer to paths directly (file:///)
         for path in self._opts['libjars']:
             if path.startswith('file:///'):
                 results.append(path[7:])  # keep leading slash
             else:
                 results.append(posixpath.join(
-                    self._master_node_setup_working_dir(),
-                    self._master_node_setup_mgr.name('file', path)))
+                    self._main_node_setup_working_dir(),
+                    self._main_node_setup_mgr.name('file', path)))
 
         return results
 
@@ -1403,7 +1403,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
-            self._log_address_of_master_once()
+            self._log_address_of_main_once()
 
         # now that we know which cluster it is, check for Spark support
         if self._has_spark_steps():
@@ -1439,7 +1439,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         num_steps = len(self._get_steps())
 
         expected_num_steps = num_steps
-        if self._master_node_setup_script_path:
+        if self._main_node_setup_script_path:
             expected_num_steps += 1
 
         # get info about steps submitted to cluster
@@ -1459,9 +1459,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
             self._set_up_ssh_tunnel_and_hdfs()
 
-        # treat master node setup as step -1
+        # treat main node setup as step -1
         start = 0
-        if self._master_node_setup_script_path:
+        if self._main_node_setup_script_path:
             start -= 1
 
         for step_num, step in enumerate(steps, start=start):
@@ -1508,8 +1508,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                       self._opts['check_cluster_every'])
             time.sleep(self._opts['check_cluster_every'])
 
-            # log address of the master node once if we have it
-            self._log_address_of_master_once()
+            # log address of the main node once if we have it
+            self._log_address_of_main_once()
 
             step = emr_client.describe_step(
                 ClusterId=self._cluster_id, StepId=step_id)['Step']
@@ -1541,7 +1541,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 self._set_up_ssh_tunnel_and_hdfs()
                 log.info('  RUNNING%s' % time_running_desc)
 
-                # don't log progress for master node setup step, because
+                # don't log progress for main node setup step, because
                 # it doesn't appear in job tracker
                 if step_num >= 0:
                     self._log_step_progress()
@@ -1591,14 +1591,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     # was it because a bootstrap action failed?
                     self._check_for_failed_bootstrap_action(cluster)
 
-            # spark steps require different log parsing. The master node
+            # spark steps require different log parsing. The main node
             # setup script is a JAR step (albeit one that never produces
             # counters)
             step_type = (
                 self._get_step(step_num)['type'] if step_num >= 0 else 'jar')
 
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
-            # try to fetch counters. (Except for master node setup
+            # try to fetch counters. (Except for main node setup
             # and Spark, which has no counters.)
             if step['Status']['State'] != 'CANCELLED' and step_num >= 0:
                 self._log_counters(log_interpretation, step_num)
@@ -1615,24 +1615,24 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 step_num=step_num, num_steps=num_steps,
                 # "Step 0 of ... failed" looks weird
                 step_desc=(
-                    'Master node setup step' if step_num == -1 else None))
+                    'Main node setup step' if step_num == -1 else None))
 
-    def _log_address_of_master_once(self):
-        """Log the master node's public DNS, if we haven't already"""
+    def _log_address_of_main_once(self):
+        """Log the main node's public DNS, if we haven't already"""
         # Some users like to SSH in manually. See #2007
         if not self._cluster_id:
             return
 
-        if self._cluster_id in self._logged_address_of_master:
+        if self._cluster_id in self._logged_address_of_main:
             return
 
-        master_dns = self._address_of_master()
+        main_dns = self._address_of_main()
 
-        if not master_dns:
+        if not main_dns:
             return
 
-        log.info('  master node is %s' % master_dns)
-        self._logged_address_of_master.add(self._cluster_id)
+        log.info('  main node is %s' % main_dns)
+        self._logged_address_of_main.add(self._cluster_id)
 
     def _log_step_progress(self):
         """Tunnel to the job tracker/resource manager and log the
@@ -1684,7 +1684,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _progress_html_over_ssh(self):
         """Fetch progress by running :command:`curl` over SSH, or return
         ``None``"""
-        host = self._address_of_master()
+        host = self._address_of_main()
 
         if not self._opts['ec2_key_pair_file']:
             return None
@@ -1723,7 +1723,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # don't check for max_mins_idle because it's possible to
         # join a self-terminating cluster without having max_mins_idle set
-        # on this runner (pooling only cares about the master bootstrap script,
+        # on this runner (pooling only cares about the main bootstrap script,
         # not other bootstrap actions)
 
         # our step should be CANCELLED (not failed)
@@ -1736,7 +1736,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # didn't write data to the output dir, so it's not worth the extra
         # code.
 
-        # cluster should have stopped because master node failed
+        # cluster should have stopped because main node failed
         # could also check for
         # cluster.status.statechangereason.code == 'INSTANCE_FAILURE'
         if not _CLUSTER_SELF_TERMINATED_RE.match(_get_reason(cluster)):
@@ -1816,7 +1816,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # dir_name=None means don't try to SSH in.
         #
-        # TODO: If the failure is on the master node, we could just look in
+        # TODO: If the failure is on the main node, we could just look in
         # /mnt/var/log/bootstrap-actions. However, if it's on a worker node,
         # we'd have to look up its internal IP using the ListInstances
         # API call. This *would* be a bit faster though. See #1346.
@@ -1935,7 +1935,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Stream log dirs for any kind of log.
 
         Our general strategy is first, if SSH is enabled, to SSH into the
-        master node (and possibly workers, if *ssh_to_workers* is set).
+        main node (and possibly workers, if *ssh_to_workers* is set).
 
         If this doesn't work, we have to look on S3. If the cluster is
         TERMINATING, we first wait for it to terminate (since that
@@ -1955,7 +1955,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             yield [hdfs_log_dir]
 
         if dir_name and self.fs.can_handle_path('ssh:///'):
-            ssh_host = self._address_of_master()
+            ssh_host = self._address_of_main()
             if ssh_host:
                 hosts = [ssh_host]
                 host_desc = ssh_host
@@ -1986,7 +1986,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _ssh_worker_hosts(self):
         """Get the hostnames of all core and task nodes,
-        that are currently running, so we can SSH to them through the master
+        that are currently running, so we can SSH to them through the main
         nodes and read their logs.
 
         (This currently returns IP addresses rather than full hostnames
@@ -2023,8 +2023,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # going to need to wait for logs to get archived to S3
 
             # "step_num" is just a unique ID for the step; using -1
-            # for master node setup script
-            if (self._master_node_setup_script_path and
+            # for main node setup script
+            if (self._main_node_setup_script_path and
                     self._mns_log_interpretation is None):
                 step_num = -1
             else:
@@ -2128,7 +2128,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Parse *bootstrap_actions* option into dictionaries with
         keys *path*, *args*, adding Spark bootstrap action if needed.
 
-        (This doesn't handle the master bootstrap script.)
+        (This doesn't handle the main bootstrap script.)
         """
         actions = list(self._opts['bootstrap_actions'])
 
@@ -2166,39 +2166,39 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             ('*://*', 'hadoop fs -copyToLocal'),
         ]
 
-    ### master node setup script ###
+    ### main node setup script ###
 
-    def _create_master_node_setup_script_if_needed(self):
+    def _create_main_node_setup_script_if_needed(self):
         """Helper for :py:meth:`_add_bootstrap_files_for_upload`.
 
-        If we need a master node setup script and write it into our local
-        temp directory. Set self._master_node_setup_script_path.
+        If we need a main node setup script and write it into our local
+        temp directory. Set self._main_node_setup_script_path.
         """
         # already created
-        if self._master_node_setup_script_path:
+        if self._main_node_setup_script_path:
             return
 
         # currently, the only thing this script does is upload files
-        if not self._master_node_setup_mgr.paths():
+        if not self._main_node_setup_mgr.paths():
             return
 
         # create script
         path = os.path.join(self._get_local_tmp_dir(), 'mns.sh')
-        contents = self._master_node_setup_script_content()
+        contents = self._main_node_setup_script_content()
 
-        self._write_script(contents, path, 'master node setup script')
+        self._write_script(contents, path, 'main node setup script')
 
-        # the script itself doesn't need to be on the master node, just S3
-        self._master_node_setup_script_path = path
+        # the script itself doesn't need to be on the main node, just S3
+        self._main_node_setup_script_path = path
         self._upload_mgr.add(path)
 
-    def _master_node_setup_script_content(self):
-        """Create the contents of the master node setup script as an
+    def _main_node_setup_script_content(self):
+        """Create the contents of the main node setup script as an
         array of strings.
 
-        (prepare self._master_node_setup_mgr first)
+        (prepare self._main_node_setup_mgr first)
         """
-        # TODO: this is very similar to _master_bootstrap_script_content();
+        # TODO: this is very similar to _main_bootstrap_script_content();
         # merge common code
         out = []
 
@@ -2212,13 +2212,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         out.append('{')
 
         # make working dir
-        working_dir = self._master_node_setup_working_dir()
+        working_dir = self._main_node_setup_working_dir()
         out.append('  mkdir -p %s' % pipes.quote(working_dir))
         out.append('  cd %s' % pipes.quote(working_dir))
         out.append('')
 
         for name, path in sorted(
-                self._master_node_setup_mgr.name_to_path('file').items()):
+                self._main_node_setup_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
             out.append('  %s %s %s' % (
                 self._cp_to_local_cmd(), pipes.quote(uri), pipes.quote(name)))
@@ -2231,8 +2231,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         return out
 
-    def _master_node_setup_working_dir(self):
-        """Where to place files used by the master node setup script."""
+    def _main_node_setup_working_dir(self):
+        """Where to place files used by the main node setup script."""
         return '/home/hadoop/%s' % self._job_key
 
     def _script_runner_jar_uri(self):
@@ -2613,14 +2613,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         return self._get_cluster_info('image_version')
 
-    def _address_of_master(self):
-        """Get the address of the master node so we can SSH to it"""
-        return self._get_cluster_info('master_public_dns')
+    def _address_of_main(self):
+        """Get the address of the main node so we can SSH to it"""
+        return self._get_cluster_info('main_public_dns')
 
-    def _master_private_ip(self):
-        """Get the internal ("private") address of the master node, so we
+    def _main_private_ip(self):
+        """Get the internal ("private") address of the main node, so we
         can direct our SSH tunnel to it."""
-        return self._get_cluster_info('master_private_ip')
+        return self._get_cluster_info('main_private_ip')
 
     def _get_app_versions(self):
         """Returns a map from lowercase app name to version for our cluster.
@@ -2641,8 +2641,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         cache = self._cluster_to_cache[self._cluster_id]
 
         if not cache.get(key):
-            if key == 'master_private_ip':
-                self._store_master_instance_info()
+            if key == 'main_private_ip':
+                self._store_main_instance_info()
             else:
                 self._store_cluster_info()
 
@@ -2650,7 +2650,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _store_cluster_info(self):
         """Describe our cluster, and cache image_version, hadoop_version,
-        and master_public_dns"""
+        and main_public_dns"""
         if not self._cluster_id:
             raise ValueError('cluster has not yet been created')
 
@@ -2674,11 +2674,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             'InstanceCollectionType', 'INSTANCE_GROUP')
 
         if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
-            cache['master_public_dns'] = cluster['MasterPublicDnsName']
+            cache['main_public_dns'] = cluster['MainPublicDnsName']
 
-    def _store_master_instance_info(self):
-        """List master instance for our cluster, and cache
-        master_private_ip."""
+    def _store_main_instance_info(self):
+        """List main instance for our cluster, and cache
+        main_private_ip."""
         if not self._cluster_id:
             raise ValueError('cluster has not yet been created')
 
@@ -2693,12 +2693,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if not instances:
             return
 
-        master = instances[0]
+        main = instances[0]
 
         # can also get private DNS and public IP/DNS, but we don't use this
-        master_private_ip = master.get('PrivateIpAddress')
-        if master_private_ip:  # may not have been assigned yet
-            cache['master_private_ip'] = master_private_ip
+        main_private_ip = main.get('PrivateIpAddress')
+        if main_private_ip:  # may not have been assigned yet
+            cache['main_private_ip'] = main_private_ip
 
     def make_ec2_client(self):
         """Create a :py:mod:`boto3` EC2 client.
@@ -2820,7 +2820,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 ClusterId=self.get_cluster_id()))
 
             for fleet in fleets:
-                # master doesn't matter if it's not running tasks
+                # main doesn't matter if it's not running tasks
                 if fleet['InstanceFleetType'] == 'MASTER' and len(fleets) > 1:
                     continue
 
@@ -2835,7 +2835,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 ClusterId=self.get_cluster_id()))
 
             for ig in igs:
-                # master doesn't matter if it's not running tasks
+                # main doesn't matter if it's not running tasks
                 if ig['InstanceGroupType'] == 'MASTER' and len(igs) > 1:
                     continue
 
@@ -3068,7 +3068,7 @@ def _build_instance_group(role, instance_type, num_instances, bid_price):
         InstanceRole=role,
         InstanceType=instance_type,
         Market='ON_DEMAND',
-        Name=role.lower(),  # just name the groups "core", "master", and "task"
+        Name=role.lower(),  # just name the groups "core", "main", and "task"
     )
 
     if bid_price:

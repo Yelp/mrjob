@@ -140,12 +140,12 @@ Options::
                         EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge -- See
                         http://aws.amazon.com/ec2/instance-types/
   --label LABEL         Alternate label for the job, to help us identify it.
-  --master-instance-bid-price MASTER_INSTANCE_BID_PRICE
-                        Bid price to specify for the master node when setting
+  --main-instance-bid-price MASTER_INSTANCE_BID_PRICE
+                        Bid price to specify for the main node when setting
                         it up as an EC2 spot instance (you probably only want
                         to do this for task instances).
-  --master-instance-type MASTER_INSTANCE_TYPE
-                        Type of GCE/EC2 master instance to launch
+  --main-instance-type MASTER_INSTANCE_TYPE
+                        Type of GCE/EC2 main instance to launch
   --max-mins-idle MAX_MINS_IDLE
                         If we create a cluster, have it automatically
                         terminate itself after it's been idle this many

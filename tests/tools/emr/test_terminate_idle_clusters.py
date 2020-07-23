@@ -293,7 +293,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
                 dict(
                     Args=['pool-0123456789abcdef0123456789abcdef',
                           'reflecting'],
-                    Name='master',
+                    Name='main',
                 ),
             ],
             Id='j-POOLED',

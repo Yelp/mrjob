@@ -300,7 +300,7 @@ class InlineRunnerSparkTestCase(SandboxedTestCase, SingleSparkContextTestCase):
         fowl_path = self.makefile('fowl', b'goose')
 
         # --use-driver-cwd gets around issues with the shared JVM not changing
-        # executors' working directory to match the driver on local master
+        # executors' working directory to match the driver on local main
         job = MRSparkOSWalk(['-r', 'inline',
                              '--use-driver-cwd',
                              '--files',

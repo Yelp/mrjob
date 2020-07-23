@@ -131,7 +131,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         'hadoop_streaming_jar',
         'hadoop_tmp_dir',
         'spark_deploy_mode',
-        'spark_master',
+        'spark_main',
     }
 
     # supports everything (so far)
@@ -409,7 +409,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
     def _run_hadoop(self, hadoop_args, env, record_callback):
         # try to use a PTY if it's available
         try:
-            pid, master_fd = pty.fork()
+            pid, main_fd = pty.fork()
         except (AttributeError, OSError):
             # no PTYs, just use Popen
 
@@ -447,19 +447,19 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             else:
                 log.debug('Invoking Hadoop via PTY')
 
-                with os.fdopen(master_fd, 'rb') as master:
-                    # reading from master gives us the subprocess's
+                with os.fdopen(main_fd, 'rb') as main:
+                    # reading from main gives us the subprocess's
                     # stderr and stdout (it's a fake terminal)
                     step_interpretation = (
                         _interpret_hadoop_jar_command_stderr(
-                            _eio_to_eof(master),
+                            _eio_to_eof(main),
                             record_callback=_log_record_from_hadoop))
                     _, returncode = os.waitpid(pid, 0)
 
         return returncode, step_interpretation
 
-    def _spark_master(self):
-        return self._opts['spark_master'] or 'yarn'
+    def _spark_main(self):
+        return self._opts['spark_main'] or 'yarn'
 
     def _args_for_step(self, step_num):
         step = self._get_step(step_num)

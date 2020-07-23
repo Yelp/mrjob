@@ -66,7 +66,7 @@ from mrjob.util import shlex_split
 
 def main(cl_args=None):
     usage = 'usage: %(prog)s boss CLUSTER_ID [options] "command string"'
-    description = ('Run a command on the master and all worker nodes of an EMR'
+    description = ('Run a command on the main and all worker nodes of an EMR'
                    ' cluster. Store stdout/stderr for results in OUTPUT_DIR.')
 
     arg_parser = ArgumentParser(usage=usage, description=description)
@@ -112,13 +112,13 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     *cmd_args* on all nodes in the cluster and save the stdout and stderr of
     each run to subdirectories of *output_dir*.
     """
-    master_addr = runner._address_of_master()
-    addresses = [master_addr]
+    main_addr = runner._address_of_main()
+    addresses = [main_addr]
 
     worker_addrs = runner._ssh_worker_hosts()
 
     if worker_addrs:
-        addresses += ['%s!%s' % (master_addr, worker_addr)
+        addresses += ['%s!%s' % (main_addr, worker_addr)
                       for worker_addr in worker_addrs]
 
     for addr in addresses:
@@ -133,7 +133,7 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
         if '!' in addr:
             base_dir = os.path.join(output_dir, 'worker ' + addr.split('!')[1])
         else:
-            base_dir = os.path.join(output_dir, 'master')
+            base_dir = os.path.join(output_dir, 'main')
 
         if not os.path.exists(base_dir):
             os.makedirs(base_dir)

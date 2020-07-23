@@ -147,7 +147,7 @@ class SimMRJobRunner(MRJobRunner):
         if hasattr(self, '_create_setup_wrapper_scripts'):  # inline doesn't
             self._create_setup_wrapper_scripts()
 
-        # this does nothing in inline mode, since there's no _spark_master()
+        # this does nothing in inline mode, since there's no _spark_main()
         self._copy_files_to_wd_mirror()
 
         # run mapper, combiner, sort, reducer for each step

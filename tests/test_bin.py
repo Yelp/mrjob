@@ -69,7 +69,7 @@ PYTHON_BIN = (
     ('python2.7' if PY2 else 'python3')
 )
 
-# a --spark-master that has a working directory and is available from pyspark
+# a --spark-main that has a working directory and is available from pyspark
 _LOCAL_CLUSTER_MASTER = 'local-cluster[2,1,4096]'
 
 
@@ -88,7 +88,7 @@ def _mock_upload_mgr():
 
 class GenericLocalRunnerTestCase(SandboxedTestCase):
     """Disable the local runner's custom
-    :py:meth:`~mrjob.local.LocalMRJobRunner._spark_master`
+    :py:meth:`~mrjob.local.LocalMRJobRunner._spark_main`
     method, so we can use it to test the basic functionality
     of :py:class:`~mrjob.bin.MRJobBinRunner`.
     """
@@ -96,14 +96,14 @@ class GenericLocalRunnerTestCase(SandboxedTestCase):
         super(GenericLocalRunnerTestCase, self).setUp()
 
         # couldn't figure out how to delete a method with mock
-        _spark_master_method = LocalMRJobRunner._spark_master
+        _spark_main_method = LocalMRJobRunner._spark_main
 
-        def restore_spark_master_method():
-            LocalMRJobRunner._spark_master = _spark_master_method
+        def restore_spark_main_method():
+            LocalMRJobRunner._spark_main = _spark_main_method
 
-        self.addCleanup(restore_spark_master_method)
+        self.addCleanup(restore_spark_main_method)
 
-        delattr(LocalMRJobRunner, '_spark_master')
+        delattr(LocalMRJobRunner, '_spark_main')
 
 
 class ArgsForSparkStepTestCase(GenericLocalRunnerTestCase):
@@ -1009,7 +1009,7 @@ class SparkScriptPathTestCase(GenericLocalRunnerTestCase):
 
 class SparkSubmitArgsTestCase(SandboxedTestCase):
     # mostly testing on the spark runner because it doesn't override
-    # _spark_submit_args(), _spark_master(), or _spark_deploy_mode()
+    # _spark_submit_args(), _spark_main(), or _spark_deploy_mode()
 
     def setUp(self):
         super(SparkSubmitArgsTestCase, self).setUp()
@@ -1027,15 +1027,15 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 runner._spark_submit_args(0),
                 [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
 
-    def test_spark_master_and_deploy_mode(self):
+    def test_spark_main_and_deploy_mode(self):
         job = MRNullSpark([
             '-r', 'spark',
-            '--spark-master', 'yoda',
+            '--spark-main', 'yoda',
             '--spark-deploy-mode', 'the-force',
         ])
         job.sandbox()
@@ -1045,7 +1045,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 runner._spark_submit_args(0),
                 [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'yoda',
+                    '--main', 'yoda',
                     '--deploy-mode', 'the-force',
                     '--files',
                     runner._dest_in_wd_mirror(runner._script_path,
@@ -1053,10 +1053,10 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 ]
             )
 
-    def test_empty_spark_master_and_deploy_mode_mean_defaults(self):
+    def test_empty_spark_main_and_deploy_mode_mean_defaults(self):
         job = MRNullSpark([
             '-r', 'spark',
-            '--spark-master', '',
+            '--spark-main', '',
             '--spark-deploy-mode', '',
         ])
         job.sandbox()
@@ -1066,7 +1066,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 runner._spark_submit_args(0),
                 [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1084,7 +1084,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--conf', 'spark.executorEnv.BAZ=qux',
                     '--conf', 'spark.executorEnv.FOO=bar',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1099,7 +1099,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 runner._spark_submit_args(0),
                 [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=mypy',
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1113,7 +1113,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 runner._spark_submit_args(0),
                 [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=ourpy',
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1134,7 +1134,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 runner._spark_submit_args(0),
                 [
                     '--conf', 'spark.executorEnv.FOO=bar',
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1150,7 +1150,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 [
                     '--conf', 'spark.executor.memory=10g',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1168,7 +1168,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 [
                     '--conf', 'foo=bar',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1188,15 +1188,15 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 [
                     '--conf', 'spark.executorEnv.FOO=baz',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=ourpy',
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
 
-    def test_yarn_app_master_env(self):
+    def test_yarn_app_main_env(self):
         job = MRNullSpark(
             ['-r', 'spark',
-             '--spark-master', 'yarn',
+             '--spark-main', 'yarn',
              '--cmdenv', 'FOO=bar'])
         job.sandbox()
 
@@ -1207,10 +1207,10 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--conf', 'spark.executorEnv.FOO=bar',
                     '--conf',
                     'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--conf', 'spark.yarn.appMasterEnv.FOO=bar',
+                    '--conf', 'spark.yarn.appMainEnv.FOO=bar',
                     '--conf',
-                    'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'yarn',
+                    'spark.yarn.appMainEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--main', 'yarn',
                     '--deploy-mode', 'client',
                     '--files',
                     runner._dest_in_wd_mirror(runner._script_path,
@@ -1218,8 +1218,8 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 ]
             )
 
-    def test_spark_master_method_triggers_yarn_app_master_env(self):
-        self.start(patch('mrjob.bin.MRJobBinRunner._spark_master',
+    def test_spark_main_method_triggers_yarn_app_main_env(self):
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_main',
                          return_value='yarn'))
 
         job = MRNullSpark(['-r', 'spark'])
@@ -1232,8 +1232,8 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--conf',
                     'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--conf',
-                    'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'yarn',
+                    'spark.yarn.appMainEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--main', 'yarn',
                     '--deploy-mode', 'client',
                     '--files',
                     runner._dest_in_wd_mirror(runner._script_path,
@@ -1263,7 +1263,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--conf', 'BAZ=false',
                     '--conf', 'QUX=null',
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1281,7 +1281,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--jars', fake_libjar,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1300,7 +1300,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     '--jars', 's3://a/a.jar,s3://b/b.jar',
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1315,7 +1315,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 runner._spark_submit_args(0),
                 [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                     '--name', 'Dave',
                 ]
@@ -1331,7 +1331,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                     '-v',
                 ]
@@ -1348,7 +1348,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                     '--name', 'Dave', '-v',
                 ]
@@ -1363,7 +1363,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
         job = MRNullSpark([
             '-r', 'spark',
-            '--spark-master', 'yarn',
+            '--spark-main', 'yarn',
             '--files', '%s#foo1,%s#bar,%s#baz' % (
                 foo1_path, foo2_path, foo3_uri),
             '--archives', baz_path,
@@ -1380,8 +1380,8 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
                     # there's a separate conf for envvars in YARN
                     '--conf',
-                    'spark.yarn.appMasterEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'yarn',
+                    'spark.yarn.appMainEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
+                    '--main', 'yarn',
                     '--deploy-mode', 'client',
                     '--files',
                     (runner._dest_in_wd_mirror(foo2_path, 'bar') +
@@ -1413,7 +1413,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
         job = MRNullSpark([
             '-r', 'spark',
-            '--spark-master', 'mesos://host:12345',
+            '--spark-main', 'mesos://host:12345',
             '--files', '%s,%s#bar,%s,%s#baz' % (
                 foo1_path, foo2_path, foo3_uri, foo4_uri)
         ])
@@ -1425,7 +1425,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'mesos://host:12345',
+                    '--main', 'mesos://host:12345',
                     '--deploy-mode', 'client',
                     '--files',
                     (
@@ -1450,7 +1450,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
         job = MRNullSpark([
             '-r', 'spark',
-            '--spark-master', 'mock',
+            '--spark-main', 'mock',
             '--extra-file', qux_path,  # file upload arg
         ])
         job.sandbox()
@@ -1461,7 +1461,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'mock',
+                    '--main', 'mock',
                     '--deploy-mode', 'client',
                     '--files',
                     'uri-of://files/wd/mr_null_spark.py,uri-of://files/wd/qux',
@@ -1473,7 +1473,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
         job = MRNullSpark([
             '-r', 'spark',
-            '--spark-master', _LOCAL_CLUSTER_MASTER,
+            '--spark-main', _LOCAL_CLUSTER_MASTER,
             '--extra-file', qux_path,  # file upload arg
         ])
         job.sandbox()
@@ -1484,7 +1484,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', _LOCAL_CLUSTER_MASTER,
+                    '--main', _LOCAL_CLUSTER_MASTER,
                     '--deploy-mode', 'client',
                     '--files', ('%s,%s' % (runner._script_path, qux_path)),
                 ]
@@ -1503,7 +1503,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1523,7 +1523,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                     '--files', 'foo,bar',
                 ]
@@ -1541,7 +1541,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                     '--py-files',
                     '<first py_file>,<second py_file>'
@@ -1567,7 +1567,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     '--conf', 'QUX=baz',
                     '--conf', 'spark.executorEnv.BAZ=qux',
                     '--class', 'foo.Bar',
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1580,7 +1580,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertEqual(
                 runner._spark_submit_args(0), [
                     '--conf', 'spark.executorEnv.PYSPARK_PYTHON=' + PYTHON_BIN,
-                    '--master', 'local[*]',
+                    '--main', 'local[*]',
                     '--deploy-mode', 'client',
                 ]
             )
@@ -1657,8 +1657,8 @@ class PySparkPythonTestCase(MockHadoopTestCase):
     def test_setup_wrapper_script(self):
         env, runner = self._env_and_runner('--setup', 'true')
 
-        # sanity-check master and deploy mode
-        self.assertEqual(runner._spark_master(), 'yarn')
+        # sanity-check main and deploy mode
+        self.assertEqual(runner._spark_main(), 'yarn')
         self.assertEqual(runner._spark_deploy_mode(), 'client')
 
         self.assertIsNotNone(runner._spark_python_wrapper_path)
@@ -1675,9 +1675,9 @@ class PySparkPythonTestCase(MockHadoopTestCase):
         self.assertNotIn('PYSPARK_DRIVER_PYTHON', env)
         self.assertEqual(env['PYSPARK_PYTHON'], './python-wrapper.sh')
 
-    def test_no_setup_scripts_on_local_master(self):
+    def test_no_setup_scripts_on_local_main(self):
         env, runner = self._env_and_runner(
-            '--setup', 'true', '--spark-master', 'local')
+            '--setup', 'true', '--spark-main', 'local')
 
         self.assertIsNone(runner._spark_python_wrapper_path)
         self.assertTrue(self.log.warning.called)
@@ -1731,7 +1731,7 @@ class SparkUploadArgsTestCase(MockHadoopTestCase):
             ['-r', 'hadoop',
              '--setup', 'make -f Makefile#',
              '--files', 'foo',
-             '--spark-master', 'local[*]',
+             '--spark-main', 'local[*]',
              ])
         job.sandbox()
 

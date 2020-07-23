@@ -1164,7 +1164,7 @@ class MRJob(object):
 
         .. versionchanged:: 0.6.8
 
-           fully supported on Spark, including ``local[*]`` master
+           fully supported on Spark, including ``local[*]`` main
         """
         if kwargs.get('type') not in (None, str):
             raise ArgumentTypeError(

@@ -111,7 +111,7 @@ class ParseSparkLogTestCase(BasicTestCase):
         )
 
     def test_multi_line_warning(self):
-        # on the local-cluster master, Python Tracebacks are only available
+        # on the local-cluster main, Python Tracebacks are only available
         # from warnings, not errors
         self.assertEqual(
             _parse_spark_log(_MULTI_LINE_WARNING.split('\n')),

@@ -749,7 +749,7 @@ _RUNNER_OPTS = dict(
             (['--hadoop-streaming-jar'], dict(
                 help=('Path of your hadoop streaming jar (locally, or on'
                       ' S3/HDFS). In EMR, use a file:// URI to refer to a jar'
-                      ' on the master node of your cluster.'),
+                      ' on the main node of your cluster.'),
             )),
         ],
     ),
@@ -886,22 +886,22 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    master_instance_bid_price=dict(
+    main_instance_bid_price=dict(
         cloud_role='launch',
         switches=[
-            (['--master-instance-bid-price'], dict(
-                help=('Bid price to specify for the master node when'
+            (['--main-instance-bid-price'], dict(
+                help=('Bid price to specify for the main node when'
                       ' setting it up as an EC2 spot instance (you probably'
                       ' only want to do this for task instances).'),
             )),
         ],
     ),
-    master_instance_config=dict(
+    main_instance_config=dict(
         cloud_role='launch',
         switches=[
-            (['--master-instance-config'], dict(
+            (['--main-instance-config'], dict(
                 action=_JSONAction,
-                help=('detailed JSON dict of configs for the master instance'
+                help=('detailed JSON dict of configs for the main instance'
                       ' on Dataproc including disk config. For format, see'
                       ' https://cloud.google.com/dataproc/docs/reference/rest'
                       '/v1/projects.regions.clusters#InstanceGroupConfig'
@@ -910,11 +910,11 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    master_instance_type=dict(
+    main_instance_type=dict(
         cloud_role='launch',
         switches=[
-            (['--master-instance-type'], dict(
-                help='Type of GCE/EC2 master instance to launch',
+            (['--main-instance-type'], dict(
+                help='Type of GCE/EC2 main instance to launch',
             )),
         ],
     ),
@@ -1181,10 +1181,10 @@ _RUNNER_OPTS = dict(
             )),
         ]
     ),
-    spark_master=dict(
+    spark_main=dict(
         switches=[
-            (['--spark-master'], dict(
-                help=('--master argument to spark-submit (e.g. '
+            (['--spark-main'], dict(
+                help=('--main argument to spark-submit (e.g. '
                       'spark://host:port, local). Default is "yarn"'),
             )),
         ],

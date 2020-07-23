@@ -28,7 +28,7 @@ templates_path = ['_templates']
 exclude_patterns = ['_build']
 source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
-master_doc = 'index'
+main_doc = 'index'
 pygments_style = 'sphinx'
 
 # project info

@@ -753,10 +753,10 @@ class EmulateMapInputFileTestCase(SparkHarnessOutputComparisonBaseTestCase):
     # which don't seem to work properly directly through the pyspark library,
     # which is what the inline runner uses (see comment in
     # _assert_output_matches(), above), so we have to use local mode, which
-    # uses local-cluster master.
+    # uses local-cluster main.
     #
     # this feature is more fully tested in test_runner.py, which can run tests
-    # through spark-submit on the local[*] master.
+    # through spark-submit on the local[*] main.
     def test_one_file(self):
         two_lines_path = self.makefile('two_lines', b'line\nother line\n')
 

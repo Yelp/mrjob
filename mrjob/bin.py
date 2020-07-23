@@ -123,8 +123,8 @@ class MRJobBinRunner(MRJobRunner):
         # warning: no setup scripts on Spark when no working dir
         if self._setup and self._has_pyspark_steps() and not(
                 self._spark_executors_have_own_wd()):
-            log.warning("setup commands aren't supported on Spark master %r" %
-                        self._spark_master())
+            log.warning("setup commands aren't supported on Spark main %r" %
+                        self._spark_main())
 
         # --py-files on Spark doesn't allow '#' (see #1375)
         if any('#' in path for path in self._opts['py_files']):
@@ -819,7 +819,7 @@ class MRJobBinRunner(MRJobRunner):
 
         # try to use a PTY if it's available
         try:
-            pid, master_fd = pty.fork()
+            pid, main_fd = pty.fork()
         except (AttributeError, OSError):
             # no PTYs, just use Popen
 
@@ -858,10 +858,10 @@ class MRJobBinRunner(MRJobRunner):
             else:
                 log.debug('Invoking spark-submit via PTY')
 
-                with os.fdopen(master_fd, 'rb') as master:
+                with os.fdopen(main_fd, 'rb') as main:
                     step_interpretation = (
                         _parse_spark_log(
-                            _eio_to_eof(master),
+                            _eio_to_eof(main),
                             record_callback=record_callback))
 
                     _, returncode = os.waitpid(pid, 0)
@@ -924,8 +924,8 @@ class MRJobBinRunner(MRJobRunner):
         jobconf = {}
         for key, value in self._spark_cmdenv(step_num).items():
             jobconf['spark.executorEnv.%s' % key] = value
-            if self._spark_master() == 'yarn':  # YARN only, see #1919
-                jobconf['spark.yarn.appMasterEnv.%s' % key] = value
+            if self._spark_main() == 'yarn':  # YARN only, see #1919
+                jobconf['spark.yarn.appMainEnv.%s' % key] = value
 
         jobconf.update(self._jobconf_for_step(step_num))
 
@@ -941,15 +941,15 @@ class MRJobBinRunner(MRJobRunner):
         if libjar_paths:
             args.extend(['--jars', ','.join(libjar_paths)])
 
-        # spark-submit treats --master and --deploy-mode as aliases for
-        # --conf spark.master=... and --conf spark.deploy-mode=... (see #2032).
+        # spark-submit treats --main and --deploy-mode as aliases for
+        # --conf spark.main=... and --conf spark.deploy-mode=... (see #2032).
         #
-        # we never want jobconf to override spark master or deploy mode, so put
+        # we never want jobconf to override spark main or deploy mode, so put
         # these switches after --conf
 
-        # add --master
-        if self._spark_master():
-            args.extend(['--master', self._spark_master()])
+        # add --main
+        if self._spark_main():
+            args.extend(['--main', self._spark_main()])
 
         # add --deploy-mode
         if self._spark_deploy_mode():

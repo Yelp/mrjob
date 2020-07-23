@@ -234,14 +234,14 @@ class LsLogsTestCase(BasicTestCase):
         self.mock_matcher.side_effect = matcher
 
         self.mock_paths = [
-            's3://bucket/logs/master/stderr',
-            'ssh://master/logs/stderr',
-            'ssh://master/logs/syslog',
+            's3://bucket/logs/main/stderr',
+            'ssh://main/logs/stderr',
+            'ssh://main/logs/syslog',
         ]
 
         self.assertEqual(
-            self._ls_logs([['s3://bucket/logs'], ['ssh://master/logs/']]),
-            [dict(path='ssh://master/logs/syslog')])
+            self._ls_logs([['s3://bucket/logs'], ['ssh://main/logs/']]),
+            [dict(path='ssh://main/logs/syslog')])
 
     def test_kwargs_passed_to_matcher(self):
         self.mock_paths = [

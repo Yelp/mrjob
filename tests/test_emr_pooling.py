@@ -60,7 +60,7 @@ class PoolWaitMinutesOptionTestCase(MockBoto3TestCase):
         self.assertEqual(runner._opts['pool_wait_minutes'], 12)
 
 
-class PoolMatchingTestCase(MockBoto3TestCase):
+class PoolMatchingBaseTestCase(MockBoto3TestCase):
 
     def make_pooled_cluster(self, name=None, minutes_ago=0,
                             provision=True,
@@ -129,6 +129,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         emr_client = EMRJobRunner(conf_paths=[]).make_emr_client()
         emr_client.terminate_job_flows(JobFlowIds=[actual_cluster_id])
 
+
+class BasicPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def make_simple_runner(self, pool_name, *args):
         """Make an EMRJobRunner that is ready to try to find a pool to join"""
         mr_job = MRTwoStepJob([
@@ -178,11 +181,17 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--cluster-id', cluster_id,
             '--image-version', '2.2'])
 
+
+class ConcurrentStepsPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_add_batch_in_steps_does_not_affect_pooling(self):
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters', '--add-steps-in-batch'])
+
+
+class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_pooling_with_image_version(self):
         _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')

@@ -2534,8 +2534,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 lock_acquired = _attempt_to_lock_cluster(
                     emr_client, cluster_id, self._job_key,
                     cluster=cluster,
-                    when_cluster_described=when_cluster_described,
-                    step_concurrency_level=step_concurrency_level)
+                    when_cluster_described=when_cluster_described)
 
                 if lock_acquired:
                     return cluster_id, step_concurrency_level

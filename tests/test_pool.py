@@ -19,7 +19,7 @@ import time
 from mrjob.emr import EMRJobRunner
 from mrjob.pool import _attempt_to_lock_cluster
 from mrjob.pool import _attempt_to_unlock_cluster
-from mrjob.pool import _get_cluster_state_and_lock
+from mrjob.pool import _get_cluster_lock
 from mrjob.pool import _make_cluster_lock
 from mrjob.pool import _parse_cluster_lock
 from mrjob.pool import _pool_name
@@ -129,18 +129,17 @@ class AttemptToLockClusterTestCase(MockBoto3TestCase):
         self.mock_emr_clusters[self.cluster_id]['Status']['State'] = 'RUNNING'
 
         acquired = _attempt_to_lock_cluster(
-            self.emr_client, self.cluster_id, self.our_key,
-            step_concurrency_level=1)
+            self.emr_client, self.cluster_id, self.our_key)
 
         self.assertFalse(acquired)
         self.assertFalse(self.mock_sleep.called)
 
     def test_running_concurrent_cluster(self):
         self.mock_emr_clusters[self.cluster_id]['Status']['State'] = 'RUNNING'
+        self.mock_emr_clusters[self.cluster_id]['StepConcurrencyLevel'] = 2
 
         acquired = _attempt_to_lock_cluster(
-            self.emr_client, self.cluster_id, self.our_key,
-            step_concurrency_level=2)
+            self.emr_client, self.cluster_id, self.our_key)
 
         self.assertTrue(acquired)
         self.assertTrue(self.mock_sleep.called)
@@ -282,8 +281,10 @@ class AttemptToUnlockClusterTestCase(MockBoto3TestCase):
         self.our_key = 'mr_wc.dmarin.20200419.185348.359278'
 
     def _get_cluster_lock(self):
-        return _get_cluster_state_and_lock(
-            self.emr_client, self.cluster_id)[1]
+        cluster = self.emr_client.describe_cluster(
+            ClusterId=self.cluster_id)['Cluster']
+
+        return _get_cluster_lock(cluster)
 
     def test_remove_existing_tags(self):
         _attempt_to_lock_cluster(

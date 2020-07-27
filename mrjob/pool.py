@@ -32,6 +32,7 @@ except ImportError:
 
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
+from mrjob.aws import _boto3_paginate
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
 
@@ -639,10 +640,10 @@ def _attempt_to_lock_cluster(
 
     if step_concurrency_level > 1:
         # is cluster already full of steps?
-        num_active_steps = len(_boto3_paginate(
+        num_active_steps = len(list(_boto3_paginate(
             'Steps', emr_client, 'list_steps',
             ClusterId=cluster_id,
-            StepStates=['PENDING', 'RUNNING']))
+            StepStates=['PENDING', 'RUNNING'])))
 
         if num_active_steps >= step_concurrency_level:
             log.info(

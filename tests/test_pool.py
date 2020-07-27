@@ -125,14 +125,25 @@ class AttemptToLockClusterTestCase(MockBoto3TestCase):
         self.assertTrue(acquired)
         self.mock_sleep.assert_called_once_with(10.0)
 
-    def test_running_cluster(self):
+    def test_running_non_concurrent_cluster(self):
         self.mock_emr_clusters[self.cluster_id]['Status']['State'] = 'RUNNING'
 
         acquired = _attempt_to_lock_cluster(
-            self.emr_client, self.cluster_id, self.our_key)
+            self.emr_client, self.cluster_id, self.our_key,
+            step_concurrency_level=1)
 
         self.assertFalse(acquired)
         self.assertFalse(self.mock_sleep.called)
+
+    def test_running_concurrent_cluster(self):
+        self.mock_emr_clusters[self.cluster_id]['Status']['State'] = 'RUNNING'
+
+        acquired = _attempt_to_lock_cluster(
+            self.emr_client, self.cluster_id, self.our_key,
+            step_concurrency_level=2)
+
+        self.assertTrue(acquired)
+        self.assertTrue(self.mock_sleep.called)
 
     def test_terminating_cluster(self):
         self.emr_client.terminate_job_flows(JobFlowIds=[self.cluster_id])

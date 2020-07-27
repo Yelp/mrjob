@@ -554,15 +554,12 @@ def _attempt_to_lock_cluster(
     You may optionally include *cluster* (a cluster description) and
     *when_cluster_described*, to save an API call to ``DescribeCluster``
 
-    *step_concurrency_level* is the number of steps the cluster can run at
-    once.
-
-    If *step_concurrency_level* is 1, locking considers the cluster
+    If the cluster's StepConcurrency Level is 1, locking considers the cluster
     available if it's in the WAITING state. this means we should not release
     our lock until our step(s) have started running, which can take several
     seconds.
 
-    If *step_concurrency_level* is > 1 (steps can run concurrently), locking
+    Otherwise, steps can run concurrently, so locking
     considers the cluster available if it's in the WAITING or RUNNING state.
     Additionally, it makes a ``ListSteps`` API call to verify that the cluster
     doesn't already have as many active steps as it can run simultaneously.
@@ -646,6 +643,7 @@ def _attempt_to_lock_cluster(
         if num_active_steps >= cluster['StepConcurrencyLevel']:
             log.info(
                 '  cluster already has %d active steps' % num_active_steps)
+            return
 
     lock = _get_cluster_lock(cluster)
 

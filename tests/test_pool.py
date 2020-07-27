@@ -137,6 +137,38 @@ class AttemptToLockClusterTestCase(MockBoto3TestCase):
     def test_running_concurrent_cluster(self):
         self.mock_emr_clusters[self.cluster_id]['Status']['State'] = 'RUNNING'
         self.mock_emr_clusters[self.cluster_id]['StepConcurrencyLevel'] = 2
+        self.mock_emr_clusters[self.cluster_id]['_Steps'] = [
+            dict(Id='s-ONE', Status=dict(State='RUNNING'))
+        ]
+
+        acquired = _attempt_to_lock_cluster(
+            self.emr_client, self.cluster_id, self.our_key)
+
+        self.assertTrue(acquired)
+        self.assertTrue(self.mock_sleep.called)
+
+    def test_concurrent_cluster_that_is_full(self):
+        self.mock_emr_clusters[self.cluster_id]['Status']['State'] = 'RUNNING'
+        self.mock_emr_clusters[self.cluster_id]['StepConcurrencyLevel'] = 2
+        self.mock_emr_clusters[self.cluster_id]['_Steps'] = [
+            dict(Id='s-ONE', Status=dict(State='RUNNING')),
+            dict(Id='s-TWO', Status=dict(State='PENDING')),
+        ]
+
+        acquired = _attempt_to_lock_cluster(
+            self.emr_client, self.cluster_id, self.our_key)
+
+        self.assertFalse(acquired)
+        # only check number of steps once, after attempting to lock cluster
+        self.assertTrue(self.mock_sleep.called)
+
+    def test_concurrent_cluster_with_old_steps(self):
+        self.mock_emr_clusters[self.cluster_id]['Status']['State'] = 'RUNNING'
+        self.mock_emr_clusters[self.cluster_id]['StepConcurrencyLevel'] = 2
+        self.mock_emr_clusters[self.cluster_id]['_Steps'] = [
+            dict(Id='s-ONE', Status=dict(State='COMPLETE')),
+            dict(Id='s-TWO', Status=dict(State='CANCELLED')),
+        ]
 
         acquired = _attempt_to_lock_cluster(
             self.emr_client, self.cluster_id, self.our_key)

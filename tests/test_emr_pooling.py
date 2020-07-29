@@ -103,6 +103,52 @@ class PoolMatchingBaseTestCase(MockBoto3TestCase):
 
         return runner, cluster_id
 
+
+    def _fleet_config(
+            self, role='MASTER', instance_types=None,
+            weighted_capacities=None,
+            ebs_device_configs=None,
+            ebs_optimized=None,
+            on_demand_capacity=1, spot_capacity=0, spot_spec=None):
+
+        config = dict(InstanceFleetType=role, InstanceTypeConfigs=[])
+
+        if not instance_types:
+            instance_types = ['m1.medium']
+
+        if not weighted_capacities:
+            weighted_capacities = {}
+
+        for instance_type in instance_types:
+            instance_config = dict(InstanceType=instance_type)
+            if weighted_capacities.get(instance_type):
+                instance_config['WeightedCapacity'] = (
+                    weighted_capacities[instance_type])
+
+            EbsConfiguration = {}
+
+            if ebs_device_configs is not None:
+                EbsConfiguration['EbsBlockDeviceConfigs'] = ebs_device_configs
+
+            if ebs_optimized is not None:
+                EbsConfiguration['EbsOptimized'] = ebs_optimized
+
+            if EbsConfiguration:
+                instance_config['EbsConfiguration'] = EbsConfiguration
+
+            config['InstanceTypeConfigs'].append(instance_config)
+
+        if spot_spec:
+            config['LaunchSpecifications'] = dict(SpotSpecification=spot_spec)
+
+        if on_demand_capacity:
+            config['TargetOnDemandCapacity'] = on_demand_capacity
+
+        if spot_capacity:
+            config['TargetSpotCapacity'] = spot_capacity
+
+        return config
+
     def get_cluster(self, job_args, job_class=MRTwoStepJob):
         mr_job = job_class(job_args)
         mr_job.sandbox()
@@ -129,9 +175,6 @@ class PoolMatchingBaseTestCase(MockBoto3TestCase):
         emr_client = EMRJobRunner(conf_paths=[]).make_emr_client()
         emr_client.terminate_job_flows(JobFlowIds=[actual_cluster_id])
 
-
-class BasicPoolMatchingTestCase(PoolMatchingBaseTestCase):
-
     def make_simple_runner(self, pool_name, *args):
         """Make an EMRJobRunner that is ready to try to find a pool to join"""
         mr_job = MRTwoStepJob([
@@ -142,6 +185,9 @@ class BasicPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self.prepare_runner_for_ssh(runner)
         runner._prepare_for_launch()
         return runner
+
+
+class BasicPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_make_new_pooled_cluster(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-clusters'])
@@ -173,6 +219,13 @@ class BasicPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--pool-name', 'pool1'])
 
+    def test_dont_join_wrong_named_pool(self):
+        _, cluster_id = self.make_pooled_cluster('pool1')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--pool-name', 'not_pool1'])
+
     def test_join_anyway_if_i_say_so(self):
         _, cluster_id = self.make_pooled_cluster(image_version='2.0')
 
@@ -190,8 +243,15 @@ class ConcurrentStepsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters', '--add-steps-in-batch'])
 
+    def test_same_max_concurrent_steps(self):
+        _, cluster_id = self.make_pooled_cluster(
+            max_concurrent_steps=3)
 
-class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--max-concurrent-steps', '3'])
+
+
+class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_pooling_with_image_version(self):
         _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
@@ -317,6 +377,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '-r', 'emr', '--pool-clusters',
             '--image-id', 'ami-blanchin', '--image-version', '5.10.0'])
 
+
+class ApplicationsPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_matching_applications(self):
         _, cluster_id = self.make_pooled_cluster(
             image_version='4.0.0', applications=['Mahout'])
@@ -352,6 +415,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
             '--application', 'mahout'])
+
+
+class EMRConfigurationPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_matching_emr_configurations(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -408,6 +474,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
         ])
 
+
+class SubnetPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_matching_subnet(self):
         _, cluster_id = self.make_pooled_cluster(
             subnet='subnet-ffffffff')
@@ -458,6 +527,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--instance-fleets', json.dumps(fleets),
             '--subnets', 'subnet-eeeeeeee,subnet-ffffffff'])
 
+
+class AdditionalEMRInfoPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
         _, cluster_id = self.make_pooled_cluster(
@@ -474,6 +546,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--additional-emr-info', info])
+
+
+class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_join_pool_with_same_instance_type_and_count(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -717,6 +792,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--instance-type', 'a1.sauce',
             '--num-core-instances', '2'])
 
+
+class EBSRootVolumeGBPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     # note that ebs_root_volume_gb is independent from EBS config on
     # instance fleets and instance groups
 
@@ -756,6 +834,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             ebs_root_volume_gb=123)
 
         self.assertDoesNotJoin(cluster_id, ['-r', 'emr', '--pool-clusters'])
+
+
+class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def _ig_with_ebs_config(
             self, device_configs=(), iops=None,
@@ -1027,6 +1108,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--instance-groups', json.dumps(requested_igs)])
 
+
+class BidPricePoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_can_join_cluster_with_same_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(
             master_instance_bid_price='0.25')
@@ -1083,50 +1167,8 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--master-instance-bid-price', '77.77',
             '--task-instance-bid-price', '22.00'])
 
-    def _fleet_config(
-            self, role='MASTER', instance_types=None,
-            weighted_capacities=None,
-            ebs_device_configs=None,
-            ebs_optimized=None,
-            on_demand_capacity=1, spot_capacity=0, spot_spec=None):
 
-        config = dict(InstanceFleetType=role, InstanceTypeConfigs=[])
-
-        if not instance_types:
-            instance_types = ['m1.medium']
-
-        if not weighted_capacities:
-            weighted_capacities = {}
-
-        for instance_type in instance_types:
-            instance_config = dict(InstanceType=instance_type)
-            if weighted_capacities.get(instance_type):
-                instance_config['WeightedCapacity'] = (
-                    weighted_capacities[instance_type])
-
-            EbsConfiguration = {}
-
-            if ebs_device_configs is not None:
-                EbsConfiguration['EbsBlockDeviceConfigs'] = ebs_device_configs
-
-            if ebs_optimized is not None:
-                EbsConfiguration['EbsOptimized'] = ebs_optimized
-
-            if EbsConfiguration:
-                instance_config['EbsConfiguration'] = EbsConfiguration
-
-            config['InstanceTypeConfigs'].append(instance_config)
-
-        if spot_spec:
-            config['LaunchSpecifications'] = dict(SpotSpecification=spot_spec)
-
-        if on_demand_capacity:
-            config['TargetOnDemandCapacity'] = on_demand_capacity
-
-        if spot_capacity:
-            config['TargetSpotCapacity'] = spot_capacity
-
-        return config
+class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_same_instance_fleet_config(self):
         fleets = [
@@ -1536,12 +1578,19 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--instance-fleets', json.dumps(req_fleets)
         ])
 
-    def test_dont_join_wrong_named_pool(self):
-        _, cluster_id = self.make_pooled_cluster('pool1')
+    def test_dont_join_fleet_pool_without_provisioned_capacity(self):
+        # make sure that we only join fleets with provisioned capacity
+        fleets = [self._fleet_config()]
+
+        _, cluster_id = self.make_pooled_cluster(provision=False,
+                                                 instance_fleets=fleets)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--pool-name', 'not_pool1'])
+            '--instance-fleets', json.dumps(fleets)])
+
+
+class MrjobVersionPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_dont_join_wrong_mrjob_version(self):
         _, cluster_id = self.make_pooled_cluster()
@@ -1566,6 +1615,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--python-bin', 'snake'])
+
+
+class BootstrapPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_join_similarly_bootstrapped_pool(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -1651,6 +1703,9 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--bootstrap', true_story])
+
+
+class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_pool_contention(self):
         _, cluster_id = self.make_pooled_cluster('robert_downey_jr')
@@ -1862,16 +1917,8 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters'])
 
-    def test_dont_join_fleet_pool_without_provisioned_capacity(self):
-        # make sure that we only join fleets with provisioned capacity
-        fleets = [self._fleet_config()]
 
-        _, cluster_id = self.make_pooled_cluster(provision=False,
-                                                 instance_fleets=fleets)
-
-        self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-clusters',
-            '--instance-fleets', json.dumps(fleets)])
+class DockerPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_same_docker_image(self):
         _, cluster_id = self.make_pooled_cluster(

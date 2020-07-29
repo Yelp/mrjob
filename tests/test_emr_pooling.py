@@ -2279,6 +2279,17 @@ class ClusterLockingTestCase(PoolMatchingBaseTestCase):
 
         self.assertFalse(self._attempt_to_lock_cluster.called)
 
+    def test_no_locking_with_explicit_cluster_id(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertFalse(self._attempt_to_lock_cluster.called)
+
     def test_join_non_concurrent_pooled_cluster(self):
         _, cluster_id = self.make_pooled_cluster()
 

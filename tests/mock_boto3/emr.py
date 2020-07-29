@@ -1145,7 +1145,8 @@ class MockEMRClient(object):
 
                 # CANCEL_AND_WAIT makes no sense when other job's steps
                 # could be cancelled
-                if cluster.get('StepConcurrencyLevel') != 1:
+                if (Step['ActionOnFailure'] == 'CANCEL_AND_WAIT' and
+                        cluster.get('StepConcurrencyLevel') != 1):
                     raise _ValidationException(
                         operation_name,
                         "Action on failure 'CANCEL_AND_WAIT' is invalid.")

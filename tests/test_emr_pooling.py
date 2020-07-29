@@ -248,7 +248,28 @@ class ConcurrentStepsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             max_concurrent_steps=3)
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '--max-concurrent-steps', '3'])
+            '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
+
+    def test_dont_join_cluster_with_higher_concurrency(self):
+        _, cluster_id = self.make_pooled_cluster(
+            max_concurrent_steps=4)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
+
+    def test_join_cluster_with_lower_concurrency(self):
+        _, cluster_id = self.make_pooled_cluster(
+            max_concurrent_steps=2)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
+
+    def test_non_concurrent_cluster_okay(self):
+        _, cluster_id = self.make_pooled_cluster(
+            max_concurrent_steps=1)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
 
 
 class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):

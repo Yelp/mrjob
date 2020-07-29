@@ -2510,6 +2510,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if step_concurrency > self._opts['max_concurrent_steps']:
             log.debug('  cluster %s: step concurrency level too high' %
                       cluster_id)
+            return
 
         return True
 

@@ -326,7 +326,6 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
        ``Properties`` and ``Configurations``, the earlier dict will be simply
        deleted.
 
-
 .. mrjob-opt::
     :config: release_label
     :switch: --release-label
@@ -359,6 +358,23 @@ See also :mrjob-opt:`check_cluster_every`, :mrjob-opt:`ssh_tunnel`.
 
 Cluster pooling
 ---------------
+
+.. mrjob-opt::
+    :config: max_concurrent_steps
+    :switch: --max-concurrent-steps
+    :type: integer
+    :set: emr
+    :default: 1
+
+    When joining a pooled cluster, require its ``StepConcurrency`` to be
+    no higher than this, and make sure it doesn't already have as many
+    steps as it can possibly run concurrently (it's okay to join a
+    pooled cluster in the ``RUNNING`` state if it runs steps concurrently).
+
+    When launching a new cluster, set ``StepConcurrency`` to this. This can
+    be used even without enabling :mrjob-opt:`pool_clusters`.
+
+    .. versionadded:: 0.7.4
 
 .. mrjob-opt::
     :config: pool_clusters

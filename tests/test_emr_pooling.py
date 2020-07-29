@@ -24,6 +24,8 @@ from shutil import make_archive
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
+from mrjob.pool import _attempt_to_lock_cluster
+from mrjob.pool import _attempt_to_unlock_cluster
 from mrjob.pool import _pool_name
 from mrjob.step import StepFailedException
 
@@ -2251,3 +2253,62 @@ class PoolingDisablingTestCase(MockBoto3TestCase):
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['AutoTerminate'], True)
+
+
+class ClusterLockingTestCase(PoolMatchingBaseTestCase):
+
+    # ensure that clusters get locked and unlocked at the right time
+
+    def setUp(self):
+        super(ClusterLockingTestCase, self).setUp()
+
+        self._attempt_to_lock_cluster = self.start(patch(
+            'mrjob.emr._attempt_to_lock_cluster',
+            side_effect=_attempt_to_lock_cluster))
+
+        self._attempt_to_unlock_cluster = self.start(patch(
+            'mrjob.emr._attempt_to_unlock_cluster',
+            side_effect=_attempt_to_unlock_cluster))
+
+    def test_no_locking_without_pooling(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertFalse(self._attempt_to_lock_cluster.called)
+
+    def test_join_non_concurrent_pooled_cluster(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        job = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_input_files_for_upload()
+            runner._launch()
+
+            self.assertTrue(self._attempt_to_lock_cluster.called)
+            self.assertFalse(self._attempt_to_unlock_cluster.called)
+
+            self.mock_emr_failures.add((cluster_id, 0))
+            self.assertRaises(StepFailedException, runner._finish_run)
+
+            # unlocked at some point while first step was running
+            self.assertTrue(self._attempt_to_unlock_cluster.called)
+
+    def test_join_concurrent_pooled_cluster(self):
+        _, cluster_id = self.make_pooled_cluster(max_concurrent_steps=2)
+
+        job = MRTwoStepJob(['-r', 'emr', '--pool-clusters',
+                            '--max-concurrent-steps', '2'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_input_files_for_upload()
+            runner._launch()
+
+            self.assertTrue(self._attempt_to_lock_cluster.called)
+            # unlocked immediately after adding steps
+            self.assertTrue(self._attempt_to_unlock_cluster.called)

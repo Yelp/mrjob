@@ -260,7 +260,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
         self.assertEqual(step_ids, [step['Id'] for step in steps])
 
     def test_failed_job(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v'])
+        mr_job = MRTwoStepJob(['-r', 'emr'])
         mr_job.sandbox()
 
         self.add_mock_s3_data({'walrus': {}})
@@ -279,15 +279,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'],
-                             'TERMINATED_WITH_ERRORS')
-
-        # job should get terminated on cleanup
-        cluster_id = runner.get_cluster_id()
-        for _ in range(10):
-            self.simulate_emr_progress(cluster_id)
-
-        cluster = runner._describe_cluster()
-        self.assertEqual(cluster['Status']['State'], 'TERMINATED_WITH_ERRORS')
+                             'TERMINATED')
 
     def _test_cloud_tmp_cleanup(self, mode, tmp_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKCLUSTER0/1': b'1\n'}})
@@ -2104,7 +2096,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         def mock_yield_clusters_to_join(*args, **kwargs):
             for cluster_id in self.mock_cluster_ids:
                 when_cluster_described = time.time()
-                cluster = dict(Id=cluster_id)
+                cluster = dict(Id=cluster_id, StepConcurrencyLevel=1)
                 yield (cluster, when_cluster_described)
 
         def mock_sleep(time):
@@ -2137,14 +2129,14 @@ class JobWaitTestCase(MockBoto3TestCase):
         self.mock_cluster_ids = ['j-fail-lock']
 
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=0)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
 
     def test_no_waiting_for_job_pool_success(self):
         self.mock_cluster_ids = ['j-fail-lock']
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=0)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
         # sleep once after creating temp bucket
@@ -2153,7 +2145,7 @@ class JobWaitTestCase(MockBoto3TestCase):
     def test_acquire_lock_on_first_attempt(self):
         self.mock_cluster_ids = ['j-successful-lock']
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
         self.assertEqual(self.mock_sleep.call_count, 1)
@@ -2162,7 +2154,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         self.mock_cluster_ids = ['j-fail-lock']
         self.future_mock_cluster_ids.append('j-successful-lock')
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
         self.assertEqual(self.mock_sleep.call_count, 1)
@@ -2171,7 +2163,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         self.mock_cluster_ids = ['j-fail-lock']
         self.future_mock_cluster_ids.append('j-epic-fail-lock')
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=2)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
         self.assertEqual(self.mock_sleep.call_count, 4)
@@ -2182,7 +2174,7 @@ class JobWaitTestCase(MockBoto3TestCase):
             'j-fail-lock', 'j-epic-fail-lock', 'j-successful-lock']
 
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
-        cluster_id = runner._find_cluster()
+        cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
         self.assertEqual(self.mock_sleep.call_count, 1)
@@ -2842,15 +2834,30 @@ class ActionOnFailureTestCase(MockBoto3TestCase):
     def test_default(self):
         runner = EMRJobRunner()
         self.assertEqual(runner._action_on_failure(),
-                         'TERMINATE_CLUSTER')
+                         'CONTINUE')
 
     def test_default_with_pooling(self):
         runner = EMRJobRunner(pool_clusters=True)
         self.assertEqual(runner._action_on_failure(),
-                         'CANCEL_AND_WAIT')
+                         'CONTINUE')
 
     def test_default_with_cluster_id(self):
         runner = EMRJobRunner(cluster_id='j-CLUSTER')
+        self.assertEqual(runner._action_on_failure(),
+                         'CONTINUE')
+
+    def test_add_steps_in_batch(self):
+        runner = EMRJobRunner(add_steps_in_batch=True)
+        self.assertEqual(runner._action_on_failure(),
+                         'TERMINATE_CLUSTER')
+
+    def test_pooling_with_add_steps_in_batch(self):
+        runner = EMRJobRunner(add_steps_in_batch=True, pool_clusters=True)
+        self.assertEqual(runner._action_on_failure(),
+                         'CANCEL_AND_WAIT')
+
+    def test_cluster_id_with_add_steps_in_batch(self):
+        runner = EMRJobRunner(add_steps_in_batch=True, cluster_id='j-CLUSTER')
         self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
 
@@ -4294,6 +4301,9 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
 
 class GetJobStepsTestCase(MockBoto3TestCase):
 
+    # get_job_steps() was designed with the assumption that all job steps
+    # will be submitted at once, and is now obsolete
+
     def test_empty(self):
         runner = EMRJobRunner()
         runner.make_persistent_cluster()
@@ -4301,7 +4311,7 @@ class GetJobStepsTestCase(MockBoto3TestCase):
         self.assertEqual(runner.get_job_steps(), [])
 
     def test_own_cluster(self):
-        job = MRTwoStepJob(['-r', 'emr']).sandbox()
+        job = MRTwoStepJob(['-r', 'emr', '--add-steps-in-batch']).sandbox()
 
         with job.make_runner() as runner:
             self.launch(runner)
@@ -4325,7 +4335,9 @@ class GetJobStepsTestCase(MockBoto3TestCase):
                             HadoopJarStep=(dict(Jar='dummy.jar')))] * n,
             )
 
-        job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id]).sandbox()
+        job = MRTwoStepJob([
+            '-r', 'emr', '--add-steps-in-batch', '--cluster-id', cluster_id]
+        ).sandbox()
 
         with job.make_runner() as runner:
             add_other_steps(runner, 50)
@@ -4436,6 +4448,26 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         mock_cluster = self.mock_emr_clusters[runner._cluster_id]
         mock_steps = mock_cluster['_Steps']
 
+        # steps are submitted one at a time
+        self.assertEqual(len(mock_steps), 1)
+        self.assertEqual(mock_steps[0]['Status']['State'], 'RUNNING')
+
+    def test_open_ssh_tunnel_when_first_step_of_batch_runs(self):
+        # normally, we'll open the SSH tunnel when the first step
+        # is RUNNING
+
+        # stop the test as soon as SSH tunnel is set up
+        EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
+
+        runner = self.make_runner('--add-steps-in-batch')
+
+        self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
+
+        self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 1)
+
+        mock_cluster = self.mock_emr_clusters[runner._cluster_id]
+        mock_steps = mock_cluster['_Steps']
+
         self.assertEqual(len(mock_steps), 2)
         self.assertEqual(mock_steps[0]['Status']['State'], 'RUNNING')
 
@@ -4478,9 +4510,10 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         EMRJobRunner._set_up_ssh_tunnel_and_hdfs.side_effect = self.StopTest
 
         # put steps from previous job on cluster
-        previous_runner = self.make_runner()
+        previous_runner = self.make_runner('--add-steps-in-batch')
 
         runner = self.make_runner(
+            '--add-steps-in-batch',
             '--cluster-id', previous_runner.get_cluster_id())
 
         mock_cluster = self.mock_emr_clusters[runner._cluster_id]
@@ -6141,3 +6174,52 @@ class DockerClientConfigTestCase(MockBoto3TestCase):
         self.assertNotIn(
             'YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG',
             runner._cmdenv())
+
+
+class AddStepsInBatchTestCase(MockBoto3TestCase):
+
+    def setUp(self):
+        super(AddStepsInBatchTestCase, self).setUp()
+
+        # tests fail, so see how many steps they have on them
+        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0)}
+
+    def _assert_adds_steps_in_batch(self, *job_args):
+        self._assert_matches(True, 2, job_args)
+
+    def _assert_adds_steps_one_at_a_time(self, *job_args):
+        self._assert_matches(False, 1, job_args)
+
+    def _assert_matches(self, expected_value, expected_num_steps, job_args):
+        job = MRTwoStepJob(['-r', 'emr'] + list(job_args)).sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._add_steps_in_batch(), expected_value)
+
+            self.assertRaises(StepFailedException, runner.run)
+            num_steps_submitted = len(
+                self.mock_emr_clusters[runner.get_cluster_id()]['_Steps'])
+            self.assertEqual(num_steps_submitted, expected_num_steps)
+
+    def test_default(self):
+        self._assert_adds_steps_one_at_a_time()
+
+    def test_ami_4_0_0(self):
+        self._assert_adds_steps_in_batch('--image-version', '4.0.0')
+
+    def test_ami_5_27_0(self):
+        self._assert_adds_steps_in_batch('--image-version', '5.27.0')
+
+    def test_ami_5_28_0(self):
+        self._assert_adds_steps_one_at_a_time('--image-version', '5.28.0')
+
+    def test_ami_6_0_0(self):
+        self._assert_adds_steps_one_at_a_time('--image-version', '6.0.0')
+
+    def test_add_steps_in_batch_switch(self):
+        self._assert_adds_steps_in_batch('--add-steps-in-batch')
+
+    def test_no_add_steps_in_batch_switch(self):
+        self._assert_adds_steps_one_at_a_time(
+            '--image-version', '4.0.0',
+            '--no-add-steps-in-batch')

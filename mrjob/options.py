@@ -307,6 +307,19 @@ _DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
 # the list of which options apply to which runner is in the runner class
 # itself (e.g. EMRJobRunner.OPT_NAMES)
 _RUNNER_OPTS = dict(
+    add_steps_in_batch=dict(
+        switches=[
+            (['--add-steps-in-batch'], dict(
+                action='store_true',
+                help='For multi-step jobs, submit all steps at once',
+            )),
+            (['--no-add-steps-in-batch'], dict(
+                action='store_false',
+                help=('For multi-step jobs, submit steps successively after'
+                      ' the previous one completes'),
+            )),
+        ]
+    ),
     additional_emr_info=dict(
         cloud_role='launch',
         switches=[
@@ -915,6 +928,16 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--master-instance-type'], dict(
                 help='Type of GCE/EC2 master instance to launch',
+            )),
+        ],
+    ),
+    max_concurrent_steps=dict(
+        cloud_role='launch',
+        switches=[
+            (['--max-concurrent-steps'], dict(
+                help=("Maximum number of steps that may run on the cluster"
+                      " at one time. Default is 1"),
+                type=int,
             )),
         ],
     ),

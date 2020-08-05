@@ -24,6 +24,8 @@ from shutil import make_archive
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
+from mrjob.pool import _attempt_to_lock_cluster
+from mrjob.pool import _attempt_to_unlock_cluster
 from mrjob.pool import _pool_name
 from mrjob.step import StepFailedException
 
@@ -60,7 +62,7 @@ class PoolWaitMinutesOptionTestCase(MockBoto3TestCase):
         self.assertEqual(runner._opts['pool_wait_minutes'], 12)
 
 
-class PoolMatchingTestCase(MockBoto3TestCase):
+class PoolMatchingBaseTestCase(MockBoto3TestCase):
 
     def make_pooled_cluster(self, name=None, minutes_ago=0,
                             provision=True,
@@ -103,6 +105,52 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
         return runner, cluster_id
 
+
+    def _fleet_config(
+            self, role='MASTER', instance_types=None,
+            weighted_capacities=None,
+            ebs_device_configs=None,
+            ebs_optimized=None,
+            on_demand_capacity=1, spot_capacity=0, spot_spec=None):
+
+        config = dict(InstanceFleetType=role, InstanceTypeConfigs=[])
+
+        if not instance_types:
+            instance_types = ['m1.medium']
+
+        if not weighted_capacities:
+            weighted_capacities = {}
+
+        for instance_type in instance_types:
+            instance_config = dict(InstanceType=instance_type)
+            if weighted_capacities.get(instance_type):
+                instance_config['WeightedCapacity'] = (
+                    weighted_capacities[instance_type])
+
+            EbsConfiguration = {}
+
+            if ebs_device_configs is not None:
+                EbsConfiguration['EbsBlockDeviceConfigs'] = ebs_device_configs
+
+            if ebs_optimized is not None:
+                EbsConfiguration['EbsOptimized'] = ebs_optimized
+
+            if EbsConfiguration:
+                instance_config['EbsConfiguration'] = EbsConfiguration
+
+            config['InstanceTypeConfigs'].append(instance_config)
+
+        if spot_spec:
+            config['LaunchSpecifications'] = dict(SpotSpecification=spot_spec)
+
+        if on_demand_capacity:
+            config['TargetOnDemandCapacity'] = on_demand_capacity
+
+        if spot_capacity:
+            config['TargetSpotCapacity'] = spot_capacity
+
+        return config
+
     def get_cluster(self, job_args, job_class=MRTwoStepJob):
         mr_job = job_class(job_args)
         mr_job.sandbox()
@@ -140,6 +188,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         runner._prepare_for_launch()
         return runner
 
+
+class BasicPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_make_new_pooled_cluster(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-clusters'])
         mr_job.sandbox()
@@ -170,6 +221,13 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--pool-name', 'pool1'])
 
+    def test_dont_join_wrong_named_pool(self):
+        _, cluster_id = self.make_pooled_cluster('pool1')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--pool-name', 'not_pool1'])
+
     def test_join_anyway_if_i_say_so(self):
         _, cluster_id = self.make_pooled_cluster(image_version='2.0')
 
@@ -177,6 +235,46 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--cluster-id', cluster_id,
             '--image-version', '2.2'])
+
+
+class ConcurrentStepsPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
+    def test_add_batch_in_steps_does_not_affect_pooling(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--add-steps-in-batch'])
+
+    def test_same_max_concurrent_steps(self):
+        _, cluster_id = self.make_pooled_cluster(
+            max_concurrent_steps=3)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
+
+    def test_dont_join_cluster_with_higher_concurrency(self):
+        _, cluster_id = self.make_pooled_cluster(
+            max_concurrent_steps=4)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
+
+    def test_join_cluster_with_lower_concurrency(self):
+        _, cluster_id = self.make_pooled_cluster(
+            max_concurrent_steps=2)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
+
+    def test_non_concurrent_cluster_okay(self):
+        _, cluster_id = self.make_pooled_cluster(
+            max_concurrent_steps=1)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
+
+
+class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_pooling_with_image_version(self):
         _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
@@ -302,6 +400,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '--pool-clusters',
             '--image-id', 'ami-blanchin', '--image-version', '5.10.0'])
 
+
+class ApplicationsPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_matching_applications(self):
         _, cluster_id = self.make_pooled_cluster(
             image_version='4.0.0', applications=['Mahout'])
@@ -337,6 +438,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
             '--application', 'mahout'])
+
+
+class EMRConfigurationPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_matching_emr_configurations(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -393,6 +497,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
         ])
 
+
+class SubnetPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_matching_subnet(self):
         _, cluster_id = self.make_pooled_cluster(
             subnet='subnet-ffffffff')
@@ -443,6 +550,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--instance-fleets', json.dumps(fleets),
             '--subnets', 'subnet-eeeeeeee,subnet-ffffffff'])
 
+
+class AdditionalEMRInfoPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
         _, cluster_id = self.make_pooled_cluster(
@@ -459,6 +569,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--additional-emr-info', info])
+
+
+class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_join_pool_with_same_instance_type_and_count(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -702,6 +815,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--instance-type', 'a1.sauce',
             '--num-core-instances', '2'])
 
+
+class EBSRootVolumeGBPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     # note that ebs_root_volume_gb is independent from EBS config on
     # instance fleets and instance groups
 
@@ -741,6 +857,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             ebs_root_volume_gb=123)
 
         self.assertDoesNotJoin(cluster_id, ['-r', 'emr', '--pool-clusters'])
+
+
+class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def _ig_with_ebs_config(
             self, device_configs=(), iops=None,
@@ -1012,6 +1131,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--instance-groups', json.dumps(requested_igs)])
 
+
+class BidPricePoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_can_join_cluster_with_same_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(
             master_instance_bid_price='0.25')
@@ -1068,50 +1190,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--master-instance-bid-price', '77.77',
             '--task-instance-bid-price', '22.00'])
 
-    def _fleet_config(
-            self, role='MASTER', instance_types=None,
-            weighted_capacities=None,
-            ebs_device_configs=None,
-            ebs_optimized=None,
-            on_demand_capacity=1, spot_capacity=0, spot_spec=None):
 
-        config = dict(InstanceFleetType=role, InstanceTypeConfigs=[])
-
-        if not instance_types:
-            instance_types = ['m1.medium']
-
-        if not weighted_capacities:
-            weighted_capacities = {}
-
-        for instance_type in instance_types:
-            instance_config = dict(InstanceType=instance_type)
-            if weighted_capacities.get(instance_type):
-                instance_config['WeightedCapacity'] = (
-                    weighted_capacities[instance_type])
-
-            EbsConfiguration = {}
-
-            if ebs_device_configs is not None:
-                EbsConfiguration['EbsBlockDeviceConfigs'] = ebs_device_configs
-
-            if ebs_optimized is not None:
-                EbsConfiguration['EbsOptimized'] = ebs_optimized
-
-            if EbsConfiguration:
-                instance_config['EbsConfiguration'] = EbsConfiguration
-
-            config['InstanceTypeConfigs'].append(instance_config)
-
-        if spot_spec:
-            config['LaunchSpecifications'] = dict(SpotSpecification=spot_spec)
-
-        if on_demand_capacity:
-            config['TargetOnDemandCapacity'] = on_demand_capacity
-
-        if spot_capacity:
-            config['TargetSpotCapacity'] = spot_capacity
-
-        return config
+class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_same_instance_fleet_config(self):
         fleets = [
@@ -1521,12 +1601,19 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--instance-fleets', json.dumps(req_fleets)
         ])
 
-    def test_dont_join_wrong_named_pool(self):
-        _, cluster_id = self.make_pooled_cluster('pool1')
+    def test_dont_join_fleet_pool_without_provisioned_capacity(self):
+        # make sure that we only join fleets with provisioned capacity
+        fleets = [self._fleet_config()]
+
+        _, cluster_id = self.make_pooled_cluster(provision=False,
+                                                 instance_fleets=fleets)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--pool-name', 'not_pool1'])
+            '--instance-fleets', json.dumps(fleets)])
+
+
+class MrjobVersionPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_dont_join_wrong_mrjob_version(self):
         _, cluster_id = self.make_pooled_cluster()
@@ -1551,6 +1638,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--python-bin', 'snake'])
+
+
+class BootstrapPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_join_similarly_bootstrapped_pool(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -1637,6 +1727,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '--pool-clusters',
             '--bootstrap', true_story])
 
+
+class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
     def test_pool_contention(self):
         _, cluster_id = self.make_pooled_cluster('robert_downey_jr')
 
@@ -1652,8 +1745,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         runner_1 = runner_plz()
         runner_2 = runner_plz()
 
-        self.assertEqual(runner_1._find_cluster(), cluster_id)
-        self.assertEqual(runner_2._find_cluster(), None)
+        self.assertEqual(runner_1._find_cluster()[0], cluster_id)
+        self.assertEqual(runner_2._find_cluster()[0], None)
 
     def test_sorting_by_cpu_capacity(self):
         _, cluster_id_1 = self.make_pooled_cluster(
@@ -1670,8 +1763,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         runner_2 = self.make_simple_runner(
             'pool1', '--num-core-instances', '1')
 
-        self.assertEqual(runner_1._find_cluster(), cluster_id_1)
-        self.assertEqual(runner_2._find_cluster(), cluster_id_2)
+        self.assertEqual(runner_1._find_cluster()[0], cluster_id_1)
+        self.assertEqual(runner_2._find_cluster()[0], cluster_id_2)
 
     def test_sorting_by_cpu_capacity_divides_by_number_of_hours(self):
         _, cluster_id_1 = self.make_pooled_cluster(
@@ -1689,8 +1782,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         runner_2 = self.make_simple_runner(
             'pool1', '--num-core-instances', '1')
 
-        self.assertEqual(runner_1._find_cluster(), cluster_id_1)
-        self.assertEqual(runner_2._find_cluster(), cluster_id_2)
+        self.assertEqual(runner_1._find_cluster()[0], cluster_id_1)
+        self.assertEqual(runner_2._find_cluster()[0], cluster_id_2)
 
     def test_dont_destroy_own_pooled_cluster_on_failure(self):
         # Issue 242: job failure shouldn't kill the pooled clusters
@@ -1847,16 +1940,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters'])
 
-    def test_dont_join_fleet_pool_without_provisioned_capacity(self):
-        # make sure that we only join fleets with provisioned capacity
-        fleets = [self._fleet_config()]
 
-        _, cluster_id = self.make_pooled_cluster(provision=False,
-                                                 instance_fleets=fleets)
-
-        self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-clusters',
-            '--instance-fleets', json.dumps(fleets)])
+class DockerPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_same_docker_image(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -1917,6 +2002,9 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
 
         return cluster_id
 
+    def step_ids(self, cluster_id):
+        return [s['Id'] for s in self.mock_emr_clusters[cluster_id]['_Steps']]
+
     def num_steps(self, cluster_id):
         return len(self.mock_emr_clusters[cluster_id]['_Steps'])
 
@@ -1942,11 +2030,15 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            # tried to add steps to pooled cluster, had to try again
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # tried to add step to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+            # make sure self._step_ids got cleared
+            self.assertEqual(runner._step_ids,
+                             self.step_ids(runner.get_cluster_id()))
 
     def test_launch_new_multi_node_cluster_after_self_termination(self):
         # the error message is different when a multi-node cluster
@@ -1960,11 +2052,15 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            # tried to add steps to pooled cluster, had to try again
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # tried to add step to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+            # make sure self._step_ids got cleared
+            self.assertEqual(runner._step_ids,
+                             self.step_ids(runner.get_cluster_id()))
 
     def test_reset_ssh_tunnel_and_hadoop_fs_on_launch(self):
         # regression test for #1549
@@ -2007,8 +2103,8 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
 
             runner.run()
 
-            # tried to add steps to pooled cluster, had to try again
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # tried to add step to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
@@ -2035,10 +2131,13 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            self.assertEqual(self.num_steps(cluster1_id), 2)
+            self.assertEqual(self.num_steps(cluster1_id), 1)
 
             self.assertEqual(runner.get_cluster_id(), cluster2_id)
             self.assertEqual(self.num_steps(cluster2_id), 2)
+
+            # make sure self._step_ids got cleared
+            self.assertEqual(runner._step_ids, self.step_ids(cluster2_id))
 
     def test_multiple_failover(self):
         cluster_ids = []
@@ -2068,7 +2167,8 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertRaises(StepFailedException, runner.run)
 
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # steps are added one at a time
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
     def test_dont_recover_from_user_termination(self):
         cluster_id = self.make_pooled_cluster()
@@ -2082,7 +2182,8 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.launch(runner)
 
             self.assertEqual(runner.get_cluster_id(), cluster_id)
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # steps are added one at a time
+            self.assertEqual(self.num_steps(cluster_id), 1)
 
             self.client('emr').terminate_job_flows(JobFlowIds=[cluster_id])
 
@@ -2096,7 +2197,8 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.launch(runner)
 
             cluster_id = runner.get_cluster_id()
-            self.assertEqual(self.num_steps(cluster_id), 2)
+            # steps are added one at a time
+            self.assertEqual(self.num_steps(cluster_id), 1)
             self.mock_emr_self_termination.add(cluster_id)
 
             self.assertRaises(StepFailedException, runner._finish_run)
@@ -2151,3 +2253,73 @@ class PoolingDisablingTestCase(MockBoto3TestCase):
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['AutoTerminate'], True)
+
+
+class ClusterLockingTestCase(PoolMatchingBaseTestCase):
+
+    # ensure that clusters get locked and unlocked at the right time
+
+    def setUp(self):
+        super(ClusterLockingTestCase, self).setUp()
+
+        self._attempt_to_lock_cluster = self.start(patch(
+            'mrjob.emr._attempt_to_lock_cluster',
+            side_effect=_attempt_to_lock_cluster))
+
+        self._attempt_to_unlock_cluster = self.start(patch(
+            'mrjob.emr._attempt_to_unlock_cluster',
+            side_effect=_attempt_to_unlock_cluster))
+
+    def test_no_locking_without_pooling(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertFalse(self._attempt_to_lock_cluster.called)
+
+    def test_no_locking_with_explicit_cluster_id(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertFalse(self._attempt_to_lock_cluster.called)
+
+    def test_join_non_concurrent_pooled_cluster(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        job = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_input_files_for_upload()
+            runner._launch()
+
+            self.assertTrue(self._attempt_to_lock_cluster.called)
+            self.assertFalse(self._attempt_to_unlock_cluster.called)
+
+            self.mock_emr_failures.add((cluster_id, 0))
+            self.assertRaises(StepFailedException, runner._finish_run)
+
+            # unlocked at some point while first step was running
+            self.assertTrue(self._attempt_to_unlock_cluster.called)
+
+    def test_join_concurrent_pooled_cluster(self):
+        _, cluster_id = self.make_pooled_cluster(max_concurrent_steps=2)
+
+        job = MRTwoStepJob(['-r', 'emr', '--pool-clusters',
+                            '--max-concurrent-steps', '2'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_input_files_for_upload()
+            runner._launch()
+
+            self.assertTrue(self._attempt_to_lock_cluster.called)
+            # unlocked immediately after adding steps
+            self.assertTrue(self._attempt_to_unlock_cluster.called)

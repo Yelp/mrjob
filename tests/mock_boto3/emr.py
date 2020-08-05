@@ -109,6 +109,9 @@ DEFAULT_MAX_STEPS_RETURNED = 50
 # need to fill in a version for non-Hadoop applications
 DUMMY_APPLICATION_VERSION = '0.0.0'
 
+# give the runner a chance to add more steps
+DEFAULT_AUTO_TERMINATE_COUNTDOWN = 3
+
 
 # TODO: raise InvalidRequest: Missing required header for this
 # request: x-amz-content-sha256 when region name is clearly invalid
@@ -250,6 +253,7 @@ class MockEMRClient(object):
                 StateChangeReason={},
                 Timeline=dict(CreationDateTime=now),
             ),
+            StepConcurrencyLevel=1,
             Tags=[],
             TerminationProtected=False,
             VisibleToAllUsers=False,
@@ -397,6 +401,16 @@ class MockEMRClient(object):
             # report it if you don't set it
             _validate_param(kwargs, 'EbsRootVolumeSize', integer_types)
             cluster['EbsRootVolumeSize'] = kwargs.pop('EbsRootVolumeSize')
+
+        # StepConcurrencyLevel
+        if 'StepConcurrencyLevel' in kwargs:
+            _validate_param(kwargs, 'StepConcurrencyLevel', integer_types)
+            if not 1 <= kwargs['StepConcurrencyLevel'] <= 256:
+                raise _error('Invalid step concurrency level. Allowed level'
+                             ' is from 1 to 256')
+
+            cluster['StepConcurrencyLevel'] = kwargs.pop(
+                'StepConcurrencyLevel')
 
         # pass BootstrapActions off to helper
         if 'BootstrapActions' in kwargs:
@@ -1129,6 +1143,14 @@ class MockEMRClient(object):
                     ['CANCEL_AND_WAIT', 'CONTINUE',
                      'TERMINATE_JOB_FLOW', 'TERMINATE_CLUSTER'])
 
+                # CANCEL_AND_WAIT makes no sense when other job's steps
+                # could be cancelled
+                if (Step['ActionOnFailure'] == 'CANCEL_AND_WAIT' and
+                        cluster.get('StepConcurrencyLevel') != 1):
+                    raise _ValidationException(
+                        operation_name,
+                        "Action on failure 'CANCEL_AND_WAIT' is invalid.")
+
                 new_step['ActionOnFailure'] = Step.pop('ActionOnFailure')
 
             # HadoopJarStep (required)
@@ -1672,19 +1694,23 @@ class MockEMRClient(object):
             if step_num < len(cluster['_Steps']) - 1:
                 return
 
-        # no pending steps. should we wait, or shut down?
+        # no pending steps. should we shut down?
         if cluster['AutoTerminate']:
-            cluster['Status']['State'] = 'TERMINATING'
-            cluster['Status']['StateChangeReason']['Code'] = (
-                'ALL_STEPS_COMPLETED')
-            cluster['Status']['StateChangeReason']['Message'] = (
-                'Steps Completed')
-        else:
-            # just wait
-            cluster['Status']['State'] = 'WAITING'
-            cluster['Status']['StateChangeReason'] = {}
+            cluster.setdefault('_auto_terminate_countdown',
+                               DEFAULT_AUTO_TERMINATE_COUNTDOWN)
+            cluster['_auto_terminate_countdown'] -= 1
 
-        return
+            if cluster['_auto_terminate_countdown'] <= 0:
+                cluster['Status']['State'] = 'TERMINATING'
+                cluster['Status']['StateChangeReason']['Code'] = (
+                    'ALL_STEPS_COMPLETED')
+                cluster['Status']['StateChangeReason']['Message'] = (
+                    'Steps Completed')
+                return
+
+        # just wait
+        cluster['Status']['State'] = 'WAITING'
+        cluster['Status']['StateChangeReason'] = {}
 
 
 # configuration munging

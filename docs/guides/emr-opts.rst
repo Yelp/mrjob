@@ -326,7 +326,6 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
        ``Properties`` and ``Configurations``, the earlier dict will be simply
        deleted.
 
-
 .. mrjob-opt::
     :config: release_label
     :switch: --release-label
@@ -359,6 +358,23 @@ See also :mrjob-opt:`check_cluster_every`, :mrjob-opt:`ssh_tunnel`.
 
 Cluster pooling
 ---------------
+
+.. mrjob-opt::
+    :config: max_concurrent_steps
+    :switch: --max-concurrent-steps
+    :type: integer
+    :set: emr
+    :default: 1
+
+    When joining a pooled cluster, require its ``StepConcurrencyLevel`` to be
+    no higher than this, and make sure it doesn't already have as many
+    steps as it can possibly run concurrently (it's okay to join a
+    pooled cluster in the ``RUNNING`` state if it runs steps concurrently).
+
+    When launching a new cluster, set ``StepConcurrencyLevel`` to this. This
+    can be used even without enabling :mrjob-opt:`pool_clusters`.
+
+    .. versionadded:: 0.7.4
 
 .. mrjob-opt::
     :config: pool_clusters
@@ -517,6 +533,19 @@ API Endpoints
 
 Other rarely used options
 -------------------------
+
+.. mrjob-opt::
+    :config: add_steps_in_batch
+    :switch: --add-steps-in-batch, --no-add-steps-in-batch
+    :type: boolean
+    :set: emr
+    :default: ``True`` for AMIs before 5.28.0, ``False`` otherwise
+
+    For a multi-step job, should we submit all steps at once, or one at
+    a time? By default, we only submit steps all at once if the AMI doesn't
+    support running concurrent steps (that is, before AMI 5.28.0).
+
+    .. versionadded:: 0.7.4
 
 .. mrjob-opt::
     :config: additional_emr_info

@@ -188,6 +188,9 @@ _MIN_SPARK_AMI_VERSION = '3.8.0'
 # first AMI version with Spark that supports Python 3
 _MIN_SPARK_PY3_AMI_VERSION = '4.0.0'
 
+# first AMI version that allows steps to run concurrently
+_MIN_STEP_CONCURRENCY_AMI_VERSION = '5.28.0'
+
 # we have to wait this many minutes for logs to transfer to S3 (or wait
 # for the cluster to terminate). Docs say logs are transferred every 5
 # minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
@@ -247,6 +250,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     alias = 'emr'
 
     OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
+        'add_steps_in_batch',
         'additional_emr_info',
         'applications',
         'aws_access_key_id',
@@ -274,6 +278,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
+        'max_concurrent_steps',
         'pool_clusters',
         'pool_name',
         'pool_wait_minutes',
@@ -343,6 +348,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 "Cluster pooling is not fully supported on AMIs prior to"
                 " 2.4.8/3.1.1 due to the limit on total number of steps")
 
+        if self._opts['max_concurrent_steps'] < 1:
+            raise ValueError('max_concurrent_steps must be at least 1')
+
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
         s3_files_dir = self._cloud_tmp_dir + 'files/'
@@ -362,11 +370,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # did we acquire a lock on self._cluster_id? (used for pooling)
         self._locked_cluster = None
 
+        # IDs of steps we have submitted to the cluster
+        self._step_ids = []
+
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
 
         # map from cluster ID to a dictionary containing cached info about
         # that cluster. Includes the following keys:
+        #
         # - image_version
         # - hadoop_version
         # - master_public_dns
@@ -400,6 +412,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # info used to match clusters. catches _pool_hash_dict()
         self._pool_hash_dict_cached = None
 
+        # add_steps_in_batch and concurrent steps don't mix
+        if (self._add_steps_in_batch() and
+                self._opts['max_concurrent_steps'] > 1):
+            log.warning('add_steps_in_batch will probably not work'
+                        ' with max_concurrent_steps > 1')
+
     ### Options ###
 
     @classmethod
@@ -414,6 +432,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 docker_client_config=None,
                 docker_image=None,
                 image_version=_DEFAULT_IMAGE_VERSION,
+                max_concurrent_steps=1,
                 num_core_instances=0,
                 num_task_instances=0,
                 pool_clusters=False,
@@ -664,6 +683,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         assert not self._opts['cluster_id']
         self._cluster_id = None
         self._created_cluster = False
+        self._step_ids = []
 
         # old SSH tunnel isn't valid for this cluster (see #1549)
         if self._ssh_proc:
@@ -1169,6 +1189,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         kwargs['Steps'] = Steps = []
 
+        kwargs['StepConcurrencyLevel'] = self._opts['max_concurrent_steps']
+
         if self._opts['enable_emr_debugging']:
             # other steps are added separately
             Steps.append(self._build_debugging_step())
@@ -1228,13 +1250,24 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # don't terminate other people's clusters
         if (self._opts['emr_action_on_failure']):
             return self._opts['emr_action_on_failure']
+        elif not self._add_steps_in_batch():
+            # concurrent clusters don't allow CANCEL_ON_WAIT
+            return 'CONTINUE'
         elif (self._opts['cluster_id'] or
                 self._opts['pool_clusters']):
             return 'CANCEL_AND_WAIT'
         else:
             return 'TERMINATE_CLUSTER'
 
-    def _build_steps(self):
+    def _add_steps_in_batch(self):
+        if self._opts['add_steps_in_batch'] is None:
+            # by default, add steps in batch only when concurrent steps
+            # are not possible
+            return not self._image_version_gte('5.28.0')
+        else:
+            return self._opts['add_steps_in_batch']
+
+    def _steps_to_submit(self):
         """Return a step data structures to pass to ``boto3``"""
         # quick, add the other steps before the job spins up and
         # then shuts itself down! (in practice that won't happen
@@ -1386,12 +1419,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Create an empty cluster on EMR, and set self._cluster_id to
         its ID.
         """
-        emr_client = self.make_emr_client()
+        # step concurrency level of a cluster we added steps to, used
+        # for locking
+        step_concurrency_level = None
 
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
         if (self._opts['pool_clusters'] and not self._cluster_id):
-            cluster_id = self._find_cluster()
+            cluster_id, step_concurrency_level = self._find_cluster()
             if cluster_id:
                 self._cluster_id = cluster_id
                 self._locked_cluster = True
@@ -1410,11 +1445,18 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._check_cluster_spark_support()
 
         # define our steps
-        steps = self._build_steps()
-        steps_kwargs = dict(JobFlowId=self._cluster_id, Steps=steps)
-        log.debug('Calling add_job_flow_steps(%s)' % ','.join(
-            ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
-        emr_client.add_job_flow_steps(**steps_kwargs)
+        steps = self._steps_to_submit()
+
+        if self._add_steps_in_batch():
+            self._add_steps_to_cluster(steps)
+        else:
+            # later steps will be added one at a time
+            self._add_steps_to_cluster(steps[:1])
+
+        # if we locked a cluster with concurrent steps, we can release
+        # the lock immediately
+        if step_concurrency_level and step_concurrency_level > 1:
+            self._release_cluster_lock()
 
         # learn about how fast the cluster state switches
         cluster = self._describe_cluster()
@@ -1425,29 +1467,45 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 self.get_image_version(), '4.3.0'):
             self.fs.ssh.use_sudo_over_ssh()
 
+    def _release_cluster_lock(self):
+        if not self._locked_cluster:
+            return
+
+        emr_client = self.make_emr_client()
+
+        log.info('  releasing cluster lock')
+        # this can fail, but usually it's because the cluster
+        # started terminating, so only try releasing the lock once
+        _attempt_to_unlock_cluster(emr_client, self._cluster_id)
+        self._locked_cluster = False
+
+    def _add_steps_to_cluster(self, steps):
+        """Add steps (from _steps_to_submit()) to our cluster and append their
+         IDs to self._step_ids"""
+        emr_client = self.make_emr_client()
+
+        steps_kwargs = dict(JobFlowId=self._cluster_id, Steps=steps)
+        log.debug('Calling add_job_flow_steps(%s)' % ','.join(
+            ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
+        step_ids = emr_client.add_job_flow_steps(**steps_kwargs)['StepIds']
+        self._step_ids.extend(step_ids)
+
     def get_job_steps(self):
         """Fetch the steps submitted by this runner from the EMR API.
 
+        .. deprecated:: 0.7.4
+
         .. versionadded:: 0.6.1
         """
+        log.warning(
+            'get_job_steps() is deprecated and will be removed in v0.8.0')
+
         return _get_job_steps(
             self.make_emr_client(), self.get_cluster_id(), self.get_job_key())
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
-        # get info about expected number of steps
-        num_steps = len(self._get_steps())
-
-        expected_num_steps = num_steps
-        if self._master_node_setup_script_path:
-            expected_num_steps += 1
-
-        # get info about steps submitted to cluster
-        steps = self.get_job_steps()
-
-        if len(steps) < expected_num_steps:
-            log.warning('Expected to find %d steps on cluster, found %d' %
-                        (expected_num_steps, len(steps)))
+        steps = self._steps_to_submit()
 
         # clear out log interpretations if they were filled somehow
         self._log_interpretations = []
@@ -1459,23 +1517,27 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
             self._set_up_ssh_tunnel_and_hdfs()
 
-        # treat master node setup as step -1
-        start = 0
-        if self._master_node_setup_script_path:
-            start -= 1
+        for i, step in enumerate(steps):
+            # if our step isn't already submitted, submit it
+            if len(self._step_ids) <= i:
+                self._add_steps_to_cluster(
+                    steps[len(self._step_ids):i + 1])
 
-        for step_num, step in enumerate(steps, start=start):
-            step_id = step['Id']
-            # don't include job_key in logging messages
+            step_id = self._step_ids[i]
             step_name = step['Name'].split(': ')[-1]
+
+            # treat master node setup script is treated as step -1
+            if self._master_node_setup_script_path:
+                step_num = i - 1
+            else:
+                step_num = i
 
             log.info('Waiting for %s (%s) to complete...' %
                      (step_name, step_id))
 
-            self._wait_for_step_to_complete(step_id, step_num, num_steps)
+            self._wait_for_step_to_complete(step_id, step_num)
 
-    def _wait_for_step_to_complete(
-            self, step_id, step_num=None, num_steps=None):
+    def _wait_for_step_to_complete(self, step_id, step_num=None):
         """Helper for _wait_for_step_to_complete(). Wait for
         step with the given ID to complete, and fetch counters.
         If it fails, attempt to diagnose the error, and raise an
@@ -1483,13 +1545,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         :param step_id: the s-XXXXXXX step ID on EMR
         :param step_num: which step this is out of the steps
-                         belonging to our job (0-indexed)
-        :param num_steps: number of steps in our job
+                         belonging to our job (0-indexed). Master node
+                         setup script, if there is one, is step -1
 
-        *step_num* and *num_steps* are optional and only used when raising
-        a :py:class:`~mrjob.step.StepFailedException`.
-
-        This also adds an item to self._log_interpretations
+        This also adds an item to self._log_interpretations or sets
+        self._mns_log_interpretation
         """
         log_interpretation = dict(step_id=step_id)
 
@@ -1547,12 +1607,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     self._log_step_progress()
 
                 # it's safe to clean up our lock, cluster isn't WAITING
-                if self._locked_cluster:
-                    log.info('  releasing cluster lock')
-                    # this can fail, but usually it's because the cluster
-                    # started terminating, so only try releasing the lock once
-                    _attempt_to_unlock_cluster(emr_client, self._cluster_id)
-                    self._locked_cluster = False
+                self._release_cluster_lock()
 
                 continue
 
@@ -1612,7 +1667,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     _log_probable_cause_of_failure(log, error)
 
             raise StepFailedException(
-                step_num=step_num, num_steps=num_steps,
+                step_num=step_num, num_steps=self._num_steps(),
                 # "Step 0 of ... failed" looks weird
                 step_desc=(
                     'Master node setup step' if step_num == -1 else None))
@@ -2332,9 +2387,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         now = _boto3_now()
 
+        if self._opts['max_concurrent_steps'] > 1:
+            cluster_states = ['RUNNING', 'WAITING']
+        else:
+            cluster_states = ['WAITING']
+
         for cluster in _boto3_paginate(
                 'Clusters', emr_client, 'list_clusters',
-                ClusterStates=['WAITING']):
+                ClusterStates=cluster_states):
 
             cluster_id = cluster['Id']
 
@@ -2445,6 +2505,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.debug('  cluster %s: subnet mismatch' % cluster_id)
             return
 
+        # step concurrency
+        step_concurrency = cluster.get('StepConcurrencyLevel', 1)
+        if step_concurrency > self._opts['max_concurrent_steps']:
+            log.debug('  cluster %s: step concurrency level too high' %
+                      cluster_id)
+            return
+
         return True
 
     def _find_cluster(self):
@@ -2462,6 +2529,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             for cluster, when_cluster_described in (
                     self._yield_clusters_to_join()):
                 cluster_id = cluster['Id']
+                step_concurrency_level = cluster['StepConcurrencyLevel']
 
                 log.debug('  Attempting to join cluster %s' % cluster_id)
                 lock_acquired = _attempt_to_lock_cluster(
@@ -2470,7 +2538,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     when_cluster_described=when_cluster_described)
 
                 if lock_acquired:
-                    return cluster_id
+                    return cluster_id, step_concurrency_level
 
             # if we're out of time, give up
             if (datetime.now() +
@@ -2483,7 +2551,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                          int(_POOLING_SLEEP_INTERVAL)))
             time.sleep(_POOLING_SLEEP_INTERVAL)
 
-        return None
+        return None, None
 
     def _pool_hash_dict(self):
         """A dictionary of information that must be matched exactly to

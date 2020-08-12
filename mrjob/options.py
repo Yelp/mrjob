@@ -963,6 +963,28 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    # min_available_* options aren't in the "launch" group because they
+    # are only used when joining a cluster, not creating one
+    min_available_mb=dict(
+        switches=[
+            (['--min-available-mb'], dict(
+                help=('When attempting to join a pooled cluster, check'
+                      ' the YARN resource manager to ensure at least'
+                      ' this much memory is available.'),
+                type=float,
+            )),
+        ]
+    ),
+    min_available_virtual_cores=dict(
+        switches=[
+            (['--min-available-virtual-cores'], dict(
+                help=('When attempting to join a pooled cluster, check'
+                      ' the YARN resource manager to ensure at least'
+                      ' this much CPU capacity is available.'),
+                type=float,
+            )),
+        ]
+    ),
     network=dict(
         cloud_role='launch',
         switches=[

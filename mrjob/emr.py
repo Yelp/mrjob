@@ -2374,8 +2374,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _available_matching_clusters(self):
         """Returns a list of IDs of clusters who are in the ``WAITING`` state
-        and whose name suffix (cluster pool name and hash) match the one our
-        job needs.
+        (or ``RUNNING``, if we allow concurrency), and whose name suffix
+        (cluster pool name and hash) match the one our job needs.
 
         Sort IDs in descending order by approximate CPU capacity, based
         on ``NormalizedInstanceHours``.

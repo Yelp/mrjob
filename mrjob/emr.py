@@ -90,6 +90,7 @@ from mrjob.pool import _instance_fleets_satisfy
 from mrjob.pool import _instance_groups_satisfy
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
+from mrjob.py2 import urljoin
 from mrjob.py2 import urlopen
 from mrjob.runner import _blank_out_conflicting_opts
 from mrjob.setup import UploadDirManager
@@ -217,6 +218,15 @@ _CLUSTER_SELF_TERMINATED_RE = re.compile(
 # if this appears in an S3 object's "restore" field, the object
 # is available to read even if it's Glacier-archived
 _RESTORED_FROM_GLACIER = 'ongoing-request="false"'
+
+# Amount of time in seconds before we timeout yarn api calls.
+_YARN_API_TIMEOUT = 20
+
+# which port to connect to the YARN resource manager on
+_YARN_RESOURCE_MANAGER_PORT = 8088
+
+# base path for YARN resource manager
+_YRM_BASE_PATH = '/ws/v1/cluster'
 
 
 # used to bail out and retry when a pooled cluster self-terminates
@@ -2436,7 +2446,33 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        if self._opts['instance_fleets']:
+        if (self._opts['min_available_mb'] or
+                self._opts['min_available_virtual_cores']):
+            cluster = emr_client.describe_cluster(
+                ClusterId=cluster_id)['Cluster']
+
+            host = cluster['MasterPublicDnsName']
+            try:
+                log.debug('    querying clusterMetrics from %s' % host)
+                metrics = self._yrm_get('metrics', host=host)['clusterMetrics']
+                log.debug('      metrics: %s' %
+                          json.dumps(metrics, sort_keys=True))
+            except IOError as ex:
+                log.info('    error while getting metrics for cluster %s: %s' %
+                         (cluster_id, str(ex)))
+                return False
+
+            if metrics['availableMB'] < self._opts['min_available_mb']:
+                log.info('    too little memory')
+                return False
+
+            if (metrics['availableVirtualCores'] <
+                    self._opts['min_available_virtual_cores']):
+                log.info('    too few virtual cores')
+                return False
+
+            return True
+        elif self._opts['instance_fleets']:
             try:
                 fleets = list(_boto3_paginate(
                     'InstanceFleets', emr_client, 'list_instance_fleets',
@@ -2995,6 +3031,44 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 Properties={},
             ),
         ]
+
+    def _yrm_get(self, path, host=None, port=None, timeout=None):
+        """Use curl to perform an HTTP GET on the given path on the
+        YARN Resource Manager. Either return decoded JSON from the call,
+        or raise an IOError
+
+        *path* should not start with a '/'
+
+        More info on the YARN REST API can be found here:
+
+        https://hadoop.apache.org/docs/current/hadoop-yarn/
+            hadoop-yarn-site/ResourceManagerRest.html
+        """
+        if host is None:
+            host = self._address_of_master()
+
+        if port is None:
+            port = _YARN_RESOURCE_MANAGER_PORT
+
+        if timeout is None:
+            timeout = _YARN_API_TIMEOUT
+
+        # using urljoin() to avoid a double / when joining host/port with path
+        yrm_url = urljoin(
+            'http://{}:{:d}'.format(host, port),
+            '{}/{}'.format(_YRM_BASE_PATH, path)
+        )
+
+        curl_args = [
+            'curl',  # always available on EMR
+            '-fsS',  # fail on HTTP errors, print errors only to stderr
+            '-m', str(timeout),  # timeout after 20 seconds
+            yrm_url,
+        ]
+
+        stdout, stderr = self.fs.ssh._ssh_run(host, curl_args)
+
+        return json.loads(stdout)
 
 
 def _get_job_steps(emr_client, cluster_id, job_key):

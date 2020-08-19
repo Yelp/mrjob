@@ -430,6 +430,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.warning('add_steps_in_batch will probably not work'
                         ' with max_concurrent_steps > 1')
 
+        # min_available_* options require SSH
+        if ((self._opts['min_available_mb'] or
+                self._opts['min_available_virtual_cores']) and
+                not (self._opts['ec2_key_pair'] and
+                     self._opts['ec2_key_pair_file'])):
+            raise ValueError('you must set up SSH (ec2_key_pair and'
+                             ' ec2_key_pair_file) to use the'
+                             ' min_available_* options')
+
     ### Options ###
 
     @classmethod

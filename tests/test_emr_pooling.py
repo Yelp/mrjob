@@ -20,6 +20,7 @@ import os
 from datetime import timedelta
 from os.path import join
 from shutil import make_archive
+from unittest.mock import call
 
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
@@ -2091,6 +2092,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
+
     def test_available_virtual_cores_only(self):
         _, cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
@@ -2107,7 +2109,41 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
-    def test_instances_attributes_dont_matter(self):
+    def test_zero_mb_disables_opt(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 6144
+        self.cluster_metrics['availableVirtualCores'] = 4
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '0',
+            '--min-available-virtual-cores', '4',
+        ])
+
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
+
+    def test_zero_virtual_cores_disables_opt(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 12288
+        self.cluster_metrics['availableVirtualCores'] = 2
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '0',
+        ])
+
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
+
+    def test_instance_attributes_dont_matter(self):
         _, cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
@@ -2149,6 +2185,28 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         ])
 
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
+
+    def test_setting_both_opts_to_zero_disables_connecting_to_yarn(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 12288
+        self.cluster_metrics['availableVirtualCores'] = 4
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '0',
+            '--min-available-virtual-cores', '0',
+            '--instance-type', 'm5.24xlarge',
+            '--num-core-instances', '100',
+        ])
+
+        self.assertNotIn(
+            call('mockmaster', self.EXPECTED_CURL_ARGS),
+            self._ssh_run.call_args_list
+        )
 
 
 class PoolingRecoveryTestCase(MockBoto3TestCase):

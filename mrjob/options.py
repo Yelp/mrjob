@@ -971,7 +971,7 @@ _RUNNER_OPTS = dict(
                 help=('When attempting to join a pooled cluster, check'
                       ' the YARN resource manager to ensure at least'
                       ' this much memory is available.'),
-                type=float,
+                type=int,
             )),
         ]
     ),

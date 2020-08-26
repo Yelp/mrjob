@@ -377,6 +377,40 @@ Cluster pooling
     .. versionadded:: 0.7.4
 
 .. mrjob-opt::
+    :config: min_available_mb
+    :switch: --min-available-mb
+    :type: integer
+    :set: emr
+    :default: 0 (disabled)
+
+    When joining a pooled cluster, connect to its YARN resource manager's
+    metrics API and make sure that ``availableMB`` is at least this high.
+
+    This requires SSH to work, so :mrjob-opt:`ec2_key_pair` and
+    :mrjob-opt:`ec2_key_pair_file` must be set.
+
+    If you enable this option, pooling will no longer query clusters about
+    their instance groups/fleets, since this information is mostly redundant.
+
+    .. versionadded:: 0.7.4
+
+.. mrjob-opt::
+    :config: min_available_virtual_cores
+    :switch: --min-available-virtual-cores
+    :type: integer
+    :set: emr
+    :default: 0 (disabled)
+
+    When joining a pooled cluster, connect to its YARN resource manager's
+    metrics API and make sure that ``availableVirtualCores`` is at least this
+    high.
+
+    Like with :mrjob-opt:`min_available_mb`, this requires SSH to work
+    and disables querying clusters about their instances.
+
+    .. versionadded:: 0.7.4
+
+.. mrjob-opt::
     :config: pool_clusters
     :switch: --pool-clusters
     :type: :ref:`string <data-type-string>`

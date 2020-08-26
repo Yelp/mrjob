@@ -1975,6 +1975,170 @@ class DockerPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '-r', 'emr', '--pool-clusters'])
 
 
+class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
+
+    def setUp(self):
+        super(MinAvailableOptsPoolMatchingTestCase, self).setUp()
+
+        # mock out _yrm_get(); we'll test what it does elsewhere
+
+        # update this dict to set availableMB etc.
+        self.cluster_metrics = dict(
+            availableMB=1,
+            availableVirtualCores=4,
+        )
+
+        self._yrm_get = self.start(patch(
+            'mrjob.emr.EMRJobRunner._yrm_get',
+            return_value=dict(clusterMetrics=self.cluster_metrics))
+        )
+
+        self.key_pair_file = self.makefile('EMR.pem')
+
+    def test_join_cluster_with_requested_resources(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 12288
+        self.cluster_metrics['availableVirtualCores'] = 4
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '4',
+        ])
+
+        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+
+    def test_join_cluster_with_more_than_requested_resources(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 24576
+        self.cluster_metrics['availableVirtualCores'] = 8
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '4',
+        ])
+
+        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+
+    def test_dont_join_cluster_with_too_few_mb(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 6144
+        self.cluster_metrics['availableVirtualCores'] = 8
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '4',
+        ])
+
+        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+
+    def test_join_cluster_with_too_few_virtual_cores(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 12288
+        self.cluster_metrics['availableVirtualCores'] = 2
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '4',
+        ])
+
+        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+
+    def test_available_mb_only(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 12288
+        self.cluster_metrics['availableVirtualCores'] = 2
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+        ])
+
+        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+
+    def test_available_virtual_cores_only(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 6144
+        self.cluster_metrics['availableVirtualCores'] = 4
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-virtual-cores', '4',
+        ])
+
+        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+
+    def test_instances_attributes_dont_matter(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 12288
+        self.cluster_metrics['availableVirtualCores'] = 4
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '4',
+            '--instance-type', 'm5.24xlarge',
+            '--num-core-instances', '100',
+        ])
+
+        # EBS attributes of instances (set with instance_groups or
+        # instance_fleets) also won't be checked. this is by design,
+        # trying to save API calls
+
+        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+
+    def test_cluster_attributes_still_matter(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ec2_key_pair='EMR')
+
+        self.cluster_metrics['availableMB'] = 12288
+        self.cluster_metrics['availableVirtualCores'] = 4
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '4',
+            '--instance-type', 'm5.24xlarge',
+            '--num-core-instances', '100',
+            '--ebs-root-volume-gb', '1000',
+        ])
+
+        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+
+
 class PoolingRecoveryTestCase(MockBoto3TestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {'pool_clusters': True}}}

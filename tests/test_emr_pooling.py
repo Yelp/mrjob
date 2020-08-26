@@ -1977,10 +1977,13 @@ class DockerPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
 class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
+    EXPECTED_CURL_ARGS = [
+        'curl', '-fsS', '-m', '20',
+        'http://mockmaster:8088/ws/v1/cluster/metrics',
+    ]
+
     def setUp(self):
         super(MinAvailableOptsPoolMatchingTestCase, self).setUp()
-
-        # mock out _yrm_get(); we'll test what it does elsewhere
 
         # update this dict to set availableMB etc.
         self.cluster_metrics = dict(
@@ -1988,10 +1991,18 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             availableVirtualCores=4,
         )
 
-        self._yrm_get = self.start(patch(
-            'mrjob.emr.EMRJobRunner._yrm_get',
-            return_value=dict(clusterMetrics=self.cluster_metrics))
-        )
+        def _mock_ssh_run(address, cmd_args):
+            return (
+                json.dumps(
+                    dict(clusterMetrics=self.cluster_metrics)
+                ).encode('utf_8'),
+                b'',
+            )
+
+        self._ssh_run = self.start(patch(
+            'mrjob.fs.ssh.SSHFilesystem._ssh_run',
+            side_effect=_mock_ssh_run,
+        ))
 
         self.key_pair_file = self.makefile('EMR.pem')
 
@@ -2010,7 +2021,8 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--min-available-virtual-cores', '4',
         ])
 
-        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+        # _ssh_run() is also called to fetch the job's progress
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_join_cluster_with_more_than_requested_resources(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -2027,7 +2039,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--min-available-virtual-cores', '4',
         ])
 
-        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_dont_join_cluster_with_too_few_mb(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -2044,7 +2056,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--min-available-virtual-cores', '4',
         ])
 
-        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_join_cluster_with_too_few_virtual_cores(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -2061,7 +2073,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--min-available-virtual-cores', '4',
         ])
 
-        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_available_mb_only(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -2077,7 +2089,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--min-available-mb', '12288',
         ])
 
-        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_available_virtual_cores_only(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -2093,7 +2105,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--min-available-virtual-cores', '4',
         ])
 
-        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_instances_attributes_dont_matter(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -2116,7 +2128,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         # instance_fleets) also won't be checked. this is by design,
         # trying to save API calls
 
-        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_cluster_attributes_still_matter(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -2136,7 +2148,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--ebs-root-volume-gb', '1000',
         ])
 
-        self._yrm_get.assert_called_once_with('metrics', host='mockmaster')
+        self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
 
 class PoolingRecoveryTestCase(MockBoto3TestCase):

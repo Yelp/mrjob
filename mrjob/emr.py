@@ -454,7 +454,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 docker_image=None,
                 image_version=_DEFAULT_IMAGE_VERSION,
                 max_concurrent_steps=1,
-                min_available_mb=0.0,
+                min_available_mb=0,
                 min_available_virtual_cores=0,
                 num_core_instances=0,
                 num_task_instances=0,

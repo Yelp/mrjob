@@ -90,6 +90,7 @@ from mrjob.pool import _instance_fleets_satisfy
 from mrjob.pool import _instance_groups_satisfy
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
+from mrjob.py2 import to_unicode
 from mrjob.py2 import urljoin
 from mrjob.py2 import urlopen
 from mrjob.runner import _blank_out_conflicting_opts
@@ -3077,7 +3078,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         stdout, stderr = self.fs.ssh._ssh_run(host, curl_args)
 
-        return json.loads(stdout)
+        return json.loads(to_unicode(stdout))
 
 
 def _get_job_steps(emr_client, cluster_id, job_key):

@@ -20,7 +20,6 @@ import os
 from datetime import timedelta
 from os.path import join
 from shutil import make_archive
-from unittest.mock import call
 
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
@@ -34,6 +33,7 @@ from tests.mock_boto3 import MockBoto3TestCase
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import Mock
+from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_emr import CORE_SITE_EMR_CONFIGURATION

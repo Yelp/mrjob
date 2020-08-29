@@ -86,6 +86,7 @@ from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.pool import _attempt_to_lock_cluster
 from mrjob.pool import _attempt_to_unlock_cluster
+from mrjob.pool import _cluster_name_suffix
 from mrjob.pool import _instance_fleets_satisfy
 from mrjob.pool import _instance_groups_satisfy
 from mrjob.py2 import PY2
@@ -2685,14 +2686,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Extra info added to the cluster name, for pooling."""
         if not self._opts['pool_clusters']:
             return ''
-
-        fields = [
-            mrjob.__version__,
-            self._opts['pool_name'],
-            self._pool_hash(),
-        ]
-
-        return ' pooling:%s' % ','.join(fields)
+        else:
+            return _cluster_name_suffix(
+                self._pool_hash(), self._opts['pool_name'])
 
     ### EMR-specific Stuff ###
 

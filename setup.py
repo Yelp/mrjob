@@ -30,7 +30,8 @@ try:
                 'botocore>=1.6.0',
             ],
             'google': [
-                'google-cloud-dataproc>=0.3.0',
+                # 1.1.0 is the last version that supports Python 2.7
+                'google-cloud-dataproc>=0.3.0,<=1.1.0',
                 'google-cloud-logging>=1.9.0',
                 'google-cloud-storage>=1.13.1',
             ],

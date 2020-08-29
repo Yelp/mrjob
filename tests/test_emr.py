@@ -6223,3 +6223,66 @@ class AddStepsInBatchTestCase(MockBoto3TestCase):
         self._assert_adds_steps_one_at_a_time(
             '--image-version', '4.0.0',
             '--no-add-steps-in-batch')
+
+
+class MinAvailableOptsTestCase(MockBoto3TestCase):
+    # these options are used extensively in test_emr_pooling.py, so just
+    # testing error conditions
+
+    def setUp(self):
+        super(MinAvailableOptsTestCase, self).setUp()
+
+        self.key_pair_file = self.makefile('EMR.pem')
+
+    def test_with_ssh_opts(self):
+        self.make_runner(
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '4',
+        )
+
+    def test_requires_ec2_key_pair(self):
+        self.assertRaises(
+            ValueError,
+            self.make_runner,
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '4',
+        )
+
+    def test_requires_ec2_key_pair_file(self):
+        self.assertRaises(
+            ValueError,
+            self.make_runner,
+            '--ec2-key-pair', 'EMR',
+            '--min-available-mb', '12288',
+            '--min-available-virtual-cores', '4',
+        )
+
+    def test_min_available_mb_alone(self):
+        self.assertRaises(
+            ValueError,
+            self.make_runner,
+            '--ec2-key-pair', 'EMR',
+            '--min-available-mb', '12288',
+        )
+
+    def test_min_available_virtual_cores_alone(self):
+        self.assertRaises(
+            ValueError,
+            self.make_runner,
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-virtual-cores', '4',
+        )
+
+    def test_available_mb_is_int(self):
+        # doesn't make sense for this to be a float, YARN returns an int
+        self.assertRaises(
+            ValueError,
+            self.make_runner,
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', self.key_pair_file,
+            '--min-available-mb', '12288.0',
+            '--min-available-virtual-cores', '4',
+        )

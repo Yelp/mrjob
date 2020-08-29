@@ -931,6 +931,16 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    max_clusters_in_pool=dict(
+        switches=[
+            (['--max-clusters-in-pool'], dict(
+                help=("If attempting to join a pooled cluster, don't bail"
+                      " out and create a new one if there are at least"
+                      " this many clusters already in the pool."),
+                type=int,
+            )),
+        ],
+    ),
     max_concurrent_steps=dict(
         cloud_role='launch',
         switches=[

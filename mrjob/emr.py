@@ -289,6 +289,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
+        'max_clusters_in_pool',
         'max_concurrent_steps',
         'min_available_mb',
         'min_available_virtual_cores',

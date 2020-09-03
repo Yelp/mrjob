@@ -68,25 +68,38 @@ def _pool_name(cluster):
 # this may change between versions of mrjob
 
 def _cluster_name_suffix(hash, name):
-    fields = [mrjob.__version__, hash, name]
+    fields = [mrjob.__version__, name, hash]
     return ' pooling:%s' % ','.join(fields)
 
 
 def _parse_cluster_name_suffix(cluster_name):
+    """Return a dictionary possibly containing the keys:
+
+    mrjob_version: version of mrjob that created this cluster
+    pool_hash: hash representing bootstrap setup etc.
+    pool_name: name of the cluster pool
+
+    If the cluster is not pooled or we can't parse its pooling suffix,
+    return ``{}``.
+    """
     # return version, hash, and name from cluster pool suffix
 
     i = cluster_name.find(' pooling:')
     if i == -1:
-        return (None, None, None)
+        return {}
 
     suffix = cluster_name[i + len(' pooling:'):]
 
     parts = suffix.split(',', 3)
 
     if len(parts) == 3:
-        return tuple(parts)
+        return dict(
+            mrjob_version=parts[0],
+            pool_name=parts[1],
+            pool_hash=parts[2],
+        )
     else:
-        return (None, None, None)
+        return {}
 
 
 ### instance groups ###

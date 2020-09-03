@@ -230,6 +230,14 @@ _YARN_RESOURCE_MANAGER_PORT = 8088
 # base path for YARN resource manager
 _YRM_BASE_PATH = '/ws/v1/cluster'
 
+# all the cluster states other than terminating/terminated. We need this list
+# because the ListClusters call can't filter out unwanted cluster states;
+# it can only accept a whitelist of desired ones
+#
+# valid states are here:
+# https://docs.aws.amazon.com/emr/latest/APIReference/API_ListClusters.html
+_ACTIVE_CLUSTER_STATES = {'STARTING', 'BOOTSTRAPPING', 'RUNNING', 'WAITING'}
+
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
@@ -2393,6 +2401,32 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 continue
 
             yield (cluster, when_cluster_described)
+
+    def _list_cluster_ids_for_pooling(self, created_after=None):
+        """Call ListClusters, and collect cluster IDs relevant to pooling.
+
+        Optionally, only list clusters created after *created_after*.
+
+        Returns a dictionary with the following keys:
+
+        available: a list of IDs of clusters that we could join, based on their
+                   state and name suffix (pool name and hash, mrjob version).
+                   Sorted so that the cluster with the most CPU (based on
+                   NormalizedInstanceHours) goes first
+        matching: a set of IDs of clusters that have the right name suffix but
+                  may or may not be in the right state to join (a superset
+                  of *available*)
+        in_pool: a set of IDs of clusters that are in the pool we want to join,
+                 regardless of their state or pool hash (a superset of
+                 *matching*)
+        max_created: the latest creation timestamp for *any* cluster listed
+                     (so we can call this again to get stats on newly created
+                     clusters only)
+        """
+        available = set()
+        matching = set()
+        in_pool = set()
+
 
     def _available_matching_clusters(self):
         """Returns a list of IDs of clusters who are in the ``WAITING`` state

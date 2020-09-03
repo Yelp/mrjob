@@ -89,6 +89,7 @@ from mrjob.pool import _attempt_to_unlock_cluster
 from mrjob.pool import _cluster_name_suffix
 from mrjob.pool import _instance_fleets_satisfy
 from mrjob.pool import _instance_groups_satisfy
+from mrjob.pool import _parse_cluster_name_suffix
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import to_unicode
@@ -236,7 +237,7 @@ _YRM_BASE_PATH = '/ws/v1/cluster'
 #
 # valid states are here:
 # https://docs.aws.amazon.com/emr/latest/APIReference/API_ListClusters.html
-_ACTIVE_CLUSTER_STATES = {'STARTING', 'BOOTSTRAPPING', 'RUNNING', 'WAITING'}
+_ACTIVE_CLUSTER_STATES = ['STARTING', 'BOOTSTRAPPING', 'RUNNING', 'WAITING']
 
 
 # used to bail out and retry when a pooled cluster self-terminates
@@ -2383,9 +2384,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        # check cluster summaries (ListClusters)
-        for cluster_id in self._available_matching_clusters():
-            # check instance group/fleet setup (ListInstanceGroups/Fleets)
+        cluster_ids = self._list_cluster_ids_for_pooling()
+
+        for cluster_id in cluster_ids['available']:
             if not self._cluster_has_adequate_capacity(cluster_id):
                 continue
 
@@ -2423,44 +2424,48 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                      (so we can call this again to get stats on newly created
                      clusters only)
         """
-        available = set()
+        # a map from cluster_id to cpu_capacity
+        available = {}
         matching = set()
         in_pool = set()
+        max_created = None
 
-
-    def _available_matching_clusters(self):
-        """Returns a list of IDs of clusters who are in the ``WAITING`` state
-        (or ``RUNNING``, if we allow concurrency), and whose name suffix
-        (cluster pool name and hash) match the one our job needs.
-
-        Sort IDs in descending order by approximate CPU capacity, based
-        on ``NormalizedInstanceHours``.
-
-        The only API call this method makes is ``ListClusters``.
-        """
-        emr_client = self.make_emr_client()
-
-        suffix = self._cluster_name_pooling_suffix()
-
-        # tuples of (cluster_summary, cpu_capacity)
-        cluster_id_to_sort_key = {}
-
-        now = _boto3_now()
+        name_to_match = self._opts['pool_name']
+        suffix_to_match = self._cluster_name_pooling_suffix()
 
         if self._opts['max_concurrent_steps'] > 1:
-            cluster_states = ['RUNNING', 'WAITING']
+            states_to_match = {'RUNNING', 'WAITING'}
         else:
-            cluster_states = ['WAITING']
+            states_to_match = {'WAITING'}
+
+        emr_client = self.make_emr_client()
+        now = _boto3_now()
 
         for cluster in _boto3_paginate(
                 'Clusters', emr_client, 'list_clusters',
-                ClusterStates=cluster_states):
+                ClusterStates=_ACTIVE_CLUSTER_STATES,
+                CreatedAfter=created_after):
 
             cluster_id = cluster['Id']
 
-            if not cluster['Name'].endswith(suffix):
-                log.debug('  cluster %s: wrong cluster name suffix'
-                          % cluster_id)
+            created = cluster['Status']['Timeline']['CreationDateTime']
+
+            if max_created is None or created > max_created:
+                max_created = created
+
+            name = _parse_cluster_name_suffix(cluster['Name']).get('pool_name')
+
+            if name != name_to_match:
+                continue
+
+            in_pool.add(cluster_id)
+
+            if not cluster['Name'].endswith(suffix_to_match):
+                continue
+
+            matching.add(cluster_id)
+
+            if cluster['Status']['State'] not in states_to_match:
                 continue
 
             when_ready = cluster['Status']['Timeline'].get('ReadyDateTime')
@@ -2474,14 +2479,20 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 # in the WAITING state
                 cpu_capacity = 0
 
-            cluster_id_to_sort_key[cluster_id] = cpu_capacity
+            available[cluster_id] = cpu_capacity
 
-        cluster_ids = sorted(
-            cluster_id_to_sort_key,
-            key=lambda c: cluster_id_to_sort_key[c],
+        # convert *available* from a dict to a sorted list
+        available = sorted(
+            available,
+            key=lambda c: available[c],
             reverse=True)
 
-        return cluster_ids
+        return dict(
+            available=available,
+            in_pool=in_pool,
+            matching=matching,
+            max_created=max_created,
+        )
 
     def _cluster_has_adequate_capacity(self, cluster_id):
         """Check if the cluster has an instance group/fleet configuration

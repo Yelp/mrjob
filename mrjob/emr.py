@@ -2374,7 +2374,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Get the ID of the cluster our job is running on, or ``None``."""
         return self._cluster_id
 
-    def _yield_clusters_to_join(self):
+    def _yield_clusters_to_join(self, available_cluster_ids):
         """Get a list of IDs of pooled clusters that this runner can join,
         sorted so that the ones with the greatest CPU capacity come first.
 
@@ -2384,9 +2384,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        cluster_ids = self._list_cluster_ids_for_pooling()
-
-        for cluster_id in cluster_ids['available']:
+        for cluster_id in available_cluster_ids:
             if not self._cluster_has_adequate_capacity(cluster_id):
                 continue
 
@@ -2623,8 +2621,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         log.info('Attempting to find an available cluster...')
         while True:
+            cluster_ids = self._list_cluster_ids_for_pooling()
+
             for cluster, when_cluster_described in (
-                    self._yield_clusters_to_join()):
+                    self._yield_clusters_to_join(cluster_ids['available'])):
                 cluster_id = cluster['Id']
                 step_concurrency_level = cluster['StepConcurrencyLevel']
 

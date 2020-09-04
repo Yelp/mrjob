@@ -1053,6 +1053,17 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    pool_jitter_seconds=dict(
+        switches=[
+            (['--pool-jitter-seconds'], dict(
+                help=('If --max-pools-in-cluster is set, before launching a'
+                      ' cluster, wait a random amount of time between 0 and'
+                      ' this many seconds and then double-check the number'
+                      ' of clusters in the pool before launching'),
+                type=int,
+            )),
+        ],
+    ),
     pool_name=dict(
         cloud_role='launch',
         switches=[

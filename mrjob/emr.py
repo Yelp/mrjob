@@ -304,6 +304,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'min_available_mb',
         'min_available_virtual_cores',
         'pool_clusters',
+        'pool_jitter_seconds',
         'pool_name',
         'pool_wait_minutes',
         'release_label',
@@ -472,6 +473,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 num_task_instances=0,
                 pool_clusters=False,
                 pool_name='default',
+                pool_jitter_seconds=60,
                 pool_wait_minutes=0,
                 region=_DEFAULT_EMR_REGION,
             )

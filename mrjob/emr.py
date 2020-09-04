@@ -22,6 +22,7 @@ import os
 import os.path
 import pipes
 import posixpath
+import random
 import re
 import time
 from collections import OrderedDict
@@ -2441,10 +2442,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         emr_client = self.make_emr_client()
         now = _boto3_now()
 
+        # you can't pass CreatedAfter=None to list_clusters()
+        list_cluster_kwargs = dict(ClusterStates=_ACTIVE_CLUSTER_STATES)
+        if created_after:
+            list_cluster_kwargs['CreatedAfter'] = created_after
+
         for cluster in _boto3_paginate(
                 'Clusters', emr_client, 'list_clusters',
-                ClusterStates=_ACTIVE_CLUSTER_STATES,
-                CreatedAfter=created_after):
+                **list_cluster_kwargs):
 
             cluster_id = cluster['Id']
 
@@ -2621,6 +2626,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         end_time = datetime.now() + timedelta(
             minutes=self._opts['pool_wait_minutes'])
 
+        max_in_pool = self._opts['max_clusters_in_pool']
+
         log.info('Attempting to find an available cluster...')
         while True:
             cluster_ids = self._list_cluster_ids_for_pooling()
@@ -2630,7 +2637,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cluster_id = cluster['Id']
                 step_concurrency_level = cluster['StepConcurrencyLevel']
 
-                log.debug('  Attempting to join cluster %s' % cluster_id)
+                log.info('  Attempting to join cluster %s' % cluster_id)
                 lock_acquired = _attempt_to_lock_cluster(
                     emr_client, cluster_id, self._job_key,
                     cluster=cluster,
@@ -2639,17 +2646,55 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 if lock_acquired:
                     return cluster_id, step_concurrency_level
 
-            # if we're out of time, give up
+            # if we haven't exhausted pool_wait_minutes, sleep and try again
             if (datetime.now() +
-                    timedelta(seconds=_POOLING_SLEEP_INTERVAL)) > end_time:
-                break
+                    timedelta(seconds=_POOLING_SLEEP_INTERVAL)) <= end_time:
 
-            log.info('No clusters available in pool %r. Checking again'
-                     ' in %d seconds...' % (
+                log.info('No clusters available in pool %r. Checking again'
+                         ' in %d seconds...' % (
                          self._opts['pool_name'],
                          int(_POOLING_SLEEP_INTERVAL)))
-            time.sleep(_POOLING_SLEEP_INTERVAL)
+                time.sleep(_POOLING_SLEEP_INTERVAL)
+                continue
 
+            # implement max_clusters_in_pool
+            if max_in_pool:
+                num_in_pool = len(cluster_ids['in_pool'])
+
+                log.info('  %d cluster%s in pool (max. is %d)' % (
+                    num_in_pool, _plural(num_in_pool), max_in_pool))
+
+                if num_in_pool < max_in_pool:
+                    jitter_seconds = random.randint(
+                        0, self._opts['pool_jitter_seconds'])
+                    log.info('  waiting %d seconds and double-checking number'
+                             ' of clusters in pool...' % jitter_seconds)
+                    time.sleep(jitter_seconds)
+
+                    new_cluster_ids = self._list_cluster_ids_for_pooling(
+                        created_after=cluster_ids['max_created'])
+
+                    new_num_in_pool = len(
+                        cluster_ids['in_pool'] | new_cluster_ids['in_pool'])
+
+                    log.info('    %d cluster%s in pool' % (
+                        num_in_pool, _plural(num_in_pool)))
+
+                    if num_in_pool < max_in_pool:
+                        # allow creating a new cluster
+                        return None, None
+
+                log.info('Checking again in %d seconds...' % (
+                    _POOLING_SLEEP_INTERVAL))
+                time.sleep(_POOLING_SLEEP_INTERVAL)
+
+                continue
+
+            # pool_wait_minutes is exhausted and max_clusters_in_pool is not
+            # set, so create a new cluster
+            return None, None
+
+        # (defensive programming, in case we break out of the loop)
         return None, None
 
     def _pool_hash_dict(self):
@@ -3276,3 +3321,11 @@ def _build_instance_group(role, instance_type, num_instances, bid_price):
         ig['BidPrice'] = str(bid_price)  # must be a string
 
     return ig
+
+
+def _plural(n):
+    """Utility for logging messages"""
+    if n == 1:
+         return ''
+    else:
+        return 's'

@@ -710,6 +710,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._add_master_node_setup_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files()
+        # make sure we can see the files we copied to S3
+        self._wait_for_s3_eventual_consistency()
 
     def _launch(self):
         """Set up files and then launch our job on EMR."""
@@ -1105,9 +1107,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         persistent -- if this is true, create the cluster with the keep_alive
             option, indicating the job will have to be manually terminated.
         """
-        # make sure we can see the files we copied to S3
-        self._wait_for_s3_eventual_consistency()
-
         log.debug('Creating Elastic MapReduce cluster')
         emr_client = self.make_emr_client()
 
@@ -2365,6 +2364,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         self._add_bootstrap_files_for_upload(persistent=True)
         self._upload_local_files()
+
+        # make sure we can see the files we copied to S3
+        self._wait_for_s3_eventual_consistency()
 
         # don't allow user to call run()
         self._ran_job = True

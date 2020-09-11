@@ -2449,11 +2449,16 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if created_after:
             list_cluster_kwargs['CreatedAfter'] = created_after
 
+        log.debug('calling list_clusters(%s)' % ', '.join(
+            '%s=%r' % (k, v)
+            for k, v in sorted(list_cluster_kwargs.items())))
+
         for cluster in _boto3_paginate(
                 'Clusters', emr_client, 'list_clusters',
                 **list_cluster_kwargs):
 
             cluster_id = cluster['Id']
+            log.debug(cluster_id)
 
             created = cluster['Status']['Timeline']['CreationDateTime']
 
@@ -2628,6 +2633,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         end_time = datetime.now() + timedelta(
             minutes=self._opts['pool_wait_minutes'])
 
+        pool_name = self._opts['pool_name']
         max_in_pool = self._opts['max_clusters_in_pool']
 
         log.info('Attempting to find an available cluster...')
@@ -2654,8 +2660,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 log.info('No clusters available in pool %r. Checking again'
                          ' in %d seconds...' % (
-                         self._opts['pool_name'],
-                         int(_POOLING_SLEEP_INTERVAL)))
+                             pool_name, int(_POOLING_SLEEP_INTERVAL)))
                 time.sleep(_POOLING_SLEEP_INTERVAL)
                 continue
 
@@ -2663,8 +2668,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if max_in_pool:
                 num_in_pool = len(cluster_ids['in_pool'])
 
-                log.info('  %d cluster%s in pool (max. is %d)' % (
-                    num_in_pool, _plural(num_in_pool), max_in_pool))
+                log.info('  %d cluster%s in pool %r (max. is %d)' % (
+                    num_in_pool, _plural(num_in_pool), pool_name, max_in_pool))
 
                 if num_in_pool < max_in_pool:
                     jitter_seconds = random.randint(

@@ -24,6 +24,7 @@ from shutil import make_archive
 
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import PoolTimeoutException
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
 from mrjob.emr import _POOLING_SLEEP_INTERVAL
 from mrjob.pool import _attempt_to_lock_cluster
@@ -2565,13 +2566,14 @@ class TestTimedOutException(Exception):
     pass
 
 
-class MaxClustersInPoolTestCase(PoolMatchingBaseTestCase):
+class FindClusterLoopTestCase(PoolMatchingBaseTestCase):
+    # test max_clusters_in_pool, pool_wait_minutes, and pool_timeout_minutes
 
-    # bail out if we "sleep" for more than this many seconds
-    MAX_TIME_SLEPT = 1000
+    # bail out if we "sleep" for more than ten minutes
+    MAX_TIME_SLEPT = 600
 
     def setUp(self):
-        super(MaxClustersInPoolTestCase, self).setUp()
+        super(FindClusterLoopTestCase, self).setUp()
 
         # mock out sleep() and now()
         #
@@ -2646,6 +2648,49 @@ class MaxClustersInPoolTestCase(PoolMatchingBaseTestCase):
             '--pool-clusters', '--max-clusters-in-pool', '2')
 
         self.assertRaises(TestTimedOutException, runner._find_cluster)
+
+    def test_pool_timeout_minutes(self):
+        # pool is full, forever
+        self.list_cluster_ids_for_pooling.return_value.update(dict(
+            in_pool={'j-INPOOL1', 'j-INPOOL2'},
+            max_created=datetime(2020, 9, 11, 12, 13),
+        ))
+
+        runner = self.make_runner(
+            '--pool-clusters', '--max-clusters-in-pool', '2',
+            '--pool-timeout-minutes', '2')
+
+        self.assertRaises(PoolTimeoutException, runner._find_cluster)
+
+        # pooling sleep interval is a little more than 30 seconds, so
+        # four times would exceed the timeout
+        self.assertEqual(self.time_slept, 3 * _POOLING_SLEEP_INTERVAL)
+
+    def test_pool_timeout_of_zero_means_dont_time_out(self):
+        self.list_cluster_ids_for_pooling.return_value.update(dict(
+            in_pool={'j-INPOOL1', 'j-INPOOL2'},
+            max_created=datetime(2020, 9, 11, 12, 13),
+        ))
+
+        runner = self.make_runner(
+            '--pool-clusters', '--max-clusters-in-pool', '2',
+            '--pool-timeout-minutes', '0')
+
+        self.assertRaises(TestTimedOutException, runner._find_cluster)
+
+    def test_pool_timeout_minutes_applies_to_jitter(self):
+        runner = self.make_runner(
+            '--pool-clusters', '--max-clusters-in-pool', '2',
+            '--pool-jitter-seconds', '250',
+            '--pool-timeout-minutes', '2')
+
+        self.assertRaises(PoolTimeoutException, runner._find_cluster)
+
+        # should attempt to wait a random number of seconds before
+        # double-checking that the pool isn't full, but would have to wait
+        # too long
+        self.randint.assert_called_once_with(0, 250)
+        self.assertEqual(self.time_slept, 0)
 
     def test_join_available_cluster_from_full_pool(self):
         self.list_cluster_ids_for_pooling.return_value.update(dict(

@@ -1076,7 +1076,9 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--pool-timeout-minutes'], dict(
                 help=("If pooling can't join or create a cluster within this"
-                      " many minutes, raise an exception")
+                      " many minutes, raise an exception. (0 means don't"
+                      " timeout"),
+                type=int,
             )),
         ],
     ),

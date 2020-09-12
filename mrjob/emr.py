@@ -246,6 +246,14 @@ class _PooledClusterSelfTerminatedException(Exception):
     pass
 
 
+if PY2:
+    # this was introduced in Python 3.3
+    TimeoutError = OSError
+
+class PoolTimeoutException(TimeoutError):
+    pass
+
+
 class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
     Invoked when you run your job with ``-r emr``.
@@ -306,8 +314,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'min_available_virtual_cores',
         'pool_clusters',
         'pool_jitter_seconds',
-        'pool_timeout_seconds',
         'pool_name',
+        'pool_timeout_minutes',
         'pool_wait_minutes',
         'release_label',
         's3_endpoint',
@@ -2631,11 +2639,23 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        end_time = datetime.now() + timedelta(
-            minutes=self._opts['pool_wait_minutes'])
-
+        start = datetime.now()
+        wait_mins = self._opts['pool_wait_minutes']
+        timeout_mins = self._opts['pool_timeout_minutes']
         pool_name = self._opts['pool_name']
         max_in_pool = self._opts['max_clusters_in_pool']
+
+        # like sleep() but also raises PoolTimeoutException if we're going to
+        # sleep beyond the timeout
+        def sleep_or_time_out(seconds):
+            if (timeout_mins and (
+                    datetime.now() + timedelta(seconds=seconds) >
+                    start + timedelta(minutes=timeout_mins))):
+                raise PoolTimeoutException(
+                    'Unable to join or create a cluster within %d minutes' %
+                    timeout_mins)
+
+            time.sleep(seconds)
 
         log.info('Attempting to find an available cluster...')
         while True:
@@ -2656,13 +2676,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     return cluster_id, step_concurrency_level
 
             # if we haven't exhausted pool_wait_minutes, sleep and try again
-            if (datetime.now() +
-                    timedelta(seconds=_POOLING_SLEEP_INTERVAL)) <= end_time:
-
+            if (datetime.now() + timedelta(seconds=_POOLING_SLEEP_INTERVAL) <=
+                    start + timedelta(minutes=wait_mins)):
                 log.info('No clusters available in pool %r. Checking again'
                          ' in %d seconds...' % (
                              pool_name, int(_POOLING_SLEEP_INTERVAL)))
-                time.sleep(_POOLING_SLEEP_INTERVAL)
+                sleep_or_time_out(_POOLING_SLEEP_INTERVAL)
                 continue
 
             # implement max_clusters_in_pool
@@ -2677,7 +2696,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                         0, self._opts['pool_jitter_seconds'])
                     log.info('  waiting %d seconds and double-checking number'
                              ' of clusters in pool...' % jitter_seconds)
-                    time.sleep(jitter_seconds)
+                    sleep_or_time_out(jitter_seconds)
 
                     new_cluster_ids = self._list_cluster_ids_for_pooling(
                         created_after=cluster_ids['max_created'])
@@ -2694,7 +2713,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 log.info('Checking again in %d seconds...' % (
                     _POOLING_SLEEP_INTERVAL))
-                time.sleep(_POOLING_SLEEP_INTERVAL)
+                sleep_or_time_out(_POOLING_SLEEP_INTERVAL)
 
                 continue
 

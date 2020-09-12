@@ -17,6 +17,7 @@
 """Tests of EMRJobRunner's cluster pooling."""
 import json
 import os
+from datetime import datetime
 from datetime import timedelta
 from os.path import join
 from shutil import make_archive
@@ -24,6 +25,7 @@ from shutil import make_archive
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
+from mrjob.emr import _POOLING_SLEEP_INTERVAL
 from mrjob.pool import _attempt_to_lock_cluster
 from mrjob.pool import _attempt_to_unlock_cluster
 from mrjob.pool import _pool_name
@@ -2557,3 +2559,154 @@ class ClusterLockingTestCase(PoolMatchingBaseTestCase):
             self.assertTrue(self._attempt_to_lock_cluster.called)
             # unlocked immediately after adding steps
             self.assertTrue(self._attempt_to_unlock_cluster.called)
+
+
+class TestTimedOutException(Exception):
+    pass
+
+
+class MaxClustersInPoolTestCase(PoolMatchingBaseTestCase):
+
+    # bail out if we "sleep" for more than this many seconds
+    MAX_TIME_SLEPT = 1000
+
+    def setUp(self):
+        super(MaxClustersInPoolTestCase, self).setUp()
+
+        # mock out sleep() and now()
+        #
+        # also break the test out of infinite loops
+        self.time_slept = 0
+
+        def mock_sleep(time):
+            self.time_slept += time
+            if self.time_slept >= self.MAX_TIME_SLEPT:
+                raise TestTimedOutException(
+                    'Test slept for more than %d seconds' %
+                    self.MAX_TIME_SLEPT)
+
+        self.sleep = self.start(patch('time.sleep', side_effect=mock_sleep))
+
+        now_func = datetime.now
+
+        def mock_now():
+            return now_func() + timedelta(seconds=self.time_slept)
+
+        self.datetime = self.start(patch('mrjob.emr.datetime'))
+        self.datetime.now = mock_now
+
+        # by default, treat all available cluster IDs as valid
+        def mock_yield_clusters_to_join(available_cluster_ids):
+            for cluster_id in available_cluster_ids:
+                mock_cluster = dict(
+                    Id=cluster_id,
+                    StepConcurrencyLevel=1)
+
+                yield (mock_cluster, mock_now())
+
+        self.yield_clusters_to_join = self.start(patch(
+            'mrjob.emr.EMRJobRunner._yield_clusters_to_join',
+            side_effect=mock_yield_clusters_to_join))
+
+        # cluster locking always succeeds
+        self.attempt_to_lock_cluster = self.start(patch(
+            'mrjob.emr._attempt_to_lock_cluster', return_value=True))
+
+        # change this to make the tests work differently
+        self.list_cluster_ids_for_pooling = self.start(patch(
+            'mrjob.emr.EMRJobRunner._list_cluster_ids_for_pooling',
+            return_value=dict(
+                available=[],
+                in_pool=set(),
+                matching=set(),
+                max_created=None,
+            )
+        ))
+
+        # make randint repeatable
+        def mock_randint(a, b):
+            return (a + b) // 2
+
+        self.randint = self.start(patch(
+            'mrjob.emr.randint', side_effect=mock_randint))
+
+    def test_create_own_cluster_if_none_available(self):
+        runner = self.make_runner(
+            '--pool-clusters', '--max-clusters-in-pool', '2')
+
+        self.assertEqual(runner._find_cluster()[0], None)
+
+    def test_wait_forever_if_pool_full(self):
+        self.list_cluster_ids_for_pooling.return_value.update(dict(
+            in_pool={'j-INPOOL1', 'j-INPOOL2'},
+            max_created=datetime(2020, 9, 11, 12, 13),
+        ))
+
+        runner = self.make_runner(
+            '--pool-clusters', '--max-clusters-in-pool', '2')
+
+        self.assertRaises(TestTimedOutException, runner._find_cluster)
+
+    def test_join_available_cluster_from_full_pool(self):
+        self.list_cluster_ids_for_pooling.return_value.update(dict(
+            available=['j-INPOOL2'],
+            matching={'j-INPOOL2'},
+            in_pool={'j-INPOOL1', 'j-INPOOL2'},
+            max_created=datetime(2020, 9, 11, 12, 13),
+        ))
+
+        runner = self.make_runner(
+            '--pool-clusters', '--max-clusters-in-pool', '2')
+
+        self.assertEqual(runner._find_cluster()[0], 'j-INPOOL2')
+
+    def test_retry_with_random_jitter(self):
+        self.list_cluster_ids_for_pooling.side_effect = [
+            dict(
+                available=[],
+                in_pool={'j-INPOOL1'},
+                matching={'j-INPOOL1'},
+                max_created=datetime(2020, 9, 11, 12, 13),
+            ),
+            # when we check again, another cluster has started
+            dict(
+                available=[],
+                in_pool={'j-INPOOL1', 'j-INPOOL2'},
+                matching={'j-INPOOL2'},
+                max_created=datetime(2020, 9, 11, 12, 13, 14),
+            ),
+            # and then the first one becomes available to join
+            dict(
+                available=['j-INPOOL1'],
+                in_pool={'j-INPOOL1', 'j-INPOOL2'},
+                matching={'j-INPOOL1', 'j-INPOOL2'},
+                max_created=datetime(2020, 9, 11, 12, 13, 14),
+            ),
+        ]
+
+        runner = self.make_runner(
+            '--pool-clusters', '--max-clusters-in-pool', '2')
+
+        self.assertEqual(runner._find_cluster()[0], 'j-INPOOL1')
+
+        self.randint.assert_called_once_with(0, 60)  # default jitter
+
+        self.list_cluster_ids_for_pooling.assert_any_call(
+            created_after=datetime(2020, 9, 11, 12, 13))
+
+        self.assertEqual(self.time_slept,
+                         _POOLING_SLEEP_INTERVAL + self.randint(0, 60))
+
+    def test_pool_jitter_seconds_option(self):
+        runner = self.make_runner(
+            '--pool-clusters', '--max-clusters-in-pool', '2',
+            '--pool-jitter-seconds', '120')
+
+        self.assertEqual(runner._find_cluster()[0], None)
+
+        self.randint.assert_called_once_with(0, 120)
+
+        self.list_cluster_ids_for_pooling.assert_any_call(
+            created_after=None)
+
+        self.assertEqual(self.time_slept, self.randint(0, 120))

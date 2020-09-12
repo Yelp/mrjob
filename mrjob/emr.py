@@ -22,7 +22,6 @@ import os
 import os.path
 import pipes
 import posixpath
-import random
 import re
 import time
 from collections import OrderedDict
@@ -30,6 +29,7 @@ from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
 from math import ceil
+from random import randint
 
 try:
     import botocore.client
@@ -2672,7 +2672,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     num_in_pool, _plural(num_in_pool), pool_name, max_in_pool))
 
                 if num_in_pool < max_in_pool:
-                    jitter_seconds = random.randint(
+                    jitter_seconds = randint(
                         0, self._opts['pool_jitter_seconds'])
                     log.info('  waiting %d seconds and double-checking number'
                              ' of clusters in pool...' % jitter_seconds)
@@ -2685,9 +2685,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                         cluster_ids['in_pool'] | new_cluster_ids['in_pool'])
 
                     log.info('    %d cluster%s in pool' % (
-                        num_in_pool, _plural(num_in_pool)))
+                        new_num_in_pool, _plural(new_num_in_pool)))
 
-                    if num_in_pool < max_in_pool:
+                    if new_num_in_pool < max_in_pool:
                         # allow creating a new cluster
                         return None, None
 

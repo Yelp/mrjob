@@ -1072,6 +1072,14 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    pool_timeout_minutes=dict(
+        switches=[
+            (['--pool-timeout-minutes'], dict(
+                help=("If pooling can't join or create a cluster within this"
+                      " many minutes, raise an exception")
+            )),
+        ],
+    ),
     pool_wait_minutes=dict(
         switches=[
             (['--pool-wait-minutes'], dict(

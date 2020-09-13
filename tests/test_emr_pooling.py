@@ -2566,14 +2566,14 @@ class TestTimedOutException(Exception):
     pass
 
 
-class FindClusterLoopTestCase(PoolMatchingBaseTestCase):
+class FindClusterTestCase(MockBoto3TestCase):
     # test max_clusters_in_pool, pool_wait_minutes, and pool_timeout_minutes
 
     # bail out if we "sleep" for more than ten minutes
     MAX_TIME_SLEPT = 600
 
     def setUp(self):
-        super(FindClusterLoopTestCase, self).setUp()
+        super(FindClusterTestCase, self).setUp()
 
         # mock out sleep() and now()
         #
@@ -2705,7 +2705,7 @@ class FindClusterLoopTestCase(PoolMatchingBaseTestCase):
 
         self.assertEqual(runner._find_cluster()[0], 'j-INPOOL2')
 
-    def test_retry_with_random_jitter(self):
+    def test_double_check_with_random_jitter(self):
         self.list_cluster_ids_for_pooling.side_effect = [
             dict(
                 available=[],
@@ -2755,3 +2755,76 @@ class FindClusterLoopTestCase(PoolMatchingBaseTestCase):
             created_after=None)
 
         self.assertEqual(self.time_slept, self.randint(0, 120))
+
+    def test_pool_wait_minutes(self):
+        self.list_cluster_ids_for_pooling.return_value.update(dict(
+            available=[],
+            matching={'j-NICE'},
+            in_pool={'j-NICE'},
+            max_created=datetime(2020, 9, 11, 12, 13),
+        ))
+
+        runner = self.make_runner(
+            '--pool-clusters', '--pool-wait-minutes', '5')
+
+        self.assertEqual(runner._find_cluster()[0], None)
+
+        # should wait a little over 5 minutes
+        self.assertGreater(self.time_slept, 5 * 60)
+        self.assertLess(self.time_slept, 6 * 60)
+
+        # should not use jitter to create new cluster, since we just timed out
+        self.assertFalse(self.randint.called)
+
+    def test_pool_wait_minutes_with_max_clusters_in_pool(self):
+        self.list_cluster_ids_for_pooling.return_value.update(dict(
+            available=[],
+            matching={'j-NICE'},
+            in_pool={'j-NICE'},
+            max_created=datetime(2020, 9, 11, 12, 13),
+        ))
+
+        runner = self.make_runner(
+            '--pool-clusters', '--pool-wait-minutes', '5',
+            '--max-clusters-in-pool', '2')
+
+        self.assertEqual(runner._find_cluster()[0], None)
+
+        # should use jitter to create new cluster, since we just timed out
+        self.randint.assert_called_once_with(0, 60)
+
+        # should wait a little over 5 minutes
+        self.assertGreater(self.time_slept, 5 * 60 + self.randint(0, 60))
+        self.assertLess(self.time_slept, 6 * 60 + self.randint(0, 60))
+
+    def test_pool_wait_minutes_with_no_matching_clusters(self):
+        self.list_cluster_ids_for_pooling.return_value.update(dict(
+            available=[],
+            matching=set(),
+            in_pool={'j-NOPE'},
+            max_created=datetime(2020, 9, 11, 12, 13),
+        ))
+
+        runner = self.make_runner(
+            '--pool-clusters', '--pool-wait-minutes', '5')
+
+        self.assertEqual(runner._find_cluster()[0], None)
+
+        # should not wait at all except for jitter
+        self.randint.assert_called_once_with(0, 60)
+
+        self.assertEqual(self.time_slept, self.randint(0, 60))
+
+    def test_no_matching_clusters_but_pool_full(self):
+        self.list_cluster_ids_for_pooling.return_value.update(dict(
+            available=[],
+            matching=set(),
+            in_pool={'j-NOPE1', 'j-NOPE2'},
+            max_created=datetime(2020, 9, 11, 12, 13),
+        ))
+
+        runner = self.make_runner(
+            '--pool-clusters', '--pool-wait-minutes', '5',
+            '--max-clusters-in-pool', '2')
+
+        self.assertRaises(TestTimedOutException, runner._find_cluster)

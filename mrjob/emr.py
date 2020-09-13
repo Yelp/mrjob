@@ -2676,8 +2676,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     return cluster_id, step_concurrency_level
 
             keep_waiting = (
-                datetime.now() + timedelta(seconds=_POOLING_SLEEP_INTERVAL) <=
-                start + timedelta(minutes=wait_mins))
+                datetime.now() < start + timedelta(minutes=wait_mins))
 
             # if we haven't exhausted pool_wait_minutes, and there are
             # clusters we might eventually join, sleep and try again
@@ -2721,7 +2720,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     new_num_in_pool, _plural(new_num_in_pool)))
 
                 if ((not max_in_pool or new_num_in_pool < max_in_pool) and
-                        (not keep_waiting or new_cluster_ids['matching'])):
+                        (not keep_waiting or not new_cluster_ids['matching'])):
 
                     # allow creating a new cluster
                     return None, None

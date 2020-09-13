@@ -2675,10 +2675,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 if lock_acquired:
                     return cluster_id, step_concurrency_level
 
-            # if we haven't exhausted pool_wait_minutes, sleep and try again
-            if (datetime.now() + timedelta(seconds=_POOLING_SLEEP_INTERVAL) <=
-                    start + timedelta(minutes=wait_mins)):
-                log.info('No clusters available in pool %r. Checking again'
+            keep_waiting = (
+                datetime.now() + timedelta(seconds=_POOLING_SLEEP_INTERVAL) <=
+                start + timedelta(minutes=wait_mins))
+
+            # if we haven't exhausted pool_wait_minutes, and there are
+            # clusters we might eventually join, sleep and try again
+            if keep_waiting and cluster_ids['matching']:
+                log.info('No clusters in pool %r are available. Checking again'
                          ' in %d seconds...' % (
                              pool_name, int(_POOLING_SLEEP_INTERVAL)))
                 sleep_or_time_out(_POOLING_SLEEP_INTERVAL)
@@ -2691,25 +2695,36 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 log.info('  %d cluster%s in pool %r (max. is %d)' % (
                     num_in_pool, _plural(num_in_pool), pool_name, max_in_pool))
 
-                if num_in_pool < max_in_pool:
-                    jitter_seconds = randint(
-                        0, self._opts['pool_jitter_seconds'])
-                    log.info('  waiting %d seconds and double-checking number'
-                             ' of clusters in pool...' % jitter_seconds)
-                    sleep_or_time_out(jitter_seconds)
+                if num_in_pool >= max_in_pool:
+                    log.info('Checking again in %d seconds...' % (
+                        _POOLING_SLEEP_INTERVAL))
+                    sleep_or_time_out(_POOLING_SLEEP_INTERVAL)
+                    continue
 
-                    new_cluster_ids = self._list_cluster_ids_for_pooling(
-                        created_after=cluster_ids['max_created'])
+            # to avoid race conditions, double-check the clusters in the pool
+            # if we need to satisfy max_clusters_in_pool or are trying to
+            # bypass pool_wait_minutes
+            if max_in_pool or (keep_waiting and not cluster_ids['matching']):
+                jitter_seconds = randint(0, self._opts['pool_jitter_seconds'])
 
-                    new_num_in_pool = len(
-                        cluster_ids['in_pool'] | new_cluster_ids['in_pool'])
+                log.info('  waiting %d seconds and double-checking for '
+                          'newly created clusters...' % jitter_seconds)
+                sleep_or_time_out(jitter_seconds)
 
-                    log.info('    %d cluster%s in pool' % (
-                        new_num_in_pool, _plural(new_num_in_pool)))
+                new_cluster_ids = self._list_cluster_ids_for_pooling(
+                    created_after=cluster_ids['max_created'])
 
-                    if new_num_in_pool < max_in_pool:
-                        # allow creating a new cluster
-                        return None, None
+                new_num_in_pool = len(
+                    cluster_ids['in_pool'] | new_cluster_ids['in_pool'])
+
+                log.info('    %d cluster%s in pool' % (
+                    new_num_in_pool, _plural(new_num_in_pool)))
+
+                if ((not max_in_pool or new_num_in_pool < max_in_pool) and
+                        (not keep_waiting or new_cluster_ids['matching'])):
+
+                    # allow creating a new cluster
+                    return None, None
 
                 log.info('Checking again in %d seconds...' % (
                     _POOLING_SLEEP_INTERVAL))

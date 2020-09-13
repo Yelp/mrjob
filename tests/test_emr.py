@@ -2073,6 +2073,7 @@ class CleanupClusterTestCase(MockBoto3TestCase):
 
 
 class JobWaitTestCase(MockBoto3TestCase):
+    # TODO: merge this into FindClusterTestCase in test_emr_pooling.py
 
     # A list of job ids that hold booleans of whether or not the job can
     # acquire a lock. Helps simulate mrjob.emr._attempt_to_acquire_lock.
@@ -2110,6 +2111,14 @@ class JobWaitTestCase(MockBoto3TestCase):
         def mock_now():
             return now_func() + timedelta(seconds=self.time_slept)
 
+        def mock_list_cluster_ids_for_pooling(created_after=None):
+            return dict(
+                available=list(self.mock_cluster_ids),
+                in_pool=set(self.mock_cluster_ids),
+                matching=set(self.mock_cluster_ids),
+                max_created=None,
+            )
+
         self.start(patch.object(EMRJobRunner, '_yield_clusters_to_join',
                                 side_effect=mock_yield_clusters_to_join))
         self.start(patch('mrjob.emr._attempt_to_lock_cluster',
@@ -2119,6 +2128,10 @@ class JobWaitTestCase(MockBoto3TestCase):
                                            side_effect=mock_sleep))
         mock_datetime = self.start(patch('mrjob.emr.datetime'))
         mock_datetime.now = mock_now
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._list_cluster_ids_for_pooling',
+            side_effect=mock_list_cluster_ids_for_pooling))
 
     def tearDown(self):
         super(JobWaitTestCase, self).tearDown()
@@ -2166,7 +2179,7 @@ class JobWaitTestCase(MockBoto3TestCase):
         cluster_id, _ = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
-        self.assertEqual(self.mock_sleep.call_count, 4)
+        self.assertEqual(self.mock_sleep.call_count, 5)
 
     def test_try_all_clusters_before_waiting(self):
         # regression test for #2164

@@ -21,6 +21,7 @@ from datetime import datetime
 from datetime import timedelta
 from os.path import join
 from shutil import make_archive
+from time import sleep
 
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
@@ -2828,3 +2829,276 @@ class FindClusterTestCase(MockBoto3TestCase):
             '--max-clusters-in-pool', '2')
 
         self.assertRaises(TestTimedOutException, runner._find_cluster)
+
+
+class ListClusterIdsForPoolingTestCase(PoolMatchingBaseTestCase):
+    # test this method separately, since we mocked it out in the above test
+
+    def test_empty(self):
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],
+                in_pool=set(),
+                matching=set(),
+                max_created=None,
+            )
+        )
+
+    def test_new_cluster(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        self.assertEqual(cluster['Status']['State'], 'STARTING')
+
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],  # because still STARTING
+                in_pool={cluster_id},
+                matching={cluster_id},
+                max_created=cluster['Status']['Timeline']['CreationDateTime'],
+            )
+        )
+
+    def test_bootstrapping_cluster(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        cluster['Status']['State'] = 'BOOTSTRAPPING'
+
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],
+                in_pool={cluster_id},
+                matching={cluster_id},
+                max_created=cluster['Status']['Timeline']['CreationDateTime'],
+            )
+        )
+
+    def test_waiting_cluster(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        cluster['Status']['State'] = 'WAITING'
+
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[cluster_id],
+                in_pool={cluster_id},
+                matching={cluster_id},
+                max_created=cluster['Status']['Timeline']['CreationDateTime'],
+            )
+        )
+
+    def test_running_cluster(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        cluster['Status']['State'] = 'RUNNING'
+
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],
+                in_pool={cluster_id},
+                matching={cluster_id},
+                max_created=cluster['Status']['Timeline']['CreationDateTime'],
+            )
+        )
+
+    def test_running_cluster_with_concurrency_allowed(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        cluster['Status']['State'] = 'RUNNING'
+
+        runner = self.make_runner(
+            '--pool-clusters', '--max-concurrent-steps', '2')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[cluster_id],
+                in_pool={cluster_id},
+                matching={cluster_id},
+                max_created=cluster['Status']['Timeline']['CreationDateTime'],
+            )
+        )
+
+    def test_terminating_cluster(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        cluster['Status']['State'] = 'TERMINATING'
+
+        runner = self.make_runner('--pool-clusters')
+
+        # TERMINATING clusters aren't queried
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],
+                in_pool=set(),
+                matching=set(),
+                max_created=None,
+            )
+        )
+
+    def test_terminated_cluster(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        cluster['Status']['State'] = 'TERMINATED'
+
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],
+                in_pool=set(),
+                matching=set(),
+                max_created=None,
+            )
+        )
+
+    def test_terminated_with_errors_cluster(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        cluster['Status']['State'] = 'TERMINATED_WITH_ERRORS'
+
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],
+                in_pool=set(),
+                matching=set(),
+                max_created=None,
+            )
+        )
+
+    def test_non_matching_cluster(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters', '--bootstrap', 'true').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        cluster['Status']['State'] = 'WAITING'
+
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],
+                in_pool={cluster_id},
+                matching=set(),
+                max_created=cluster['Status']['Timeline']['CreationDateTime'],
+            )
+        )
+
+    def test_cluster_in_other_pool(self):
+        cluster_id = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        cluster = self.mock_emr_clusters[cluster_id]
+        cluster['Status']['State'] = 'WAITING'
+
+        runner = self.make_runner('--pool-clusters', '--pool-name', 'mine')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],
+                in_pool=set(),
+                matching=set(),
+                max_created=cluster['Status']['Timeline']['CreationDateTime'],
+            )
+        )
+
+    def test_max_created(self):
+        # max_created is the maximum creation time for clusters we list,
+        # even if they're not in the pool
+
+        cluster_id_1 = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+        cluster_1 = self.mock_emr_clusters[cluster_id_1]
+
+        sleep(0.0001)
+
+        cluster_id_2 = self.make_runner(
+            '--pool-clusters', '--pool-name', 'mine').make_persistent_cluster()
+        cluster_2 = self.mock_emr_clusters[cluster_id_2]
+
+        sleep(0.0001)
+
+        cluster_id_3 = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+
+        # TERMINATING clusters aren't even listed
+        cluster_3 = self.mock_emr_clusters[cluster_id_3]
+        cluster_3['Status']['State'] = 'TERMINATING'
+
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(),
+            dict(
+                available=[],
+                in_pool={cluster_id_1},
+                matching={cluster_id_1},
+                max_created=cluster_2[
+                    'Status']['Timeline']['CreationDateTime'],
+            )
+        )
+
+    def test_created_after(self):
+        cluster_id_1 = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+        cluster_1 = self.mock_emr_clusters[cluster_id_1]
+
+        sleep(0.0001)
+
+        cluster_id_2 = self.make_runner(
+            '--pool-clusters').make_persistent_cluster()
+        cluster_2 = self.mock_emr_clusters[cluster_id_2]
+
+        created_after = (
+            cluster_1['Status']['Timeline']['CreationDateTime'] +
+            timedelta(microseconds=500))
+
+        runner = self.make_runner('--pool-clusters')
+
+        self.assertEqual(
+            runner._list_cluster_ids_for_pooling(created_after=created_after),
+            dict(
+                available=[],
+                in_pool={cluster_id_2},
+                matching={cluster_id_2},
+                max_created=cluster_2[
+                    'Status']['Timeline']['CreationDateTime'],
+            )
+        )

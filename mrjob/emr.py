@@ -29,6 +29,7 @@ from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
 from math import ceil
+from random import randint
 
 try:
     import botocore.client
@@ -86,8 +87,10 @@ from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.pool import _attempt_to_lock_cluster
 from mrjob.pool import _attempt_to_unlock_cluster
+from mrjob.pool import _cluster_name_suffix
 from mrjob.pool import _instance_fleets_satisfy
 from mrjob.pool import _instance_groups_satisfy
+from mrjob.pool import _parse_cluster_name_suffix
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import to_unicode
@@ -229,9 +232,25 @@ _YARN_RESOURCE_MANAGER_PORT = 8088
 # base path for YARN resource manager
 _YRM_BASE_PATH = '/ws/v1/cluster'
 
+# all the cluster states other than terminating/terminated. We need this list
+# because the ListClusters call can't filter out unwanted cluster states;
+# it can only accept a whitelist of desired ones
+#
+# valid states are here:
+# https://docs.aws.amazon.com/emr/latest/APIReference/API_ListClusters.html
+_ACTIVE_CLUSTER_STATES = ['STARTING', 'BOOTSTRAPPING', 'RUNNING', 'WAITING']
+
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
+    pass
+
+
+if PY2:
+    # this was introduced in Python 3.3
+    TimeoutError = OSError
+
+class PoolTimeoutException(TimeoutError):
     pass
 
 
@@ -289,11 +308,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
+        'max_clusters_in_pool',
         'max_concurrent_steps',
         'min_available_mb',
         'min_available_virtual_cores',
         'pool_clusters',
+        'pool_jitter_seconds',
         'pool_name',
+        'pool_timeout_minutes',
         'pool_wait_minutes',
         'release_label',
         's3_endpoint',
@@ -461,6 +483,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 num_task_instances=0,
                 pool_clusters=False,
                 pool_name='default',
+                pool_jitter_seconds=60,
                 pool_wait_minutes=0,
                 region=_DEFAULT_EMR_REGION,
             )
@@ -696,6 +719,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._add_master_node_setup_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files()
+        # make sure we can see the files we copied to S3
+        self._wait_for_s3_eventual_consistency()
 
     def _launch(self):
         """Set up files and then launch our job on EMR."""
@@ -1091,9 +1116,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         persistent -- if this is true, create the cluster with the keep_alive
             option, indicating the job will have to be manually terminated.
         """
-        # make sure we can see the files we copied to S3
-        self._wait_for_s3_eventual_consistency()
-
         log.debug('Creating Elastic MapReduce cluster')
         emr_client = self.make_emr_client()
 
@@ -2352,6 +2374,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._add_bootstrap_files_for_upload(persistent=True)
         self._upload_local_files()
 
+        # make sure we can see the files we copied to S3
+        self._wait_for_s3_eventual_consistency()
+
         # don't allow user to call run()
         self._ran_job = True
 
@@ -2363,7 +2388,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Get the ID of the cluster our job is running on, or ``None``."""
         return self._cluster_id
 
-    def _yield_clusters_to_join(self):
+    def _yield_clusters_to_join(self, available_cluster_ids):
         """Get a list of IDs of pooled clusters that this runner can join,
         sorted so that the ones with the greatest CPU capacity come first.
 
@@ -2373,9 +2398,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        # check cluster summaries (ListClusters)
-        for cluster_id in self._available_matching_clusters():
-            # check instance group/fleet setup (ListInstanceGroups/Fleets)
+        for cluster_id in available_cluster_ids:
             if not self._cluster_has_adequate_capacity(cluster_id):
                 continue
 
@@ -2392,39 +2415,78 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
             yield (cluster, when_cluster_described)
 
-    def _available_matching_clusters(self):
-        """Returns a list of IDs of clusters who are in the ``WAITING`` state
-        (or ``RUNNING``, if we allow concurrency), and whose name suffix
-        (cluster pool name and hash) match the one our job needs.
+    def _list_cluster_ids_for_pooling(self, created_after=None):
+        """Call ListClusters, and collect cluster IDs relevant to pooling.
 
-        Sort IDs in descending order by approximate CPU capacity, based
-        on ``NormalizedInstanceHours``.
+        Optionally, only list clusters created after *created_after*.
 
-        The only API call this method makes is ``ListClusters``.
+        Returns a dictionary with the following keys:
+
+        available: a list of IDs of clusters that we could join, based on their
+                   state and name suffix (pool name and hash, mrjob version).
+                   Sorted so that the cluster with the most CPU (based on
+                   NormalizedInstanceHours) goes first
+        matching: a set of IDs of clusters that have the right name suffix but
+                  may or may not be in the right state to join (a superset
+                  of *available*)
+        in_pool: a set of IDs of clusters that are in the pool we want to join,
+                 regardless of their state or pool hash (a superset of
+                 *matching*)
+        max_created: the latest creation timestamp for *any* cluster listed
+                     (so we can call this again to get stats on newly created
+                     clusters only)
         """
-        emr_client = self.make_emr_client()
+        # a map from cluster_id to cpu_capacity
+        available = {}
+        matching = set()
+        in_pool = set()
+        max_created = None
 
-        suffix = self._cluster_name_pooling_suffix()
-
-        # tuples of (cluster_summary, cpu_capacity)
-        cluster_id_to_sort_key = {}
-
-        now = _boto3_now()
+        name_to_match = self._opts['pool_name']
+        suffix_to_match = self._cluster_name_pooling_suffix()
 
         if self._opts['max_concurrent_steps'] > 1:
-            cluster_states = ['RUNNING', 'WAITING']
+            states_to_match = {'RUNNING', 'WAITING'}
         else:
-            cluster_states = ['WAITING']
+            states_to_match = {'WAITING'}
+
+        emr_client = self.make_emr_client()
+        now = _boto3_now()
+
+        # you can't pass CreatedAfter=None to list_clusters()
+        list_cluster_kwargs = dict(ClusterStates=_ACTIVE_CLUSTER_STATES)
+        if created_after:
+            list_cluster_kwargs['CreatedAfter'] = created_after
+
+        log.debug('calling list_clusters(%s)' % ', '.join(
+            '%s=%r' % (k, v)
+            for k, v in sorted(list_cluster_kwargs.items())))
 
         for cluster in _boto3_paginate(
                 'Clusters', emr_client, 'list_clusters',
-                ClusterStates=cluster_states):
+                **list_cluster_kwargs):
 
             cluster_id = cluster['Id']
+            log.debug(cluster_id)
 
-            if not cluster['Name'].endswith(suffix):
-                log.debug('  cluster %s: wrong cluster name suffix'
-                          % cluster_id)
+            created = cluster['Status']['Timeline']['CreationDateTime']
+
+            if max_created is None or created > max_created:
+                max_created = created
+
+            name = _parse_cluster_name_suffix(cluster['Name']).get('pool_name')
+
+            if name != name_to_match:
+                continue
+
+            in_pool.add(cluster_id)
+
+            if not cluster['Name'].endswith(suffix_to_match):
+                continue
+
+            matching.add(cluster_id)
+
+            if cluster['Status']['State'] not in states_to_match:
                 continue
 
             when_ready = cluster['Status']['Timeline'].get('ReadyDateTime')
@@ -2438,14 +2500,20 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 # in the WAITING state
                 cpu_capacity = 0
 
-            cluster_id_to_sort_key[cluster_id] = cpu_capacity
+            available[cluster_id] = cpu_capacity
 
-        cluster_ids = sorted(
-            cluster_id_to_sort_key,
-            key=lambda c: cluster_id_to_sort_key[c],
+        # convert *available* from a dict to a sorted list
+        available = sorted(
+            available,
+            key=lambda c: available[c],
             reverse=True)
 
-        return cluster_ids
+        return dict(
+            available=available,
+            in_pool=in_pool,
+            matching=matching,
+            max_created=max_created,
+        )
 
     def _cluster_has_adequate_capacity(self, cluster_id):
         """Check if the cluster has an instance group/fleet configuration
@@ -2571,17 +2639,34 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        end_time = datetime.now() + timedelta(
-            minutes=self._opts['pool_wait_minutes'])
+        start = datetime.now()
+        wait_mins = self._opts['pool_wait_minutes']
+        timeout_mins = self._opts['pool_timeout_minutes']
+        pool_name = self._opts['pool_name']
+        max_in_pool = self._opts['max_clusters_in_pool']
+
+        # like sleep() but also raises PoolTimeoutException if we're going to
+        # sleep beyond the timeout
+        def sleep_or_time_out(seconds):
+            if (timeout_mins and (
+                    datetime.now() + timedelta(seconds=seconds) >
+                    start + timedelta(minutes=timeout_mins))):
+                raise PoolTimeoutException(
+                    'Unable to join or create a cluster within %d minutes' %
+                    timeout_mins)
+
+            time.sleep(seconds)
 
         log.info('Attempting to find an available cluster...')
         while True:
+            cluster_ids = self._list_cluster_ids_for_pooling()
+
             for cluster, when_cluster_described in (
-                    self._yield_clusters_to_join()):
+                    self._yield_clusters_to_join(cluster_ids['available'])):
                 cluster_id = cluster['Id']
                 step_concurrency_level = cluster['StepConcurrencyLevel']
 
-                log.debug('  Attempting to join cluster %s' % cluster_id)
+                log.info('  Attempting to join cluster %s' % cluster_id)
                 lock_acquired = _attempt_to_lock_cluster(
                     emr_client, cluster_id, self._job_key,
                     cluster=cluster,
@@ -2590,17 +2675,67 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 if lock_acquired:
                     return cluster_id, step_concurrency_level
 
-            # if we're out of time, give up
-            if (datetime.now() +
-                    timedelta(seconds=_POOLING_SLEEP_INTERVAL)) > end_time:
-                break
+            keep_waiting = (
+                datetime.now() < start + timedelta(minutes=wait_mins))
 
-            log.info('No clusters available in pool %r. Checking again'
-                     ' in %d seconds...' % (
-                         self._opts['pool_name'],
-                         int(_POOLING_SLEEP_INTERVAL)))
-            time.sleep(_POOLING_SLEEP_INTERVAL)
+            # if we haven't exhausted pool_wait_minutes, and there are
+            # clusters we might eventually join, sleep and try again
+            if keep_waiting and cluster_ids['matching']:
+                log.info('No clusters in pool %r are available. Checking again'
+                         ' in %d seconds...' % (
+                             pool_name, int(_POOLING_SLEEP_INTERVAL)))
+                sleep_or_time_out(_POOLING_SLEEP_INTERVAL)
+                continue
 
+            # implement max_clusters_in_pool
+            if max_in_pool:
+                num_in_pool = len(cluster_ids['in_pool'])
+
+                log.info('  %d cluster%s in pool %r (max. is %d)' % (
+                    num_in_pool, _plural(num_in_pool), pool_name, max_in_pool))
+
+                if num_in_pool >= max_in_pool:
+                    log.info('Checking again in %d seconds...' % (
+                        _POOLING_SLEEP_INTERVAL))
+                    sleep_or_time_out(_POOLING_SLEEP_INTERVAL)
+                    continue
+
+            # to avoid race conditions, double-check the clusters in the pool
+            # if we need to satisfy max_clusters_in_pool or are trying to
+            # bypass pool_wait_minutes
+            if max_in_pool or (keep_waiting and not cluster_ids['matching']):
+                jitter_seconds = randint(0, self._opts['pool_jitter_seconds'])
+
+                log.info('  waiting %d seconds and double-checking for '
+                          'newly created clusters...' % jitter_seconds)
+                sleep_or_time_out(jitter_seconds)
+
+                new_cluster_ids = self._list_cluster_ids_for_pooling(
+                    created_after=cluster_ids['max_created'])
+
+                new_num_in_pool = len(
+                    cluster_ids['in_pool'] | new_cluster_ids['in_pool'])
+
+                log.info('    %d cluster%s in pool' % (
+                    new_num_in_pool, _plural(new_num_in_pool)))
+
+                if ((not max_in_pool or new_num_in_pool < max_in_pool) and
+                        (not keep_waiting or not new_cluster_ids['matching'])):
+
+                    # allow creating a new cluster
+                    return None, None
+
+                log.info('Checking again in %d seconds...' % (
+                    _POOLING_SLEEP_INTERVAL))
+                sleep_or_time_out(_POOLING_SLEEP_INTERVAL)
+
+                continue
+
+            # pool_wait_minutes is exhausted and max_clusters_in_pool is not
+            # set, so create a new cluster
+            return None, None
+
+        # (defensive programming, in case we break out of the loop)
         return None, None
 
     def _pool_hash_dict(self):
@@ -2684,14 +2819,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Extra info added to the cluster name, for pooling."""
         if not self._opts['pool_clusters']:
             return ''
-
-        fields = [
-            mrjob.__version__,
-            self._opts['pool_name'],
-            self._pool_hash(),
-        ]
-
-        return ' pooling:%s' % ','.join(fields)
+        else:
+            return _cluster_name_suffix(
+                self._pool_hash(), self._opts['pool_name'])
 
     ### EMR-specific Stuff ###
 
@@ -3232,3 +3362,11 @@ def _build_instance_group(role, instance_type, num_instances, bid_price):
         ig['BidPrice'] = str(bid_price)  # must be a string
 
     return ig
+
+
+def _plural(n):
+    """Utility for logging messages"""
+    if n == 1:
+         return ''
+    else:
+        return 's'

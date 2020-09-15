@@ -931,6 +931,16 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    max_clusters_in_pool=dict(
+        switches=[
+            (['--max-clusters-in-pool'], dict(
+                help=("If attempting to join a pooled cluster, don't bail"
+                      " out and create a new one if there are at least"
+                      " this many clusters already in the pool."),
+                type=int,
+            )),
+        ],
+    ),
     max_concurrent_steps=dict(
         cloud_role='launch',
         switches=[
@@ -1043,11 +1053,32 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    pool_jitter_seconds=dict(
+        switches=[
+            (['--pool-jitter-seconds'], dict(
+                help=('If --max-pools-in-cluster is set, before launching a'
+                      ' cluster, wait a random amount of time between 0 and'
+                      ' this many seconds and then double-check the number'
+                      ' of clusters in the pool before launching'),
+                type=int,
+            )),
+        ],
+    ),
     pool_name=dict(
         cloud_role='launch',
         switches=[
             (['--pool-name'], dict(
                 help='Specify a pool name to join. Default is "default"',
+            )),
+        ],
+    ),
+    pool_timeout_minutes=dict(
+        switches=[
+            (['--pool-timeout-minutes'], dict(
+                help=("If pooling can't join or create a cluster within this"
+                      " many minutes, raise an exception. (0 means don't"
+                      " timeout"),
+                type=int,
             )),
         ],
     ),

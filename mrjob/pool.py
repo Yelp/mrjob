@@ -21,6 +21,7 @@ In theory, this module might support pooling in general, but so far, there's
 only a need for pooling on EMR.
 
 """
+import re
 import time
 from collections import defaultdict
 from logging import getLogger
@@ -30,6 +31,7 @@ try:
 except ImportError:
     ClientError = Exception
 
+import mrjob
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import _boto3_paginate
@@ -44,7 +46,7 @@ log = getLogger(__name__)
 # the error when EMRJobRunner attempts to create a new cluster. See #1696
 
 
-### identifying pooled clusters ###
+### tagging pooled clusters ###
 
 def _pool_tags(hash, name):
     """Return a dict with "hidden" tags to add to the given cluster."""
@@ -59,6 +61,45 @@ def _extract_tags(cluster):
 def _pool_name(cluster):
     tags = _extract_tags(cluster)
     return tags.get('__mrjob_pool_name')
+
+
+### putting pooling information in the name of a cluster
+
+# this may change between versions of mrjob
+
+def _cluster_name_suffix(hash, name):
+    fields = [mrjob.__version__, name, hash]
+    return ' pooling:%s' % ','.join(fields)
+
+
+def _parse_cluster_name_suffix(cluster_name):
+    """Return a dictionary possibly containing the keys:
+
+    mrjob_version: version of mrjob that created this cluster
+    pool_hash: hash representing bootstrap setup etc.
+    pool_name: name of the cluster pool
+
+    If the cluster is not pooled or we can't parse its pooling suffix,
+    return ``{}``.
+    """
+    # return version, hash, and name from cluster pool suffix
+
+    i = cluster_name.find(' pooling:')
+    if i == -1:
+        return {}
+
+    suffix = cluster_name[i + len(' pooling:'):]
+
+    parts = suffix.split(',', 3)
+
+    if len(parts) == 3:
+        return dict(
+            mrjob_version=parts[0],
+            pool_name=parts[1],
+            pool_hash=parts[2],
+        )
+    else:
+        return {}
 
 
 ### instance groups ###

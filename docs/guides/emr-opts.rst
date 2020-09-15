@@ -360,19 +360,20 @@ Cluster pooling
 ---------------
 
 .. mrjob-opt::
-    :config: max_concurrent_steps
-    :switch: --max-concurrent-steps
+    :config: max_clusters_in_pool
+    :switch: --max-clusters-in-pool
     :type: integer
     :set: emr
-    :default: 1
+    :default: 0 (disabled)
 
-    When joining a pooled cluster, require its ``StepConcurrencyLevel`` to be
-    no higher than this, and make sure it doesn't already have as many
-    steps as it can possibly run concurrently (it's okay to join a
-    pooled cluster in the ``RUNNING`` state if it runs steps concurrently).
+    Don't create a new pooled cluster if there are already this many
+    active (not terminated) clusters in our pool; instead wait until one of
+    the clusters is available to join or terminates.
 
-    When launching a new cluster, set ``StepConcurrencyLevel`` to this. This
-    can be used even without enabling :mrjob-opt:`pool_clusters`.
+    To deal with the situation where several jobs start at once, before
+    creating a cluster, we wait a random number of seconds (see
+    :mrjob-opt:`pool_jitter_seconds` and double-check before creating
+    a new cluster).
 
     .. versionadded:: 0.7.4
 
@@ -418,10 +419,30 @@ Cluster pooling
     :default: ``True``
 
     Try to run the job on a ``WAITING`` pooled cluster with the same
-    bootstrap configuration. Prefer the one with the most compute units. Use
-    S3 to "lock" the cluster and ensure that the job is not scheduled behind
-    another job. If no suitable cluster is `WAITING`, create a new pooled
-    cluster.
+    bootstrap configuration. Prefer the one with the most compute units. If
+    we can't join an existing cluster, create our own (unless
+    :mrjob-opt:`max_clusters_in_pool` or :mrjob-opt:`pool_wait_minutes`
+    disallow it).
+
+.. mrjob-opt::
+    :config: pool_jitter_seconds
+    :switch: --pool-jitter-seconds
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: 60
+
+    Wait a random number of seconds between 0 and this many before
+    double-checking active clusters in the pool for
+    :mrjob-opt:`max_clusters_in_pool` or to bypass
+    :mrjob-opt:`pool_wait_minutes`.
+
+    The main point of this option is so that if several jobs start
+    simultaneously, they can double-check if the other jobs have launched a
+    cluster before launching one themselves. You may need wish to adjust
+    this based on your maximum pool size and the number of jobs you expect
+    to launch simultaneously.
+
+    .. versionadded:: 0.7.4
 
 .. mrjob-opt::
     :config: pool_name
@@ -433,6 +454,18 @@ Cluster pooling
     Specify a pool name to join. Does not imply :mrjob-opt:`pool_clusters`.
 
 .. mrjob-opt::
+    :config: pool_timeout_minutes
+    :switch: --pool-timeout-minutes
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: 0 (disabled)
+
+    If we can't create or join a cluster after this many minutes, raise
+    an exception and bail out.
+
+    .. versionadded:: 0.7.4
+
+.. mrjob-opt::
     :config: pool_wait_minutes
     :switch: --pool-wait-minutes
     :type: :ref:`string <data-type-string>`
@@ -442,6 +475,15 @@ Cluster pooling
     If pooling is enabled and no cluster is available, retry finding a cluster
     every 30 seconds until this many minutes have passed, then start a new
     cluster instead of joining one.
+
+    .. versionchanged:: 0.7.4
+
+       If there aren't any active clusters with a matching pool name and
+       hash, we may create our own cluster before *pool_wait_minutes* is
+       up. We first wait a random number of seconds and double-check that
+       other clusters have not been created (see
+       :mrjob-opt:`pool_jitter_seconds`).
+
 
 S3 Filesystem
 -------------

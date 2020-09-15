@@ -17,7 +17,7 @@
 """Write and run Hadoop Streaming jobs on
 Amazon Elastic MapReduce / Google Dataproc / your own Hadoop cluster."""
 
-__author__ = 'David Marin <dave@davemarin.com>'
+__author__ = 'Coyote Codornices Marin <coyote@coyote.rocks>'
 
 __credits__ = [
     'Marc Abramowitz <msabramo@gmail.com>',

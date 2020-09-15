@@ -73,8 +73,9 @@ class PoolMatchingBaseTestCase(MockBoto3TestCase):
                             provision=True,
                             normalized_instance_hours=None,
                             **kwargs):
-        """Returns ``(runner, cluster_id)``. Set minutes_ago to set
-        ``cluster.startdatetime`` to seconds before
+        """Makes a pooled cluster and returns its cluster ID.
+
+        Set ``cluster.startdatetime`` to *minutes_ago* before
         ``datetime.datetime.now()``."""
         runner = EMRJobRunner(pool_clusters=True,
                               pool_name=name,
@@ -108,7 +109,7 @@ class PoolMatchingBaseTestCase(MockBoto3TestCase):
                     fleet['ProvisionedSpotCapacity'] = fleet[
                         'TargetSpotCapacity']
 
-        return runner, cluster_id
+        return cluster_id
 
 
     def _fleet_config(
@@ -214,27 +215,27 @@ class BasicPoolMatchingTestCase(PoolMatchingBaseTestCase):
             self.assertEqual(cluster['Status']['State'], 'WAITING')
 
     def test_join_pooled_cluster(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters'])
 
     def test_join_named_pool(self):
-        _, cluster_id = self.make_pooled_cluster('pool1')
+        cluster_id = self.make_pooled_cluster('pool1')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--pool-name', 'pool1'])
 
     def test_dont_join_wrong_named_pool(self):
-        _, cluster_id = self.make_pooled_cluster('pool1')
+        cluster_id = self.make_pooled_cluster('pool1')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--pool-name', 'not_pool1'])
 
     def test_join_anyway_if_i_say_so(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.0')
+        cluster_id = self.make_pooled_cluster(image_version='2.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -245,34 +246,34 @@ class BasicPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class ConcurrentStepsPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_add_batch_in_steps_does_not_affect_pooling(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters', '--add-steps-in-batch'])
 
     def test_same_max_concurrent_steps(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             max_concurrent_steps=3)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
 
     def test_dont_join_cluster_with_higher_concurrency(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             max_concurrent_steps=4)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
 
     def test_join_cluster_with_lower_concurrency(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             max_concurrent_steps=2)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters', '--max-concurrent-steps', '3'])
 
     def test_non_concurrent_cluster_okay(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             max_concurrent_steps=1)
 
         self.assertJoins(cluster_id, [
@@ -282,14 +283,14 @@ class ConcurrentStepsPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_pooling_with_image_version(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
+        cluster_id = self.make_pooled_cluster(image_version='2.4.9')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '2.4.9'])
 
     def test_pooling_requires_exact_image_version_match(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.4.9')
+        cluster_id = self.make_pooled_cluster(image_version='2.4.9')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -298,14 +299,14 @@ class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
     def test_partial_image_version_okay(self):
         # the 2.x series is over, so "2.4" is always the same
         # patch version anyhow
-        _, cluster_id = self.make_pooled_cluster(image_version='2.4')
+        cluster_id = self.make_pooled_cluster(image_version='2.4')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '2.4'])
 
     def test_dont_join_pool_with_wrong_image_version(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.2')
+        cluster_id = self.make_pooled_cluster(image_version='2.2')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -313,49 +314,49 @@ class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_pooling_with_4_x_ami_version(self):
         # this actually uses release label internally
-        _, cluster_id = self.make_pooled_cluster(image_version='4.0.0')
+        cluster_id = self.make_pooled_cluster(image_version='4.0.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0'])
 
     def test_pooling_with_release_label(self):
-        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+        cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0'])
 
     def test_dont_join_pool_with_wrong_release_label(self):
-        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.1')
+        cluster_id = self.make_pooled_cluster(release_label='emr-4.0.1')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0'])
 
     def test_dont_join_pool_without_release_label(self):
-        _, cluster_id = self.make_pooled_cluster(image_version='2.2')
+        cluster_id = self.make_pooled_cluster(image_version='2.2')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0'])
 
     def test_matching_release_label_and_ami_version(self):
-        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+        cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0'])
 
     def test_non_matching_release_label_and_ami_version(self):
-        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+        cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '2.2'])
 
     def test_release_label_hides_ami_version(self):
-        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+        cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -363,34 +364,34 @@ class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--image-version', '1.0.0'])
 
     def test_pooling_with_custom_ami(self):
-        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin')
+        cluster_id = self.make_pooled_cluster(image_id='ami-blanchin')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--image-id', 'ami-blanchin'])
 
     def test_dont_join_pool_with_wrong_custom_ami(self):
-        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin')
+        cluster_id = self.make_pooled_cluster(image_id='ami-blanchin')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--image-id', 'ami-awake'])
 
     def test_dont_join_pool_with_non_custom_ami(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--image-id', 'ami-blanchin'])
 
     def test_dont_join_pool_with_custom_ami_if_not_set(self):
-        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin')
+        cluster_id = self.make_pooled_cluster(image_id='ami-blanchin')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters'])
 
     def test_join_pool_with_matching_custom_ami_and_ami_version(self):
-        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin',
+        cluster_id = self.make_pooled_cluster(image_id='ami-blanchin',
                                                  image_version='5.10.0')
 
         self.assertJoins(cluster_id, [
@@ -398,7 +399,7 @@ class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--image-id', 'ami-blanchin', '--release-label', 'emr-5.10.0'])
 
     def test_dont_join_pool_with_right_custom_ami_but_wrong_version(self):
-        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin',
+        cluster_id = self.make_pooled_cluster(image_id='ami-blanchin',
                                                  image_version='5.9.0')
 
         self.assertDoesNotJoin(cluster_id, [
@@ -409,7 +410,7 @@ class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class ApplicationsPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_matching_applications(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.0.0', applications=['Mahout'])
 
         self.assertJoins(cluster_id, [
@@ -418,7 +419,7 @@ class ApplicationsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--application', 'Mahout'])
 
     def test_extra_applications_not_okay(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.0.0', applications=['Ganglia', 'Mahout'])
 
         self.assertDoesNotJoin(cluster_id, [
@@ -427,7 +428,7 @@ class ApplicationsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--application', 'Mahout'])
 
     def test_missing_applications_not_okay(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.0.0', applications=['Mahout'])
 
         self.assertDoesNotJoin(cluster_id, [
@@ -436,7 +437,7 @@ class ApplicationsPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--applications', 'Ganglia,Mahout'])
 
     def test_application_matching_is_case_insensitive(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.0.0', applications=['Mahout'])
 
         self.assertJoins(cluster_id, [
@@ -448,7 +449,7 @@ class ApplicationsPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class EMRConfigurationPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_matching_emr_configurations(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.0.0',
             emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
 
@@ -459,7 +460,7 @@ class EMRConfigurationPoolMatchingTestCase(PoolMatchingBaseTestCase):
         ])
 
     def test_missing_emr_configurations(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.0.0',
             emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
 
@@ -469,7 +470,7 @@ class EMRConfigurationPoolMatchingTestCase(PoolMatchingBaseTestCase):
         ])
 
     def test_extra_emr_configuration(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.0.0')
 
         self.assertDoesNotJoin(cluster_id, [
@@ -479,7 +480,7 @@ class EMRConfigurationPoolMatchingTestCase(PoolMatchingBaseTestCase):
         ])
 
     def test_wrong_emr_configuration(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.0.0',
             emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
 
@@ -490,7 +491,7 @@ class EMRConfigurationPoolMatchingTestCase(PoolMatchingBaseTestCase):
         ])
 
     def test_wrong_emr_configuration_ordering(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.0.0',
             emr_configurations=[CORE_SITE_EMR_CONFIGURATION,
                                 HADOOP_ENV_EMR_CONFIGURATION])
@@ -506,7 +507,7 @@ class EMRConfigurationPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class SubnetPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_matching_subnet(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             subnet='subnet-ffffffff')
 
         self.assertJoins(cluster_id, [
@@ -514,7 +515,7 @@ class SubnetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--subnet', 'subnet-ffffffff'])
 
     def test_other_subnet(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             subnet='subnet-ffffffff')
 
         self.assertDoesNotJoin(cluster_id, [
@@ -522,14 +523,14 @@ class SubnetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--subnet', 'subnet-eeeeeeee'])
 
     def test_require_subnet(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--subnet', 'subnet-ffffffff'])
 
     def test_require_no_subnet(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             subnet='subnet-ffffffff')
 
         self.assertDoesNotJoin(cluster_id, [
@@ -537,7 +538,7 @@ class SubnetPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_empty_string_subnet(self):
         # same as no subnet
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
@@ -547,7 +548,7 @@ class SubnetPoolMatchingTestCase(PoolMatchingBaseTestCase):
         # subnets only works with instance fleets
         fleets = [self._fleet_config()]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=fleets, subnet='subnet-eeeeeeee')
 
         self.assertJoins(cluster_id, [
@@ -560,7 +561,7 @@ class AdditionalEMRInfoPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             additional_emr_info=info)
 
         self.assertJoins(cluster_id, [
@@ -569,7 +570,7 @@ class AdditionalEMRInfoPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_dont_join_pool_with_wrong_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -579,7 +580,7 @@ class AdditionalEMRInfoPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_join_pool_with_same_instance_type_and_count(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='m2.4xlarge',
             num_core_instances=20)
 
@@ -602,7 +603,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             ),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=INSTANCE_GROUPS)
 
         self.assertJoins(cluster_id, [
@@ -626,7 +627,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             ),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='m2.4xlarge',
             num_core_instances=20)
 
@@ -635,7 +636,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--instance-groups', json.dumps(INSTANCE_GROUPS)])
 
     def test_join_pool_with_more_of_same_instance_type(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='m2.4xlarge',
             num_core_instances=20)
 
@@ -645,7 +646,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '5'])
 
     def test_join_cluster_with_bigger_instances(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='m2.4xlarge',
             num_core_instances=20)
 
@@ -655,7 +656,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '20'])
 
     def test_join_cluster_with_enough_cpu_and_memory(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='c1.xlarge',
             num_core_instances=3)
 
@@ -667,7 +668,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '10'])
 
     def test_dont_join_cluster_with_instances_with_too_little_memory(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='c1.xlarge',
             num_core_instances=20)
 
@@ -677,7 +678,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '2'])
 
     def test_master_instance_has_to_be_big_enough(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='c1.xlarge',
             num_core_instances=10)
 
@@ -692,14 +693,14 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
     # pooling tries to join clusters with core and/or task instances
 
     def test_master_alone_joins_master_and_core(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             num_core_instances=2)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters'])
 
     def test_master_alone_requires_big_enough_core_instances(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             master_instance_type='c3.4xlarge',
             num_core_instances=2)  # core instances are m5.xlarge
 
@@ -708,7 +709,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--master-instance-type', 'c3.4xlarge'])
 
     def test_master_alone_requires_big_enough_master_when_with_core(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             core_instance_type='c1.xlarge',
             num_core_instances=2)  # master instances are m5.xlarge
 
@@ -717,7 +718,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--master-instance-type', 'c1.xlarge'])
 
     def test_master_alone_accepts_master_core_task(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             num_core_instances=2,
             num_task_instances=2)
 
@@ -725,7 +726,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '-r', 'emr', '-v', '--pool-clusters'])
 
     def test_master_alone_does_not_accept_too_small_task_instances(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             master_instance_type='c1.xlarge',
             core_instance_type='c1.xlarge',
             task_instance_type='m1.medium',
@@ -737,7 +738,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--master-instance-type', 'c1.xlarge'])
 
     def test_accept_extra_task_instances(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='c1.xlarge',
             num_core_instances=3,
             num_task_instances=1)
@@ -751,7 +752,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '3'])
 
     def test_reject_too_small_extra_task_instances(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             core_instance_type='c1.xlarge',
             task_instance_type='m1.medium',
             num_core_instances=3,
@@ -766,7 +767,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '3'])
 
     def test_extra_task_instances_dont_count_in_total_cpu(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='c1.xlarge',
             num_core_instances=2,
             num_task_instances=2)
@@ -779,7 +780,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '3'])
 
     def test_unknown_instance_type_against_matching_pool(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='a1.sauce',
             num_core_instances=10)
 
@@ -789,7 +790,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '10'])
 
     def test_unknown_instance_type_against_pool_with_more_instances(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='a1.sauce',
             num_core_instances=20)
 
@@ -799,7 +800,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '10'])
 
     def test_unknown_instance_type_against_pool_with_less_instances(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='a1.sauce',
             num_core_instances=5)
 
@@ -809,7 +810,7 @@ class InstancePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--num-core-instances', '10'])
 
     def test_unknown_instance_type_against_other_instance_types(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_type='m2.4xlarge',
             num_core_instances=100)
 
@@ -827,7 +828,7 @@ class EBSRootVolumeGBPoolMatchingTestCase(PoolMatchingBaseTestCase):
     # instance fleets and instance groups
 
     def test_join_cluster_with_same_ebs_root_volume_gb(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ebs_root_volume_gb=123)
 
         self.assertJoins(cluster_id, [
@@ -835,7 +836,7 @@ class EBSRootVolumeGBPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--ebs-root-volume-gb', '123'])
 
     def test_join_cluster_with_larger_ebs_root_volume_gb(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ebs_root_volume_gb=456)
 
         self.assertJoins(cluster_id, [
@@ -843,7 +844,7 @@ class EBSRootVolumeGBPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--ebs-root-volume-gb', '123'])
 
     def test_dont_join_cluster_with_smaller_ebs_root_volume_gb(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ebs_root_volume_gb=11)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -851,14 +852,14 @@ class EBSRootVolumeGBPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--ebs-root-volume-gb', '123'])
 
     def test_dont_join_cluster_with_default_ebs_root_volume_gb(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--ebs-root-volume-gb', '123'])
 
     def test_dont_join_cluster_with_non_default_ebs_root_volume_gb(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ebs_root_volume_gb=123)
 
         self.assertDoesNotJoin(cluster_id, ['-r', 'emr', '--pool-clusters'])
@@ -902,7 +903,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
     def test_can_join_cluster_with_same_ebs_config(self):
         igs = [self._ig_with_ebs_config()]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=igs)
 
         self.assertJoins(cluster_id, [
@@ -912,7 +913,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
     def test_cluster_must_have_ebs_config_if_requested(self):
         igs = [self._ig_with_ebs_config()]
 
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -921,7 +922,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
     def test_any_ebs_config_okay_if_none_requested(self):
         igs = [self._ig_with_ebs_config()]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=igs)
 
         self.assertJoins(cluster_id, [
@@ -930,7 +931,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
     def test_join_ebs_optimized_cluster(self):
         igs = [self._ig_with_ebs_config(optimized=True)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=igs)
 
         self.assertJoins(cluster_id, [
@@ -941,7 +942,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         requested_igs = [self._ig_with_ebs_config(optimized=True)]
         actual_igs = [self._ig_with_ebs_config()]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -952,7 +953,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         requested_igs = [self._ig_with_ebs_config()]
         actual_igs = [self._ig_with_ebs_config(optimized=True)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertJoins(cluster_id, [
@@ -963,7 +964,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         requested_igs = [self._ig_with_ebs_config(volume_type='standard')]
         actual_igs = [self._ig_with_ebs_config(volume_type='gp2')]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -974,7 +975,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         requested_igs = [self._ig_with_ebs_config(volume_size=100)]
         actual_igs = [self._ig_with_ebs_config(volume_size=200)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertJoins(cluster_id, [
@@ -985,7 +986,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         requested_igs = [self._ig_with_ebs_config(volume_size=100)]
         actual_igs = [self._ig_with_ebs_config(volume_size=50)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -995,7 +996,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
     def test_join_cluster_with_same_iops(self):
         igs = [self._ig_with_ebs_config(iops=1000)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=igs)
 
         self.assertJoins(cluster_id, [
@@ -1006,7 +1007,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         requested_igs = [self._ig_with_ebs_config(iops=1000)]
         actual_igs = [self._ig_with_ebs_config(iops=2000)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertJoins(cluster_id, [
@@ -1017,7 +1018,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         requested_igs = [self._ig_with_ebs_config(iops=1000)]
         actual_igs = [self._ig_with_ebs_config(iops=500)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1027,7 +1028,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
     def test_multiple_volumes(self):
         igs = [self._ig_with_ebs_config(num_volumes=2)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=igs)
 
         self.assertJoins(cluster_id, [
@@ -1038,7 +1039,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         requested_igs = [self._ig_with_ebs_config(num_volumes=2)]
         actual_igs = [self._ig_with_ebs_config(num_volumes=3)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertJoins(cluster_id, [
@@ -1049,7 +1050,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         requested_igs = [self._ig_with_ebs_config(num_volumes=3)]
         actual_igs = [self._ig_with_ebs_config(num_volumes=2)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertJoins(cluster_id, [
@@ -1066,7 +1067,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         actual_igs = [self._ig_with_ebs_config(
             [dict(VolumeSpecification=volume_spec, VolumesPerInstance=2)])]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertJoins(cluster_id, [
@@ -1083,7 +1084,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
             [dict(VolumeSpecification=shared_spec),
              dict(VolumeSpecification=extra_spec)])]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertJoins(cluster_id, [
@@ -1103,7 +1104,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
             [dict(VolumeSpecification=extra_spec),
              dict(VolumeSpecification=shared_spec)])]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1114,7 +1115,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
         igs = [self._ig_with_ebs_config(volume_size=10),
                self._ig_with_ebs_config(role='CORE')]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=igs)
 
         self.assertJoins(cluster_id, [
@@ -1129,7 +1130,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
             self._ig_with_ebs_config(volume_size=10),
             self._ig_with_ebs_config(role='CORE', volume_type='gp2')]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1140,7 +1141,7 @@ class EBSConfigPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class BidPricePoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_can_join_cluster_with_same_bid_price(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             master_instance_bid_price='0.25')
 
         self.assertJoins(cluster_id, [
@@ -1148,7 +1149,7 @@ class BidPricePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--master-instance-bid-price', '0.25'])
 
     def test_can_join_cluster_with_higher_bid_price(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             master_instance_bid_price='25.00')
 
         self.assertJoins(cluster_id, [
@@ -1156,7 +1157,7 @@ class BidPricePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--master-instance-bid-price', '0.25'])
 
     def test_cant_join_cluster_with_lower_bid_price(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             master_instance_bid_price='0.25',
             num_core_instances=100)
 
@@ -1165,14 +1166,14 @@ class BidPricePoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--master-instance-bid-price', '25.00'])
 
     def test_on_demand_satisfies_any_bid_price(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--master-instance-bid-price', '25.00'])
 
     def test_no_bid_price_satisfies_on_demand(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             master_instance_bid_price='25.00')
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1180,7 +1181,7 @@ class BidPricePoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_core_and_task_instance_types(self):
         # a tricky test that mixes and matches different criteria
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             core_instance_bid_price='0.25',
             task_instance_bid_price='25.00',
             task_instance_type='c3.4xlarge',
@@ -1206,7 +1207,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
                                weighted_capacities={'m1.large': 2})
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=fleets)
 
         self.assertJoins(cluster_id, [
@@ -1217,7 +1218,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
     def test_instance_groups_dont_satisfy_fleets(self):
         fleets = [self._fleet_config(instance_types=['m1.medium', 'm1.large'])]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             master_instance_type='m1.large')
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1239,7 +1240,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
                                weighted_capacities={'m1.large': 3})
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1254,7 +1255,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
                 on_demand_capacity=3, spot_capacity=4),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=fleets)
 
         self.assertJoins(cluster_id, [
@@ -1276,7 +1277,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
                 on_demand_capacity=3, spot_capacity=4),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertJoins(cluster_id, [
@@ -1298,7 +1299,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
                 on_demand_capacity=3, spot_capacity=4),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1320,7 +1321,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
                 on_demand_capacity=3, spot_capacity=4),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertJoins(cluster_id, [
@@ -1342,7 +1343,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
                 on_demand_capacity=4, spot_capacity=3),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1357,7 +1358,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             self._fleet_config(
                 instance_types=['m1.medium', 'm1.large', 'm1.xlarge'])]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertJoins(cluster_id, [
@@ -1372,7 +1373,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             self._fleet_config(
                 instance_types=['m1.medium'])]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1383,7 +1384,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
         fleets = [
             self._fleet_config(ebs_optimized=True)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=fleets)
 
         self.assertJoins(cluster_id, [
@@ -1398,7 +1399,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
         req_fleets = [
             self._fleet_config(ebs_optimized=False)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertJoins(cluster_id, [
@@ -1413,7 +1414,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
         req_fleets = [
             self._fleet_config(ebs_optimized=True)]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1431,7 +1432,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             ])
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=fleets)
 
         self.assertJoins(cluster_id, [
@@ -1451,7 +1452,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
                 VolumeSpecification=dict(VolumeType='standard', SizeInGB=100))
             ])
         ]
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertJoins(cluster_id, [
@@ -1472,7 +1473,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             ])
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1490,7 +1491,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             ),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=fleets)
 
         self.assertJoins(cluster_id, [
@@ -1514,7 +1515,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             self._fleet_config(on_demand_capacity=0, spot_capacity=1)
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1545,7 +1546,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             ),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1576,7 +1577,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             ),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertJoins(cluster_id, [
@@ -1598,7 +1599,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
             ),
         ]
 
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)
 
         self.assertJoins(cluster_id, [
@@ -1610,7 +1611,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
         # make sure that we only join fleets with provisioned capacity
         fleets = [self._fleet_config()]
 
-        _, cluster_id = self.make_pooled_cluster(provision=False,
+        cluster_id = self.make_pooled_cluster(provision=False,
                                                  instance_fleets=fleets)
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1621,7 +1622,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class MrjobVersionPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_dont_join_wrong_mrjob_version(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.start(patch('mrjob.__version__', 'OVER NINE THOUSAAAAAND'))
 
@@ -1629,7 +1630,7 @@ class MrjobVersionPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '-r', 'emr', '--pool-clusters'])
 
     def test_version_matters_even_if_mrjob_not_bootstrapped(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             bootstrap_mrjob=False)
 
         self.start(patch('mrjob.__version__', 'OVER NINE THOUSAAAAAND'))
@@ -1638,7 +1639,7 @@ class MrjobVersionPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '-r', 'emr', '--pool-clusters'])
 
     def test_python_bin_doesnt_matter(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
@@ -1648,7 +1649,7 @@ class MrjobVersionPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class BootstrapPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_join_similarly_bootstrapped_pool(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             bootstrap=['true'])
 
         self.assertJoins(cluster_id, [
@@ -1656,7 +1657,7 @@ class BootstrapPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--bootstrap', 'true'])
 
     def test_dont_join_differently_bootstrapped_pool(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -1667,7 +1668,7 @@ class BootstrapPoolMatchingTestCase(PoolMatchingBaseTestCase):
         with open(bootstrap_path, 'w') as f:
             f.write('#!/usr/bin/sh\necho "hi mom"\n')
 
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -1678,7 +1679,7 @@ class BootstrapPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
         true_story = 'true %s#' % story_path
 
-        _, cluster_id = self.make_pooled_cluster(bootstrap=[true_story])
+        cluster_id = self.make_pooled_cluster(bootstrap=[true_story])
 
         # same bootstrap command, same file (matches)
         self.assertJoins(cluster_id, [
@@ -1715,7 +1716,7 @@ class BootstrapPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
         true_story = 'true %s#/' % story_path
 
-        _, cluster_id = self.make_pooled_cluster(bootstrap=[true_story])
+        cluster_id = self.make_pooled_cluster(bootstrap=[true_story])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
@@ -1736,7 +1737,7 @@ class BootstrapPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_pool_contention(self):
-        _, cluster_id = self.make_pooled_cluster('robert_downey_jr')
+        cluster_id = self.make_pooled_cluster('robert_downey_jr')
 
         def runner_plz():
             mr_job = MRTwoStepJob([
@@ -1754,11 +1755,11 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self.assertEqual(runner_2._find_cluster()[0], None)
 
     def test_sorting_by_cpu_capacity(self):
-        _, cluster_id_1 = self.make_pooled_cluster(
+        cluster_id_1 = self.make_pooled_cluster(
             'pool1',
             num_core_instances=2,
             normalized_instance_hours=48)
-        _, cluster_id_2 = self.make_pooled_cluster(
+        cluster_id_2 = self.make_pooled_cluster(
             'pool1',
             num_core_instances=1,
             normalized_instance_hours=32)
@@ -1772,11 +1773,11 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self.assertEqual(runner_2._find_cluster()[0], cluster_id_2)
 
     def test_sorting_by_cpu_capacity_divides_by_number_of_hours(self):
-        _, cluster_id_1 = self.make_pooled_cluster(
+        cluster_id_1 = self.make_pooled_cluster(
             'pool1',
             num_core_instances=2,
             normalized_instance_hours=48)
-        _, cluster_id_2 = self.make_pooled_cluster(
+        cluster_id_2 = self.make_pooled_cluster(
             'pool1',
             num_core_instances=1,
             minutes_ago=90,
@@ -1818,7 +1819,7 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_dont_destroy_other_pooled_cluster_on_failure(self):
         # Issue 242: job failure shouldn't kill the pooled clusters
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.mock_emr_failures = set([(cluster_id, 0)])
 
@@ -1851,46 +1852,46 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
     def test_max_mins_idle_doesnt_affect_pool_hash(self):
         # max_mins_idle uses a bootstrap action, but it's not included
         # in the pool hash
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters', '--max-mins-idle', '60'])
 
     def test_can_join_cluster_started_with_max_mins_idle(self):
-        _, cluster_id = self.make_pooled_cluster(max_mins_idle=60)
+        cluster_id = self.make_pooled_cluster(max_mins_idle=60)
 
         self.assertJoins(cluster_id, ['-r', 'emr', '--pool-clusters'])
 
     def test_can_join_cluster_with_same_key_pair(self):
-        _, cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
+        cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
 
         self.assertJoins(
             cluster_id,
             ['-r', 'emr', '--ec2-key-pair', 'EMR', '--pool-clusters'])
 
     def test_cant_join_cluster_with_different_key_pair(self):
-        _, cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
+        cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
 
         self.assertDoesNotJoin(
             cluster_id,
             ['-r', 'emr', '--ec2-key-pair', 'EMR2', '--pool-clusters'])
 
     def test_cant_join_cluster_with_missing_key_pair(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(
             cluster_id,
             ['-r', 'emr', '--ec2-key-pair', 'EMR2', '--pool-clusters'])
 
     def test_ignore_key_pair_if_we_have_none(self):
-        _, cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
+        cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
 
         self.assertJoins(
             cluster_id,
             ['-r', 'emr', '--pool-clusters'])
 
     def test_dont_join_cluster_without_spark(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(
             cluster_id,
@@ -1898,7 +1899,7 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             job_class=MRNullSpark)
 
     def test_join_cluster_with_spark_3_x_ami(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='3.11.0',
             bootstrap_actions=[_3_X_SPARK_BOOTSTRAP_ACTION])
 
@@ -1908,7 +1909,7 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             job_class=MRNullSpark)
 
     def test_join_cluster_with_spark_4_x_ami(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.7.2',
             applications=['Spark'])
 
@@ -1918,7 +1919,7 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
             job_class=MRNullSpark)
 
     def test_ignore_spark_bootstrap_action_on_4_x_ami(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='4.7.2',
             bootstrap_actions=[_3_X_SPARK_BOOTSTRAP_ACTION])
 
@@ -1929,7 +1930,7 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_other_install_spark_bootstrap_action_on_3_x_ami(self):
         # has to be exactly the install-spark bootstrap action we expected
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             image_version='3.11.0',
             bootstrap_actions=['s3://bucket/install-spark'])
 
@@ -1940,7 +1941,7 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_dont_join_pool_without_provisioned_instances(self):
         # test #1633
-        _, cluster_id = self.make_pooled_cluster(provision=False)
+        cluster_id = self.make_pooled_cluster(provision=False)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters'])
@@ -1949,7 +1950,7 @@ class MiscPoolMatchingTestCase(PoolMatchingBaseTestCase):
 class DockerPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_same_docker_image(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             docker_image='dead-sea/scrolls:latest')
 
         self.assertJoins(cluster_id, [
@@ -1957,7 +1958,7 @@ class DockerPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--docker-image', 'dead-sea/scrolls:latest'])
 
     def test_same_docker_registry(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             docker_image='dead-sea/scrolls:latest')
 
         self.assertJoins(cluster_id, [
@@ -1965,7 +1966,7 @@ class DockerPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--docker-image', 'dead-sea/mud'])
 
     def test_different_docker_registry(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             docker_image='dead-sea/scrolls:latest')
 
         self.assertDoesNotJoin(cluster_id, [
@@ -1973,7 +1974,7 @@ class DockerPoolMatchingTestCase(PoolMatchingBaseTestCase):
             '--docker-image', 'mrjob-registry/mrjob'])
 
     def test_docker_image_vs_none(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             docker_image='dead-sea/scrolls:latest')
 
         self.assertDoesNotJoin(cluster_id, [
@@ -2012,7 +2013,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self.key_pair_file = self.makefile('EMR.pem')
 
     def test_join_cluster_with_requested_resources(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 12288
@@ -2030,7 +2031,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_join_cluster_with_more_than_requested_resources(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 24576
@@ -2047,7 +2048,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_dont_join_cluster_with_too_few_mb(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 6144
@@ -2064,7 +2065,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_join_cluster_with_too_few_virtual_cores(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 12288
@@ -2081,7 +2082,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_available_mb_only(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 12288
@@ -2098,7 +2099,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
 
     def test_available_virtual_cores_only(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 6144
@@ -2114,7 +2115,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_zero_mb_disables_opt(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 6144
@@ -2131,7 +2132,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_zero_virtual_cores_disables_opt(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 12288
@@ -2148,7 +2149,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_instance_attributes_dont_matter(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 12288
@@ -2171,7 +2172,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_cluster_attributes_still_matter(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 12288
@@ -2191,7 +2192,7 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
 
     def test_setting_both_opts_to_zero_disables_connecting_to_yarn(self):
-        _, cluster_id = self.make_pooled_cluster(
+        cluster_id = self.make_pooled_cluster(
             ec2_key_pair='EMR')
 
         self.cluster_metrics['availableMB'] = 12288
@@ -2518,7 +2519,7 @@ class ClusterLockingTestCase(PoolMatchingBaseTestCase):
         self.assertFalse(self._attempt_to_lock_cluster.called)
 
     def test_no_locking_with_explicit_cluster_id(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id])
         job.sandbox()
@@ -2529,7 +2530,7 @@ class ClusterLockingTestCase(PoolMatchingBaseTestCase):
         self.assertFalse(self._attempt_to_lock_cluster.called)
 
     def test_join_non_concurrent_pooled_cluster(self):
-        _, cluster_id = self.make_pooled_cluster()
+        cluster_id = self.make_pooled_cluster()
 
         job = MRTwoStepJob(['-r', 'emr', '--pool-clusters'])
         job.sandbox()
@@ -2548,7 +2549,7 @@ class ClusterLockingTestCase(PoolMatchingBaseTestCase):
             self.assertTrue(self._attempt_to_unlock_cluster.called)
 
     def test_join_concurrent_pooled_cluster(self):
-        _, cluster_id = self.make_pooled_cluster(max_concurrent_steps=2)
+        cluster_id = self.make_pooled_cluster(max_concurrent_steps=2)
 
         job = MRTwoStepJob(['-r', 'emr', '--pool-clusters',
                             '--max-concurrent-steps', '2'])

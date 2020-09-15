@@ -21,7 +21,6 @@ In theory, this module might support pooling in general, but so far, there's
 only a need for pooling on EMR.
 
 """
-import re
 import time
 from collections import defaultdict
 from logging import getLogger

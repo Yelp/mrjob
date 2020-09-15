@@ -2549,7 +2549,7 @@ class ClusterLockingTestCase(PoolMatchingBaseTestCase):
             self.assertTrue(self._attempt_to_unlock_cluster.called)
 
     def test_join_concurrent_pooled_cluster(self):
-        cluster_id = self.make_pooled_cluster(max_concurrent_steps=2)
+        self.make_pooled_cluster(max_concurrent_steps=2)
 
         job = MRTwoStepJob(['-r', 'emr', '--pool-clusters',
                             '--max-concurrent-steps', '2'])
@@ -3046,7 +3046,6 @@ class ListClusterIdsForPoolingTestCase(PoolMatchingBaseTestCase):
 
         cluster_id_1 = self.make_runner(
             '--pool-clusters').make_persistent_cluster()
-        cluster_1 = self.mock_emr_clusters[cluster_id_1]
 
         sleep(0.0001)
 

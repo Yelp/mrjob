@@ -26,8 +26,8 @@ try:
     setuptools_kwargs = {
         'extras_require': {
             'aws': [
-                'boto3>=1.4.6',
-                'botocore>=1.6.0',
+                'boto3>=1.10.0',
+                'botocore>=1.13.26',
             ],
             'google': [
                 # 1.1.0 is the last version that supports Python 2.7

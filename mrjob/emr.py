@@ -250,6 +250,7 @@ if PY2:
     # this was introduced in Python 3.3
     TimeoutError = OSError
 
+
 class PoolTimeoutException(TimeoutError):
     pass
 
@@ -2706,8 +2707,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if max_in_pool or (keep_waiting and not cluster_ids['matching']):
                 jitter_seconds = randint(0, self._opts['pool_jitter_seconds'])
 
-                log.info('  waiting %d seconds and double-checking for '
-                          'newly created clusters...' % jitter_seconds)
+                log.info('  waiting %d seconds and double-checking for'
+                         ' newly created clusters...' % jitter_seconds)
                 sleep_or_time_out(jitter_seconds)
 
                 new_cluster_ids = self._list_cluster_ids_for_pooling(
@@ -3367,6 +3368,6 @@ def _build_instance_group(role, instance_type, num_instances, bid_price):
 def _plural(n):
     """Utility for logging messages"""
     if n == 1:
-         return ''
+        return ''
     else:
         return 's'

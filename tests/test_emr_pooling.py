@@ -111,7 +111,6 @@ class PoolMatchingBaseTestCase(MockBoto3TestCase):
 
         return cluster_id
 
-
     def _fleet_config(
             self, role='MASTER', instance_types=None,
             weighted_capacities=None,
@@ -392,7 +391,7 @@ class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_join_pool_with_matching_custom_ami_and_ami_version(self):
         cluster_id = self.make_pooled_cluster(image_id='ami-blanchin',
-                                                 image_version='5.10.0')
+                                              image_version='5.10.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
@@ -400,7 +399,7 @@ class AMIPoolMatchingTestCase(PoolMatchingBaseTestCase):
 
     def test_dont_join_pool_with_right_custom_ami_but_wrong_version(self):
         cluster_id = self.make_pooled_cluster(image_id='ami-blanchin',
-                                                 image_version='5.9.0')
+                                              image_version='5.9.0')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
@@ -1612,7 +1611,7 @@ class InstanceFleetPoolMatchingTestCase(PoolMatchingBaseTestCase):
         fleets = [self._fleet_config()]
 
         cluster_id = self.make_pooled_cluster(provision=False,
-                                                 instance_fleets=fleets)
+                                              instance_fleets=fleets)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -2096,7 +2095,6 @@ class MinAvailableOptsPoolMatchingTestCase(PoolMatchingBaseTestCase):
         ])
 
         self._ssh_run.assert_any_call('mockmaster', self.EXPECTED_CURL_ARGS)
-
 
     def test_available_virtual_cores_only(self):
         cluster_id = self.make_pooled_cluster(

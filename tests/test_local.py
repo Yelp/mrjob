@@ -637,7 +637,9 @@ class CommandSubstepTestCase(SandboxedTestCase):
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             r.run()
-            self.assertEqual(sum(int(l) for l in to_lines(r.cat_output())), 3)
+            self.assertEqual(
+                sum(int(line) for line in to_lines(r.cat_output())),
+                3)
 
 
 class FilterTestCase(SandboxedTestCase):

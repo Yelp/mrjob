@@ -4,6 +4,88 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.7.4:
+
+0.7.4
+-----
+
+Docker on EMR
+^^^^^^^^^^^^^
+
+This release adds support for Docker on EMR, which
+`was released with AMI version 6.0.0 <https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark-docker.html>`__.
+This is enabled by setting :mrjob-opt:`docker_image` to point at your image.
+
+There is also a :mrjob-opt:`docker_mounts` option, and, if you want to
+host your image on a private ECR repo instead of Docker Hub, a
+:mrjob-opt:`docker_client_config` option (though with AMIs 6.1.0 and later,
+you can also auto-authenticate to ECR; see
+`this page <https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-plan-docker.html>`__).
+
+As a result of adding Docker support, the default :mrjob-opt:`image_version`
+on EMR is 6.0.0. Also, on EMR and Dataproc we used to literally bootstrap
+mrjob by copying it to Python's root package directory, but as this won't
+put mrjob into a Docker image, mrjob is now bootstrapped via
+:mrjob-opt:`py_files`, like on every other runner.
+
+Concurrent Steps on EMR clusters
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This release also supports concurrent steps on EMR clusters, a feature
+introduced in AMI 5.28.0. The :mrjob-opt:`max_concurrent_steps` option
+controls both the concurrency level of a newly launched cluster, and how
+much concurrency we will accept when joining a pooled cluster.
+
+To prevent
+steps from the same job attempting to run simultaneously, mrjob will  now
+submit steps of a multi-step one at a time (after the previous one completes)
+on clusters running AMI 5.28.0 or later. This can be changed with the
+:mrjob-opt:`add_steps_in_batch` option.
+
+:py:meth:`~mrjob.emr.EMRJobRunner.get_job_steps` is now deprecated, as
+it can't fetch steps before they're submitted.
+
+Cluster Pooling
+^^^^^^^^^^^^^^^
+
+Cluster pooling can now join pooled clusters based on available CPU and
+memory reported by the YARN resource manager, rather than looking at number
+and type of instances in the cluster. You can enable this by setting
+:mrjob-opt:`min_available_mb` and/or :mrjob-opt:`min_available_virtual_cores`.
+For this feature to work, you must enable SSH (the :mrjob-opt:`ec2_key_pair`
+and :mrjob-opt:`ec2_key_pair_file` options).
+
+You can now control the size of your cluster pool with the
+:mrjob-opt:`max_clusters_in_pool` option. If a job wants to launch a new
+cluster in the pool but the pool is already "full," it will wait and try again
+until the pool is no longer full or it can join a cluster.
+
+Once a job
+determines that it is okay to add another cluster to the pool, it will
+wait a random number of seconds and try again. This way, if several pooled
+jobs launch simultaneously, they will be likely to stay within the maximum
+number of clusters rather than all launching their own. The random wait time
+can be controlled with :mrjob-opt:`pool_jitter_seconds`.
+
+By default, a job will wait forever to either join an existing cluster or
+create new one. You can make jobs give up and raise an exception with the
+:mrjob-opt:`pool_timeout_minutes` option.
+
+mrjob will now bypass the :mrjob-opt:`pool_wait_minutes` option if there is
+not a matching, active cluster to join. Basically, it won't wait if there
+is not a cluster to wait for. As with :mrjob-opt:`max_clusters_in_pool`,
+if a job determines there are no clusters to wait for, it will wait a
+random number of seconds and double-check before launching a new cluster.
+
+Library requirements
+^^^^^^^^^^^^^^^^^^^^
+
+To support concurrent
+steps, ``boto3`` must be at least version 1.10.0 and ``botocore`` must be at
+least version 1.13.16. The  ``google-cloud-dataproc`` library must
+be no greater than 1.1.0, to maintain compatibility with our code.
+
+
 .. _v0.7.3:
 
 0.7.3

@@ -3,6 +3,7 @@
 # Copyright 2015-2017 Yelp
 # Copyright 2018 Yelp and Contributors
 # Copyright 2019 Yelp
+# Copyright 2020 Affirm, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -637,7 +638,9 @@ class CommandSubstepTestCase(SandboxedTestCase):
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             r.run()
-            self.assertEqual(sum(int(l) for l in to_lines(r.cat_output())), 3)
+            self.assertEqual(
+                sum(int(line) for line in to_lines(r.cat_output())),
+                3)
 
 
 class FilterTestCase(SandboxedTestCase):

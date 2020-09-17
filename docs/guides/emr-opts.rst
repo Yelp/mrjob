@@ -327,6 +327,21 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
        deleted.
 
 .. mrjob-opt::
+   :config: max_concurrent_steps
+   :switch: --max-concurrent-steps
+   :type: :ref:`string <data-type-string>`
+   :set: emr
+   :default: 1
+
+   How many steps may an EMR cluster run at the same time? This affects both
+   clusters launched by our job, and, if using cluster pooling, which
+   clusters our job will join.
+
+   Prior to AMI 5.28.0, EMR clusters could only ever run one step at a time.
+
+   .. versionadded:: 0.7.4
+
+.. mrjob-opt::
     :config: release_label
     :switch: --release-label
     :type: :ref:`string <data-type-string>`
@@ -512,7 +527,9 @@ Docker
     :default: ``None``
 
     An ``hdfs://`` URI pointing to the client config, which is used to
-    authenticate with a private Docker registry (e.g. ECR).
+    authenticate with a private Docker registry (e.g. ECR). This is mostly
+    useful on AMIs prior to 6.1.0; otherwise you can use auto-authentication
+    (see `this page <https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-plan-docker.html>`__).
 
     See "Using ECR" on `this page <https://aws.amazon.com/blogs/big-data/run-spark-applications-with-docker-using-amazon-emr-6-0-0-beta/>`__
     for information about how to fetch working credentials. Because ECR

@@ -1,5 +1,27 @@
-v0.7.4, 2020-??-?? -- ???
+v0.7.4, 2020-09-?? -- ???
+ * library requirement changes:
+   * [emr] requires boto3>=1.10.0, botocore>=1.13.26 (#2193)
+   * [google] requires google-cloud-dataproc<=1.1.0
+ * cloud runners (Dataproc, EMR):
+   * mrjob is now bootstrapped through py_files, not at bootstrap time
  * EMR Runner:
+   * default image_version is now 6.0.0
+   * support Docker on 6.x AMIs (#2179)
+     * added docker_client_config, docker_image, docker_mounts opts
+   * allow concurrent steps on EMR clusters (#2185)
+     * max_concurrent_steps option
+     * for multi-step jobs, can add steps to cluster one at a time
+       * by default, does this if cluster supports concurrent steps
+       * can be controlled directly with add_steps_in_batch option
+   * pooling:
+     * join pooled clusters based on YARN cluster metrics (#2191)
+       * min_available_mb, min_available_virtual_cores opts
+     * upgrades to timing and cluster management:
+       * max_clusters_in_pool option (#2192)
+       * pool_timeout_minutes (#2199)
+       * pool_jitter_seconds to prevent race conditions (#2200)
+         * wait for S3 sync after uploading to S3, not before launching cluster
+       * don't wait pool_wait_minutes if no clusters to wait for (#2198)
    * get_job_steps() is deprecated
 
 v0.7.3, 2020-06-05 -- API-efficient cluster pooling

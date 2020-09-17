@@ -1,4 +1,4 @@
-v0.7.4, 2020-09-?? -- ???
+v0.7.4, 2020-09-17 -- Docker, concurrent steps, and pooling
  * library requirement changes:
    * [emr] requires boto3>=1.10.0, botocore>=1.13.26 (#2193)
    * [google] requires google-cloud-dataproc<=1.1.0

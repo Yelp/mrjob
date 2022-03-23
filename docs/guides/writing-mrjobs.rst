@@ -583,15 +583,6 @@ URIs of input files) to Hadoop, and instructs Hadoop to send one line to
 each mapper. In most cases, this should be seamless, even to the point of
 telling you which file was being read when a task fails.
 
-By default, files in recognized compressed formats (`.gz`, `.bz2`) are 
-decompressed after being download. If you want to handle the original
-file directly and unpack the contents in your mapper, you can set 
-`unpack_archives: false` in your runner configuration::
-
-   runners:
-       hadoop:
-           unpack_archives: false
-
 
 .. warning::
 
@@ -599,6 +590,22 @@ file directly and unpack the contents in your mapper, you can set
    files to the local filesystem, which means Hadoop has to invoke
    itself. If your cluster has tightly tuned memory requirements, this can
    sometimes cause an out-of-memory error.
+
+
+Passing raw archive files to your job 
+
+.. versionadded:: 0.?.?
+
+By default, files in recognized compressed formats (e.g. `.gz`, `.bz2`) are 
+decompressed after being download. If you want to handle the original
+file directly in your mapper, you can set `unpack_archives: false` in your 
+runner configuration. For example, to configure this setting for the Hadoop 
+runner, use::
+
+   runners:
+       hadoop:
+           unpack_archives: false
+
 
 .. _non-hadoop-streaming-jar-steps:
 

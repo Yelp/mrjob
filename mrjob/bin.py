@@ -139,6 +139,7 @@ class MRJobBinRunner(MRJobRunner):
             super(MRJobBinRunner, cls)._default_opts(),
             dict(
                 read_logs=True,
+                unpack_archives=True
             )
         )
 
@@ -689,17 +690,18 @@ class MRJobBinRunner(MRJobRunner):
         lines.append('')
 
         # unpack .bz2 and .gz files
-        lines.append('  # if input file is compressed, unpack it')
-        lines.append('  case $INPUT_PATH in')
-        for ext, cmd in self._manifest_uncompress_commands():
-            lines.append('    *.%s)' % ext)
-            lines.append('      %s $INPUT_PATH' % cmd)
-            lines.append("      INPUT_PATH="
-                         r"$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
-            lines.append('      ;;')
-        lines.append('  esac')
-        lines.append('} 1>&2')
-        lines.append('')
+        if self._opts['unpack_archives']:
+            lines.append('  # if input file is compressed, unpack it')
+            lines.append('  case $INPUT_PATH in')
+            for ext, cmd in self._manifest_uncompress_commands():
+                lines.append('    *.%s)' % ext)
+                lines.append('      %s $INPUT_PATH' % cmd)
+                lines.append("      INPUT_PATH="
+                            r"$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
+                lines.append('      ;;')
+            lines.append('  esac')
+            lines.append('} 1>&2')
+            lines.append('')
 
         # don't exit if script fails
         lines.append('# run our mrjob script')

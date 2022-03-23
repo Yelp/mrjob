@@ -583,6 +583,16 @@ URIs of input files) to Hadoop, and instructs Hadoop to send one line to
 each mapper. In most cases, this should be seamless, even to the point of
 telling you which file was being read when a task fails.
 
+By default, files in recognized compressed formats (`.gz`, `.bz2`) are 
+decompressed after being download. If you want to handle the original
+file directly and unpack the contents in your mapper, you can set 
+`unpack_archives: false` in your runner configuration.
+
+
+   runners:
+       hadoop:
+           unpack_archives: false
+
 .. warning::
 
    For all runners except EMR, mrjob uses :command:`hadoop fs` to download

@@ -583,7 +583,6 @@ URIs of input files) to Hadoop, and instructs Hadoop to send one line to
 each mapper. In most cases, this should be seamless, even to the point of
 telling you which file was being read when a task fails.
 
-
 .. warning::
 
    For all runners except EMR, mrjob uses :command:`hadoop fs` to download

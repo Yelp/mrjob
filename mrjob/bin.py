@@ -700,8 +700,9 @@ class MRJobBinRunner(MRJobRunner):
                             r"$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
                 lines.append('      ;;')
             lines.append('  esac')
-            lines.append('} 1>&2')
-            lines.append('')
+
+        lines.append('} 1>&2')
+        lines.append('')
 
         # don't exit if script fails
         lines.append('# run our mrjob script')

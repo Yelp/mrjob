@@ -586,12 +586,12 @@ telling you which file was being read when a task fails.
 By default, files in recognized compressed formats (`.gz`, `.bz2`) are 
 decompressed after being download. If you want to handle the original
 file directly and unpack the contents in your mapper, you can set 
-`unpack_archives: false` in your runner configuration.
-
+`unpack_archives: false` in your runner configuration::
 
    runners:
        hadoop:
            unpack_archives: false
+
 
 .. warning::
 

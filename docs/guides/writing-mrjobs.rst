@@ -593,6 +593,7 @@ telling you which file was being read when a task fails.
 
 
 Passing raw archive files to your job 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. versionadded:: 0.?.?
 

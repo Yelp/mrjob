@@ -1411,6 +1411,18 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    unpack_archives=dict(
+        switches=[
+            (['--unpack-archives'], dict(
+                action='store_true',
+                help=('Unpack archives when processing entire files (the default).')
+            )),
+            (['--no-unpack-archives'], dict(
+                action='store_false',
+                help="Don't unpack archive formats when processing entire files."
+            )),
+        ],
+    ),
     upload_archives=dict(
         combiner=combine_path_lists,
         switches=[

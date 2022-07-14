@@ -47,7 +47,7 @@ Some terminology:
 An "ngram" is a word or phrase. "foo" is a 1-gram; "foo bar baz" is a 3-gram.
 
 "tf" refers to term frequency, that is, the number of times an ngram appears.
-"df" referse to document frequency, that is, the number of documents an ngram
+"df" refers to document frequency, that is, the number of documents an ngram
 appears in at least once.
 """
 from collections import defaultdict

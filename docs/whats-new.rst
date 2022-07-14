@@ -248,7 +248,7 @@ miscellanous tweaks
 The :command:`mrjob audit-emr-usage` subcommand no longer attempts to read
 cluster pool names from clusters launched by mrjob v0.5.x.
 
-Method arguments in filesystem classes (in ``mrjob.fs``) are now consistenly
+Method arguments in filesystem classes (in ``mrjob.fs``) are now consistently
 named. This probably won't matter in practice, as
 ``runner.fs <mrjob.runner.MRJobRunner.fs>`` is always a
 :py:class:`~mrjob.fs.composite.CompositeFilesystem` anyhow.

@@ -32,7 +32,8 @@ try:
             'google': [
                 # 1.1.0 is the last version that supports Python 2.7
                 'google-cloud-dataproc>=0.3.0,<=1.1.0',
-                'google-cloud-logging>=1.9.0',
+                # 1.15.1 is the last version that supports Python 2.7
+                'google-cloud-logging>=1.9.0,<=1.15.1',
                 'google-cloud-storage>=1.13.1',
             ],
             'rapidjson': ['python-rapidjson'],

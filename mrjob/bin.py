@@ -20,8 +20,8 @@
 import logging
 import os
 import os.path
-import pipes
 import re
+import shlex
 import sys
 from mrjob.py2 import PY2
 from platform import python_implementation
@@ -468,8 +468,8 @@ class MRJobBinRunner(MRJobRunner):
                     'archive_file', path)
 
                 setup.append(_unarchive_cmd(path) % dict(
-                    file=pipes.quote(archive_file_name),
-                    dir=pipes.quote(name)))
+                    file=shlex.quote(archive_file_name),
+                    dir=shlex.quote(name)))
 
         setup.extend(self._setup)
 
@@ -633,7 +633,7 @@ class MRJobBinRunner(MRJobRunner):
                 if isinstance(token, dict):
                     # it's a path dictionary
                     line += '$__mrjob_PWD/'
-                    line += pipes.quote(self._working_dir_mgr.name(**token))
+                    line += shlex.quote(self._working_dir_mgr.name(**token))
                 else:
                     # it's raw script
                     line += token

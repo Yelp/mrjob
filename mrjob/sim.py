@@ -62,7 +62,7 @@ class SimMRJobRunner(MRJobRunner):
         'partitioner',
     ]
 
-    # options that we ignore becaue they require real Hadoop.
+    # options that we ignore because they require real Hadoop.
     _IGNORED_HADOOP_OPTS = [
         'libjars',
     ]

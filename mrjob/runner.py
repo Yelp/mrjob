@@ -105,6 +105,7 @@ class MRJobRunner(object):
         'py_files',
         'read_logs',
         'setup',
+        'unpack_archives',
         'upload_archives',
         'upload_dirs',
         'upload_files'

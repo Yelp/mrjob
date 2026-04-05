@@ -590,6 +590,23 @@ telling you which file was being read when a task fails.
    itself. If your cluster has tightly tuned memory requirements, this can
    sometimes cause an out-of-memory error.
 
+
+Passing raw archive files to your job 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionadded:: 0.?.?
+
+By default, files in recognized compressed formats (e.g. `.gz`, `.bz2`) are 
+decompressed after being download. If you want to handle the original
+file directly in your mapper, you can set `unpack_archives: false` in your 
+runner configuration. For example, to configure this setting for the Hadoop 
+runner, use::
+
+   runners:
+       hadoop:
+           unpack_archives: false
+
+
 .. _non-hadoop-streaming-jar-steps:
 
 Jar steps

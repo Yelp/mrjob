@@ -20,7 +20,6 @@
 import logging
 import os
 import os.path
-import pipes
 import random
 import shlex
 import shutil
@@ -50,7 +49,7 @@ def cmd_line(args):
     """build a command line that works in a shell.
     """
     args = [str(x) for x in args]
-    return ' '.join(pipes.quote(x) for x in args)
+    return ' '.join(shlex.quote(x) for x in args)
 
 
 def expand_path(path):

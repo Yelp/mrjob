@@ -40,6 +40,7 @@ try:
             'ujson': ['ujson'],
         },
         'install_requires': [
+             'setuptools',
              'PyYAML>=3.10',
         ],
         'provides': ['mrjob'],

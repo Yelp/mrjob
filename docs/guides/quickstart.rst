@@ -126,7 +126,7 @@ Your input files can come from HDFS if you're using Hadoop, or GCS if you're
 using Dataproc::
 
   $ python my_job.py -r dataproc gcs://my-inputs/input.txt
-  $ python my_job.py -r hadoop hdfs://my_home/input.txt
+  $ python my_job.py -r hadoop hdfs:///my_home/input.txt # Assuming your input is located at /my_home/input.txt
 
 
 If you have Elastic MapReduce configured (see :doc:`emr-quickstart`), you can
@@ -136,7 +136,7 @@ Your input files can come from HDFS if you're using Hadoop, or S3 if you're
 using EMR::
 
   $ python my_job.py -r emr s3://my-inputs/input.txt
-  $ python my_job.py -r hadoop hdfs://my_home/input.txt
+  $ python my_job.py -r hadoop hdfs:///my_home/input.txt # If the input file is located /my_home/input.txt in hdfs
 
 If your code spans multiple files, see :ref:`cookbook-src-tree-pythonpath`.
 

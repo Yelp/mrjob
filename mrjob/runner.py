@@ -329,7 +329,7 @@ class MRJobRunner(object):
     def _default_opts(cls):
         try:
             owner = getpass.getuser()
-        except:
+        except Exception:
             owner = None
 
         return dict(

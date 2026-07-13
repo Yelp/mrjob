@@ -158,7 +158,7 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
         # but it makes our automated tasks run out of file descriptors.
 
             pool.close()
-        except:
+        except Exception:
             # if there's an error in one task, terminate all others
             pool.terminate()
             raise

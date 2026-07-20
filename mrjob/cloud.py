@@ -16,7 +16,7 @@
 # limitations under the License.
 import logging
 import os
-import pipes
+import shlex
 import socket
 import random
 import signal
@@ -276,9 +276,9 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
             out.append('  %s %s $__mrjob_PWD/%s' %
-                       (cp_to_local, pipes.quote(uri), pipes.quote(name)))
+                       (cp_to_local, shlex.quote(uri), shlex.quote(name)))
             # imitate Hadoop Distributed Cache (see #1602)
-            out.append('  chmod u+rx $__mrjob_PWD/%s' % pipes.quote(name))
+            out.append('  chmod u+rx $__mrjob_PWD/%s' % shlex.quote(name))
             out.append('')
 
         # download and unarchive archives
@@ -297,19 +297,19 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                     'archive_file', path)
 
                 # copy file to tmp dir
-                quoted_archive_path = '$__mrjob_TMP/%s' % pipes.quote(
+                quoted_archive_path = '$__mrjob_TMP/%s' % shlex.quote(
                     archive_file_name)
 
                 out.append('  %s %s %s' % (
-                    cp_to_local, pipes.quote(uri), quoted_archive_path))
+                    cp_to_local, shlex.quote(uri), quoted_archive_path))
 
                 out.append('  ' + _unarchive_cmd(path) % dict(
                     file=quoted_archive_path,
-                    dir='$__mrjob_PWD/' + pipes.quote(name)))
+                    dir='$__mrjob_PWD/' + shlex.quote(name)))
 
                 # imitate Hadoop Distributed Cache (see #1602)
                 out.append(
-                    '  chmod u+rx -R $__mrjob_PWD/%s' % pipes.quote(name))
+                    '  chmod u+rx -R $__mrjob_PWD/%s' % shlex.quote(name))
 
                 out.append('')
 
@@ -323,7 +323,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                 if isinstance(token, dict):
                     # it's a path dictionary
                     line += '$__mrjob_PWD/'
-                    line += pipes.quote(self._bootstrap_dir_mgr.name(**token))
+                    line += shlex.quote(self._bootstrap_dir_mgr.name(**token))
                 else:
                     # it's raw script
                     line += token
